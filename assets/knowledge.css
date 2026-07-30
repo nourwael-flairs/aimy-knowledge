@@ -40,6 +40,22 @@
 ═══════════════════════════════════════════════ */
 input, select, textarea { font-family: inherit; }
 
+/* <strong> pinned to a weight we actually load.
+   The UA gives <strong> `font-weight: bolder`, which is RELATIVE: inside a
+   600 parent it computes to 900. Briefing conclusions emphasise their key
+   figures with <strong> inside .bcard-title (600), so every one of them asked
+   for a 900 face the webfont request never included — the browser then
+   substitutes 800 and may synthesise the difference on top, which is a
+   heavier, muddier stroke than the real cut. 800 is the same face it was
+   already landing on, now reached deterministically. */
+strong, b { font-weight: var(--fw-extrabold); }
+
+/* Bare <code> falls back to the UA's generic monospace, so the ingestion-error
+   codes on Governance rendered in a different typeface from every other
+   monospaced string in the product. The library styles .copy-field code and
+   .ds-code but never the element itself. */
+code { font-family: var(--font-mono); }
+
 /* Element-selector specificity (0,0,1), so any component class that sets these
    still wins — .btn, .entry-action, .filter-chip, .ds-theme-toggle and the
    rest are untouched. What it removes is only what the UA supplies where no
