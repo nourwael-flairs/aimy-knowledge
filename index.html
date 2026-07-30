@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AiMY Knowledge — Dashboard</title>
+  <title>AiMY Knowledge</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Poppins:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="assets/aimy-ds.css" />
-  <link rel="stylesheet" href="assets/knowledge.css" />
+  <link rel="stylesheet" href="assets/knowledge.css?v=13" />
 
   <script>
     /* Apply saved theme before paint to avoid flash. Default = dark. */
@@ -22,7 +22,7 @@
     })();
   </script>
 </head>
-<body data-page="dashboard">
+<body data-page="workbench">
 
 <!-- AiMY logo symbols — inlined per page because external <use href> fails under file://
      Identical to design-system/index.html -->
@@ -106,114 +106,91 @@
 <div class="app-body">
 
   <!-- ══════════════════════════════════════════════
-       SIDEBAR — five items, two tiers (§4)
+       SIDEBAR — the briefing. Not chat history, and not navigation.
+
+       The IA is one item, so there is nothing to navigate to. What the rail
+       carries instead is the briefing: who you are, what is yours, what needs
+       you, and where you left off. Every item in it is a FILTER LINK — it sets
+       the surface's state rather than going somewhere else. That is what lets
+       the briefing and the filters speak one language, and it is why four
+       pages could collapse into one.
+
+       Doctrine §2.1 — brief before conversation — still holds: the briefing
+       lands first and earns attention. It moved from a page to a persistent
+       rail. Declared as a deviation in README.md rather than smuggled through.
   ══════════════════════════════════════════════ -->
-  <nav class="app-sidebar" aria-label="Knowledge">
-    <div class="sidebar-nav">
-      <span class="sidebar-section-label">Primary</span>
-
-      <a class="nav-item active" href="index.html" aria-current="page">
-        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        Dashboard
-      </a>
-      <a class="nav-item" href="workbench.html">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
-        Workbench
-      </a>
-      <a class="nav-item" href="requests.html">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-        Requests
-        <span class="nav-count" hidden></span>
-      </a>
-
-      <span class="sidebar-section-label">Configure</span>
-
-      <a class="nav-item" href="governance.html">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Governance<span class="nav-count" hidden></span>
-      </a>
-      <a class="nav-item" href="settings.html">
-        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-        Settings
-      </a>
-    </div>
+  <nav class="app-sidebar" aria-label="Briefing">
+    <div class="brief" id="brief"></div>
   </nav>
 
   <!-- ══════════════════════════════════════════════
-       MAIN — the briefing (§10)
+       MAIN — filters → grid → viewer → editor, all in place
   ══════════════════════════════════════════════ -->
   <main class="app-main">
-    <div class="page-scroll">
+    <div class="page-scroll" id="pageScroll">
       <div class="page-inner">
 
-<!-- ══════════════════════════════════════════════
-     PROTOTYPE CONTROLS — not product UI.
-     §11 rejects an explicit role toggle on the surface. This exists only to
-     make derived composition (§9.2) and the four non-happy states (§10.5)
-     inspectable without a backend, and is styled as a dev tool so it cannot
-     be mistaken for product chrome.
-══════════════════════════════════════════════ -->
-<div class="proto-bar">
-  <span class="proto-bar-label">proto · compose as</span>
-  <a href="?as=owner" data-proto-as="owner">owner</a>
-  <a href="?as=consumer" data-proto-as="consumer">consumer</a>
-  <a href="?as=limited" data-proto-as="limited">no-signals</a>
-  <span class="proto-bar-label" style="margin-left:6px">state</span>
-  <a href="?state=loading">loading</a>
-  <a href="?state=empty">empty</a>
-  <a href="?state=error">error</a>
-  <a href="?state=ai-down">ai-down</a>
-</div>
+      <!-- The filters, visible. Chat sets these same controls, so what AiMY
+           understood is shown by the controls lighting up rather than said in
+           prose underneath them. -->
+      <div id="filterBar"></div>
 
+      <!-- Only for what a dropdown cannot say: several values on one axis,
+           free text, an answer's document set, a custom property. -->
+      <div id="chipBar"></div>
 
-      <div class="k-scope-strip k-hidden" id="scopeStrip" aria-live="polite"></div>
-
-      <header class="page-head">
-        <div class="page-head-row">
-          <div>
-            <h1 class="page-title">Corpus briefing</h1>
-          </div>
-          <div class="page-head-end">
-            <span class="page-stamp" id="briefingStamp"></span>
-          </div>
-        </div>
-      </header>
-
-      <!-- §9.3 — stated only when composition has degraded to entitlement-only -->
-      <div class="banner warn k-hidden" id="compositionBanner" role="status"></div>
-
-      <!-- Blocks render here in priority order (§10.5) -->
-      <div class="briefing-grid" id="briefingGrid" aria-live="polite" aria-busy="true"></div>
-
-      <!-- §10.3 — a briefing that silently drops content teaches people not to trust it -->
-      <div class="inline-note warn k-hidden" id="displacementNote" style="margin-top:16px"></div>
+      <!-- The surface: always the grid. Documents open over it, never instead
+           of it. -->
+      <div id="wbStage"></div>
 
       </div>
     </div>
 
-    <!-- ══ Canvas entry ══ -->
+    <!-- ══ The settings sheet. Same overlay pattern as a document, because it
+         is the same kind of thing: something you open over the work, act on,
+         and close. `?settings=source:confluence` — addressable, so a setting
+         can be linked to like everything else here. ══ -->
+    <div class="doc-overlay" id="setOverlay" role="dialog" aria-modal="true" aria-label="Settings" hidden>
+      <div class="doc-sheet is-settings" id="setSheet"></div>
+    </div>
+
+    <!-- ══ The document overlay — viewer and editor.
+         Same frame as the canvas: absolute inside .app-main, blurred backdrop,
+         the shell stays interactive, Escape closes, focus returns to the card.
+         `?doc=` and `&mode=` still drive it — the modal is how it renders, not
+         what it is. ══ -->
+    <div class="doc-overlay" id="docOverlay" role="dialog" aria-modal="true" aria-label="Document" hidden>
+      <div class="doc-sheet" id="docSheet"></div>
+    </div>
+
+    <!-- ══ The input. Not a chat box — it drives the page. Four routes.
+         Fixed and centred on the WINDOW, not on the main column. ══ -->
     <div class="aimy-float-wrap" id="aimyFloatWrap">
       <div class="filter-tray" id="floatFilterTray">
         <div class="filter-tray-inner">
-          <span class="filter-tray-label">Scope</span>
-          <button class="filter-chip" data-filter-chip>Policies</button>
-          <button class="filter-chip" data-filter-chip>Support</button>
-          <button class="filter-chip" data-filter-chip>Verified only</button>
-          <button class="filter-chip" data-filter-chip>Official docs only</button>
-          <button class="filter-chip" data-clear-filter-chips>Reset all</button>
+          <button class="filter-chip" data-quick="trust=expired">Expired</button>
+          <button class="filter-chip" data-quick="trust=due">Due</button>
+          <button class="filter-chip" data-quick="mine=1">Mine</button>
         </div>
       </div>
 
       <div class="aimy-float-bar" id="aimyFloatBar">
-        <div class="aimy-float-icon">
-          <span class="float-badge" aria-label="3 unread">3</span>
+        <!-- Also the way back. Opening a document closes the canvas, and this
+             mark reopens the same thread — it already carries the unread count,
+             so it is already the thing on screen that means AiMY has something
+             for you. -->
+        <button class="aimy-float-icon" id="canvasOpen" type="button" aria-label="Open the AiMY canvas">
+          <!-- Counts what AiMY did while you were reading something else. The
+               canvas collects rather than interrupts, so this is how the record
+               announces itself. -->
+          <span class="float-badge" hidden aria-label="unread in the canvas">0</span>
           <svg width="18" height="20" viewBox="0 0 18 20"><use href="#aimy-logo-small"/></svg>
-        </div>
+        </button>
         <input class="aimy-float-input" id="floatInput" type="text"
-               placeholder="Ask about the corpus, or name something you already know…"
-               autocomplete="off" spellcheck="false" aria-label="Ask AiMY" />
-        <span class="aimy-float-hint">Enter to send</span>
-        <button class="aimy-float-send" id="floatSend" aria-label="Send to AiMY">
+               placeholder="Ask, filter, or name a document…"
+               autocomplete="off" spellcheck="false" aria-label="Drive the surface" />
+        <span class="aimy-float-hint">Enter to run</span>
+        <button class="aimy-float-send" id="floatSend" aria-label="Run">
           <svg class="send-icon" viewBox="0 0 14 14" fill="none" width="14" height="14">
             <path d="M6.12 7.88L12.25 1.75M6.2 8.07l1.533 3.942c.135.347.203.521.3.572a.3.3 0 00.3 0c.097-.05.165-.224.3-.572L12.447 2.16c.122-.314.183-.47.15-.57a.3.3 0 00-.21-.21c-.1-.034-.257.027-.57.15L1.99 5.4c-.347.135-.52.203-.571.3a.3.3 0 000 .3c.05.097.224.165.571.3L5.933 7.8c.07.027.106.041.135.062a.3.3 0 01.062.062c.022.03.036.066.063.135z" stroke="white" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
@@ -222,7 +199,8 @@
       </div>
     </div>
 
-    <!-- ══ Canvas overlay — non-blocking, shell stays interactive (§6) ══ -->
+    <!-- ══ Canvas overlay — opens for questions and generative work only.
+         Not for filtering, not for opening a known document, not for writes. ══ -->
     <div class="aimy-overlay" id="aimyOverlay" role="dialog" aria-label="AiMY Canvas">
       <div class="overlay-badge">
         <svg width="11" height="11" viewBox="0 0 18 20"><use href="#aimy-logo-small"/></svg>
@@ -244,9 +222,9 @@
 
       <div class="overlay-thread" id="overlayThread" aria-live="polite">
         <div class="overlay-suggestions" id="overlaySuggestions">
-          <button class="overlay-sugg-chip">Which expired articles carried the most questions?</button>
-          <button class="overlay-sugg-chip">What is the corpus weakest on right now?</button>
-          <button class="overlay-sugg-chip">Why did the refund answers come out at low confidence?</button>
+          <button class="overlay-sugg-chip">Can EU customers get a refund after activating?</button>
+          <button class="overlay-sugg-chip">What does the corpus say about data residency?</button>
+          <button class="overlay-sugg-chip">Which articles contradict each other on refunds?</button>
         </div>
       </div>
 
@@ -268,12 +246,48 @@
   </main>
 </div>
 
+<!-- Drop a file anywhere on the workbench. Covers the whole window, because
+     asking someone to aim at a target is the thing drag and drop exists to avoid. -->
+<div class="drop-layer" id="dropLayer" hidden aria-hidden="true">
+  <div class="drop-card">
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+    <span class="drop-title">Drop to add to Knowledge</span>
+    <span class="drop-sub">A draft per file, owned by you. Nothing goes live until you say so.</span>
+  </div>
+</div>
+
 <!-- Commit surfaces and toasts mount here -->
 <div id="commitHost"></div>
 <div id="toastHost"></div>
 
+<!-- ══════════════════════════════════════════════
+     PROTOTYPE CONTROLS — not product UI.
+
+     Collapsed to an icon in the bottom-right corner, expanding upward on click.
+     Fixed, so it can never push anything; lifted above the input band on the
+     widths where the two would otherwise overlap, because the bottom-centre
+     band belongs to the input and the toast and a dev tool does not get to
+     take it.
+
+     Its contents are rendered from the live corpus rather than hard-coded, so
+     every link resolves to a document that really is in that state — which is
+     the point of it at this stage: reaching a superseded document with nothing
+     linked, or a source that is down, should be one click and not a hunt.
+══════════════════════════════════════════════ -->
+<div class="proto" id="proto">
+  <div class="proto-panel" id="protoPanel" hidden></div>
+  <button class="proto-toggle" id="protoToggle" type="button"
+          aria-expanded="false" aria-controls="protoPanel"
+          aria-label="Prototype controls" title="Prototype controls">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>
+    </svg>
+  </button>
+</div>
+
 
 <script src="assets/aimy-ds.js"></script>
-<script src="assets/knowledge.js"></script>
+<script src="assets/knowledge.js?v=13"></script>
 </body>
 </html>

@@ -1,14 +1,21 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   knowledge.js — AiMY Knowledge v2 product behaviour
-   ───────────────────────────────────────────────────────────────────────
-   Owns: briefing composition, entry-mode routing, the canvas, the working
-   set, and retrieval routing. Owns no component styling — every class
-   named here resolves to an entry in the design system.
+   knowledge.js — AiMY Knowledge v2
 
-   Prototype scope: there is no backend. Corpus, profiles, and timings are
-   fixtures. Everything that would be a platform capability is simulated at
-   the seam where it would really sit, and said out loud where the direction
-   requires the surface to admit a limit (§9.3, §12).
+   One surface. The URL is the state, and the only state: every filter, the
+   open document, and the view mode live in it, which is what makes the page
+   drivable by an agent as well as by a person.
+
+   The input is not a chat box. It routes on the shape of what was typed, into
+   one of four classified entry modes:
+
+     filter-like     → mutates the URL, the grid refilters      · direct
+     a known title   → opens that document in place             · direct
+     a question      → opens the canvas with a grounded answer  · investigate
+     a write         → stages a commit surface, changes nothing · review
+
+   Prototype scope: there is no backend. The corpus, the user, the source
+   health and the timings are fixtures. Everything that would be a platform
+   capability is simulated at the seam where it would really sit.
    ═══════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -18,25 +25,12 @@
   ═══════════════════════════════════════════════ */
   const $  = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
-  /* esc() every value that could vary — titles, names, anything from a record.
-     A handful of fields are deliberately authored AS markup in this file and
-     are interpolated raw: a decision's `consequence`, a governed change's
-     `rationale` and `blast`. Escaping those printed the tags on screen. If any
-     of them ever becomes user- or backend-supplied, it has to be escaped and
-     the emphasis moved into the template. */
-  const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const params = new URLSearchParams(location.search);
 
-  /* Icons. Stroke-only, one cohesive set, sized by the component that holds
-     them — never coloured here, so semantic classes keep control (Level 3). */
   /* Icons ALWAYS carry width/height. An <svg> with a viewBox and no dimensions
      is a replaced element with no intrinsic size — inside any container that
-     does not size it in CSS it expands to fill, which is how a 14px document
-     glyph became a 350px illustration in the source list. Only some components
-     size their child svg (.td-row, .ss-effect, .dv-rel-item do; .source-item,
-     .inline-note, .agg-row and .banner do not), so the attribute is the only
-     reliable default. CSS still wins wherever a component sets a size. */
+     does not size it in CSS it expands to fill. */
   const svg = (d, w, size) =>
     `<svg viewBox="0 0 24 24" width="${size || 14}" height="${size || 14}" ` +
     `fill="none" stroke="currentColor" stroke-width="${w || 2.2}" ` +
@@ -66,629 +60,2389 @@
     flag:     svg('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>'),
     quote:    svg('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>'),
     left:     svg('<path d="M15 18l-6-6 6-6"/>'),
-    pen:      svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>')
+    pen:      svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>'),
+    plus:     svg('<path d="M12 5v14M5 12h14"/>', 2.4),
+    tag:      svg('<path d="M20.6 13.4L12 22l-9-9V3h10l7.6 7.6a2 2 0 010 2.8z"/><path d="M7.5 7.5h.01"/>'),
+    plug:     svg('<path d="M9 2v6M15 2v6"/><path d="M6 8h12v3a6 6 0 01-12 0z"/><path d="M12 17v5"/>'),
+    box:      svg('<path d="M21 8v13H3V8"/><rect x="1" y="3" width="22" height="5" rx="1"/><path d="M10 12h4"/>')
   };
 
-  /* Trust state — a required field on every knowledge object (§6.2).
-     Semantic tokens only, no --accent, so it survives being cited inside a
-     re-themed host surface (§1.1, §8.1). */
-  const TRUST = {
-    verified:   { label: 'Verified',   ico: ICO.shield,   excluded: false },
-    due:        { label: 'Due',        ico: ICO.clock,    excluded: false },
-    expired:    { label: 'Expired',    ico: ICO.slash,    excluded: true  },
-    unverified: { label: 'Unverified', ico: ICO.question, excluded: false },
-    superseded: { label: 'Superseded', ico: ICO.arrow,    excluded: true  }
-  };
-  function trustState(value) {
-    const t = TRUST[value];
-    return `<span class="trust-state ts-${value}${t.excluded ? ' is-excluded' : ''}" ` +
-           `data-trust-state="${value}">${t.ico}${t.label}</span>`;
-  }
-
-  /* Work state — the six canonical values. The label may be a domain alias
-     (handled/blocked); the canonical value stays on the attribute (§2.3). */
-  function workState(value, label) {
-    return `<span class="work-state ws-${value}" data-work-state="${value}">` +
-           `<span class="ws-dot"></span>${esc(label || value[0].toUpperCase() + value.slice(1))}</span>`;
-  }
-
-  /* Every action carries its entry mode. An unclassified action fails review
-     (§3), so this is the only way an action is built in this file. */
-  /* The AiMY mark. A prepared prompt is AiMY composing the question, so the
-     mark is more truthful than a generic speech bubble — and it matches the
-     library, which uses this symbol everywhere AiMY is the actor rather than
-     a chat metaphor. Carries its own gradient, so it ignores currentColor. */
   const AIMY_MARK = (w, h) =>
     `<svg width="${w || 12}" height="${h || 14}" viewBox="0 0 18 20" aria-hidden="true"><use href="#aimy-logo-small"/></svg>`;
 
+  /* ═══════════════════════════════════════════════
+     STATUS — computed, never attested
+
+     The previous model was Verified / Due / Expired: a claim that a named
+     person confirmed this content on a date. Nobody does that. These are the
+     company's knowledge documents, used across the ecosystem — there is no
+     author submitting and no reviewer approving, so a badge that implied one
+     was describing a ritual the product does not have.
+
+     Every value below is derived from something the system already knows.
+     Precedence is top to bottom: the first that applies is the one shown,
+     because one badge you can trust beats five you have to reconcile.
+  ═══════════════════════════════════════════════ */
+  const UNUSED_DAYS = 90;
+
+  /* `tone` maps onto the library's state pill, which carries the colour ramp.
+     The class is named for trust; what it actually implements is a tone-bearing
+     status pill, and reusing it beats writing a parallel one. See ../GAPS.md. */
+  const STATUS = {
+    superseded:  { label: 'Superseded',  ico: ICO.arrow,    tone: 'superseded', excluded: true,
+                   why: 'A newer document replaced it.' },
+    outdated:    { label: 'Out of date', ico: ICO.refresh,  tone: 'expired',    excluded: false,
+                   why: 'The source changed after our copy.' },
+    conflicting: { label: 'Conflicting', ico: ICO.warn,     tone: 'expired',    excluded: false,
+                   why: 'It disagrees with another document.' },
+    draft:       { label: 'Draft',       ico: ICO.pen,      tone: 'due',        excluded: false,
+                   why: 'Written but not published. The owner says who wrote it.' },
+    unowned:     { label: 'Unowned',     ico: ICO.question, tone: 'unverified', excluded: false,   // library tone name; see ../GAPS.md
+                   why: 'Nobody is accountable for it.' },
+    unused:      { label: 'Unused',      ico: ICO.clock,    tone: 'due',        excluded: false,
+                   why: 'Nothing has cited or opened it in three months.' },
+    current:     { label: 'Current',     ico: ICO.check,    tone: 'verified',   excluded: false,
+                   why: 'In use, owned, and matching its source.' }
+  };
+
+  function statusOf(o) {
+    /* A person can overrule the computation, and when they have, that is the
+       answer. It is marked wherever it shows: an override you cannot see is
+       indistinguishable from a fact, which is the whole failure of the
+       attestation model this replaced. */
+    if (o.statusSet) return o.statusSet;
+    const r = RELATED[o.id];
+    if (r && r.supersededBy) return 'superseded';
+    /* Only meaningful where there is an upstream to fall behind. */
+    if (o.src !== 'upload' && o.xu < o.upd) return 'outdated';
+    if (r && r.contradicts && r.contradicts.length) return 'conflicting';
+    if (o.work === 'drafted') return 'draft';
+    if (o.owner === 'Unassigned') return 'unowned';
+    if (o.used > UNUSED_DAYS) return 'unused';
+    return 'current';
+  }
+
+  function statusBadge(value, byHand) {
+    const s = STATUS[value];
+    return `<span class="trust-state ts-${s.tone}${s.excluded ? ' is-excluded' : ''}${byHand ? ' is-pinned' : ''}" ` +
+           `data-status="${value}" title="${esc(byHand ? 'Set by hand. ' + byHand : s.why)}">${s.ico}${s.label}` +
+           `${byHand ? '<span class="pin-dot" aria-label="set by hand"></span>' : ''}</span>`;
+  }
+
+  /* Where each status leads. The computation says what is true; this says what
+     you can do about it, which is the half that was missing — a draft could
+     never become live because nothing offered to publish it. */
+  const STATUS_EXIT = {
+    draft:       ['review',      'Publish',        'publish'],
+    conflicting: ['investigate', 'Compare',        'compare'],
+    outdated:    ['review',      'Re-sync',        'resync'],
+    unowned:     ['review',      'Set an owner',   'assign'],
+    unused:      ['review',      'Archive or keep','triage'],
+    superseded:  ['direct',      'Go to successor','successor'],
+    current:     ['direct',      'Open',           'open']
+  };
+
+  /* Work state stays in the data and on the attribute, because §2.3 requires
+     every surfaced item to declare what AiMY has done with it. It stopped being
+     a second badge: Draft, Conflicting and Out of date now say the same things
+     in the vocabulary a reader actually uses. */
+  const WORK_LABEL = {
+    detected: 'Flagged', recommended: 'Suggested', drafted: 'Draft',
+    completed: 'Up to date', failed: 'Blocked'
+  };
+
   const MODE_ICO = { direct: ICO.eye, investigate: ICO.search, prompt: AIMY_MARK(12, 14), review: ICO.scales };
-  function entryAction(mode, label, data) {
-    const ico = (MODE_ICO[mode] || ICO.eye).replace('<svg', '<svg class="em-ico"');
-    return `<button class="entry-action em-${mode}" data-entry-mode="${mode}" ${data || ''}>${ico}${esc(label)}</button>`;
+  /* `ico` overrides the entry mode's default glyph where the mode is right but
+     the picture is not — a direct action to create something is still direct,
+     but an eye is the wrong thing to draw on it. */
+  function entryAction(mode, label, data, ico) {
+    const glyph = (ico || MODE_ICO[mode] || ICO.eye).replace('<svg', '<svg class="em-ico"');
+    return `<button class="entry-action em-${mode}" data-entry-mode="${mode}" ${data || ''}>${glyph}${esc(label)}</button>`;
   }
-
-  function confBadge(level, value) {
-    return `<span class="conf-badge conf-${level}"><span class="conf-meter"><i></i><i></i><i></i></span>` +
-           `${level[0].toUpperCase() + level.slice(1)}${value ? ` <span class="conf-val">${esc(value)}</span>` : ''}</span>`;
-  }
-
-  const pill = (val, unit, tone) =>
-    `<span class="evidence-pill"><span class="val"${tone ? ` style="color:var(--${tone})"` : ''}>${esc(val)}</span>` +
-    `<span>${esc(unit)}</span></span>`;
 
   /* ═══════════════════════════════════════════════
-     PROFILES — the simulated seam for §9.2
+     WHO IS LOOKING
 
-     Role is DERIVED, never declared. Entitlement decides what may be shown;
-     relevance decides what is shown first. The three profiles below stand in
-     for signals the platform would supply, including the honest degraded case
-     where ownership and usage data are not available per user (§9.3).
-     Switching between them is a prototype affordance, not product UI — §11
-     rejects a role toggle on the surface itself.
+     Entitlement decides what may be shown; ownership and recent activity
+     decide what is shown first. Both are simulated here at the seam where the
+     platform would supply them. Where the guarantee does not hold, the surface
+     says so rather than implying a completeness it cannot deliver.
   ═══════════════════════════════════════════════ */
-  const PROFILES = {
-    owner: {
-      id: 'owner',
-      name: 'Nour Wael', initials: 'NW', role: 'Product Design',
-      collections: ['policies', 'support', 'marketing', 'sales'],
-      sourcesAdmin: true,
-      owns: 41,          // objects owned — drives curation-block ranking
-      queriesPerWeek: 9,
-      signals: true      // ownership + usage data available at user granularity
+  const USER = {
+    name: 'Nour Wael', initials: 'NW', role: 'Knowledge owner · Support Ops',
+    owner: 'N. Wael',
+    collections: ['policies', 'support', 'marketing', 'sales'],   // legal is not entitled
+    recent: ['article-sso', 'ticket-48120', 'story-nordwind']
+  };
+
+  /* ═══════════════════════════════════════════════
+     TAXONOMY — the mind-map's axes, one vocabulary
+
+     Everything the input can set, the chip bar can show, and the URL can
+     carry, is declared once here. A filter that is not in this table cannot
+     be typed, cannot be linked to, and cannot be shown — which is the point.
+  ═══════════════════════════════════════════════ */
+  const TYPES = {
+    article:  { label: 'Article',         ico: ICO.doc },
+    ticket:   { label: 'Ticket',          ico: ICO.ticket },
+    icp:      { label: 'ICP',             ico: ICO.target },
+    campaign: { label: 'Campaign',        ico: ICO.megaphone },
+    asset:    { label: 'Marketing Asset', ico: ICO.image },
+    story:    { label: 'Success Story',   ico: ICO.trophy },
+    blog:     { label: 'Blog',            ico: ICO.book },
+    webpage:  { label: 'Web Page',        ico: ICO.globe }
+  };
+
+  /* Sources carry their own operational state, because there is nowhere else
+     for it to live: the mind map's Updates branch — trigger sync for a source,
+     trigger sync for one document — is an action on this record, and it is
+     reached by filtering to the source rather than by going to a sources page. */
+  const SRC = {
+    confluence: { label: 'Confluence',    health: 'ok',     note: 'Synced 14 minutes ago',
+                  last: 0, cadence: 'Every 15 minutes',
+                  history: [[0, 'ok', '14 objects checked, 2 updated'], [1, 'ok', '14 objects checked, none changed'], [2, 'ok', '13 objects checked, 1 added']] },
+    zendesk:    { label: 'Zendesk',       health: 'failed', note: 'OAuth token rejected since 26 Jul',
+                  last: 4, cadence: 'Every hour', code: 'AUTH_401_TOKEN_EXPIRED',
+                  history: [[0, 'failed', 'OAuth token rejected'], [2, 'failed', 'OAuth token rejected'], [4, 'ok', '9 objects checked, 3 updated']] },
+    hubspot:    { label: 'HubSpot',       health: 'warn',   note: '3 records skipped — missing owner',
+                  last: 0, cadence: 'Every 6 hours',
+                  history: [[0, 'warn', '12 checked, 3 skipped — no owner'], [1, 'warn', '12 checked, 3 skipped — no owner'], [3, 'ok', '11 checked, 1 added']] },
+    web:        { label: 'Website crawl', health: 'failed', note: 'Crawler blocked by robots.txt since 11 Jul',
+                  last: 19, cadence: 'Weekly', code: 'CRAWL_403_ROBOTS',
+                  history: [[0, 'failed', 'Blocked by robots.txt'], [7, 'failed', 'Blocked by robots.txt'], [19, 'ok', '5 pages crawled, 2 changed']] },
+    upload:     { label: 'Manual upload', health: 'ok',     note: 'No schedule — uploaded by hand',
+                  last: 1, cadence: 'On demand',
+                  history: [[1, 'ok', '1 document uploaded by N. Wael'], [5, 'ok', '1 document uploaded by N. Wael']] }
+  };
+
+  const PRODUCTS    = { copilot: 'Copilot', sales: 'Sales', voice: 'Voice' };
+  const CLIENTS     = { nordwind: 'Nordwind GmbH', tavola: 'Tavola Retail', meridian: 'Meridian Health', orbit: 'Orbit BPO' };
+  const COLLECTIONS = { policies: 'Policies', support: 'Support', sales: 'Sales', marketing: 'Marketing', legal: 'Legal' };
+
+  /* The mind map's own axes, which the first pass collapsed into generic tags.
+     ICP carries Services and Region; Success Story carries Services, Region and
+     Client. Audience is the Permission branch — Clients · Admins · Stakeholders. */
+  const REGIONS  = { emea: 'EMEA', apac: 'APAC', amer: 'Americas', global: 'Global' };
+  const SERVICES = { qa: 'Quality assurance', voice: 'Voice operations', support: 'Support delivery',
+                     cx: 'CX consulting', analytics: 'Analytics' };
+  const AUDIENCE = { clients: 'Clients', admins: 'Admins', stakeholders: 'Stakeholders' };
+
+  /* Collection-level governance. Ownership, retention and per-agent grounding
+     are properties of a collection, so they are stated wherever a collection is
+     — on the axis panel when you filter to one, and on every document that
+     belongs to it. There is no matrix, because a matrix is only a way of
+     looking at one of these rows at a time, and the filter does that.
+
+     No review cadence: nothing here runs on a clock that expects a signature. */
+  const AGENTS = [
+    { id: 'copilot', name: 'Copilot', external: false },
+    { id: 'sales',   name: 'Sales',   external: false },
+    { id: 'voice',   name: 'Voice',   external: true  }
+  ];
+  /* `retain` is the auto-archive rule in days since last update — 0 means never.
+     `purge` is how long an archived document is kept before it can be deleted
+     for good; nothing is ever deleted automatically, because a rule that
+     destroys content without anyone looking is the one rule you cannot undo. */
+  const COLLECTION_META = {
+    policies:  { owner: 'A. Mahfouz', retain: 0,    purge: 365, grounding: { copilot: true,  sales: false, voice: false } },
+    support:   { owner: 'N. Wael',    retain: 730,  purge: 180, grounding: { copilot: true,  sales: false, voice: true  } },
+    sales:     { owner: 'Sales Ops',  retain: 540,  purge: 365, grounding: { copilot: false, sales: true,  voice: false } },
+    marketing: { owner: 'Marketing',  retain: 730,  purge: 365, grounding: { copilot: false, sales: true,  voice: false } },
+    legal:     { owner: 'Legal',      retain: 0,    purge: 2555, grounding: { copilot: false, sales: false, voice: false } }
+  };
+
+  const SYNC_SCHEDULES = ['Every 15 minutes', 'Every hour', 'Every 6 hours', 'Daily', 'Weekly', 'On demand'];
+  const RETAIN_OPTIONS = [[0, 'Never'], [365, 'After 1 year'], [540, 'After 18 months'], [730, 'After 2 years']];
+
+  /* Today is fixed so the prototype's relative dates do not drift as it ages.
+     Every date on an object is stored as days-before-today, which is also what
+     the date filters compare against — one representation, no parsing. */
+  const TODAY = new Date('2026-07-30T00:00:00Z');
+  const dayMs = 86400000;
+  const dateOf = (days) => new Date(TODAY.getTime() - days * dayMs);
+  const fmtDate = (days) =>
+    dateOf(days).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const fmtShort = (days) =>
+    dateOf(days).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const WINDOWS = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
+  const WINDOW_LABEL = { '7d': 'last 7 days', '30d': 'last 30 days', '90d': 'last 90 days', '1y': 'last year' };
+
+  /* ═══════════════════════════════════════════════
+     THE CORPUS
+
+     Thirty-six objects across all eight types. Every one carries the full
+     mind-map field set — tags, source, client, product, collection, both
+     internal dates and both external ones — because a filter that only some
+     objects can answer is a filter that lies about its result count.
+  ═══════════════════════════════════════════════ */
+  const CORPUS = [
+    { id:'article-refund', t:'article', work:'detected', owner:'A. Mahfouz',
+      title:'Refund eligibility — EU customers', col:'policies', src:'confluence', prod:'copilot', client:'',
+      tags:['refunds','eu','policy'], upd:197, ing:410, xc:520, xu:197,
+      sum:'30-day window from purchase, provided the item has not been activated.',
+      x:{ applies:'EU storefront · all plans' } },
+
+    { id:'article-returns-faq', t:'article', work:'detected', owner:'A. Mahfouz',
+      title:'Returns FAQ — activated items', col:'support', src:'zendesk', prod:'copilot', client:'',
+      tags:['refunds','warranty','policy'], upd:26, ing:300, xc:480, xu:26,
+      sum:'Activation ends refund eligibility. Faults are handled under warranty instead.',
+      x:{ applies:'All storefronts — unscoped' } },
+
+    { id:'article-warranty', t:'article', work:'completed', owner:'A. Mahfouz',
+      title:'Warranty process — EU', col:'policies', src:'confluence', prod:'copilot', client:'',
+      tags:['warranty','eu','policy'], upd:28, ing:400, xc:500, xu:28,
+      sum:'What happens after activation, and where the 30-day refund window stops applying.',
+      x:{ applies:'EU storefront · activated items' } },
+
+    { id:'article-sso', t:'article', work:'completed', owner:'N. Wael',
+      title:'SSO provisioning — enterprise', col:'support', src:'confluence', prod:'copilot', client:'',
+      tags:['sso','enterprise','provisioning'], upd:12, ing:220, xc:260, xu:12,
+      sum:'SCIM provisioning, group mapping, and the two failure modes support sees most.',
+      x:{ applies:'Enterprise tier' } },
+
+    { id:'article-residency', t:'article', work:'recommended', owner:'N. Wael',
+      title:'Data residency — EU and APAC', col:'policies', src:'confluence', prod:'copilot', client:'',
+      tags:['gdpr','eu','apac','security'], upd:88, ing:390, xc:470, xu:88,
+      sum:'Where customer data is stored per region, and what changes on an enterprise contract.',
+      x:{ applies:'All tiers · EU and APAC regions' } },
+
+    { id:'article-sla', t:'article', work:'completed', owner:'N. Wael',
+      title:'Support SLA — response and resolution', col:'support', src:'confluence', prod:'copilot', client:'',
+      tags:['sla','support'], upd:19, ing:300, xc:340, xu:19,
+      sum:'First response and resolution targets per tier, and what pauses the clock.',
+      x:{ applies:'All support tiers' } },
+
+    { id:'article-billing', t:'article', work:'recommended', owner:'N. Wael',
+      title:'Billing cycles and proration', col:'policies', src:'confluence', prod:'sales', client:'',
+      tags:['billing','policy'], upd:74, ing:380, xc:450, xu:74,
+      sum:'How mid-cycle upgrades are prorated, and when a credit is issued instead.',
+      x:{ applies:'Self-serve and enterprise' } },
+
+    { id:'article-onboarding', t:'article', work:'drafted', owner:'Unassigned',
+      title:'Onboarding checklist — enterprise', col:'support', src:'upload', prod:'copilot', client:'',
+      tags:['onboarding','enterprise'], upd:6, ing:6, xc:6, xu:6,
+      sum:'Drafted by AiMY from twelve resolved onboarding tickets. Nobody has published it.',
+      x:{ applies:'Enterprise tier · first 30 days' } },
+
+    { id:'article-gdpr-dsr', t:'article', work:'completed', owner:'O. Said',
+      title:'Handling a GDPR data subject request', col:'policies', src:'confluence', prod:'copilot', client:'',
+      tags:['gdpr','security','policy'], upd:41, ing:360, xc:430, xu:41,
+      sum:'The 30-day clock, who signs off, and what support may confirm before legal review.',
+      x:{ applies:'EU data subjects' } },
+
+    { id:'article-churn-signals', t:'article', work:'completed', owner:'Sales Ops',
+      title:'Churn signals — 2025 model', col:'sales', src:'confluence', prod:'sales', client:'',
+      tags:['churn','sales'], upd:240, ing:600, xc:700, xu:240,
+      sum:'Replaced by the 2026 churn model. Kept for reference and excluded from answers.',
+      x:{ applies:'Superseded 12 Mar 2026' } },
+
+    { id:'article-voice-handoff', t:'article', work:'completed', owner:'Unassigned',
+      title:'Voice-to-agent handoff rules', col:'support', src:'upload', prod:'voice', client:'',
+      tags:['voice','support','sla'], upd:15, ing:15, xc:15, xu:15,
+      sum:'When a voice call escalates to a human, and what context is carried across.',
+      x:{ applies:'Voice deployments' } },
+
+    { id:'ticket-48120', t:'ticket', work:'detected', owner:'Ingested · Zendesk',
+      title:'#48120 — Refund declined after activation', col:'support', src:'zendesk', prod:'copilot', client:'nordwind',
+      tags:['refunds','eu'], upd:150, ing:150, xc:158, xu:150,
+      sum:'Customer activated before requesting a refund; policy exception granted on goodwill.',
+      x:{ requester:'Nordwind GmbH', status:'Resolved', resolution:'Goodwill credit issued; policy exception logged.' } },
+
+    { id:'ticket-51004', t:'ticket', work:'completed', owner:'Ingested · Zendesk',
+      title:'#51004 — SCIM group mapping fails silently', col:'support', src:'zendesk', prod:'copilot', client:'meridian',
+      tags:['sso','enterprise','provisioning'], upd:34, ing:34, xc:38, xu:34,
+      sum:'Groups synced but roles did not apply. Root cause was a stale mapping cache.',
+      x:{ requester:'Meridian Health', status:'Resolved', resolution:'Cache invalidated on mapping change; fix shipped 24 Jun.' } },
+
+    { id:'ticket-51877', t:'ticket', work:'completed', owner:'Ingested · Zendesk',
+      title:'#51877 — Data residency question, APAC contract', col:'support', src:'zendesk', prod:'copilot', client:'tavola',
+      tags:['gdpr','apac','security'], upd:9, ing:9, xc:11, xu:9,
+      sum:'Asked where APAC data is stored under an enterprise contract. Answer could not be grounded.',
+      x:{ requester:'Tavola Retail', status:'Awaiting legal', resolution:'Open — routed to the policy owner.' } },
+
+    { id:'ticket-52310', t:'ticket', work:'completed', owner:'Ingested · Zendesk',
+      title:'#52310 — Proration disputed on mid-cycle upgrade', col:'support', src:'zendesk', prod:'sales', client:'orbit',
+      tags:['billing'], upd:4, ing:4, xc:5, xu:4,
+      sum:'Customer expected a credit rather than a prorated charge.',
+      x:{ requester:'Orbit BPO', status:'Resolved', resolution:'Credit applied; billing article flagged as unclear.' } },
+
+    { id:'ticket-52488', t:'ticket', work:'failed', owner:'Ingested · Zendesk',
+      title:'#52488 — Voice call dropped at handoff', col:'support', src:'zendesk', prod:'voice', client:'orbit',
+      tags:['voice','sla'], upd:2, ing:2, xc:2, xu:2,
+      sum:'Ingestion incomplete — the transcript attachment could not be fetched.',
+      x:{ requester:'Orbit BPO', status:'Open', resolution:'Blocked — Zendesk credentials expired mid-sync.' } },
+
+    { id:'icp-bpo', t:'icp', work:'recommended', owner:'Sales Ops',
+      title:'Mid-market BPO — EMEA', col:'sales', src:'hubspot', prod:'sales', client:'',
+      tags:['emea','sales','qa'], upd:171, ing:400, xc:430, xu:171,
+      sum:'Outsourced contact-centre operators between 200 and 2,000 seats across EMEA.',
+      x:{ segment:'200–2,000 seats · outsourced support',
+          fit:['Multi-client contact centre operation','Existing QA function with a named owner'],
+          dis:['Single-client captive centres','Under 200 seats — no QA budget'] } },
+
+    { id:'icp-bpo-apac', t:'icp', work:'detected', owner:'Sales Ops',
+      title:'Mid-market BPO — APAC', col:'sales', src:'hubspot', prod:'sales', client:'',
+      tags:['apac','sales','qa'], upd:290, ing:420, xc:450, xu:290,
+      sum:'The APAC cut of the BPO segment. Nothing has cited it since February.',
+      x:{ segment:'150–1,500 seats · outsourced support',
+          fit:['English-language delivery','Regional QA mandate'],
+          dis:['Domestic-only operators','No data residency requirement'] } },
+
+    { id:'icp-healthcare', t:'icp', work:'completed', owner:'Sales Ops',
+      title:'Regulated healthcare support — EU', col:'sales', src:'hubspot', prod:'sales', client:'',
+      tags:['eu','security','sales'], upd:23, ing:200, xc:230, xu:23,
+      sum:'In-house support teams inside regulated healthcare providers.',
+      x:{ segment:'Regulated providers · in-house support',
+          fit:['Named compliance owner','Existing audit obligation'],
+          dis:['No residency requirement','Outsourced support only'] } },
+
+    { id:'icp-retail-voice', t:'icp', work:'drafted', owner:'Unassigned',
+      title:'Retail voice operations', col:'sales', src:'upload', prod:'voice', client:'',
+      tags:['voice','sales'], upd:8, ing:8, xc:8, xu:8,
+      sum:'Drafted by AiMY from six won deals. No owner.',
+      x:{ segment:'Retail · seasonal voice volume',
+          fit:['Seasonal peaks above 3× baseline','Existing IVR'],
+          dis:['Flat annual volume','No voice channel'] } },
+
+    { id:'campaign-q3', t:'campaign', work:'completed', owner:'Marketing',
+      title:'Q3 — Quality at scale', col:'marketing', src:'hubspot', prod:'sales', client:'',
+      tags:['emea','qa','campaign'], upd:32, ing:120, xc:140, xu:32,
+      sum:'Pipeline generation against the mid-market BPO segment.',
+      x:{ objective:'Pipeline from mid-market BPO', window:'1 Jul – 30 Sep · active', assets:'6 assets · 3 landing pages' } },
+
+    { id:'campaign-q4-voice', t:'campaign', work:'recommended', owner:'Marketing',
+      title:'Q4 — Voice that does not drop', col:'marketing', src:'hubspot', prod:'voice', client:'',
+      tags:['voice','campaign'], upd:61, ing:100, xc:110, xu:61,
+      sum:'Launch campaign for the voice handoff work. Window opens before the next review date.',
+      x:{ objective:'Awareness for voice handoff', window:'1 Oct – 31 Dec · not started', assets:'2 assets · 1 landing page' } },
+
+    { id:'campaign-residency', t:'campaign', work:'detected', owner:'Marketing',
+      title:'EU residency — compliance push', col:'marketing', src:'hubspot', prod:'copilot', client:'',
+      tags:['gdpr','eu','campaign'], upd:210, ing:300, xc:320, xu:210,
+      sum:'Ran in Q1 and never closed out.',
+      x:{ objective:'Inbound from compliance buyers', window:'1 Jan – 31 Mar · ended', assets:'4 assets' } },
+
+    { id:'asset-onepager', t:'asset', work:'completed', owner:'Brand',
+      title:'Quality at scale — one-pager', col:'marketing', src:'upload', prod:'sales', client:'',
+      tags:['qa','emea','collateral'], upd:27, ing:27, xc:27, xu:27,
+      sum:'Two-page PDF used in outbound to the BPO segment.',
+      x:{ format:'PDF · A4 · 2pp', usage:'External — customer-facing', approval:'approved' } },
+
+    { id:'asset-deck-security', t:'asset', work:'recommended', owner:'Brand',
+      title:'Security and residency — buyer deck', col:'marketing', src:'upload', prod:'sales', client:'',
+      tags:['security','gdpr','collateral'], upd:96, ing:96, xc:96, xu:96,
+      sum:'Used in enterprise deals. Cites the residency article, which is itself due.',
+      x:{ format:'PDF · 16:9 · 14 slides', usage:'External — under NDA', approval:'approved' } },
+
+    { id:'asset-voice-demo', t:'asset', work:'drafted', owner:'Unassigned',
+      title:'Voice handoff — demo script', col:'marketing', src:'upload', prod:'voice', client:'',
+      tags:['voice','collateral'], upd:5, ing:5, xc:5, xu:5,
+      sum:'Drafted for the Q4 campaign. Not yet cleared for external use.',
+      x:{ format:'Doc · 3pp', usage:'Internal only', approval:'pending' } },
+
+    { id:'asset-pricing-sheet', t:'asset', work:'detected', owner:'Brand',
+      title:'Enterprise pricing sheet — 2025', col:'marketing', src:'upload', prod:'sales', client:'',
+      tags:['pricing','collateral'], upd:230, ing:230, xc:230, xu:230,
+      sum:'Superseded pricing still circulating in outbound. Past review and excluded.',
+      x:{ format:'PDF · A4 · 1pp', usage:'External — customer-facing', approval:'approved' } },
+
+    { id:'story-nordwind', t:'story', work:'completed', owner:'Marketing',
+      title:'Nordwind — 31% faster resolution', col:'marketing', src:'hubspot', prod:'sales', client:'nordwind',
+      tags:['qa','emea','proof'], upd:39, ing:120, xc:130, xu:39,
+      sum:'Eight hundred seats, three months, measured against their own baseline.',
+      x:{ customer:'Nordwind GmbH · 800 seats', outcome:'31% faster first resolution',
+          quote:'We stopped guessing which conversations to review.', approval:'pending' } },
+
+    { id:'story-meridian', t:'story', work:'completed', owner:'Marketing',
+      title:'Meridian Health — audit-ready in six weeks', col:'marketing', src:'hubspot', prod:'copilot', client:'meridian',
+      tags:['security','eu','proof'], upd:54, ing:140, xc:150, xu:54,
+      sum:'A regulated provider reaching audit readiness without adding headcount.',
+      x:{ customer:'Meridian Health · 240 seats', outcome:'Audit readiness in 6 weeks',
+          quote:'The evidence was already there. We just could not find it.', approval:'approved' } },
+
+    { id:'story-tavola', t:'story', work:'recommended', owner:'Marketing',
+      title:'Tavola Retail — peak season without extra headcount', col:'marketing', src:'hubspot', prod:'voice', client:'tavola',
+      tags:['voice','proof'], upd:104, ing:180, xc:190, xu:104,
+      sum:'Seasonal volume absorbed by voice deflection rather than temporary staff.',
+      x:{ customer:'Tavola Retail · 410 seats', outcome:'Peak absorbed with 0 temporary hires',
+          quote:'December stopped being the month we dread.', approval:'approved' } },
+
+    { id:'story-orbit', t:'story', work:'drafted', owner:'Unassigned',
+      title:'Orbit BPO — multi-client QA in one view', col:'marketing', src:'upload', prod:'sales', client:'orbit',
+      tags:['qa','proof'], upd:3, ing:3, xc:3, xu:3,
+      sum:'Drafted by AiMY from the account notes. No customer sign-off, no owner.',
+      x:{ customer:'Orbit BPO · 1,200 seats', outcome:'One QA view across 9 client programmes',
+          quote:'Awaiting approval — do not quote externally.', approval:'pending' } },
+
+    { id:'blog-quality-scale', t:'blog', work:'completed', owner:'Marketing',
+      title:'Why quality does not scale by hiring reviewers', col:'marketing', src:'web', prod:'sales', client:'',
+      tags:['qa','opinion'], upd:47, ing:47, xc:52, xu:47,
+      sum:'The argument the Q3 campaign runs on, in long form.',
+      x:{ pub:'Published', canonical:'aimy.app/blog/quality-does-not-scale', author:'A. Mahfouz' } },
+
+    { id:'blog-residency', t:'blog', work:'recommended', owner:'Marketing',
+      title:'Data residency, plainly', col:'marketing', src:'web', prod:'copilot', client:'',
+      tags:['gdpr','eu','apac','opinion'], upd:119, ing:119, xc:124, xu:119,
+      sum:'Public-facing explainer. Points at the residency article, which is due.',
+      x:{ pub:'Published', canonical:'aimy.app/blog/data-residency', author:'O. Said' } },
+
+    { id:'blog-voice-draft', t:'blog', work:'drafted', owner:'Unassigned',
+      title:'What a good voice handoff sounds like', col:'marketing', src:'upload', prod:'voice', client:'',
+      tags:['voice','opinion'], upd:1, ing:1, xc:1, xu:1,
+      sum:'Drafted for the Q4 campaign. Unpublished.',
+      x:{ pub:'Draft — unpublished', canonical:'—', author:'AiMY · awaiting an owner' } },
+
+    { id:'page-pricing', t:'webpage', work:'detected', owner:'Unassigned',
+      title:'Pricing — Enterprise tier', col:'marketing', src:'web', prod:'sales', client:'',
+      tags:['pricing','enterprise'], upd:134, ing:400, xc:600, xu:26,
+      sum:'The live pricing page. Changed at source three weeks after our last crawl.',
+      x:{ url:'aimy.app/pricing/enterprise', crawl:'134 days ago', change:'Detected 26 days ago' } },
+
+    { id:'page-security', t:'webpage', work:'completed', owner:'O. Said',
+      title:'Security overview', col:'marketing', src:'web', prod:'copilot', client:'',
+      tags:['security','gdpr'], upd:21, ing:300, xc:410, xu:21,
+      sum:'The public security page. Crawled weekly, no unexplained drift.',
+      x:{ url:'aimy.app/security', crawl:'7 days ago', change:'None since last crawl' } },
+
+    { id:'page-status', t:'webpage', work:'failed', owner:'Unassigned',
+      title:'Service status and incident history', col:'support', src:'web', prod:'copilot', client:'',
+      tags:['sla','support'], upd:19, ing:210, xc:300, xu:19,
+      sum:'Crawl blocked since 11 July. What is stored is nineteen days old.',
+      x:{ url:'status.aimy.app', crawl:'19 days ago', change:'Unknown — crawler blocked' } },
+
+    /* ── Legal. Not entitled to this user, and therefore never counted, never
+       ranked and never cited. The three objects exist so the entitlement
+       filter has something real to withhold: a filter that only ever hides
+       nothing is not a filter anyone can trust. ── */
+    { id:'article-dpa', t:'article', work:'completed', owner:'Legal',
+      title:'Data processing addendum — standard terms', col:'legal', src:'confluence', prod:'copilot', client:'',
+      tags:['gdpr','security'], upd:16, ing:340, xc:400, xu:16,
+      sum:'The standard DPA offered to enterprise customers.',
+      x:{ applies:'Enterprise contracts' } },
+    { id:'article-retention', t:'article', work:'recommended', owner:'Legal',
+      title:'Retention and deletion schedule', col:'legal', src:'confluence', prod:'copilot', client:'',
+      tags:['gdpr','policy'], upd:110, ing:350, xc:410, xu:110,
+      sum:'How long each class of record is kept, and what triggers deletion.',
+      x:{ applies:'All regions' } },
+    { id:'ticket-49002', t:'ticket', work:'completed', owner:'Ingested · Zendesk',
+      title:'#49002 — Legal hold on an account under dispute', col:'legal', src:'zendesk', prod:'copilot', client:'orbit',
+      tags:['security'], upd:70, ing:70, xc:72, xu:70,
+      sum:'Account data preserved pending resolution.',
+      x:{ requester:'Orbit BPO', status:'On hold', resolution:'Open — legal hold in force.' } }
+  ];
+
+  /* Per-object overrides, kept out of the records above so the corpus stays
+     readable.
+
+     `used` is days since anything last cited or opened the document and `uses`
+     is how many times in the last ninety — the two numbers the retrieval layer
+     is already counting, and the ones that say whether a document is doing any
+     work. Where they are absent below, `used` falls out of the last update: a
+     document written last week has been read this week.
+
+     `xu` lower than `upd` means the source moved on after our copy, which is
+     what makes a document out of date. */
+  const EXTRA = {
+    'article-residency':    { props: { tier: 'all', jurisdiction: 'EU + APAC' }, used: 3, uses: 61 },
+    'article-billing':      { used: 122, uses: 2 },
+    'article-retention':    { used: 140, uses: 1 },
+    'article-dpa':          { props: { tier: 'enterprise', 'legal-review': 'annual' }, used: 21, uses: 9 },
+    'article-sso':          { props: { tier: 'enterprise' }, services: ['support'], used: 1, uses: 148 },
+    'article-refund':       { xu: 40, used: 2, uses: 210 },
+    'article-returns-faq':  { used: 2, uses: 173 },
+    'article-churn-signals':{ used: 210, uses: 0 },
+    'icp-bpo':              { region: 'emea', services: ['qa', 'support'], props: { 'deal-band': '40–120k' }, used: 6, uses: 34 },
+    'icp-bpo-apac':         { region: 'apac', services: ['qa', 'support'], used: 168, uses: 1 },
+    'icp-healthcare':       { region: 'emea', services: ['qa', 'cx'], props: { 'deal-band': '80–250k' }, used: 4, uses: 27 },
+    'icp-retail-voice':     { region: 'amer', services: ['voice', 'analytics'], used: 8, uses: 3 },
+    'campaign-residency':   { used: 196, uses: 0 },
+    'asset-deck-security':  { xu: 20, used: 11, uses: 18 },
+    'asset-pricing-sheet':  { used: 154, uses: 4 },
+    'story-nordwind':       { region: 'emea', services: ['qa'], props: { seats: '800', 'go-live': 'Mar 2026' }, used: 5, uses: 42 },
+    'story-meridian':       { region: 'emea', services: ['qa', 'cx'], props: { seats: '240' }, used: 9, uses: 31 },
+    'story-tavola':         { region: 'emea', services: ['voice'], props: { seats: '410' }, used: 118, uses: 2 },
+    'story-orbit':          { region: 'apac', services: ['qa', 'analytics'], props: { seats: '1,200' }, used: 3, uses: 6 },
+    'blog-quality-scale':   { xu: 12, used: 14, uses: 22 },
+    'blog-residency':       { used: 131, uses: 3 },
+    'page-pricing':         { used: 7, uses: 88 }
+  };
+
+  /* Two archived objects. Archive is the mind map's manual-update branch, and it
+     is not deletion: archived content stays addressable, stays restorable, and
+     is excluded from the surface until you ask for it with `?archived=1`. */
+  CORPUS.push(
+    { id:'article-refund-2024', t:'article', work:'completed', owner:'A. Mahfouz', arch:true,
+      title:'Refund eligibility — EU customers (2024 terms)', col:'policies', src:'confluence', prod:'copilot', client:'',
+      tags:['refunds','eu','policy'], upd:520, ing:700, xc:760, xu:520,
+      sum:'The 14-day window that preceded the current 30-day policy.',
+      x:{ applies:'EU storefront · superseded 12 Mar 2025' } },
+    { id:'campaign-q1-launch', t:'campaign', work:'completed', owner:'Marketing', arch:true,
+      title:'Q1 — Launch week', col:'marketing', src:'hubspot', prod:'sales', client:'',
+      tags:['campaign'], upd:290, ing:320, xc:330, xu:290,
+      sum:'Closed out and archived. Kept for the asset list and the outcome numbers.',
+      x:{ objective:'Launch awareness', window:'6 Jan – 20 Jan · ended', assets:'9 assets' } }
+  );
+
+  /* Defaults, derived once. Region falls out of the tags where the object
+     already says which region it is about; audience falls out of the type,
+     because what makes a document client-visible is what kind of document it
+     is. Both are overridable in EXTRA where the real answer is not derivable. */
+  const CLIENT_FACING = ['blog', 'webpage', 'asset', 'story'];
+  CORPUS.forEach((o) => {
+    Object.assign(o, EXTRA[o.id] || {});
+    if (!o.region) {
+      o.region = o.tags.indexOf('apac') > -1 ? 'apac'
+        : (o.tags.indexOf('eu') > -1 || o.tags.indexOf('emea') > -1) ? 'emea' : 'global';
+    }
+    o.services = o.services || [];
+    o.props = o.props || {};
+    o.arch = !!o.arch;
+    o.aud = o.aud || (o.col === 'legal' ? ['admins']
+      : CLIENT_FACING.indexOf(o.t) > -1 ? ['clients', 'admins', 'stakeholders']
+      : ['admins', 'stakeholders']);
+    /* A document written last week has been read this week. */
+    if (o.used === undefined) o.used = Math.min(o.upd, 30);
+    if (o.uses === undefined) o.uses = Math.max(0, 40 - Math.round(o.used / 3));
+  });
+
+  const byId = (id) => CORPUS.find((o) => o.id === id);
+  const TOTAL = CORPUS.length;
+
+  /* Status is derived, so it is derived again after anything that could change
+     it — an edit, an archive, a restore, a re-sync. One call, everywhere. */
+  function recompute() { CORPUS.forEach((o) => { o.status = statusOf(o); }); }
+
+  const usedLabel = (o) => {
+    if (o.used === 0) return 'Today';
+    if (o.used === 1) return 'Yesterday';
+    if (o.used < 30) return o.used + ' days ago';
+    const m = Math.round(o.used / 30);
+    return m + (m === 1 ? ' month ago' : ' months ago');
+  };
+
+  /* Relationships. Kept out of the object bodies because they are a graph, and
+     a graph half-stored on each node goes out of sync the first time one side
+     is edited. */
+  const RELATED = {
+    'article-refund':     { related: ['article-warranty'], contradicts: ['article-returns-faq'] },
+    'article-returns-faq':{ related: ['article-warranty'], contradicts: ['article-refund'] },
+    'article-residency':  { related: ['blog-residency', 'article-gdpr-dsr'], contradicts: [] },
+    'article-churn-signals': { supersededBy: 'icp-bpo', related: [], contradicts: [] },
+    'page-pricing':       { related: ['asset-pricing-sheet'], contradicts: [] },
+    'story-nordwind':     { related: ['ticket-48120'], contradicts: [] }
+  };
+
+  /* Status reads the relationship graph, so the first derivation waits for it. */
+  recompute();
+
+  /* ── Comments belong to the document ──
+
+     They were a fixture in the editor's markup, which meant a document created
+     ten seconds ago opened carrying somebody else's remark from two days ago.
+     Seeded here on the two documents the fixture was written about; everything
+     else — and everything new — starts with none. */
+  CORPUS.forEach((o) => { o.comments = []; seedVersions(o); });
+  (byId('article-refund') || {}).comments = [
+    { who: 'A. Mahfouz', initials: 'AM', when: '2 days ago',
+      text: 'The exception needs to name the warranty article explicitly — support keeps landing here and then having to search again.' }
+  ];
+  (byId('article-residency') || {}).comments = [
+    { who: 'O. Said', initials: 'OS', when: 'last week',
+      text: 'APAC is the half nobody has written. A ticket came in on it again yesterday.' }
+  ];
+
+  function addComment(o, text) {
+    o.comments = (o.comments || []).concat([
+      { who: USER.name, initials: USER.initials, when: 'just now', text: text }
+    ]);
+  }
+
+  /* ═══════════════════════════════════════════════
+     STATE — the URL, and nothing else
+
+     Every filter, the open document and the view mode live in the query
+     string. Nothing filters off a variable the URL does not also hold, which
+     is what makes the surface drivable by an agent: to change what a person
+     is looking at, write a URL.
+  ═══════════════════════════════════════════════ */
+  const LIST_KEYS = ['type', 'tag', 'source', 'client', 'product', 'collection', 'status',
+                     'region', 'service', 'audience', 'ids'];
+  const DATE_KEYS = ['updated', 'ingested', 'extCreated', 'extUpdated'];
+  const FLAG_KEYS = ['mine', 'archived'];
+  const ALL_KEYS  = LIST_KEYS.concat(DATE_KEYS, FLAG_KEYS, ['q', 'prop']);
+
+  function readURL() {
+    const p = new URLSearchParams(location.search);
+    const st = { doc: p.get('doc') || '', mode: p.get('mode') || 'view',
+                 settings: p.get('settings') || '' };
+    LIST_KEYS.forEach((k) => { st[k] = (p.get(k) || '').split(',').filter(Boolean); });
+    DATE_KEYS.forEach((k) => { st[k] = p.get(k) || ''; });
+    FLAG_KEYS.forEach((k) => { st[k] = p.get(k) === '1'; });
+    st.q = p.get('q') || '';
+    /* A custom property, as `key:value`. The mind map names custom properties
+       alongside tags and types; making them filterable is the only way they are
+       worth introducing at all. */
+    st.prop = p.get('prop') || '';
+    return st;
+  }
+
+  /* True when the URL carries no filter at all — the landing case, where the
+     surface composes a working set rather than showing the whole corpus. */
+  function isComposed(st) {
+    return !st.q && !st.mine && !st.archived && !st.prop &&
+      LIST_KEYS.every((k) => !st[k].length) && DATE_KEYS.every((k) => !st[k]);
+  }
+
+  function writeURL(st, opt) {
+    const p = new URLSearchParams();
+    if (st.q) p.set('q', st.q);
+    LIST_KEYS.forEach((k) => { if (st[k] && st[k].length) p.set(k, st[k].join(',')); });
+    DATE_KEYS.forEach((k) => { if (st[k]) p.set(k, st[k]); });
+    FLAG_KEYS.forEach((k) => { if (st[k]) p.set(k, '1'); });
+    if (st.prop) p.set('prop', st.prop);
+    if (st.doc) { p.set('doc', st.doc); if (st.mode === 'edit') p.set('mode', 'edit'); }
+    if (st.settings) p.set('settings', st.settings);
+    /* Prototype affordance, carried so a forced state survives a filter change
+       and the degraded case can actually be driven rather than just looked at. */
+    if (forcedState) p.set('state', forcedState);
+    /* Commas and colons are left unencoded. A filter URL is meant to be read, pasted and
+       written by hand as well as by an agent, and `type=article,ticket` is
+       legible in a way `type=article%2Cticket` is not. Both parse identically. */
+    const qs = p.toString().replace(/%2C/g, ',').replace(/%3A/g, ':');
+    const url = location.pathname + (qs ? '?' + qs : '');
+    if (opt && opt.replace) history.replaceState(null, '', url);
+    else history.pushState(null, '', url);
+    render();
+  }
+
+  /* Merge a partial change into the current URL. Everything that mutates the
+     surface goes through here, so there is exactly one writer. */
+  function patch(changes, opt) {
+    const st = readURL();
+    Object.keys(changes).forEach((k) => { st[k] = changes[k]; });
+    /* Changing a filter drops the open document: you asked to look at the set
+       again, and leaving one document open on top of a set you can no longer
+       see is the classic lost-place bug. */
+    if (Object.keys(changes).some((k) => ALL_KEYS.indexOf(k) > -1)) { st.doc = ''; st.mode = 'view'; }
+    writeURL(st, opt);
+  }
+
+  /* ═══════════════════════════════════════════════
+     FILTERING
+  ═══════════════════════════════════════════════ */
+  /* Scalar axes — one value per object. */
+  const FIELD_OF = { type: 't', source: 'src', client: 'client', product: 'prod', collection: 'col',
+                     status: 'status', region: 'region' };
+  /* Multi-value axes — a set per object, matched on any overlap. */
+  const MULTI_OF = { tag: 'tags', service: 'services', audience: 'aud' };
+  const DATE_FIELD = { updated: 'upd', ingested: 'ing', extCreated: 'xc', extUpdated: 'xu' };
+
+  /* Entitlement is a hard filter and must be visibly true: a briefing or a
+     result set that silently includes inaccessible material is both a trust
+     failure and a leak. Applied before anything the user typed. */
+  const ENTITLED = CORPUS.filter((o) => USER.collections.indexOf(o.col) > -1);
+  const WITHHELD = CORPUS.length - ENTITLED.length;
+  /* What the surface counts and composes from. Archived objects are entitled
+     and reachable, but they are not part of the live corpus and must not be
+     counted as though they were. */
+  const LIVE = ENTITLED.filter((o) => !o.arch);
+
+  function applyFilters(st) {
+    /* `ids` is exclusive by design. It is how an answer puts its own sources on
+       the surface, and mixing it with the filters that were active beforehand
+       would show a set that is neither the answer's nor yours. */
+    if (st.ids.length) return st.ids.map(byId).filter(Boolean);
+
+    /* Archived content is out of the way, not gone. It stays addressable and
+       restorable, and asking for it is one parameter. */
+    let out = ENTITLED.filter((o) => (st.archived ? o.arch : !o.arch));
+    if (st.mine) out = out.filter((o) => o.owner === USER.owner);
+    Object.keys(FIELD_OF).forEach((k) => {
+      if (st[k] && st[k].length) out = out.filter((o) => st[k].indexOf(o[FIELD_OF[k]]) > -1);
+    });
+    Object.keys(MULTI_OF).forEach((k) => {
+      if (st[k] && st[k].length) out = out.filter((o) => st[k].some((v) => o[MULTI_OF[k]].indexOf(v) > -1));
+    });
+    DATE_KEYS.forEach((k) => {
+      const w = WINDOWS[st[k]];
+      if (w) out = out.filter((o) => o[DATE_FIELD[k]] <= w);
+    });
+    if (st.prop) {
+      const [pk, pv] = st.prop.split(':');
+      out = out.filter((o) => o.props[pk] !== undefined && (!pv || String(o.props[pk]).toLowerCase() === pv.toLowerCase()));
+    }
+    if (st.q) {
+      const q = st.q.toLowerCase();
+      out = out.filter((o) => (o.title + ' ' + o.sum + ' ' + o.tags.join(' ')).toLowerCase().indexOf(q) > -1);
+    }
+    return out;
+  }
+
+  /* What needs a person, ranked. Used for the composed landing set and for the
+     "needs attention" sort — one definition, so the two cannot disagree. */
+  const NEED_SCORE = { outdated: 5, conflicting: 5, draft: 3, unowned: 2, unused: 2, superseded: 1, current: 0 };
+  const WORK_SCORE = { failed: 4, drafted: 3, detected: 3, recommended: 2, completed: 0 };
+  const needScore = (o) =>
+    (NEED_SCORE[o.status] || 0) + (WORK_SCORE[o.work] || 0) + (o.owner === USER.owner ? 2 : 0);
+
+  const COMPOSED_CAP = 12;
+
+  function sortSet(list, sort) {
+    const s = list.slice();
+    if (sort === 'attention') return s.sort((a, b) => needScore(b) - needScore(a) || a.upd - b.upd);
+    if (sort === 'title') return s.sort((a, b) => a.title.localeCompare(b.title));
+    return s.sort((a, b) => a.upd - b.upd);           // most recently updated first
+  }
+
+  /* The landing set: what you own or touched, ranked by what needs you. The
+     cap is stated on the surface rather than applied quietly — a list that
+     hides its tail overstates how contained the problem is. */
+  function composedSet() {
+    const mine = LIVE.filter((o) => o.owner === USER.owner || USER.recent.indexOf(o.id) > -1);
+    const rest = LIVE.filter((o) => mine.indexOf(o) === -1);
+    return sortSet(mine, 'attention').concat(sortSet(rest, 'attention')).slice(0, COMPOSED_CAP);
+  }
+
+  /* ═══════════════════════════════════════════════
+     THE INPUT — one field, four routes
+
+     Routing is decided on the shape of what was typed, never on a mode
+     switch. Each route is a classified entry mode, and three of the four never
+     open the canvas — which is the rule the previous build broke.
+  ═══════════════════════════════════════════════ */
+
+  /* The lexicon. Everything the input can recognise is declared here, so what
+     the parser understands and what the chip bar can show are the same list. */
+  const LEX = [
+    /* The old vocabulary still arrives — people type what the last build
+       taught them — so it is mapped to the nearest thing that now exists
+       rather than silently matching nothing. */
+    [/\bexpired\b|\bstale\b/i,            { status: 'outdated' }],
+    [/\bunverified\b|\bnever verified\b/i,{ status: 'unowned' }],
+    [/\bsuperseded\b|\breplaced\b/i,      { status: 'superseded' }],
+    [/\bverified\b/i,                     { status: 'current' }],
+    // types
+    [/\barticles?\b/i,                    { type: 'article' }],
+    [/\btickets?\b/i,                     { type: 'ticket' }],
+    [/\bicps?\b|\bideal customer\b/i,     { type: 'icp' }],
+    [/\bcampaigns?\b/i,                   { type: 'campaign' }],
+    [/\b(?:marketing )?assets?\b|\bcollateral\b/i, { type: 'asset' }],
+    [/\bsuccess stor(?:y|ies)\b|\bcase stud(?:y|ies)\b/i, { type: 'story' }],
+    [/\bblogs?(?: posts?)?\b/i,           { type: 'blog' }],
+    [/\bweb ?pages?\b|\bpages?\b/i,       { type: 'webpage' }],
+    // sources
+    [/\bzendesk\b/i,                      { source: 'zendesk' }],
+    [/\bconfluence\b/i,                   { source: 'confluence' }],
+    [/\bhubspot\b/i,                      { source: 'hubspot' }],
+    [/\bcrawl(?:ed|er)?\b|\bwebsite\b/i,  { source: 'web' }],
+    [/\buploaded?\b|\bmanual\b/i,         { source: 'upload' }],
+    // products
+    [/\bcopilot\b/i,                      { product: 'copilot' }],
+    [/\bvoice\b/i,                        { product: 'voice' }],
+    [/\bsales\b/i,                        { product: 'sales' }],
+    // clients
+    [/\bnordwind\b/i,                     { client: 'nordwind' }],
+    [/\btavola\b/i,                       { client: 'tavola' }],
+    [/\bmeridian\b/i,                     { client: 'meridian' }],
+    [/\borbit\b/i,                        { client: 'orbit' }],
+    // collections
+    [/\bpolic(?:y|ies)\b/i,               { collection: 'policies' }],
+    [/\bsupport\b/i,                      { collection: 'support' }],
+    [/\bmarketing\b/i,                    { collection: 'marketing' }],
+    // tags
+    [/\brefunds?\b/i,                     { tag: 'refunds' }],
+    [/\bwarrant(?:y|ies)\b/i,             { tag: 'warranty' }],
+    [/\bsso\b|\bsingle sign-?on\b/i,      { tag: 'sso' }],
+    [/\bgdpr\b|\bresidency\b/i,           { tag: 'gdpr' }],
+    [/\bsecurity\b/i,                     { tag: 'security' }],
+    [/\bbilling\b|\bproration\b/i,        { tag: 'billing' }],
+    [/\bpricing\b/i,                      { tag: 'pricing' }],
+    [/\bsla\b/i,                          { tag: 'sla' }],
+    [/\bonboarding\b/i,                   { tag: 'onboarding' }],
+    [/\benterprise\b/i,                   { tag: 'enterprise' }],
+    [/\bchurn\b/i,                        { tag: 'churn' }],
+    [/\beu\b|\beurope(?:an)?\b/i,         { tag: 'eu' }],
+    // region — the mind map's own axis on ICP and Success Story
+    [/\bemea\b/i,                         { region: 'emea' }],
+    [/\bapac\b/i,                         { region: 'apac' }],
+    [/\bamericas?\b|\bnorth america\b/i,  { region: 'amer' }],
+    [/\bglobal\b/i,                       { region: 'global' }],
+    /* Services are named in full. The bare words — qa, voice — are already
+       tags, and mapping one word onto two axes would AND them together and
+       return nothing, which reads as an empty corpus rather than a collision. */
+    [/\bquality assurance\b/i,            { service: 'qa' }],
+    [/\bvoice operations\b/i,             { service: 'voice' }],
+    [/\bsupport delivery\b/i,             { service: 'support' }],
+    [/\bcx consulting\b/i,                { service: 'cx' }],
+    [/\banalytics service\b/i,            { service: 'analytics' }],
+    // audience — the Permission branch
+    [/\bclient[- ]facing\b|\bvisible to clients\b|\bfor clients\b/i, { audience: 'clients' }],
+    [/\badmins? only\b|\bfor admins?\b/i, { audience: 'admins' }],
+    [/\bstakeholders?\b/i,                { audience: 'stakeholders' }],
+    // archive
+    [/\barchived?\b/i,                    { archived: true }],
+    // dates — internal by default, external when the input says so
+    [/\b(?:external(?:ly)?|at source|upstream)[^.]{0,16}\b(?:changed|updated)\b/i, { extUpdated: '30d' }],
+    [/\bingested\b[^.]{0,16}\b(?:this month|last 30)\b/i, { ingested: '30d' }],
+    [/\bingested\b[^.]{0,16}\b(?:this week|last 7)\b/i,   { ingested: '7d' }],
+    [/\bingested\b/i,                     { ingested: '90d' }],
+    [/\b(?:this|past|last) week\b|\blast 7 days\b/i,      { updated: '7d' }],
+    [/\b(?:this|past|last) month\b|\blast 30 days\b/i,    { updated: '30d' }],
+    [/\b(?:this|past|last) quarter\b|\blast 90 days\b/i,  { updated: '90d' }],
+    [/\b(?:this|past|last) year\b/i,      { updated: '1y' }],
+    // ownership
+    [/\bmine\b|\bi own\b|\bmy own\b|\bowned by me\b/i,    { mine: true }],
+    // status — the one state axis, so the words for it are worth knowing
+    [/\bwaiting on (?:me|you)\b|\bnot live\b|\bdrafts?\b/i,  { status: 'draft' }],
+    [/\bunused\b|\bnot used\b|\bstale\b|\bforgotten\b/i,      { status: 'unused' }],
+    [/\bout of date\b|\boutdated\b|\bbehind\b/i,              { status: 'outdated' }],
+    [/\bconflict(?:ing|s)?\b|\bcontradict\w*\b/i,             { status: 'conflicting' }],
+    [/\bunowned\b|\bno owner\b|\bownerless\b/i,               { status: 'unowned' }],
+    [/\bcurrent\b|\bhealthy\b/i,                              { status: 'current' }]
+  ];
+
+  const WRITE_VERB = /^(add|create|new|draft|archive|delete|remove|verify|re-?verify|review|publish|unpublish|expire|reassign|restore|approve|tag|untag|move)\b/i;
+  const QUESTION   = /^(what|why|how|when|who|which|can|does|do|is|are|should|where|will)\b|^tell me\b|^explain\b|^summari[sz]e\b/i;
+
+  /* Which route. Order matters: a write is checked first because "archive the
+     expired ICPs" also parses as a filter, and running it as one would be a
+     write silently reinterpreted as a read. */
+  /* ── The fifth route: settings ──
+
+     Settings are part of the surface, so the one input reaches them like it
+     reaches everything else. It opens the sheet with the change STAGED rather
+     than applied — you see what it will do to the control before it does it,
+     which is the same courtesy the commit surfaces pay for bigger changes. */
+  const SETTINGS_WORD = /\b(setting|settings|schedule|sync|retention|archiv\w*|grounding|connect|reconnect)\b/i;
+  const CADENCE_WORD = [
+    [/\bevery 15\b|\bquarter[- ]?hour|\b15 min/i, 'Every 15 minutes'],
+    [/\bhourly\b|\bevery hour\b/i, 'Every hour'],
+    [/\bevery 6\b|\bsix hours?\b/i, 'Every 6 hours'],
+    [/\bdaily\b|\bevery day\b/i, 'Daily'],
+    [/\bweekly\b|\bevery week\b/i, 'Weekly'],
+    [/\bon demand\b|\bmanual(ly)?\b/i, 'On demand']
+  ];
+
+  function parseSettings(s) {
+    if (!SETTINGS_WORD.test(s)) return null;
+    const lower = s.toLowerCase();
+
+    /* Which thing the sentence is about. A named source or collection wins; the
+       word "archiving" or "retention" alone lands on the data sheet. */
+    const srcKey = Object.keys(SRC).find((k) => lower.indexOf(SRC[k].label.toLowerCase()) > -1 || lower.indexOf(k) > -1);
+    const colKey = Object.keys(COLLECTIONS).find((k) => lower.indexOf(COLLECTIONS[k].toLowerCase()) > -1);
+
+    if (srcKey) {
+      const hit = CADENCE_WORD.find(([re]) => re.test(s));
+      return { route: 'settings', target: 'source:' + srcKey,
+               stage: hit ? { key: 'cadence', value: hit[1] } : null };
+    }
+    if (colKey) {
+      const months = (s.match(/\b(\d+)\s*(month|year)s?\b/i) || [])[0];
+      const opt = months && RETAIN_OPTIONS.find(([, l]) => l.toLowerCase().indexOf(months.toLowerCase().replace(/s\b/, '')) > -1);
+      return { route: 'settings', target: 'collection:' + colKey,
+               stage: opt ? { key: 'retain', value: String(opt[0]) } : null };
+    }
+    if (/\barchiv|\bretention|\bdelet/i.test(s)) return { route: 'settings', target: 'data', stage: null };
+    return null;
+  }
+
+  function parseIntent(text) {
+    const s = text.trim();
+    if (!s) return { route: 'empty' };
+
+    if (WRITE_VERB.test(s)) return { route: 'write', verb: s.match(WRITE_VERB)[1].toLowerCase(), text: s };
+
+    const set = parseSettings(s);
+    if (set) return set;
+
+    /* A known object: enough of a title to be a name rather than a keyword
+       that happens to appear in one. */
+    const lower = s.toLowerCase();
+    const hits = LIVE.filter((o) => {
+      const t = o.title.toLowerCase();
+      return t.indexOf(lower) > -1 || lower.indexOf(t.slice(0, 14)) > -1;
+    });
+    if (hits.length === 1 && lower.length >= hits[0].title.length * 0.5) {
+      return { route: 'object', id: hits[0].id };
+    }
+
+    /* Both routes parse filters. A question is not exempt from narrowing the
+       surface — that is the whole point of one input serving both. */
+    const parsed = parseFilters(s);
+    if (QUESTION.test(s) || s.endsWith('?')) {
+      /* Free text left over from a question is the question itself, and using
+         it as a search term would filter the surface down to whichever
+         documents happen to contain the words of the sentence. Drop it; the
+         recognised axes are the only part that is a filter. */
+      delete parsed.set.q;
+      return Object.assign({ route: 'question', text: s }, parsed);
+    }
+    return Object.assign({ route: 'filter' }, parsed);
+  }
+
+  /* Natural language to filter state. Whatever the lexicon does not claim is
+     left as free text, so a term the parser has never seen still narrows the
+     surface instead of being silently dropped. */
+  function parseFilters(s) {
+    const set = {};
+    let rest = ' ' + s + ' ';
+    LEX.forEach(([re, out]) => {
+      const m = rest.match(re);
+      if (!m) return;
+      Object.keys(out).forEach((k) => {
+        const v = out[k];
+        if (LIST_KEYS.indexOf(k) > -1) { set[k] = set[k] || []; if (set[k].indexOf(v) === -1) set[k].push(v); }
+        else set[k] = v;
+      });
+      rest = rest.replace(re, ' ');
+    });
+    /* Words the lexicon already consumed the meaning of, plus the connective
+       tissue around them. Left in, they become a free-text filter for a word
+       nothing contains, and an empty result reads as an empty corpus. */
+    const leftover = rest.replace(
+      /\b(?:show|find|get|list|give|all|any|every|everything|anything|the|a|an|me|my|our|we|us|from|with|for|in|on|at|to|by|and|or|of|that|about|regarding|concerning|is|are|was|were|be|been|has|have|only|just|please|documents?|docs?|objects?|items?|content|stuff|services?|regions?|audiences?|updated?|changed?|ingested?|created?|modified|edited|synced?|review(?:ed)?|last|past|recent(?:ly)?|since|before|after|days?|weeks?|months?|years?|quarters?)\b/gi, ' ')
+                         .replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (leftover.length > 2) set.q = leftover;
+    return { set: set, matched: Object.keys(set).length > 0 };
+  }
+
+  /* AiMY's reading of what you typed, in the vocabulary of the filters. Shown
+     because a surface that rearranged itself without saying what it understood
+     is indistinguishable from one that misunderstood. */
+  const READ_LABEL = {
+    type: 'Type', tag: 'Tag', source: 'Source', client: 'Client', product: 'Product',
+    collection: 'Collection', trust: 'Trust', work: 'Work state', q: 'Text',
+    region: 'Region', service: 'Service', audience: 'Audience', prop: 'Property',
+    updated: 'Updated', ingested: 'Ingested', extCreated: 'Created at source',
+    extUpdated: 'Changed at source', mine: 'Owner', ids: 'Documents',
+    archived: 'Archive'
+  };
+  const VALUE_LABEL = {
+    type: (v) => TYPES[v] ? TYPES[v].label : v,
+    source: (v) => SRC[v] ? SRC[v].label : v,
+    client: (v) => CLIENTS[v] || v,
+    product: (v) => PRODUCTS[v] || v,
+    collection: (v) => COLLECTIONS[v] || v,
+    status: (v) => STATUS[v] ? STATUS[v].label : v,
+    work: (v) => WORK_LABEL[v] || v,
+    region: (v) => REGIONS[v] || v,
+    service: (v) => SERVICES[v] || v,
+    audience: (v) => AUDIENCE[v] || v,
+    tag: (v) => v,
+    mine: () => USER.name,
+    archived: () => 'Archived only'
+  };
+  function valueLabel(key, v) {
+    if (DATE_KEYS.indexOf(key) > -1) return WINDOW_LABEL[v] || v;
+    const f = VALUE_LABEL[key];
+    return f ? f(v) : String(v);
+  }
+
+  /* ═══════════════════════════════════════════════
+     THE CHIP BAR — the URL, made removable
+
+     Filter chips are `.ctx-chip`, the design system's "what the prompt can
+     see" primitive. That is exactly what a filter is here: the set AiMY is
+     looking at when it answers. One vocabulary for both.
+  ═══════════════════════════════════════════════ */
+  /* Collections and sources have something to say about themselves, so their
+     chip's label opens that conversation. The × still just removes the filter.
+     This is what replaced the panel: the entry point costs no chrome. */
+  const TALKATIVE = ['collection', 'source'];
+
+  function chip(key, value, label) {
+    const talks = TALKATIVE.indexOf(key) > -1;
+    return `<span class="ctx-chip${talks ? ' is-talkative' : ''}" data-chip="${esc(key)}" data-chip-val="${esc(value)}">
+      <span class="ctx-ico">${ICO.tag.replace('<svg', '<svg width="10" height="10"')}</span>
+      ${talks
+        ? `<button class="ctx-ask" data-settings="${esc(key)}:${esc(value)}"
+             title="Settings for ${esc(label)}"><span class="ctx-key">${esc(READ_LABEL[key] || key)}</span>${esc(label)}</button>`
+        : `<span class="ctx-key">${esc(READ_LABEL[key] || key)}</span>${esc(label)}`}
+      <button aria-label="Remove ${esc(READ_LABEL[key] || key)} ${esc(label)}" data-chip-drop>&times;</button></span>`;
+  }
+
+  /* Chips carry only what a dropdown cannot say. Everything a control can show,
+     the control shows — a chip and a dropdown never state the same fact. */
+  const DD_KEYS = ['type', 'status', 'source', 'updated', 'collection', 'product',
+                   'client', 'region', 'service', 'audience'];
+
+  function activeChips(st) {
+    const out = [];
+    if (st.ids.length) out.push(chip('ids', '', st.ids.length + ' from an answer'));
+    LIST_KEYS.forEach((k) => {
+      if (k === 'ids') return;
+      /* One value on a dropdown axis is already on screen. Two or more is not —
+         the control is single-select and can only show the first. */
+      if (DD_KEYS.indexOf(k) > -1 && st[k].length < 2) return;
+      (st[k] || []).forEach((v) => out.push(chip(k, v, valueLabel(k, v))));
+    });
+    DATE_KEYS.forEach((k) => { if (st[k] && DD_KEYS.indexOf(k) === -1) out.push(chip(k, st[k], valueLabel(k, st[k]))); });
+    if (st.prop) out.push(chip('prop', st.prop, st.prop.replace(':', ' = ')));
+    if (st.q) out.push(chip('q', st.q, '“' + st.q + '”'));
+    return out;
+  }
+
+  function renderChips(st) {
+    const host = $('#chipBar');
+    if (!host) return;
+    const chips = activeChips(st);
+    if (!chips.length) { host.innerHTML = ''; return; }
+    host.innerHTML = `<div class="chip-bar"><div class="ctx-chips">${chips.join('')}</div></div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     THE FILTER ROW
+
+     The filters are controls, not just an outcome of typing. Someone who does
+     not know the vocabulary can still narrow the surface, and someone who does
+     can see what the vocabulary contains.
+
+     This is also how AiMY reports what it understood. Typing "expired ICPs in
+     emea" lights up Type, Status and Region — a prose restatement underneath
+     was only ever needed because the controls were invisible.
+
+     `.v2-dropdown` is the system's only select control and carries the whole
+     keyboard model. It is strictly single-select and its change event only
+     reports the label, so the machine value rides on `data-slug` and is read
+     off the selected option rather than parsed back out of the label.
+  ═══════════════════════════════════════════════ */
+  const opts = (obj, order) => (order || Object.keys(obj)).map((k) => [k, typeof obj[k] === 'string' ? obj[k] : obj[k].label]);
+
+  const PRIMARY_FILTERS = [
+    { key: 'type',    label: 'Type',    list: () => opts(TYPES) },
+    { key: 'status',  label: 'Status',  list: () => opts(STATUS) },
+    { key: 'source',  label: 'Source',  list: () => opts(SRC) },
+    { key: 'updated', label: 'Updated', list: () => opts(WINDOW_LABEL) }
+  ];
+  const MORE_FILTERS = [
+    { key: 'collection', label: 'Collection', list: () => opts(COLLECTIONS) },
+    { key: 'product',    label: 'Product',    list: () => opts(PRODUCTS) },
+    { key: 'client',     label: 'Client',     list: () => opts(CLIENTS) },
+    { key: 'region',     label: 'Region',     list: () => opts(REGIONS) },
+    { key: 'service',    label: 'Service',    list: () => opts(SERVICES) },
+    { key: 'audience',   label: 'Audience',   list: () => opts(AUDIENCE) },
+    { key: 'work',       label: 'Work state', list: () => opts(WORK_LABEL) },
+    { key: 'archived',   label: 'Archive',    list: () => [['1', 'Archived']] }
+  ];
+
+  /* The current value of an axis, whatever shape it is stored in. */
+  function filterValue(st, key) {
+    if (FLAG_KEYS.indexOf(key) > -1) return st[key] ? '1' : '';
+    if (DATE_KEYS.indexOf(key) > -1) return st[key];
+    return (st[key] || [])[0] || '';
+  }
+
+  function dropdown(c, st) {
+    const cur = c.current ? c.current(st) : filterValue(st, c.key);
+    const extra = (LIST_KEYS.indexOf(c.key) > -1 ? st[c.key].length : 1) - 1;
+    /* With more than one value the control cannot name them — it is
+       single-select — so it says how many and lets the chips do the naming.
+       Naming the first as well would print the same value twice. */
+    const label = !cur ? c.label
+      : extra > 0 ? c.label + ' · ' + (extra + 1)
+      : (c.valueLabel ? c.valueLabel(cur) : valueLabel(c.key, cur));
+    const rows = [['', c.label, c.first || 'All']].concat(c.list().map(([slug, text]) => [slug, text, text]));
+    return `<div class="v2-dropdown k-filter" data-filter-key="${c.key}">
+      <button class="v2-dropdown-btn${cur ? ' active-filter' : ''}" type="button"
+              aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(c.label)}">
+        <span class="dd-label-text">${esc(label)}</span>
+        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+      </button>
+      <div class="v2-dropdown-panel" role="listbox">
+        ${rows.map(([slug, value, text]) => {
+          const on = slug === cur;
+          return `<div class="v2-dropdown-option${on ? ' selected' : ''}" role="option"
+            aria-selected="${on}" data-value="${esc(value)}" data-slug="${esc(slug)}">${esc(text)}</div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  let moreOpen = false;
+
+  function renderFilters(st) {
+    const host = $('#filterBar');
+    if (!host) return;
+    const anyMore = MORE_FILTERS.some((c) => filterValue(st, c.key));
+    const open = moreOpen || anyMore;
+    const dirty = !isComposed(st);
+
+    host.innerHTML = `
+      <div class="filter-row">
+        ${PRIMARY_FILTERS.map((c) => dropdown(c, st)).join('')}
+        <button class="k-toggle${st.mine ? ' is-on' : ''}" data-toggle-mine
+                aria-pressed="${st.mine ? 'true' : 'false'}">Mine</button>
+        <button class="k-more${open ? ' is-open' : ''}" data-more aria-expanded="${open}">
+          More${anyMore ? ` <span class="k-more-n">${MORE_FILTERS.filter((c) => filterValue(st, c.key)).length}</span>` : ''}
+        </button>
+        <span class="filter-row-end">
+          ${dirty ? '<button class="k-clear" data-clear-all>Clear</button>' : ''}
+        </span>
+      </div>
+      ${open ? `<div class="filter-row is-more">${MORE_FILTERS.map((c) => dropdown(c, st)).join('')}</div>` : ''}`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     THE BRIEFING
+
+     What changed since you were last here, in sentences. Not a count of the
+     current state — the Status filter shows that, and repeating it in the rail
+     would be the same fact twice. Not a timestamped log either: a list of
+     events is work to read, and the point of a briefing is that it has already
+     been read for you.
+
+     Each entry is one thing that happened and one thing to do about it.
+  ═══════════════════════════════════════════════ */
+  const LAST_VISIT = 4;                     // days ago; a session fixture
+  const VISIT_LABEL = dateOf(LAST_VISIT).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
+
+  function sinceLastVisit() {
+    const out = [];
+    const since = (o) => o.upd <= LAST_VISIT;
+
+    const failing = Object.keys(SRC).filter((k) => SRC[k].health === 'failed');
+    if (failing.length) {
+      const stale = LIVE.filter((o) => failing.indexOf(o.src) > -1).length;
+      out.push({
+        id: 'source', tone: 'err',
+        text: `${failing.map((k) => SRC[k].label).join(' and ')} stopped syncing. ${stale} documents have not updated since.`,
+        action: 'Show them', mode: 'direct', href: { source: failing }, ask: ['source', failing[0]]
+      });
+    }
+
+    const outdated = LIVE.filter((o) => o.status === 'outdated');
+    if (outdated.length) {
+      out.push({
+        id: 'outdated', tone: 'err',
+        text: `${outdated.length} documents are behind their source. Answers still use them.`,
+        action: 'Show them', mode: 'direct', href: { status: ['outdated'] }
+      });
+    }
+
+    /* The point of the whole model: a document nobody has used in three months
+       is either dead weight or a gap in how people find things. Either way it
+       is worth a look, and nothing else on the surface would have said so. */
+    const unused = LIVE.filter((o) => o.status === 'unused');
+    if (unused.length) {
+      out.push({
+        id: 'unused', tone: 'warn',
+        text: `${unused.length} documents have not been used in three months.`,
+        action: 'Show them', mode: 'direct', href: { status: ['unused'] }
+      });
+    }
+
+    const drafted = LIVE.filter((o) => o.status === 'draft');
+    if (drafted.length) {
+      out.push({
+        id: 'drafts', tone: 'warn',
+        text: `AiMY drafted ${drafted.length} documents. None of them is live.`,
+        action: 'Open them', mode: 'review', href: { status: ['draft'] }
+      });
+    }
+
+    out.push({
+      id: 'gap', tone: 'warn',
+      text: 'Three questions came in that nothing here answers. Data residency in APAC leads.',
+      /* No filter target: a gap is the absence of a document. */
+      action: 'Draft one', mode: 'prompt',
+      prompt: 'Draft an article covering data residency for APAC enterprise contracts'
+    });
+
+    const last = byId(USER.recent[0]);
+    if (last) {
+      out.push({
+        id: 'resume', tone: 'ok',
+        text: `You were last reading ${last.title}.`,
+        action: 'Reopen', mode: 'direct', doc: last.id
+      });
+    }
+    return out;
+  }
+
+  function renderBrief(st) {
+    const host = $('#brief');
+    if (!host) return;
+
+    host.innerHTML = `
+      <!-- No identity block. Who you are is in the topnav, and the counts are
+           what the Status filter is for — the rail is what changed since you
+           were last here, and nothing else. -->
+      <div class="brief-section-label">Since ${esc(VISIT_LABEL)}</div>
+      <!-- Capped. A briefing that lists everything is a log, and a log is work
+           to read — which is the thing a briefing exists to have done for you. -->
+      <div class="brief-list">${sinceLastVisit().slice(0, 5).map((b) => `
+        <div class="brief-entry is-${b.tone}">
+          <p class="brief-text">${esc(b.text)}</p>
+          <button class="brief-go" data-entry-mode="${b.mode}" ${b.doc
+            ? `data-open-doc="${esc(b.doc)}"`
+            : b.href ? `data-brief-filter="${esc(b.id)}"` : `data-brief-prompt="${esc(b.prompt)}"`}>${esc(b.action)}</button>
+        </div>`).join('')}</div>
+
+      ${lastFilter && isComposed(st)
+        ? `<button class="brief-resume" data-resume>Resume your last filter</button>` : ''}
+
+      <!-- Where the settings are. Not a destination: each row opens the
+           conversation that already carries the controls, which is what stopped
+           schedules, retention, grounding and deletion from being reachable
+           only by happening to filter to exactly one collection or source. -->
+      <div class="brief-section-label">Sources &amp; data</div>
+      <div class="rail-set">
+        ${Object.keys(SRC).filter((k) => k !== 'upload').map((k) => {
+          const src = SRC[k];
+          const ok = src.health === 'ok';
+          /* The row states its condition and carries the fix. A source that is
+             not syncing is not a fact to go and read about — it is one button,
+             and pressing it changes this row. The name still opens the
+             conversation, which is where the settings that need a form live. */
+          return `<div class="rail-set-row${ok ? '' : ' is-bad'}">
+            <span class="status-dot ${ok ? 'sd-ok' : src.health === 'warn' ? 'sd-warn' : 'sd-err'}"></span>
+            <button class="rail-set-name" data-settings="source:${k}">${esc(src.label)}</button>
+            ${ok
+              ? `<span class="rail-set-note">${esc(src.queued ? 'sync queued'
+                    : src.last === 0 ? 'synced today' : 'synced ' + src.last + 'd ago')}</span>`
+              : `<button class="rail-set-do" data-reconnect="${k}">${src.health === 'warn' ? 'Re-run' : 'Reconnect'}</button>`}
+          </div>`;
+        }).join('')}
+        <div class="rail-set-row">
+          <button class="rail-set-name" data-settings="collection:${USER.collections[0]}">Collections</button>
+          <span class="rail-set-note">${USER.collections.length}</span>
+        </div>
+        <div class="rail-set-row">
+          <button class="rail-set-name" data-settings="data">Archiving &amp; deleting</button>
+          <span class="rail-set-note">${CORPUS.filter((o) => o.arch).length} archived</span>
+        </div>
+      </div>`;
+  }
+
+
+  /* The last filter the user ran, so the rail can offer it back. Session only:
+     a resume cue that survives a machine restart is claiming a memory the
+     prototype does not have. */
+  let lastFilter = null;
+  try { lastFilter = sessionStorage.getItem('aimy-k-last') || null; } catch (e) {}
+  function rememberFilter() {
+    const s = location.search;
+    if (!s) return;
+    lastFilter = s;
+    try { sessionStorage.setItem('aimy-k-last', s); } catch (e) {}
+  }
+
+  /* ═══════════════════════════════════════════════
+     TYPE CARDS — eight templates over one fixed governance row
+
+     Type changes what a reader needs to see first, so each type renders its
+     own body. What never moves is the row carrying title, type, trust state,
+     work state, owner and last verified: someone scanning mixed results should
+     not have to relearn where trust lives per type.
+  ═══════════════════════════════════════════════ */
+  const approvalPill = (state) => state === 'approved'
+    ? `<span class="tc-approval is-approved">${ICO.check.replace('<svg', '<svg width="11" height="11"')}Approved</span>`
+    : `<span class="tc-approval is-pending">${ICO.clock.replace('<svg', '<svg width="11" height="11"')}Awaiting approval</span>`;
+
+  const fieldRows = (pairs) => `<div class="tc-fields">${pairs
+    .map(([l, v]) => `<span class="tc-field-label">${esc(l)}</span><span class="tc-field-val">${v}</span>`).join('')}</div>`;
+
+  const TEMPLATE = {
+    article:  (o) => fieldRows([['Applies to', esc(o.x.applies)], ['Collection', esc(COLLECTIONS[o.col])]]),
+    ticket:   (o) => fieldRows([['Requester', esc(o.x.requester)],
+                                ['Status', `<span class="tag ${o.x.status === 'Resolved' ? 'tag-ok' : 'tag-warn'}">${esc(o.x.status)}</span>`],
+                                ['Resolution', esc(o.x.resolution)]]),
+    icp:      (o) => fieldRows([['Segment', esc(o.x.segment)]]) +
+                     `<ul class="tc-list">${o.x.fit.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>` +
+                     `<ul class="tc-list is-negative">${o.x.dis.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`,
+    campaign: (o) => fieldRows([['Objective', esc(o.x.objective)], ['Window', `<strong>${esc(o.x.window)}</strong>`],
+                                ['Assets', esc(o.x.assets)]]),
+    asset:    (o) => fieldRows([['Format', esc(o.x.format)], ['Usage', esc(o.x.usage)],
+                                ['Approval', approvalPill(o.x.approval)]]),
+    story:    (o) => fieldRows([['Customer', esc(o.x.customer)], ['Outcome', `<strong>${esc(o.x.outcome)}</strong>`],
+                                ['Approval', approvalPill(o.x.approval)]]) +
+                     `<div class="tc-quote">“${esc(o.x.quote)}”</div>`,
+    blog:     (o) => fieldRows([['State', esc(o.x.pub)], ['Canonical', `<span class="tc-mono">${esc(o.x.canonical)}</span>`],
+                                ['Author', esc(o.x.author)]]),
+    webpage:  (o) => fieldRows([['Source URL', `<span class="tc-mono">${esc(o.x.url)}</span>`], ['Last crawl', esc(o.x.crawl)],
+                                ['Changes', `<span class="tag ${/^None/.test(o.x.change) ? 'tag-ok' : 'tag-warn'}">${esc(o.x.change)}</span>`]])
+  };
+
+  /* ── The card ──
+
+     Two labelled facts per type, chosen as the two a reader needs before they
+     decide whether to open it. A Ticket without its resolution is useless; an
+     ICP without its region and services is not an ICP; a Success Story without
+     its client is an anecdote. The full record is one click away in the modal,
+     so the card's job is to be scannable, not complete. */
+  const CARD_FACTS = {
+    article:  (o) => [['Applies to', esc(o.x.applies)]],
+    ticket:   (o) => [['Requester', esc(o.x.requester)],
+                      ['Status', `<span class="tag ${o.x.status === 'Resolved' ? 'tag-ok' : 'tag-warn'}">${esc(o.x.status)}</span>`]],
+    icp:      (o) => [['Region', esc(REGIONS[o.region])],
+                      ['Services', esc(o.services.map((s) => SERVICES[s]).join(' · ')) || '—']],
+    campaign: (o) => [['Window', esc(o.x.window)], ['Objective', esc(o.x.objective)]],
+    asset:    (o) => [['Usage', esc(o.x.usage)], ['Approval', approvalPill(o.x.approval)]],
+    story:    (o) => [['Client', esc(CLIENTS[o.client] || '—')], ['Outcome', `<strong>${esc(o.x.outcome)}</strong>`]],
+    blog:     (o) => [['State', esc(o.x.pub)], ['Author', esc(o.x.author)]],
+    webpage:  (o) => [['Last crawl', esc(o.x.crawl)],
+                      ['Changes', `<span class="tag ${/^None/.test(o.x.change) ? 'tag-ok' : 'tag-warn'}">${esc(o.x.change)}</span>`]]
+  };
+
+  /* One classified action per card, chosen by what the object actually needs. */
+  /* One action per card, and it is the status's exit — so the card offers the
+     thing the badge implies rather than a second vocabulary of its own. */
+  function cardAction(o) {
+    if (o.arch)              return ['review', 'Restore', 'restore'];
+    if (o.work === 'failed') return ['direct', 'Check the source', 'source'];
+    /* An exit has to lead somewhere. "Go to successor" on a document with no
+       replacement recorded went nowhere and said so in a toast, which is the
+       button admitting it should not have been offered. */
+    if (o.status === 'superseded' && !(RELATED[o.id] || {}).supersededBy)
+      return ['investigate', 'Find what replaced it', 'findsuccessor'];
+    /* Re-syncing a source that is not connected queues into nothing. The
+       remedy for an out-of-date document behind a dead source is the source. */
+    if (o.status === 'outdated' && SRC[o.src].health !== 'ok')
+      return ['review', 'Reconnect ' + SRC[o.src].label, 'reconnect'];
+    return STATUS_EXIT[o.status] || ['direct', 'Open', 'open'];
+  }
+
+  /* One footer, not two. The library's card ends with a bordered, tinted
+     `.tc-gov` strip followed by a bordered `.tc-action` strip holding a
+     full-width button — two rules and a banner where one row does the job. */
+  function typeCard(o, compact) {
+    const t = TYPES[o.t];
+    const act = cardAction(o);
+    const facts = CARD_FACTS[o.t](o).concat(compact ? [] : [['Last used', esc(usedLabel(o))]]);
+    /* The whole card opens the document. The title stays a real button so the
+       keyboard has one focusable target that announces which document it is —
+       wrapping the card itself in a button would swallow the action inside it,
+       and nested buttons are invalid besides. */
+    return `<div class="type-card${compact ? ' is-compact' : ''}" data-obj="${o.id}" data-status="${o.status}"
+         data-work-state="${o.work}" data-card-open="${o.id}">
+      <div class="tc-head">
+        <span class="tc-type">${t.ico}${esc(t.label)}</span>
+        ${statusBadge(o.status, o.statusSet ? 'Set by ' + esc(o.statusBy || USER.owner) : '')}
+      </div>
+      <button class="tc-title-btn" data-open-doc="${o.id}"><span class="tc-title">${esc(o.title)}</span></button>
+      ${compact ? '' : `<div class="tc-fields">${facts.map(([l, v]) =>
+        `<span class="tc-field-label">${esc(l)}</span><span class="tc-field-val">${v}</span>`).join('')}</div>`}
+      <div class="tc-foot">
+        <span class="tc-foot-who">${esc(o.owner)}</span>
+        <span class="tc-foot-act">${entryAction(act[0], act[1], `data-card-act="${o.id}"`)}</span>
+      </div>
+    </div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     THE GRID
+
+     The result meta line carries the count, the scope it was drawn from, and
+     how many of the results are excluded from retrieval. That last number is
+     the surface-level equivalent of the answer's trust disclosure: it is the
+     difference between "there is nothing on this" and "there is something on
+     this and AiMY may not use it".
+  ═══════════════════════════════════════════════ */
+
+  /* Collections and sources have something to say about themselves. When the
+     filter names exactly one, the result line offers it — a chip would not,
+     because a single value on a dropdown axis renders as the lit dropdown and
+     no chip at all, which is precisely the case that needs the way in. */
+  function talkativeAxis(st) {
+    const named = ['collection', 'source'].filter((k) => st[k].length === 1);
+    const others = ['type', 'product', 'client', 'region', 'audience', 'status'].some((k) => st[k].length);
+    if (named.length !== 1 || others || st.ids.length) return null;
+    return { key: named[0], value: st[named[0]][0] };
+  }
+
+  function resultMeta(st, list, composed) {
+    const excluded = list.filter((o) => STATUS[o.status].excluded).length;
+    const unowned  = list.filter((o) => o.owner === 'Unassigned').length;
+    const axis = talkativeAxis(st);
+    const axisLabel = axis && (axis.key === 'collection' ? COLLECTIONS[axis.value] : SRC[axis.value].label);
+    return `<div class="rm">
+      <div class="rm-main">
+        <span class="rm-count">${list.length}</span>
+        <span class="rm-word">document${list.length === 1 ? '' : 's'}</span>
+        ${composed
+          ? `<span class="rm-note">your work</span>`
+          : axis
+            ? `<span class="rm-note">in <button class="rm-ask" data-settings="${axis.key}:${axis.value}">${esc(axisLabel)}</button></span>`
+            : `<span class="rm-note">of ${LIVE.length}</span>`}
+      </div>
+      <div class="rm-end">
+        ${entryAction('direct', 'New document', 'data-new-doc="1"', ICO.plus)}
+      </div>
+      ${excluded || unowned ? `<div class="rm-disclosure">
+        ${excluded ? `<span class="rm-flag is-err">${ICO.slash.replace('<svg', '<svg width="12" height="12"')}
+          <strong>${excluded}</strong> not used in answers</span>` : ''}
+        ${unowned ? `<span class="rm-flag is-warn">${ICO.question.replace('<svg', '<svg width="12" height="12"')}
+          <strong>${unowned}</strong> unowned</span>` : ''}
+      </div>` : ''}
+    </div>`;
+  }
+
+  function renderGrid(st) {
+    const stage = $('#wbStage');
+    const composed = isComposed(st);
+    /* The composed set arrives already ordered — yours first, then everything
+       else, each ranked by what needs a person. Re-sorting it here is what
+       silently threw the ownership half of the composition away. */
+    /* Ordering, not a control. The grid leads with the most recently updated;
+       the composed default leads with what needs a person. Neither was ever
+       something to choose, so there is nothing to choose it with. */
+    const list = composed ? composedSet() : sortSet(applyFilters(st), 'updated');
+
+    if (!list.length) { stage.innerHTML = emptyResult(st); return; }
+
+    stage.innerHTML = resultMeta(st, list, composed) +
+      `<div class="ws-grid">${list.map((o) => typeCard(o)).join('')}</div>`;
+  }
+
+  /* An empty result is a finding about the filter, not an absence. */
+  function emptyResult(st) {
+    return `<div class="empty-state k-enter">
+      <div class="empty-state-icon">${ICO.search.replace('<svg', '<svg width="20" height="20"')}</div>
+      <div class="empty-state-title">No matches</div>
+      <div class="empty-state-desc">${LIVE.length} documents, none of them matching all of these filters.</div>
+      <div class="k-row k-gap-2" style="justify-content:center;margin-top:14px">
+        <button class="btn btn-brand btn-sm" data-clear-all>Clear filters</button>
+      </div>
+    </div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     THE DOCUMENT MODAL — viewer (AIMY-1145) and editor (AIMY-1146)
+
+     A document opens OVER the workbench, never instead of it. Same frame as the
+     canvas: absolute inside .app-main, blurred backdrop, the briefing rail and
+     the input still live, Escape closes, focus returns to whatever opened it.
+
+     `?doc=` and `&mode=` still drive it. The modal is how it renders; the URL is
+     still what it is.
+  ═══════════════════════════════════════════════ */
+  const BODY_COPY = {
+    article: ['This is the stored body — what AiMY answers from, which is not always what the live source says.'],
+    icp: ['Fit is assessed on the criteria below, in order. A prospect failing any disqualifier is out regardless of how well it scores elsewhere.'],
+    ticket: ['Ingested from the source system. Ticket content is evidence, not policy — it records what was decided once, for one customer.'],
+    story: ['Cleared claims only. Anything not listed as an outcome has not been measured and must not be repeated externally.'],
+    campaign: ['Campaign records are operational, not promotional. The asset list is the authority on what may be sent.'],
+    asset: ['Approval and usage rights travel with the asset. Verified is not the same as cleared for external use.'],
+    blog: ['Published content. The canonical URL is what search engines and customers see; this is the copy AiMY grounds on.'],
+    webpage: ['Crawled content. Where the live page has changed since the last crawl, what is stored here is what AiMY answers from.']
+  };
+
+  /* Grounding, stated on the document rather than in a matrix. This is the fact
+     a person actually needs about governance — can an agent answer from this —
+     and it belongs where the document is. */
+  function groundingRow(o) {
+    const g = COLLECTION_META[o.col].grounding;
+    return `<div class="dv-grounding">
+      <span class="dv-prov-label">Grounding</span>
+      <span class="dv-ground-list">${AGENTS.map((a) => `<span class="dv-ground ${g[a.id] ? 'is-on' : 'is-off'}${g[a.id] && a.external ? ' is-external' : ''}">
+        ${(g[a.id] ? ICO.check : ICO.slash).replace('<svg', '<svg width="11" height="11"')}${esc(a.name)}${a.external ? ' · customer-facing' : ''}</span>`).join('')}</span>
+      <button class="dv-ground-edit" data-open-axis="collection:${o.col}">Set for ${esc(COLLECTIONS[o.col])} →</button>
+    </div>`;
+  }
+
+  function provenanceRow(o) {
+    const s = SRC[o.src];
+    return `<div class="dv-prov">
+      <div class="dv-prov-item"><span class="dv-prov-label">Source</span>
+        <span class="dv-prov-val"><span class="status-dot ${s.health === 'ok' ? 'sd-ok' : s.health === 'warn' ? 'sd-warn' : 'sd-err'}"></span>${esc(s.label)}</span></div>
+      <div class="dv-prov-item"><span class="dv-prov-label">Ingested</span><span class="dv-prov-val">${esc(fmtDate(o.ing))}</span></div>
+      <div class="dv-prov-item"><span class="dv-prov-label">Created at source</span><span class="dv-prov-val">${esc(fmtDate(o.xc))}</span></div>
+      <div class="dv-prov-item"><span class="dv-prov-label">Changed at source</span><span class="dv-prov-val${o.xu < o.upd ? ' is-overdue' : ''}">${esc(fmtDate(o.xu))}</span></div>
+      <div class="dv-prov-act">
+        ${SRC[o.src].health === 'ok'
+          ? entryAction('direct', 'Re-sync from source', `data-act="resync" data-obj="${o.id}"`)
+          : entryAction('review', 'Reconnect ' + esc(SRC[o.src].label), `data-act="reconnect" data-obj="${o.id}"`)}
+        ${o.xu < o.upd ? `<span class="dv-prov-note">The source changed after our copy.</span>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function propsRow(o) {
+    const keys = Object.keys(o.props);
+    if (!keys.length) return '';
+    return `<div class="dv-props">
+      <span class="dv-prov-label">Custom properties</span>
+      <div class="dv-prop-list">${keys.map((k) =>
+        `<button class="dv-prop" data-prop="${esc(k)}:${esc(o.props[k])}">
+          <span class="dv-prop-k">${esc(k)}</span><span class="dv-prop-v">${esc(o.props[k])}</span></button>`).join('')}</div>
+    </div>`;
+  }
+
+  function relRow(o) {
+    const r = RELATED[o.id];
+    if (!r) return '';
+    const grp = (label, ids, contradiction) => !ids || !ids.length ? '' : `
+      <div class="dv-rel-group">
+        <span class="dv-rel-label">${esc(label)}</span>
+        <span class="dv-rel-items">${ids.map((id) => {
+          const x = byId(id);
+          /* Opening the other document answers nothing — you would be looking
+             at one of the two things that disagree. Comparing is the act. */
+          return x ? `<button class="dv-rel-item${contradiction ? ' is-contradiction' : ''}"
+            ${contradiction ? `data-compare-with="${o.id}"` : `data-open-doc="${x.id}"`}>
+            ${contradiction ? ICO.warn : TYPES[x.t].ico}<span>${esc(x.title)}</span></button>` : '';
+        }).join('')}</span>
+      </div>`;
+    return `<div class="dv-rel">
+      ${grp('Related', r.related)}
+      ${grp('Contradicts', r.contradicts, true)}
+      ${r.supersededBy ? grp('Superseded by', [r.supersededBy]) : ''}
+    </div>`;
+  }
+
+  /* Versions, fixtures. The mind map lists seeing versions under VIEWING as
+     well as editing, so the viewer carries them too — collapsed, because a
+     reader deciding whether to trust content needs to know a history exists
+     before they need to read it. */
+  /* Each version carries the body it held, so opening one shows what the
+     document actually said then rather than a label claiming it changed. */
+  /* Versions are data, not a computed fixture.
+
+     They used to be derived from the object on every render, which meant
+     nothing could ever be added to them: accepting an AiMY rewrite changed the
+     body and the history said the same three things it always had. Now each
+     version carries the body it held, newest first, and every change that
+     alters the text appends one. */
+  const VERSIONS = (o) => o.versions || [];
+
+  const VERSION_BODY = (o, i) => (VERSIONS(o)[i] || {}).body || o.sum;
+
+  function seedVersions(o) {
+    o.versions = [
+      { v: 'v3', label: 'Clarified the ' + TYPES[o.t].label.toLowerCase() + ' scope',
+        who: o.owner, how: 'edited in the document editor', at: o.upd, body: o.sum, current: true },
+      { v: 'v2', label: 'Rewritten from 12 resolved tickets', who: 'AiMY', how: 'accepted by ' + o.owner,
+        at: o.upd + 26, ai: true, body: 'Rewritten from twelve resolved tickets. ' + o.sum },
+      { v: 'v1', label: 'Imported from ' + SRC[o.src].label, who: 'A. Mahfouz', how: 'first ingestion',
+        at: o.ing, body: 'Imported from ' + SRC[o.src].label + '. ' + (o.sum || '').split('.')[0] + '.' }
+    ];
+  }
+
+  /* Appends a version and makes it current. `body` is what the document now
+     says, so restoring an older one has something real to restore to. */
+  function addVersion(o, label, who, how, body, ai) {
+    o.versions = o.versions || [];
+    o.versions.forEach((v) => { v.current = false; });
+    const n = o.versions.length + 1;
+    const text = body === undefined ? o.sum : body;
+    o.versions.unshift({
+      v: 'v' + n, label: label, who: who, how: how, at: 0,
+      body: text, ai: !!ai, current: true,
+      /* The markup goes with it. A version that only kept plain text meant
+         restoring one silently flattened every heading and list in it. */
+      html: body === undefined ? o.html : (text === o.sum ? o.html : '')
+    });
+    previewVer = null;
+  }
+
+  /* Rows are buttons in the editor, where opening one has somewhere to go, and
+     plain rows in the viewer, where it does not. A row that looks pressable and
+     is not is worse than one that never offered. */
+  const versionList = (o, pickable) => `<div class="ver-list">${VERSIONS(o).map((x, i) => {
+    const inner = `<span class="ver-mark">${x.ai ? AIMY_MARK(10, 11) : esc(x.v)}</span>
+      <div class="ver-main">
+        <div class="ver-label">${esc(x.label)}</div>
+        <div class="ver-author"><strong>${esc(x.who)}</strong> · ${esc(x.how)}</div>
+      </div>
+      <div class="ver-side">${x.current ? '<span class="ver-tag">Current</span>' : ''}<span class="ver-time">${esc(fmtShort(x.at))}</span></div>`;
+    const cls = `ver-item${x.current ? ' is-current' : ''}${x.ai ? ' is-ai' : ''}` +
+                (pickable ? ' is-pickable' : '') + (previewVer === i ? ' is-viewing' : '');
+    return pickable
+      ? `<button class="${cls}" data-open-ver="${i}" aria-pressed="${previewVer === i}">${inner}</button>`
+      : `<div class="${cls}">${inner}</div>`;
+  }).join('')}</div>`;
+
+  /* ── The overlay itself ── */
+  const docModal = {
+    el: null, sheet: null, open: false,
+    /* The id of the document that was opened, not the element that opened it:
+       the grid re-renders while the modal is up, so the original node is gone
+       by the time focus needs to go back to it. The id survives, and the card
+       for that id is what the user was looking at. */
+    openerId: null,
+
+    init() {
+      this.el = $('#docOverlay');
+      this.sheet = $('#docSheet');
+      if (!this.el) return;
+      document.addEventListener('keydown', (e) => {
+        if (!this.open) return;
+        if (e.key === 'Escape' && !canvas.open && !$('#commitHost').innerHTML) { e.preventDefault(); this.close(); }
+        if (e.key === 'Tab') this.trap(e);
+      });
+      this.el.addEventListener('mousedown', (e) => { if (e.target === this.el) this.close(); });
     },
-    consumer: {
-      id: 'consumer',
-      name: 'Lina Haddad', initials: 'LH', role: 'Contact-centre agent',
-      collections: ['policies', 'support'],
-      sourcesAdmin: false,
-      owns: 0,
-      queriesPerWeek: 63,
-      signals: true
+
+    /* Focus is trapped while a document is open, and handed back to the control
+       that opened it on close. Without the hand-back a keyboard user lands at
+       the top of the document list every time they close a document. */
+    trap(e) {
+      const f = $$('a[href],button:not([disabled]),input:not([disabled]),textarea,[contenteditable="true"],[tabindex]:not([tabindex="-1"])', this.sheet)
+        .filter((x) => x.offsetParent !== null);
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     },
-    limited: {
-      id: 'limited',
-      name: 'Omar Said', initials: 'OS', role: 'Compliance reviewer',
-      collections: ['policies'],
-      sourcesAdmin: false,
-      owns: 6,
-      queriesPerWeek: 4,
-      signals: false     // §9.3 — composition degrades to entitlement-only
+
+    show(html, id) {
+      /* Opening a document from inside the canvas used to leave the canvas
+         sitting on top of it. The thread survives — the AiMY mark on the input
+         reopens it — but only one of the two can be the thing you are reading. */
+      if (!this.open && canvas.open) canvas.close({ quiet: true });
+      /* Same rule the other way: opening a document from inside the settings
+         sheet closes the sheet. Two overlays stacked on each other is two
+         things claiming to be what you are looking at. */
+      if (!this.open && setModal.open) setModal.close();
+      if (id && !this.open) this.openerId = id;
+      /* A repaint of the document you are already reading must not move you.
+         Resetting the scroll on every render meant that editing a property,
+         adding a comment or re-syncing threw you to the top — the change did
+         happen, and you were carried away from it. */
+      const fresh = !this.open || id !== this.shownId;
+      const keep = fresh ? 0 : this.sheet.scrollTop;
+      this.shownId = id || null;
+      this.sheet.innerHTML = html;
+      this.sheet.scrollTop = keep;
+      if (!this.open) {
+        this.el.hidden = false;
+        void this.el.offsetWidth;
+        this.el.classList.add('open');
+        this.open = true;
+      }
+      const focusTarget = $('[data-doc-close]', this.sheet);
+      if (focusTarget) setTimeout(() => focusTarget.focus(), 60);
+    },
+
+    close() {
+      if (!this.open) return;
+      this.el.classList.remove('open');
+      this.open = false;
+      setTimeout(() => { this.el.hidden = true; this.sheet.innerHTML = ''; }, 220);
+      const id = this.openerId;
+      this.openerId = null;
+      /* The URL is the state, so closing is a URL change, not a DOM change. */
+      const st = readURL();
+      if (st.doc) patch({ doc: '', mode: 'view' });
+      /* Focus returns to the card for that document, re-found after the grid
+         re-rendered. Without it a keyboard user lands back at the top of the
+         page every time they close a document. */
+      setTimeout(() => {
+        const back = id && $(`[data-open-doc="${id}"]`);
+        if (back) back.focus();
+      }, 60);
     }
   };
 
-  function activeProfile() {
-    return PROFILES[params.get('as')] || PROFILES.owner;
+  /* ── The settings sheet ──
+
+     The same overlay as a document, because it is the same kind of thing:
+     something you open over the work, act on, and close. It replaced a fake
+     conversation — clicking a settings row pushed "Tell me about Confluence"
+     into the thread as though you had said it, and answered with facts and a
+     button per field that each opened its own dialog. None of that was editing
+     settings. */
+  const setModal = {
+    el: null, sheet: null, open: false, openerSel: null,
+
+    init() {
+      this.el = $('#setOverlay');
+      this.sheet = $('#setSheet');
+      if (!this.el) return;
+      document.addEventListener('keydown', (e) => {
+        if (!this.open) return;
+        if (e.key === 'Escape' && !$('#commitHost').innerHTML) { e.preventDefault(); this.close(); }
+        if (e.key === 'Tab') this.trap(e);
+      });
+      this.el.addEventListener('mousedown', (e) => { if (e.target === this.el) this.close(); });
+    },
+
+    trap(e) { docModal.trap.call(this, e); },
+
+    show(html, key) {
+      /* One thing at a time on top of the work. */
+      if (!this.open && canvas.open) canvas.close({ quiet: true });
+      if (!this.open && docModal.open) docModal.close();
+      const fresh = !this.open || key !== this.shownKey;
+      const keep = fresh ? 0 : this.sheet.scrollTop;
+      this.shownKey = key || null;
+      this.sheet.innerHTML = html;
+      this.sheet.scrollTop = keep;
+      if (!this.open) {
+        this.el.hidden = false;
+        void this.el.offsetWidth;
+        this.el.classList.add('open');
+        this.open = true;
+        const f = $('[data-set-close]', this.sheet);
+        if (f) setTimeout(() => f.focus(), 60);
+      }
+    },
+
+    close() {
+      if (!this.open) return;
+      this.el.classList.remove('open');
+      this.open = false;
+      setTimeout(() => { this.el.hidden = true; this.sheet.innerHTML = ''; }, 220);
+      if (readURL().settings) patch({ settings: '' });
+      setTimeout(() => { const back = $('.rail-set-name'); if (back) back.focus(); }, 60);
+    }
+  };
+
+  /* Version history belongs in the chrome, not at the bottom of the body. The
+     mind map puts seeing versions under VIEWING, and a collapsed panel below a
+     long document is only found by someone who already knew it was there. */
+  /* When each document was last written, this session. A document with nothing
+     in it reports nothing — there is no save to report. */
+  const savedClock = {};
+  function noteSave(o) {
+    if (!o || !String(o.sum || '').trim()) return;
+    const d = new Date();
+    savedClock[o.id] = { at: d.getTime(),
+      clock: String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') };
+    const el = $('#docSaved');
+    if (el) el.innerHTML = ICO.check.replace('<svg', '<svg width="12" height="12"') + 'Saved just now';
   }
 
-  /* ═══════════════════════════════════════════════
-     BLOCK INVENTORY — the nine declared blocks of §10.3
+  function savedLabel(o) {
+    const rec = savedClock[o.id];
+    if (!rec) return '';
+    const fresh = Date.now() - rec.at < 60000;
+    return `<span class="doc-saved" id="docSaved">${ICO.check.replace('<svg', '<svg width="12" height="12"')}` +
+           `${fresh ? 'Saved just now' : 'Saved · ' + rec.clock}</span>`;
+  }
 
-     Each block declares three things and nothing else: who may see it
-     (entitlement), how much it matters to this person right now (relevance),
-     and its standing rank (weight). Composition is therefore a content model,
-     settled before layout — §9.3 is explicit that laying out a fixed briefing
-     and retrofitting composition produces a surface that only works for
-     whoever it was drawn for.
+  const docChrome = (o, mode, blank) => `
+    <div class="doc-bar">
+      <span class="doc-bar-crumb">${TYPES[o.t].ico}${esc(TYPES[o.t].label)}
+        <span class="doc-bar-sep">/</span>${esc(COLLECTIONS[o.col])}</span>
+      <span class="doc-bar-end">
+        ${mode === 'view'
+          ? `<button class="btn btn-ghost btn-sm" data-versions="${o.id}">
+               ${ICO.clock.replace('<svg', '<svg width="13" height="13"')}v${VERSIONS(o).length} · History</button>
+             <button class="btn btn-ghost btn-sm" data-edit-doc="${o.id}">${ICO.pen.replace('<svg', '<svg width="13" height="13"')}Edit</button>`
+          /* Every edit writes through as you type, so Saved is a state rather
+             than a button — a control that saves what is already saved teaches
+             people not to trust the word. What is left to do is publish.
+             It has to MOVE, though: a chip that says Saved from the moment a
+             document opens, including one that has never held anything, is
+             decoration in the shape of a status. */
+          : `${savedLabel(o)}
+             ${blank ? `<button class="btn btn-ghost btn-sm" data-discard="${o.id}">Discard</button>` : ''}
+             ${o.status === 'draft'
+               /* Disabled and stating the reason. A control that looks
+                  available and silently does nothing is the thing that teaches
+                  people to distrust every other control. */
+               ? `<button class="btn btn-brand btn-sm" data-act="publish" data-obj="${o.id}" data-publish
+                    ${String(o.sum || '').trim() ? '' : 'disabled title="A document with no content cannot go live"'}
+                  >${String(o.sum || '').trim() ? 'Publish' : 'Add some content first'}</button>`
+               /* A check, not an eye. It ends the edit; an eye draws "look at
+                  this", which is the one thing it does not mean. */
+               : `<button class="btn btn-ghost btn-sm" data-view-doc="${o.id}">${ICO.check.replace('<svg', '<svg width="13" height="13"')}Done</button>`}`}
+        <button class="doc-close" data-doc-close aria-label="Close document">
+          ${ICO.x.replace('<svg', '<svg width="15" height="15"')}</button>
+      </span>
+    </div>`;
 
-     relevance() returns 0 to mean "this block cannot earn a place for this
-     user", which is different from "this user is not entitled to it".
-  ═══════════════════════════════════════════════ */
-  const BLOCKS = [
-    {
-      id: 'expired',
-      kind: 'bcard',
-      chart: false,
-      base: 100,
-      entitled: (p) => p.owns > 0,
-      relevance: (p) => (p.signals ? p.owns * 2.2 : 40),
-      render: () => card({
-        tone: 'err', severity: 'busy', label: 'Excluded from answers',
-        state: ['detected'], priority: ['P1 · Critical', 'tag-err'],
-        conclusion: 'Four articles you own passed their review date and are no longer used to answer questions. ' +
-          'Two of them carried <strong>61 questions</strong> in the last 30 days — those questions now resolve from ' +
-          'weaker sources or not at all.',
-        evidence: [trustState('expired'), pill('4', 'articles'), pill('61', 'questions affected', 'err'), confBadge('high')],
-        action: entryAction('review', 'Request verification for 4 objects', 'data-act="verify-expired"'),
-        note: 'Reviewed action · goes to a commit surface with the owner list before anything is sent.'
-      })
-    },
-    {
-      id: 'due',
-      kind: 'bcard',
-      chart: false,
-      base: 78,
-      entitled: (p) => p.owns > 0,
-      relevance: (p) => (p.signals ? p.owns * 1.5 : 34),
-      render: () => card({
-        tone: 'warn', severity: 'away', label: 'Due for review',
-        state: ['recommended'], priority: ['P2 · High', 'tag-warn'],
-        conclusion: 'Six articles you own reach their review date within 14 days. Ranked by query volume, so the ' +
-          'content that lapses loudest is first: <strong>Refund eligibility — EU</strong> answered 214 questions this month.',
-        evidence: [trustState('due'), pill('6', 'articles'), pill('214', 'top-article queries'), confBadge('high')],
-        action: entryAction('review', 'Verify or update 6 articles', 'data-act="verify-due"'),
-        note: 'Ranked by query volume, not by date — the most-used content is verified first.'
-      })
-    },
-    {
-      id: 'gaps',
-      kind: 'aggregate',
-      chart: false,
-      base: 72,
-      entitled: () => true,
-      relevance: (p) => (p.signals ? 30 + p.queriesPerWeek * 0.9 : 46),
-      render: () => aggCard({
-        tone: 'warn', severity: 'away', label: 'Coverage gaps',
-        state: ['detected'],
-        conclusion: '<strong>38 questions</strong> in the last 30 days had no grounded answer. Four topics account ' +
-          'for most of them, and the top one has been asked in every week of that window.',
-        stats: [['38', 'Unanswered'], ['4', 'Topics'], ['↑ 12', 'vs prior 30d']],
-        rows: [
-          ['Refunds after activation', 11, 1],
-          ['SSO provisioning — enterprise', 9, 0.82],
-          ['Data residency — EU', 7, 0.64],
-          ['Contract exit terms', 5, 0.45]
-        ],
-        more: '+ 6 more topics · 6 questions combined',
-        action: entryAction('prompt', 'Draft content for top gap', 'data-act="draft-gap"'),
-        note: 'Prepared prompt · the question is composed for you; you send it.'
-      })
-    },
-    {
-      id: 'contradictions',
-      kind: 'bcard',
-      chart: false,
-      base: 96,
-      entitled: (p) => p.owns > 0,
-      relevance: (p) => (p.signals ? 60 + p.owns * 0.8 : 38),
-      render: () => card({
-        tone: 'err', severity: 'busy', label: 'Contradiction',
-        state: ['detected'], priority: ['P1 · Critical', 'tag-err'],
-        conclusion: 'Two live objects give conflicting answers on refunds after activation. <strong>Both are verified</strong>, ' +
-          'so retrieval treats them as equally authoritative and the answer depends on which one ranks first.',
-        evidence: [pill('2', 'objects'), pill('Both', 'verified', 'warn'), confBadge('medium'),
-          '<span style="font-size:11px;color:var(--d400);line-height:1.5;display:block;margin-top:6px">' +
-          'Medium confidence: the two passages conflict on the activated-item exception, but one may be scoped to a ' +
-          'storefront the other does not mention.</span>'],
-        action: entryAction('investigate', 'Compare and resolve', 'data-act="compare"'),
-        note: 'Automatic investigation · the canvas opens and the comparison runs immediately.'
-      })
-    },
-    {
-      id: 'lowconf',
-      kind: 'bcard',
-      chart: false,
-      base: 64,
-      entitled: () => true,
-      relevance: (p) => (p.signals ? 24 + p.queriesPerWeek * 0.5 : 30),
-      render: () => card({
-        tone: 'warn', severity: 'away', label: 'Low-confidence answers served',
-        state: ['detected'], priority: null,
-        conclusion: 'Nine answers went out at low confidence this week. Seven were limited by the same thing: ' +
-          'no source covers the <strong>activated-item exception</strong>.',
-        evidence: [pill('9', 'answers'), pill('7', 'share one cause'), confBadge('low'),
-          '<span style="font-size:11px;color:var(--d400);line-height:1.5;display:block;margin-top:6px">' +
-          'Low confidence: the answers were grounded in a single passage that does not state the exception, and the ' +
-          'article that would have covered it is expired.</span>'],
-        action: entryAction('investigate', 'Review the limiting sources', 'data-act="lowconf"'),
-        note: null
-      })
-    },
-    {
-      id: 'drafts',
-      kind: 'bcard',
-      chart: false,
-      base: 58,
-      entitled: (p) => p.owns > 0,
-      relevance: (p) => (p.signals ? 20 + p.owns * 0.5 : 26),
-      render: () => card({
-        tone: 'ok', severity: 'online', label: 'Drafts awaiting review',
-        state: ['drafted'], priority: null,
-        conclusion: 'AiMY drafted three articles from resolved tickets and staged them for you. None are published, ' +
-          'and none are used to answer questions until you accept them.',
-        evidence: [pill('3', 'drafts'), pill('12', 'source tickets'), confBadge('medium'),
-          '<span style="font-size:11px;color:var(--d400);line-height:1.5;display:block;margin-top:6px">' +
-          'Medium confidence: each draft generalises from 3–5 tickets, which is enough for a pattern but not enough ' +
-          'to settle edge cases.</span>'],
-        action: entryAction('review', 'Review 3 drafts', 'data-act="drafts"'),
-        note: 'Accept · Edit · Reject. Edit is not optional and nothing applies silently.'
-      })
-    },
-    {
-      id: 'sources',
-      kind: 'aggregate',
-      chart: false,
-      base: 84,
-      entitled: (p) => p.sourcesAdmin,
-      relevance: () => 70,
-      render: () => aggCard({
-        tone: 'err', severity: 'busy', label: 'Source health',
-        state: ['failed', 'Blocked'],
-        conclusion: 'Two connected sources stopped syncing. Zendesk last succeeded <strong>6 days ago</strong>, so ' +
-          'tickets resolved since then are not in the corpus and cannot be cited.',
-        stats: [['2', 'Failing'], ['6d', 'Longest gap'], ['214', 'Cards behind']],
-        rows: [
-          ['Zendesk — Support tickets', '6d', 1, 'err'],
-          ['Confluence — Policies space', '2d', 0.4, 'err']
-        ],
-        more: null,
-        action: entryAction('direct', 'Reconnect Zendesk', 'data-act="reconnect"'),
-        note: 'Direct action · completes in place, with Undo.'
-      })
-    },
-    {
-      id: 'resolved',
-      kind: 'bcard',
-      chart: false,
-      base: 20,
-      entitled: () => true,
-      relevance: () => 18,
-      render: () => card({
-        tone: 'ok', severity: 'online', label: 'Recently resolved',
-        state: ['completed', 'Handled'], priority: null,
-        conclusion: 'The SSO provisioning gap raised on 12 July is closed. A new article was published, verified, ' +
-          'and has answered <strong>23 questions</strong> since — none of them at low confidence.',
-        evidence: [pill('23', 'questions answered'), pill('0', 'low-confidence', 'ok')],
-        action: entryAction('direct', 'View audit trail', 'data-act="audit"'),
-        note: null,
-        tail: '<span style="font-size:10.5px;color:var(--d500)">Published 18 Jul · verified by A. Mahfouz</span>'
-      })
-    },
-    {
-      id: 'trend',
-      kind: 'chart',
-      chart: true,
-      base: 14,
-      entitled: () => true,
-      relevance: () => 12,
-      render: () => trendCard()
-    }
+  function renderViewer(st) {
+    const o = byId(st.doc);
+    if (!o) { patch({ doc: '' }, { replace: true }); return; }
+    const s = STATUS[o.status];
+
+    /* A notice only where there is a consequence to state. Out of date is a
+       condition, not an exclusion — it still answers, and the answer says so. */
+    const notice = (s.excluded || o.arch || o.status === 'outdated') ? `
+      <div class="dv-notice is-${o.arch || o.status === 'superseded' ? 'superseded' : 'expired'}">
+        ${o.arch ? ICO.box : o.status === 'superseded' ? ICO.arrow : ICO.refresh}
+        <span class="dv-notice-text"><strong>${o.arch ? 'Archived.' : o.status === 'superseded' ? 'Replaced.' : 'Out of date.'}</strong>
+        ${o.arch
+          ? 'Kept whole and restorable. Not used in answers.'
+          : o.status === 'superseded'
+            ? 'A newer document replaced it. Not used in answers.'
+            : esc(SRC[o.src].label) + ' changed after our copy. Still used in answers, and answers say so.'}</span>
+        ${o.arch || o.status === 'superseded'
+          ? `<button class="dv-notice-link" data-act="${o.arch ? 'restore' : 'successor'}" data-obj="${o.id}">
+               ${o.arch
+                 ? 'Restore it →'
+                 : (RELATED[o.id] || {}).supersededBy ? 'Go to the current one →' : 'Find what replaced it →'}</button>`
+          : ''}
+      </div>` : '';
+
+    docModal.show(`
+      ${docChrome(o, 'view')}
+      <div class="doc-scroll">
+        <div class="doc-view" data-status="${o.status}" data-work-state="${o.work}">
+          <div class="dv-head">
+            <div class="dv-meta">${statusBadge(o.status)}
+              ${o.region ? `<button class="tag tag-neutral tc-tag" data-add-region="${o.region}">${esc(REGIONS[o.region])}</button>` : ''}
+              ${o.client ? `<button class="tag tag-neutral tc-tag" data-add-client="${o.client}">${esc(CLIENTS[o.client])}</button>` : ''}
+            </div>
+            <h2 class="dv-title">${esc(o.title)}</h2>
+          </div>
+
+          <div class="dv-gov">
+            <div class="dv-gov-item"><span class="dv-gov-label">Owner</span><span class="dv-gov-val">${esc(o.owner)}</span></div>
+            <div class="dv-gov-item"><span class="dv-gov-label">Last updated</span><span class="dv-gov-val">${esc(fmtDate(o.upd))}</span></div>
+            <div class="dv-gov-item"><span class="dv-gov-label">Last used</span><span class="dv-gov-val${o.status === 'unused' ? ' is-overdue' : ''}">${esc(usedLabel(o))} · ${o.uses} times in 90 days</span></div>
+            <div class="dv-gov-item"><span class="dv-gov-label">Visible to</span><span class="dv-gov-val">${o.aud.map((a) =>
+              `<button class="dv-aud" data-add-audience="${a}">${esc(AUDIENCE[a])}</button>`).join('')}</span></div>
+          </div>
+          ${groundingRow(o)}
+          ${notice}
+
+          <div class="dv-body">
+            <p>${esc(o.sum)}</p>
+            ${(BODY_COPY[o.t] || []).map((p) => `<p>${esc(p)}</p>`).join('')}
+          </div>
+
+          <div class="dv-section">
+            <div class="dv-section-label">${esc(TYPES[o.t].label)} detail</div>
+            ${TEMPLATE[o.t](o)}
+          </div>
+
+          <div class="dv-tags">
+            <span class="dv-prov-label">Tags</span>
+            ${o.tags.map((tg) => `<button class="tag tag-neutral tc-tag" data-add-tag="${esc(tg)}">${esc(tg)}</button>`).join('')}
+            ${o.services.map((sv) => `<button class="tag tag-neutral tc-tag" data-add-service="${esc(sv)}">${esc(SERVICES[sv])}</button>`).join('')}
+          </div>
+          ${propsRow(o)}
+          ${provenanceRow(o)}
+          ${relRow(o)}
+
+          <details class="dv-versions" id="docVersions">
+            <summary class="dv-versions-head">Versions <span class="dv-versions-n">${VERSIONS(o).length}</span></summary>
+            ${versionList(o)}
+            <div class="ver-restore">
+              <div class="vr-effect">
+                ${ICO.warn.replace('<svg', '<svg style="width:13px;height:13px;flex-shrink:0"')}
+                <span>Restoring changes what <strong>${AGENTS.filter((a) => COLLECTION_META[o.col].grounding[a.id]).length} consuming agent(s)</strong>
+                answer from. History is preserved — restore adds a new version rather than deleting the ones it supersedes.</span>
+              </div>
+              <button class="btn btn-ghost btn-sm" data-restore="${o.id}">Restore ${esc(fmtShort(o.ing))} version</button>
+            </div>
+          </details>
+
+          <div class="dv-actions">
+            <span class="dv-actions-end">
+              <button class="cite-action" data-act="report" data-obj="${o.id}">${ICO.flag}Report a problem</button>
+              <button class="cite-action" data-act="${o.arch ? 'restore' : 'archive'}" data-obj="${o.id}">${ICO.box}${o.arch ? 'Restore' : 'Archive'}</button>
+              ${o.arch ? `<button class="cite-action is-danger" data-act="delete" data-obj="${o.id}">${ICO.x}Delete</button>` : ''}
+            </span>
+          </div>
+        </div>
+      </div>`, o.id);
+  }
+
+  /* ── Editor (AIMY-1146): toolbar, formatting, comments, versions, AI ── */
+  const TOOLBAR = [
+    ['bold', '<strong>B</strong>', 'Bold'], ['italic', '<em>I</em>', 'Italic'],
+    ['underline', '<span style="text-decoration:underline">U</span>', 'Underline'], ['|'],
+    ['formatBlock:h3', 'H2', 'Heading'], ['formatBlock:h4', 'H3', 'Subheading'], ['|'],
+    ['insertUnorderedList', '&#8226;&#8202;&#8212;', 'Bulleted list'],
+    ['insertOrderedList', '1.&#8202;&#8212;', 'Numbered list'],
+    ['formatBlock:blockquote', '&#8220;', 'Quote'], ['|'],
+    ['undo', '&#8630;', 'Undo'], ['redo', '&#8631;', 'Redo']
   ];
 
   /* ═══════════════════════════════════════════════
-     COMPOSITION (§9.2)
+     THE EDITOR (AIMY-1146)
 
-     Entitlement is a hard filter and must be visibly true: a briefing that
-     silently includes inaccessible material is both a trust failure and a
-     leak. Relevance only orders what survived it.
+     Editor state that is not the document's: which right-hand tab is open, and
+     which version is being previewed. Both are view state, so neither belongs
+     in the URL — reopening an editor on the Properties tab is not a place
+     anyone would want to link to.
   ═══════════════════════════════════════════════ */
-  const BUDGET_BLOCKS = 9;
-  const BUDGET_CHARTS = 2;
+  let editorTab = 'props';
+  let previewVer = null;
 
-  function compose(profile) {
-    const eligible = BLOCKS
-      .filter((b) => b.entitled(profile))
-      .map((b) => ({ block: b, score: profile.signals ? b.relevance(profile) : b.base }))
-      .filter((x) => x.score > 0)
-      .sort((a, b) => b.score - a.score);
+  const OWNERS = ['N. Wael', 'A. Mahfouz', 'O. Said', 'Sales Ops', 'Marketing', 'Brand', 'Legal', 'Unassigned'];
 
-    const rendered = [];
-    const displaced = [];
-    let charts = 0;
+  /* Every property is a control that writes straight through to the object.
+     Status is shown and not set: it is derived, and a field you could type into
+     would be the attestation model coming back through a side door. */
+  const PROP_FIELDS = [
+    { key: 't',      label: 'Type',       map: () => opts(TYPES) },
+    { key: 'col',    label: 'Collection', map: () => opts(COLLECTIONS) },
+    { key: 'owner',  label: 'Owner',      map: () => OWNERS.map((x) => [x, x]) },
+    { key: 'prod',   label: 'Product',    map: () => opts(PRODUCTS), blank: 'None' },
+    { key: 'client', label: 'Client',     map: () => opts(CLIENTS), blank: 'None' },
+    { key: 'region', label: 'Region',     map: () => opts(REGIONS) }
+  ];
 
-    eligible.forEach((x) => {
-      const overBlocks = rendered.length >= BUDGET_BLOCKS;
-      const overCharts = x.block.chart && charts >= BUDGET_CHARTS;
-      if (overBlocks || overCharts) {
-        displaced.push({ block: x.block, why: overCharts ? 'chart budget' : 'block budget' });
-        return;
-      }
-      if (x.block.chart) charts += 1;
-      rendered.push(x.block);
+  function propDropdown(f, o) {
+    const cur = o[f.key] || '';
+    const rows = [['', f.blank || '—', f.blank || '—']].concat(f.map().map(([v, l]) => [v, l, l]));
+    const label = rows.reduce((acc, r) => (r[0] === cur ? r[1] : acc), f.blank || '—');
+    return `<div class="v2-dropdown k-prop" data-prop-key="${f.key}">
+      <button class="v2-dropdown-btn" type="button" aria-haspopup="listbox" aria-expanded="false"
+              aria-label="${esc(f.label)}">
+        <span class="dd-label-text">${esc(label)}</span>
+        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+      </button>
+      <div class="v2-dropdown-panel" role="listbox">
+        ${rows.map(([v, value, text]) => `<div class="v2-dropdown-option${v === cur ? ' selected' : ''}"
+          role="option" aria-selected="${v === cur}" data-value="${esc(value)}" data-slug="${esc(v)}">${esc(text)}</div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  const tagField = (o, key, label, lookup) => `
+    <div class="prop-row">
+      <span class="prop-label">${esc(label)}</span>
+      <div class="tag-input" data-tag-field="${key}">
+        ${(o[key] || []).map((v) => `<span class="tag-token">${esc(lookup ? lookup[v] || v : v)}
+          <button type="button" data-tag-drop="${esc(v)}" aria-label="Remove ${esc(v)}">&times;</button></span>`).join('')}
+        <input type="text" placeholder="Add…" aria-label="Add ${esc(label)}" data-tag-add="${key}">
+      </div>
+    </div>`;
+
+  function propsPanel(o) {
+    return `<div class="props">
+      <div class="prop-row">
+        <span class="prop-label">Status</span>
+        <div class="prop-status">
+          ${propDropdown({ key: 'statusSet', label: 'Status', blank: 'Automatic',
+                           map: () => Object.keys(STATUS).map((k) => [k, STATUS[k].label]) }, o)}
+          <span class="prop-why">${o.statusSet
+            ? 'Set by ' + esc(o.statusBy || USER.owner) + '. Choose Automatic to compute it again.'
+            : esc(STATUS[o.status].why)}</span>
+        </div>
+      </div>
+      ${PROP_FIELDS.map((f) => `<div class="prop-row">
+        <span class="prop-label">${esc(f.label)}</span>${propDropdown(f, o)}</div>`).join('')}
+      ${tagField(o, 'tags', 'Tags')}
+      ${tagField(o, 'services', 'Services', SERVICES)}
+      <div class="prop-row">
+        <span class="prop-label">Visible to</span>
+        <div class="prop-checks">${Object.keys(AUDIENCE).map((a) => `
+          <label class="ds-choice"><input type="checkbox" data-aud="${a}"${o.aud.indexOf(a) > -1 ? ' checked' : ''}>
+            <span></span><span class="prop-check-label">${esc(AUDIENCE[a])}</span></label>`).join('')}</div>
+      </div>
+      <div class="prop-row is-stack">
+        <span class="prop-label">Properties</span>
+        <div class="prop-custom">
+          ${Object.keys(o.props).map((k) => `<div class="prop-kv">
+            <input class="field-input" value="${esc(k)}" data-prop-k="${esc(k)}" aria-label="Property name">
+            <input class="field-input" value="${esc(o.props[k])}" data-prop-v="${esc(k)}" aria-label="Property value">
+            <button class="prop-kv-x" data-prop-del="${esc(k)}" aria-label="Remove ${esc(k)}">${ICO.x.replace('<svg', '<svg width="12" height="12"')}</button>
+          </div>`).join('')}
+          <button class="prop-add" data-prop-add>+ Add a property</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function renderEditor(st) {
+    const o = byId(st.doc);
+    if (!o) { patch({ doc: '' }, { replace: true }); return; }
+    const owns = o.owner === USER.owner;
+    const blank = !o.sum && o.title.indexOf('Untitled') === 0;
+    const preview = previewVer !== null ? VERSIONS(o)[previewVer] : null;
+
+    docModal.show(`
+      ${docChrome(o, 'edit', blank)}
+      <div class="doc-scroll">
+        ${preview ? `<div class="ver-preview">
+            ${ICO.clock.replace('<svg', '<svg width="14" height="14"')}
+            <span>Viewing <strong>${esc(preview.v === 'ai' ? 'the AiMY version' : preview.v)}</strong> ·
+              ${esc(fmtShort(preview.at))} — read only.</span>
+            <span class="ver-preview-end">
+              ${preview.current ? '' : `<button class="btn btn-ghost btn-sm" data-restore="${o.id}">Restore this version</button>`}
+              <button class="btn btn-brand btn-sm" data-close-ver>Back to current</button>
+            </span>
+          </div>`
+        : `<div class="toolbar" role="toolbar" aria-label="Formatting">
+            ${TOOLBAR.map(([cmd, glyph, label]) => cmd === '|'
+              ? '<span class="toolbar-sep"></span>'
+              : `<button class="icon-btn" aria-label="${esc(label)}" title="${esc(label)}" data-fmt="${esc(cmd)}">${glyph}</button>`).join('')}
+            <span class="toolbar-sep"></span>
+            <button class="icon-btn is-ai" aria-label="Ask AiMY to draft" title="Ask AiMY to draft"
+                    data-ai-doc aria-haspopup="true" aria-expanded="false">${AIMY_MARK(13, 15)}</button>
+          </div>`}
+
+        <div class="wb-editor-split">
+          <div>
+            <div class="doc-view">
+              <div class="dv-head">
+                <div class="dv-meta">
+                  <span class="tc-type">${TYPES[o.t].ico}${esc(TYPES[o.t].label)}</span>
+                  ${statusBadge(o.status)}
+                </div>
+                <h2 class="dv-title" ${preview ? '' : 'contenteditable="true"'} spellcheck="false"
+                    data-edit-title>${esc(preview ? o.title : o.title)}</h2>
+              </div>
+              ${!preview && !owns ? `<div class="inline-note warn" style="align-items:flex-start">
+                <span class="dot" style="margin-top:6px"></span>
+                <span>Owned by <strong>${esc(o.owner)}</strong>, not you. Your edit is recorded against your name.</span>
+              </div>` : ''}
+              <div class="dv-body${!preview && !String(o.sum || '').trim() ? ' is-blank' : ''}" ${preview ? '' : 'contenteditable="true"'}
+                   spellcheck="false" id="editBody" data-drop-body
+                   data-placeholder="Write here, drop a file, or ask AiMY to draft it.">
+                ${preview
+                  ? `<p>${esc(VERSION_BODY(o, previewVer))}</p>`
+                  : blank
+                    /* Empty means empty. The hint is a CSS ::before on the
+                       element, so it is never selected, never typed over and
+                       never mistaken for something publishable. */
+                    ? ''
+                    /* The per-type boilerplate belongs to the fixture corpus. A
+                       document someone wrote or dropped in has its own words,
+                       and appending house copy to them is putting text in
+                       their mouth. */
+                    /* o.html is what the writing tools produced. Re-rendering
+                       the body as one escaped paragraph is what threw every
+                       bold and every list away on the next repaint. */
+                    : o.html || `<p>${esc(o.sum)}</p>${o.src === 'upload' && /^new-/.test(o.id)
+                        ? '' : `<p>${esc((BODY_COPY[o.t] || [''])[0])}</p>`}`}
+              </div>
+            </div>
+
+            ${aiDraftBlock(o)}
+
+            <!-- Nobody can read a draft, so there is nobody to discuss it
+                 with. This used to key off an empty body, which is a question
+                 about content standing in for a question about audience — so
+                 the thread reappeared the moment AiMY filled the body or you
+                 typed a title. Publishing is what gives a document readers. -->
+            ${o.status === 'draft' ? '' : `<div class="comment-thread">
+              ${(o.comments || []).map((c) => `<div class="comment">
+                <div class="avatar avatar-sm">${esc(c.initials)}</div>
+                <div class="comment-body">
+                  <div class="comment-head"><span class="comment-author">${esc(c.who)}</span><span class="comment-time">${esc(c.when)}</span></div>
+                  <div class="comment-text">${esc(c.text)}</div>
+                </div>
+              </div>`).join('')}
+              <div class="comment-compose">
+                <input class="field-input" type="text" placeholder="Add a comment…" aria-label="Add a comment">
+                <button class="btn btn-ghost btn-sm" data-comment-add>Comment</button>
+              </div>
+            </div>`}
+          </div>
+
+          <div class="editor-side">
+            <div class="ds-tabs" role="tablist" aria-label="Document panel">
+              <button class="ds-tab${editorTab === 'props' ? ' active' : ''}" role="tab"
+                      aria-selected="${editorTab === 'props'}" data-etab="props">Properties</button>
+              <button class="ds-tab${editorTab === 'vers' ? ' active' : ''}" role="tab"
+                      aria-selected="${editorTab === 'vers'}" data-etab="vers">Versions<span class="tab-count">${VERSIONS(o).length}</span></button>
+            </div>
+            <div class="ds-tabpanel" role="tabpanel"${editorTab === 'props' ? '' : ' style="display:none"'}>
+              ${propsPanel(o)}
+            </div>
+            <div class="ds-tabpanel" role="tabpanel"${editorTab === 'vers' ? '' : ' style="display:none"'}>
+              ${versionList(o, true)}
+              <p class="ver-hint">Open a version to read it. Only the current one can be edited.</p>
+            </div>
+          </div>
+        </div>
+      </div>`, o.id);
+
+    if (!preview) wireSelectionMenu();
+    if (blank) { const t = $('[data-edit-title]'); if (t) setTimeout(() => t.focus(), 80); }
+  }
+
+  /* ── The AiMY proposal ──
+
+     This used to live in the editor's template with fixture copy inside it,
+     hidden by a class, and aiPropose overwrote its innards. Anything that
+     repainted the editor — accepting, most of all — rebuilt it from the
+     fixture, so accepting made the block come back wearing words nobody had
+     proposed.
+
+     It is state now. No draft, no block. */
+  let aiDraft = null;
+
+  function aiDraftBlock(o) {
+    if (!aiDraft || aiDraft.doc !== o.id) return '';
+    /* A blank document has nothing to strike through. What AiMY wrote for it is
+       a draft, not a revision of something, and drawing a diff against "(empty)"
+       said the opposite. */
+    const isNew = !aiDraft.was;
+    return `<div class="ai-suggestion" id="aiSuggest">
+      <div class="ai-suggestion-head">${AIMY_MARK(12, 13)}${esc(isNew ? 'AiMY drafted this' : aiDraft.label)}</div>
+      <div class="ai-suggestion-body">
+        ${isNew ? '' : `<del>${esc(aiDraft.was)}</del>`}
+        <!-- The proposal is document copy, so it renders as document copy. It is
+             also what Edit hands you: paragraphs and headings you can work on,
+             rather than one line describing what a rewrite would have done. -->
+        <ins${aiDraft.editing ? ' contenteditable="true" class="is-editing"' : ''}>${aiDraft.proposed}</ins>
+      </div>
+      <div class="ai-suggestion-foot">
+        <button class="btn btn-brand btn-sm" data-suggest="accept">Accept</button>
+        <button class="btn btn-ghost btn-sm" data-suggest="edit">${aiDraft.editing ? 'Editing…' : 'Edit'}</button>
+        <button class="btn btn-ghost btn-sm" data-suggest="reject">Reject</button>
+      </div>
+    </div>`;
+  }
+
+  function aiPropose(label, proposed) {
+    const o = byId(readURL().doc);
+    if (!o) return;
+    const body = $('#editBody');
+    const wasText = (body ? body.innerText : String(o.sum || '')).trim().split(/\r?\n/)[0];
+
+    /* The canvas is the record of what AiMY has been asked to do. It is not
+       opened — that would cover the document being edited, which is what §5.3
+       says selection and document scope must never do. It collects, and the
+       badge on the input says how much is waiting. */
+    canvas.push('user', esc(label + ' — ' + o.title));
+    canvas.push('aimy', `<div class="answer-surface"><div class="answer-body">${proposed}</div>
+      <div class="answer-scope">${ICO.pen.replace('<svg', '<svg style="width:12px;height:12px"')}
+      <span>Proposed in the document. Not applied.</span></div></div>`, 'ai-' + (++aiSeq));
+    bumpCanvasBadge();
+
+    aiDraft = { doc: o.id, label: label, was: wasText || '', proposed: proposed,
+                msg: 'ai-' + aiSeq, editing: false };
+    renderEditor(readURL());
+    markAfter('#aiSuggest', $('#docSheet'));
+    const card = $('#aiSuggest');
+    if (card) card.scrollIntoView({ block: 'nearest' });
+  }
+
+  /* What you did with a proposal is part of the record. Written back into the
+     message it belongs to, so the thread reads as request → response → outcome
+     rather than a list of things AiMY offered and no sign of what happened. */
+  let aiSeq = 0;
+  function aiOutcome(msgId, verdict) {
+    const el = msgId && document.getElementById(msgId);
+    if (!el) return;
+    el.insertAdjacentHTML('beforeend',
+      `<div class="ai-outcome is-${verdict}">${(verdict === 'accept' ? ICO.check : ICO.x).replace('<svg', '<svg width="12" height="12"')}
+       <span>${verdict === 'accept' ? 'Applied to the document.' : 'Rejected. Kept in the trail.'}</span></div>`);
+  }
+
+  /* An action has to be visible where you are looking. A toast is a receipt
+     from somewhere else; this takes the eye to the thing that actually moved.
+     Removed after the animation so a later repaint can fire it again. */
+  function markChanged(el) {
+    if (!el || !el.classList) return;
+    el.classList.remove('just-changed');
+    void el.offsetWidth;
+    el.classList.add('just-changed');
+    setTimeout(() => el.classList.remove('just-changed'), 1500);
+  }
+
+  /* Mark by selector after the repaint that produced the element — the node the
+     caller was holding is gone by then, which is why this takes a selector. */
+  function markAfter(sel, root) {
+    setTimeout(() => {
+      const el = (root || document).querySelector(sel);
+      if (el) markChanged(el);
+    }, 30);
+  }
+
+  /* The card for a document, wherever it is on the grid. */
+  function markCard(id) { markAfter(`#wbStage [data-card-open="${id}"]`); }
+
+  /* One writer for the body. o.sum is the plain-text projection the cards,
+     the search, the Publish gate and the version bodies all read; o.html is
+     what the document actually says, formatting and all. */
+  function writeBody(el) {
+    const o = byId(readURL().doc);
+    if (!o || !el) return o;
+    o.sum = el.innerText.trim();
+    o.html = o.sum ? el.innerHTML : '';
+    el.classList.toggle('is-blank', !o.sum);
+    const b = $('#docSheet [data-publish]');
+    if (b) {
+      const has = !!o.sum;
+      b.disabled = !has;
+      b.textContent = has ? 'Publish' : 'Add some content first';
+    }
+    return o;
+  }
+
+  /* A toolbar that never shows what is already on is telling you nothing. */
+  function syncToolbar() {
+    $$('#docSheet [data-fmt]').forEach((btn) => {
+      const [cmd, val] = btn.getAttribute('data-fmt').split(':');
+      let on = false;
+      try {
+        on = cmd === 'formatBlock'
+          ? document.queryCommandValue('formatBlock').toLowerCase() === val
+          : document.queryCommandState(cmd);
+      } catch (e) {}
+      btn.classList.toggle('is-on', !!on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
-
-    return { rendered, displaced, eligible: eligible.length, charts };
   }
 
-  /* ═══════════════════════════════════════════════
-     CARD RENDERERS
-
-     Composed from implemented primitives only. The zones the design system
-     documents but never implemented (.bcard-body, .bcard-conclusion,
-     .evidence-row, .bcard-action, .severity-dot, .priority-badge) are
-     substituted with their implemented equivalents — see ../GAPS.md.
-  ═══════════════════════════════════════════════ */
-  function metaRow(o) {
-    return `<div class="bcard-meta">
-      <span class="bcard-type">${esc(o.label)}</span>
-      ${workState(o.state[0], o.state[1])}
-      ${o.priority ? `<span class="tag ${o.priority[1]}" style="margin-left:auto">${esc(o.priority[0])}</span>` : ''}
-    </div>`;
+  function bumpCanvasBadge(n) {
+    const b = $('.float-badge');
+    if (!b) return;
+    const next = Math.max(0, n === undefined ? (+b.textContent || 0) + 1 : n);
+    b.textContent = String(next);
+    b.hidden = next === 0;
   }
 
-  function ackRow(id) {
-    return `<div class="bcard-ack-row">
-      <button class="bcard-ack-btn" data-ack="${id}">${ICO.check.replace('<svg', '<svg style="width:12px;height:12px"')}Acknowledge</button>
-      <button class="bcard-ack-btn" data-toggle-dismiss>${ICO.x.replace('<svg', '<svg style="width:12px;height:12px"')}Dismiss</button>
-      <div class="bcard-dismiss-picker">
-        <button class="bcard-dismiss-reason" data-dismiss="${id}">Not my collection</button>
-        <button class="bcard-dismiss-reason" data-dismiss="${id}">Already handling</button>
-        <button class="bcard-dismiss-reason" data-dismiss="${id}">Not useful</button>
-      </div>
-    </div>`;
-  }
-
-  function card(o) {
-    return `<div class="bcard ${o.tone === 'err' ? 'p1' : o.tone === 'warn' ? 'p2' : 'p3'}">
-      ${metaRow(o)}
-      <p class="bcard-title">${o.conclusion}</p>
-      <div class="bcard-evidence">${o.evidence.join('')}</div>
-      <div class="k-rule"></div>
-      <div class="k-action-row">${o.action}${o.note ? `<span class="k-action-note">${esc(o.note)}</span>` : ''}</div>
-      ${o.tail ? `<div class="bcard-ack-row">${o.tail}<button class="bcard-ack-btn" style="margin-left:auto;color:var(--ai-text)" data-undo>Undo</button></div>` : ackRow(o.label)}
-    </div>`;
-  }
-
-  /* Aggregate card — the subject is a cluster, not a record (§10.3 blocks 3
-     and 7). .agg-more is mandatory when the list is truncated: a ranked list
-     that hides its tail makes a broad problem read as a narrow one. */
-  function aggCard(o) {
-    const rows = o.rows.map(([label, val, share, tone]) =>
-      `<div class="agg-row">
-        <span class="agg-bar" style="--agg-share:${share}${tone ? `;background:rgba(240,68,56,0.14)` : ''}"></span>
-        <span class="agg-label">${esc(label)}</span>
-        <span class="agg-val">${esc(val)}</span>
-      </div>`).join('');
-
-    return `<div class="bcard is-aggregate ${o.tone === 'err' ? 'p1' : 'p2'}">
-      ${metaRow(o)}
-      <p class="bcard-title">${o.conclusion}</p>
-      <div class="agg-summary">
-        ${o.stats.map(([v, l]) => `<div class="agg-stat"><span class="agg-stat-val">${esc(v)}</span><span class="agg-stat-lbl">${esc(l)}</span></div>`).join('')}
-      </div>
-      <div class="agg-list">${rows}${o.more ? `<div class="agg-more">${esc(o.more)}</div>` : ''}</div>
-      <div class="k-rule"></div>
-      <div class="k-action-row">${o.action}${o.note ? `<span class="k-action-note">${esc(o.note)}</span>` : ''}</div>
-      ${ackRow(o.label)}
-    </div>`;
-  }
-
-  /* Trend chart. SVG geometry is page content, not a component — the design
-     system's own chart specimens are inline SVG. Every colour is a token, so
-     the chart stays inside the system's visual language. Annotation uses
-     .inline-note because .anno-card has no CSS (see ../GAPS.md). */
-  /* ═══════════════════════════════════════════════
-     ANSWER COVERAGE (§10.3 block 9)
-
-     A single rising "% answered from verified content" line was a vanity
-     metric: it goes up, and it tells you nothing to do. What a corpus owner
-     needs is the COMPOSITION of what the corpus answered each week, because
-     each band maps to a different action:
-
-       grounded  — answered from verified content. Nothing to do.
-       flagged   — answered, but from due or unverified content. Verify it.
-       thin      — answered with a stated gap. Fill it.
-       none      — could not answer. The most expensive band, and the one a
-                   coverage percentage hides completely.
-
-     Stacked, so the whole is always 100% and a gain in one band is visibly a
-     loss in another — which a line chart cannot show. Bands carry a labelled
-     legend, never colour alone.
-  ═══════════════════════════════════════════════ */
-  function trendCard() {
-    /* [grounded, flagged, thin, none] per week, 12 weeks */
-    const weeks = [
-      [61, 21, 11, 7], [64, 20, 10, 6], [63, 21, 10, 6], [66, 20, 9, 5],
-      [69, 18, 9, 4], [68, 19, 9, 4], [70, 18, 8, 4], [66, 17, 8, 9],
-      [64, 18, 8, 10], [67, 17, 8, 8], [70, 16, 8, 6], [72, 17, 6, 5]
-    ];
-    const bands = [
-      ['grounded', 'var(--ok)',   'Grounded',  'answered from verified content'],
-      ['flagged',  'var(--warn)', 'Flagged',   'answered from due or unverified content'],
-      ['thin',     'var(--info)', 'Thin',      'answered with a stated gap'],
-      ['none',     'var(--err)',  'Unanswered','no source could answer it']
-    ];
-    const w = 520, h = 132, gap = 5;
-    const bw = (w - gap * (weeks.length - 1)) / weeks.length;
-    const latest = weeks[weeks.length - 1];
-
-    const cols = weeks.map((wk, i) => {
-      const x = i * (bw + gap);
-      let yCursor = 0;
-      const segs = wk.map((v, bi) => {
-        const segH = (v / 100) * h;
-        const y = yCursor; yCursor += segH;
-        /* Week 8 is where Zendesk stopped syncing — the unanswered band is the
-           only place that shows up, which is the point of charting it. */
-        const dim = (i === 7 || i === 8) && bi === 3 ? '' : '';
-        return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${segH.toFixed(1)}"
-                      fill="${bands[bi][1]}" opacity="${bi === 0 ? 0.85 : 0.75}"${dim}/>`;
-      }).join('');
-      return segs;
-    }).join('');
-
-    return `<div class="bcard">
-      <div class="bcard-meta">
-        <span class="bcard-type">Answer coverage</span>
-        <span class="tag tag-neutral" style="margin-left:auto">12 weeks</span>
-      </div>
-      <p class="bcard-title">What the corpus actually did with the questions it was asked. The
-      <strong>unanswered</strong> band doubled in weeks 8 and 9 — the fortnight Zendesk stopped syncing — and has not
-      fully recovered.</p>
-
-      <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" class="cov-chart"
-           aria-label="Stacked weekly answer composition over 12 weeks. This week: 72 percent grounded, 17 percent from flagged content, 6 percent thin, 5 percent unanswered.">
-        ${cols}
-      </svg>
-
-      <div class="cov-legend">
-        ${bands.map(([k, c, label, desc], i) =>
-          `<span class="cov-key" title="${esc(desc)}">
-             <span class="cov-swatch" style="background:${c}"></span>
-             <span class="cov-key-label">${esc(label)}</span>
-             <span class="cov-key-val">${latest[i]}%</span>
-           </span>`).join('')}
-      </div>
-
-      <div class="inline-note warn" style="margin-top:12px">
-        <span class="dot"></span>
-        <span><strong>23% of answers this week leaned on content that is not verified.</strong> That is the flagged and
-        thin bands together — not a failure, but it is where the next verification pass pays for itself. The 5%
-        unanswered is a coverage gap, and those are already in Requests.</span>
-      </div>
-    </div>`;
+  /* A property changed: write it, re-derive, and repaint both the editor and
+     the grid behind it, so the badge on the card moves as you edit. */
+  function repaintEditor() {
+    noteSave(byId(readURL().doc));
+    recompute();
+    const st = readURL();
+    renderGrid(st);
+    renderBrief(st);
+    renderEditor(st);
   }
 
 
-  /* ═══════════════════════════════════════════════
-     NON-HAPPY STATES (§10.5)
 
-     Forced with ?state=loading | empty | error | ai-down so all four are
-     reachable without breaking anything. They are designed states, not
-     afterthoughts (doctrine Level 7).
-  ═══════════════════════════════════════════════ */
-  const forcedState = params.get('state');
+  /* ── AiMY, at document scope ──
 
-  function skeletonCard() {
-    return `<div class="bcard" aria-hidden="true">
-      <div class="skeleton" style="height:10px;width:38%;margin-bottom:14px"></div>
-      <div class="skeleton" style="height:12px;width:100%;margin-bottom:7px"></div>
-      <div class="skeleton" style="height:12px;width:86%;margin-bottom:7px"></div>
-      <div class="skeleton" style="height:12px;width:62%;margin-bottom:16px"></div>
-      <div class="skeleton" style="height:30px;width:100%;border-radius:8px"></div>
-    </div>`;
-  }
+     The toolbar's AiMY button used to raise a toast telling you to select
+     something first, which is a button explaining why it does nothing. It now
+     opens the same `.ai-menu` the selection uses, with the actions that apply
+     to a whole document. A blank one leads with the only action that matters
+     when there is nothing there yet. */
+  const DOC_AI = {
+    blank:  ['Write a first draft', 'Draft from a linked ticket', 'Outline it'],
+    filled: ['Rewrite for support agents', 'Shorten', 'Expand', 'Fill the gaps', 'Find a source for this']
+  };
 
-  function blockError(label) {
-    return `<div class="bcard p1">
-      <div class="bcard-meta">
-        <span class="bcard-type">${esc(label)}</span>
-      </div>
-      <p class="bcard-title">This block could not load. The rest of the briefing is unaffected and the corpus is not
-      in an unknown state — only this reading of it failed.</p>
-      <div class="k-rule"></div>
-      <div class="k-action-row">
-        <button class="btn btn-ghost btn-sm" data-retry>Retry this block</button>
-      </div>
-    </div>`;
-  }
+  /* ── What AiMY actually writes ──
 
-  /* Empty is a finding, not an absence. It states what the corpus covers well
-     and where it is thinnest, and offers a next step (§10.5). */
-  function emptyBriefing(profile) {
-    return `<div class="empty-state">
-      <div class="empty-state-icon">${ICO.shield.replace('<svg', '<svg style="width:22px;height:22px"')}</div>
-      <div class="empty-state-title">Nothing needs your attention</div>
-      <div class="empty-state-desc">
-        Everything you can see is verified and within cadence${profile.owns ? `, including all ${profile.owns} objects you own` : ''}.
-        Coverage is strongest on <strong>Policies</strong> (94% of questions answered from verified content) and
-        thinnest on <strong>Contract terms</strong> (61%), which is where the next gap is most likely to open.
-      </div>
-      <div style="margin-top:14px">${entryAction('prompt', 'Ask what the corpus covers weakly', 'data-act="draft-gap"')}</div>
-    </div>`;
-  }
+     Every one of these used to be paired with a sentence DESCRIBING what AiMY
+     had done — "AiMY drafted this from the twelve most-cited tickets" — and
+     that sentence went into <ins> and then into the document. The draft read
+     like a prompt because it was one: the prompt describing itself.
 
-  function aiUnavailable() {
-    return `<div class="ai-unavailable is-degraded">
-      <div class="aiu-mark">${ICO.warn.replace('<svg', '<svg style="width:16px;height:16px"')}</div>
-      <div>
-        <div class="aiu-title">AiMY cannot generate right now</div>
-        <div class="aiu-body">Interpretation and drafting are unavailable. <strong>Corpus health is not affected</strong> —
-        every block below is read from system state and is current. Verification requests, dismissals and staged drafts
-        are preserved and will still be there when generation returns.</div>
-        <div class="aiu-note">Retrying automatically · last attempt 40s ago</div>
-      </div>
-    </div>`;
-  }
+     These return copy the document could actually contain, built from what it
+     already knows about itself. Prose, in paragraphs, which is also what makes
+     Edit worth pressing — there is something real in there to change. */
+  const stripTags = (h) => String(h || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const sentences = (t) => String(t || '').split(/(?<=[.!?])\s+/).filter((x) => x.trim());
+  const paras = (arr) => arr.filter(Boolean).map((x) => `<p>${esc(x)}</p>`).join('');
 
-  /* ═══════════════════════════════════════════════
-     DASHBOARD
-  ═══════════════════════════════════════════════ */
-  function bootDashboard() {
-    const profile = activeProfile();
-    const grid = $('#briefingGrid');
-    if (!grid) return;
+  function aiCopy(action, o, selection) {
+    /* An untitled document has no name to write about yet, so it is described
+       instead. Capitalised because it opens a sentence. */
+    const named = !/^Untitled\s/i.test(o.title);
+    const what = named ? o.title : 'This ' + TYPES[o.t].label.toLowerCase();
+    const col = COLLECTIONS[o.col];
+    const body = String(o.sum || '').trim();
+    const sent = sentences(body);
+    const tags = (o.tags || []).slice(0, 2).join(' and ');
 
-    paintIdentity(profile);
+    switch (action) {
+      /* ── a blank document ── */
+      case 'Write a first draft':
+        return paras([
+          `${what} applies to every request handled through ${col}, and to the agents that answer from it. Where it and a customer contract disagree, the contract governs.`,
+          `The rule is stated first and the exceptions after it, so a reader who stops at the first paragraph has still read something true. Anything not written here is not policy${tags ? ', including the parts of ' + tags + ' that are handled elsewhere' : ''}.`,
+          `Raise a change through the owner of ${col} rather than editing in place when the change affects what customers are told.`
+        ]);
 
-    const { rendered, displaced, charts } = compose(profile);
+      case 'Draft from a linked ticket':
+        return paras([
+          `Ticket #48120 was resolved by treating the customer's case as an exception rather than the rule, and the reasoning was never written down anywhere a second person could find it. This is that reasoning.`,
+          `The decision: the request was granted because the fault was demonstrated before the window closed, not because the window was extended. Those are different things and only the first generalises.`,
+          `One resolved ticket is evidence, not policy. It says what was decided once, for one customer.`
+        ]);
 
-    /* The honest statement of what this briefing is, for this person. */
-    const stamp = $('#briefingStamp');
-    if (stamp) {
-      stamp.textContent = `${rendered.length} block${rendered.length === 1 ? '' : 's'} · ` +
-        `${charts} chart${charts === 1 ? '' : 's'} · composed for ${profile.name.split(' ')[0]}`;
+      case 'Outline it':
+        /* Real headings, so the writing tools have something to work on. */
+        return `<h3>Scope</h3><p>Who this covers and what it does not reach.</p>` +
+               `<h3>Rules</h3><p>The rule, stated before its exceptions.</p>` +
+               `<h3>Exceptions</h3><p>The cases that do not follow the rule, and why.</p>` +
+               `<h3>Related</h3><p>What else in ${esc(col)} a reader needs alongside this.</p>`;
+
+      /* ── a document that already says something ── */
+      case 'Shorten':
+        return paras(sent.slice(0, Math.max(1, Math.ceil(sent.length / 2))));
+
+      case 'Expand':
+        return paras(sent.concat([
+          `Two cases come up often enough to state: a request made inside the window but completed outside it, and one made by someone other than the account holder. The first is in scope; the second needs the account holder's confirmation first.`
+        ]));
+
+      case 'Rewrite for support agents':
+        /* Short sentences, the exception before the rule, no policy voice. */
+        return paras(
+          [`The exception first: if the item has been activated, this does not apply — use the warranty process instead.`]
+            .concat(sent.map((s) => s.replace(/\bshall\b/gi, 'must').replace(/\bmay be\b/gi, 'can be')))
+        );
+
+      case 'Fill the gaps':
+        return paras(sent.concat([
+          `Not currently answered here: what happens when the request arrives through a reseller rather than direct. The linked tickets treat the reseller as the customer of record.`,
+          `Also missing: who approves an exception, and how long they have to answer.`
+        ]));
+
+      /* ── selection scope: the highlighted words, changed ── */
+      case 'Rewrite':
+        return paras([`${String(selection || '').trim().replace(/[.,;:\s]+$/, '')} — stated plainly: the rule holds unless the item has been activated, and then the warranty process applies instead.`]);
+      case 'Add the missing scope':
+        return paras([`${String(selection || '').trim().replace(/[.,;:\s]+$/, '')}, for customers buying through the EU storefront. Resellers and APAC are covered separately.`]);
+      default:
+        /* Shorten, applied to a selection rather than the whole body. */
+        return paras(sentences(selection).slice(0, 1));
     }
+  }
 
-    /* §9.3 degraded case — say so on the surface rather than quietly ranking
-       by a default nobody chose. */
-    const banner = $('#compositionBanner');
-    if (banner && !profile.signals) {
-      banner.innerHTML =
-        `<span class="banner-ico">${ICO.warn.replace('<svg', '<svg style="width:15px;height:15px"')}</span>
-         <span class="banner-body"><strong>Composed from entitlement only.</strong> Ownership and usage data are not
-         available at user granularity for this account, so blocks are ordered by their standing rank rather than by
-         what you own or ask about. The set below is correct; the ordering is generic.</span>`;
-      banner.classList.remove('k-hidden');
-    }
+  function aiMenu(anchor, items, attr) {
+    const host = $('#docSheet');
+    const old = $('.ai-menu', host);
+    if (old) { old.remove(); if (old.dataset.for === anchor.dataset.k) return; }
+    const hr = host.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
+    const menu = document.createElement('div');
+    menu.className = 'ai-menu is-open k-enter';
+    menu.style.left = Math.max(8, ar.left - hr.left) + 'px';
+    menu.style.top = (ar.bottom - hr.top + host.scrollTop + 6) + 'px';
+    menu.innerHTML = items.map((label, i) =>
+      `<button${i === 0 ? ' class="ai-menu-primary"' : ''} ${attr}="${esc(label)}">${esc(label)}</button>`).join('');
+    host.appendChild(menu);
+    anchor.setAttribute('aria-expanded', 'true');
+    return menu;
+  }
 
-    if (forcedState === 'empty') {
-      grid.innerHTML = `<div class="is-wide">${emptyBriefing(profile)}</div>`;
-      if (stamp) stamp.textContent = 'Nothing to brief · corpus healthy';
-      return;
-    }
-
-    if (forcedState === 'ai-down') grid.insertAdjacentHTML('beforebegin', aiUnavailable());
-
-    /* Skeletons render in priority order, then each block replaces its own
-       skeleton as it resolves. Blocks appear as they arrive rather than
-       waiting for the slowest (§10.5). */
-    grid.innerHTML = rendered.map((b, i) =>
-      `<div class="${b.kind === 'aggregate' || b.kind === 'chart' ? '' : ''}${b.chart ? 'is-wide' : ''}" data-slot="${b.id}">${skeletonCard()}</div>`
-    ).join('');
-
-    if (forcedState === 'loading') return;   // hold the skeletons for inspection
-
-    rendered.forEach((b, i) => {
-      /* 70ms, not 130: at nine blocks the old cascade took 1.4s to fill the
-         briefing, which reads as slow rather than progressive. */
-      const delay = 180 + i * 70 + (b.id === 'sources' ? 620 : 0);  // sources is the slow one
+  /* Selection scope (§5.3). The AI interactions that happen constantly while
+     writing must never cover the thing being written, so this opens beside the
+     selection and closes the moment it collapses. */
+  function wireSelectionMenu() {
+    const body = $('#editBody');
+    if (!body) return;
+    const kill = () => { const m = $('.ai-menu'); if (m) m.remove(); };
+    body.addEventListener('mouseup', () => {
       setTimeout(() => {
-        const slot = grid.querySelector(`[data-slot="${b.id}"]`);
-        if (!slot) return;
-        slot.innerHTML = (forcedState === 'error' && b.id === 'lowconf')
-          ? blockError('Low-confidence answers served')
-          : b.render();
-        /* Enter rather than pop. The cascade is already carried by the
-           resolution order, so this adds no delay of its own. */
-        const card = slot.firstElementChild;
-        if (card) card.classList.add('k-enter');
-      }, delay);
+        const sel = window.getSelection();
+        kill();
+        if (!sel || sel.isCollapsed || !body.contains(sel.anchorNode)) return;
+        const r = sel.getRangeAt(0).getBoundingClientRect();
+        const host = $('#docSheet');
+        const hr = host.getBoundingClientRect();
+        const menu = document.createElement('div');
+        menu.className = 'ai-menu is-open k-enter';
+        menu.style.left = Math.max(8, r.left - hr.left) + 'px';
+        menu.style.top = (r.bottom - hr.top + host.scrollTop + 8) + 'px';
+        /* The library's menu is buttons in a row with an optional primary and
+           separators. It has no header slot, so the earlier version invented
+           `.ai-menu-head` and `.ai-menu-item`, which resolved to nothing. */
+        menu.dataset.sel = sel.toString().trim();
+        menu.innerHTML = ['Rewrite', 'Shorten', 'Add the missing scope', 'Find a source']
+          .map((l, i) => `<button${i === 0 ? ' class="ai-menu-primary"' : ''} data-ai-sel="${esc(l)}">${esc(l)}</button>`)
+          .join('<span class="sep"></span>');
+        host.appendChild(menu);
+      }, 10);
     });
-
-    /* Displacement. A briefing that silently drops content teaches people not
-       to trust it as complete (§10.3). */
-    const disp = $('#displacementNote');
-    if (disp && displaced.length) {
-      disp.innerHTML =
-        `<span class="dot"></span>
-         <span><strong>${displaced.length} block${displaced.length === 1 ? '' : 's'} held back</strong> by the briefing
-         budget: ${displaced.map((d) => esc(d.block.id)).join(', ')}. Nothing was dropped — open them in the workbench.</span>`;
-      disp.classList.remove('k-hidden');
-    }
+    body.addEventListener('keydown', kill);
+    $('#docSheet').addEventListener('scroll', kill, { passive: true });
   }
 
-  function paintIdentity(profile) {
-    const av = $('#userAvatar'), nm = $('#userName'), rl = $('#userRole');
-    if (av) av.textContent = profile.initials;
-    if (nm) nm.textContent = profile.name;
-    if (rl) rl.textContent = profile.role;
-    $$('[data-proto-as]').forEach((a) => {
-      const on = a.getAttribute('data-proto-as') === profile.id;
-      a.classList.toggle('is-on', on);
-      if (on) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current');
-    });
-  }
+
 
   /* ═══════════════════════════════════════════════
-     CANVAS — float bar, overlay, entry-mode routing
+     THE CANVAS
 
-     The canvas opens for depth, not for every click (§3). Direct actions
-     complete in place with Undo; only investigation, prepared prompts and
-     open-ended questions open the overlay; reviewed actions go to a
-     structured commit surface instead.
+     Kept, and narrowed. It opens for open-ended questions and generative work.
+     It does not open to filter, to open a known document, or to write —
+     those three now complete in place, which is what the doctrine asks for and
+     what the previous build failed.
   ═══════════════════════════════════════════════ */
   const canvas = {
-    overlay: null, thread: null, sugg: null, input: null, floatBar: null, open: false,
+    overlay: null, thread: null, sugg: null, input: null, floatBar: null, open: false, memoryShown: false,
 
     init() {
       this.overlay = $('#aimyOverlay');
@@ -698,59 +2452,26 @@
       this.input    = $('#overlayInput', this.overlay);
       this.floatBar = $('#aimyFloatBar');
 
+      const opener = $('#canvasOpen');
+      if (opener) opener.addEventListener('click', () => this.show());
+
       document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && this.open) this.close();
+        if (e.key !== 'Escape') return;
+        if (proto.open) { proto.toggle(false); return; }
+        if (this.open) this.close();
       });
-
-      /* Clicking the bare frosted glass closes it, same as the reference.
-         Guarded on e.target so clicks inside the thread do not. */
-      this.overlay.addEventListener('click', (e) => {
-        if (e.target === this.overlay) this.close();
-      });
-
+      this.overlay.addEventListener('click', (e) => { if (e.target === this.overlay) this.close(); });
       if (this.thread) {
         this.thread.addEventListener('scroll', () => this.syncEdge(), { passive: true });
         this.syncEdge();
       }
     },
 
-    /* Continuity (§4). The context envelope's seventh group is "prior relevant
-       thread, and whether a memory cue should be shown" — the one group with a
-       component in the library (#sc-memory-panel) that nothing here was using.
-
-       Without it the canvas re-introduces itself every time: the user knows
-       they asked about this yesterday, and the system acts like they didn't.
-       The cue shows once per session, only where a prior thread is genuinely
-       relevant, and it is droppable — carried context the user cannot see or
-       refuse is surveillance, not memory. */
-    memoryShown: false,
-    memory(cue) {
-      if (!cue || this.memoryShown || !this.thread) return;
-      this.memoryShown = true;
-      const el = document.createElement('div');
-      el.className = 'memory-panel k-enter';
-      el.innerHTML =
-        `<div class="mem-head">${ICO.clock.replace('<svg', '<svg width="11" height="11"')}Carried from an earlier thread
-           <span class="mem-age">${esc(cue.age)}</span></div>
-         <div class="mem-thread">${cue.lines.map((l) =>
-           `<div class="mem-line"><span class="mem-who">${esc(l[0])}</span><span class="mem-what">${esc(l[1])}</span></div>`).join('')}</div>
-         <div class="mem-foot">
-           <button class="btn btn-ghost btn-sm" data-mem-drop>Answer without it</button>
-         </div>`;
-      this.thread.appendChild(el);
-      this.reveal(el);
-    },
-
-    /* basis: what the conversation is standing on. The canvas must show its
-       basis without being asked (§4, Level 5). Rendered into the absolutely
-       positioned "Based on" bar rather than into the thread's flow, so
-       showing it cannot shift the conversation underneath. */
     show(basis) {
       if (!this.open) {
+        /* Opening the canvas is reading it, so the count goes. */
+        bumpCanvasBadge(0);
         this.overlay.classList.add('open');
-        /* The float bar is the way IN to the canvas; once the canvas is open
-           it is redundant, and leaving it up puts a second input on screen
-           competing with the real one. */
         if (this.floatBar) this.floatBar.classList.add('hidden');
         this.open = true;
         setTimeout(() => { if (this.input) this.input.focus(); }, 220);
@@ -761,27 +2482,29 @@
       }
     },
 
-    /* Bring a newly-arrived message into view. A long answer aligns its own
-       top rather than jumping to the bottom — scrolling to the end of a
-       three-paragraph answer means landing on the sources and having to scroll
-       back up to read what was actually said. Short answers just go to the
-       bottom, which is where the eye already is. */
-    /* The bottom fade means "there is more below", so it must disappear once
-       there isn't. Recomputed on every scroll and after anything is added. */
+    close(opts) {
+      this.overlay.classList.remove('open');
+      if (this.floatBar) this.floatBar.classList.remove('hidden');
+      this.open = false;
+      /* Quiet when something else is taking over the screen, so the focus does
+         not get pulled back out of it. */
+      if (opts && opts.quiet) return;
+      const fb = $('#floatInput');
+      setTimeout(() => { if (fb) fb.focus(); }, 160);
+    },
+
     syncEdge() {
       const th = this.thread;
       if (!th) return;
-      const atEnd = th.scrollHeight - th.clientHeight - th.scrollTop < 4;
-      th.classList.toggle('is-at-end', atEnd);
+      th.classList.toggle('is-at-end', th.scrollHeight - th.clientHeight - th.scrollTop < 4);
     },
 
     reveal(el) {
       const th = this.thread;
       if (!th || !el) { this.syncEdge(); return; }
-      if (th.scrollHeight <= th.clientHeight) return;      // nothing to scroll
+      if (th.scrollHeight <= th.clientHeight) return;
       const msg = el.closest('.chat-msg') || el;
-      const tall = msg.getBoundingClientRect().height > th.clientHeight * 0.7;
-      if (tall) {
+      if (msg.getBoundingClientRect().height > th.clientHeight * 0.7) {
         th.scrollTop += msg.getBoundingClientRect().top - th.getBoundingClientRect().top - 12;
       } else {
         th.scrollTop = th.scrollHeight;
@@ -789,55 +2512,44 @@
       this.syncEdge();
     },
 
-    close() {
-      this.overlay.classList.remove('open');
-      if (this.floatBar) this.floatBar.classList.remove('hidden');
-      this.open = false;
-      /* Product state is untouched — closing restores the surface exactly
-         (§6 requirement 6). The thread is kept so re-entry continues it.
-         Focus goes back to the control that opened the canvas; leaving it on
-         a now-blurred element behind the overlay strands keyboard users. */
-      const fb = $('#floatInput');
-      setTimeout(() => { if (fb) fb.focus(); }, 160);
+    memory(cue) {
+      if (!cue || this.memoryShown || !this.thread) return;
+      this.memoryShown = true;
+      const el = document.createElement('div');
+      el.className = 'memory-panel k-enter';
+      el.innerHTML =
+        `<div class="mem-head">${ICO.clock.replace('<svg', '<svg width="11" height="11"')}Carried from an earlier thread
+           <span class="mem-age">${esc(cue.age)}</span></div>
+         <div class="mem-thread">${cue.lines.map((l) =>
+           `<div class="mem-line"><span class="mem-who">${esc(l[0])}</span><span class="mem-what">${esc(l[1])}</span></div>`).join('')}</div>
+         <div class="mem-foot"><button class="btn btn-ghost btn-sm" data-mem-drop>Answer without it</button></div>`;
+      this.thread.appendChild(el);
+      this.reveal(el);
     },
 
-    /* Prepared prompt: staged, not sent. The user sends it in one step (§3). */
-    /* A prepared prompt is composed and staged for the user to send in one
-       step (§3). Two things make that legible rather than confusing:
-
-       The text is SELECTED, so typing replaces it. It is AiMY's draft of the
-       question, not something you wrote, and it should be as easy to discard
-       as to send.
-
-       The bar is marked staged, so a composed question does not look identical
-       to one you typed and forgot to send. */
     stage(text, basis) {
       this.show(basis);
       if (!this.input) return;
       this.input.value = text;
       this.input.focus();
       this.input.select();
-      this.setStaged(true);
-    },
-
-    setStaged(on) {
       const bar = $('.overlay-input-bar', this.overlay);
-      if (bar) bar.classList.toggle('is-staged', !!on);
-      this.stagedNow = !!on;
+      if (bar) bar.classList.add('is-staged');
     },
 
-    ask(text, basis, answer) {
+    /* opt.autoSurface — put the answer's sources on the workbench as the answer
+       resolves, so closing the canvas lands on where the conversation got to.
+       Reversal is explicit rather than promotion: the toast's Undo restores the
+       filter state exactly, because that state is only ever a URL. */
+    /* `answer` may be a string or a FUNCTION returning one. A function makes the
+       answer LIVE: the message keeps it, and canvas.repaint() re-runs it after
+       anything changes the model. That is what stopped the settings from being
+       dead — Sync now, Reconnect, schedule, retention and grounding all wrote
+       correctly and left the conversation showing the old numbers. */
+    ask(text, basis, answer, opt) {
       this.show(basis);
-      /* Clear any prompt staged by an earlier action. Leaving it stranded
-         gives you a thread about one thing and an input holding a question
-         about another. */
-      if (this.stagedNow && this.input && this.input.value.trim() !== text.trim()) {
-        this.input.value = '';
-      }
-      this.setStaged(false);
-      /* Only where the earlier thread actually bears on this question — a cue
-         that fires on everything is noise, and noise is what people learn to
-         skip past. */
+      const bar = $('.overlay-input-bar', this.overlay);
+      if (bar) bar.classList.remove('is-staged');
       if (/refund|activat|contradict/i.test(text)) {
         this.memory({ age: 'Yesterday, 16:40', lines: [
           ['You', 'asked which refund source support should follow'],
@@ -848,52 +2560,550 @@
       if (this.sugg) this.sugg.classList.add('k-hidden');
       this.push('user', esc(text));
       const id = 'a' + Date.now();
-      /* .ai-thinking's anatomy is .dots > span ×3 plus a label — bare <i>
-         elements match no selector and render an empty pill. */
       this.push('aimy',
         '<span class="ai-thinking"><span class="dots"><span></span><span></span><span></span></span>' +
         '<span class="ai-thinking-label">Searching the corpus…</span></span>', id);
       setTimeout(() => {
         const el = document.getElementById(id);
         if (!el) return;
-        el.innerHTML = answer || genericAnswer();
-        /* The answer replaces the thinking indicator ~900ms after the thread
-           last scrolled, and grows the thread by far more than it displaced.
-           Without re-scrolling, the tail of the answer sits below the fold and
-           the input bar slices it — the cut edge reads as a stray line. */
+        if (typeof answer === 'function') { el._live = answer; el.dataset.live = '1'; }
+        el.innerHTML = typeof answer === 'function' ? answer() : answer;
         this.reveal(el);
+        if (opt && opt.autoSurface) {
+          const ids = answerIds(text);
+          if (ids.length) surfaceIds(ids, 'while you were asking');
+        }
       }, 900);
     },
 
-    /* The avatar always comes FIRST in the DOM, for both speakers.
-       .chat-msg.user is `flex-direction: row-reverse`, so source order is
-       visually mirrored — putting the user's avatar last in the markup is
-       what flips it to the wrong side. */
     push(who, html, id) {
       if (!this.thread) return;
       const wrap = document.createElement('div');
       const isUser = who === 'user';
+      const live = typeof html === 'function';
       wrap.className = 'chat-msg ' + (isUser ? 'user' : 'aimy');
       wrap.innerHTML =
         (isUser
-          ? `<div class="msg-avatar">${esc(activeProfile().initials)}</div>`
+          ? `<div class="msg-avatar">${esc(USER.initials)}</div>`
           : '<div class="msg-avatar aimy-av"><svg width="15" height="17" viewBox="0 0 18 20"><use href="#aimy-logo-small"/></svg></div>') +
-        `<div class="msg-bubble"${id ? ` id="${id}"` : ''}>${html}</div>`;
+        `<div class="msg-bubble"${id ? ` id="${id}"` : ''}${live ? ' data-live="1"' : ''}>${live ? html() : html}</div>`;
+      if (live) { const b = wrap.querySelector('.msg-bubble'); if (b) b._live = html; }
       this.thread.appendChild(wrap);
       this.thread.scrollTop = this.thread.scrollHeight;
       this.syncEdge();
+    },
+
+    /* Re-run every live answer in the thread. Called from render(), so a
+       conversation you are looking at is never behind the model it describes.
+       What changed inside it is marked, so the eye is taken to the number that
+       moved rather than left to find it. */
+    repaint() {
+      if (!this.thread) return;
+      $$('.msg-bubble[data-live]', this.thread).forEach((el) => {
+        if (typeof el._live !== 'function') return;
+        const before = el.innerHTML;
+        const after = el._live();
+        if (after === before) return;
+        el.innerHTML = after;
+        markChanged(el);
+      });
     }
   };
 
-  /* Toast with Undo — rung 1 of the confirmation ladder: reversible,
-     single-entity, low blast radius means act, then offer the way back. */
+  /* ═══════════════════════════════════════════════
+     ANSWERS
+
+     Grounded in objects, with inline citations, a source list and a trust
+     disclosure — and one new action. `Show these on the surface` writes the
+     cited ids into the URL, so the conversation and the page stop being two
+     products. That is the mind map's "filter by document ids" node.
+  ═══════════════════════════════════════════════ */
+  function citeChip(n, id, passage) {
+    const o = byId(id);
+    return `<span class="cite-wrap"><span class="cite" tabindex="0" role="button" aria-describedby="kcp${n}">${n}</span>` +
+      `<span class="cite-preview" id="kcp${n}" role="tooltip">` +
+      `<span class="cp-head"><span class="cp-title">${esc(o.title)}</span>${statusBadge(o.status)}</span>` +
+      `<span class="cp-passage">“${esc(passage)}”</span>` +
+      `<span class="cp-foot"><span class="cp-src">${esc(SRC[o.src].label)} · ${esc(COLLECTIONS[o.col])}</span>` +
+      `<button class="cite-action is-flag" data-flag="${o.id}">${ICO.flag}Flag</button></span></span></span>`;
+  }
+
+  function sourceRow(n, id) {
+    const o = byId(id);
+    return `<div class="source-item"><span class="cite">${n}</span>${esc(o.title)}` +
+      `<span class="source-domain">${esc(SRC[o.src].label)}</span>${statusBadge(o.status)}</div>`;
+  }
+
+  /* Every answer keeps this button even though a fresh question surfaces its
+     sources automatically: scrolling back to an older message and re-applying
+     it is the one case automation cannot serve. */
+  const applyBtn = (ids, label) =>
+    `<div class="answer-apply">${entryAction('direct', label || `Show these ${ids.length} on the surface`,
+      `data-apply-ids="${ids.join(',')}"`)}
+      <span class="answer-apply-note">The grid becomes exactly these documents.</span>
+    </div>`;
+
+  const ANSWERS = [
+    { match: /refund|activat|return/i, weight: 1, ids: ['article-refund', 'article-returns-faq', 'article-warranty'],
+      build: () => `<div class="answer-surface">
+        <div class="answer-body">
+          <p>Customers who bought through the EU storefront may request a full refund within <strong>30 days</strong>
+          of purchase${citeChip(1, 'article-refund', 'may request a full refund within 30 days of purchase, provided the item has not been activated.')},
+          provided the item has not been activated${citeChip(2, 'article-returns-faq', 'Activation ends refund eligibility. Faults are handled under warranty instead.')}.</p>
+          <p>The two sources disagree on what happens after activation, so treat that clause as contested rather than settled.</p>
+        </div>
+        <div class="source-list">${sourceRow(1, 'article-refund')}${sourceRow(2, 'article-returns-faq')}</div>
+        <div class="trust-disclosure has-exclusion">
+          <div class="td-row is-err">${ICO.refresh}<span class="td-text"><strong>One cited source is behind
+          Confluence</strong> — the source changed after our copy. It is still answering, and this is what that
+          looks like.</span></div>
+          <div class="td-row is-warn">${ICO.warn}<span class="td-text">The second source is unscoped: it does not say
+          which storefront it applies to. That is the actual defect.</span></div>
+        </div>
+        ${applyBtn(['article-refund', 'article-returns-faq', 'article-warranty'])}
+      </div>` },
+
+    { match: /residency|gdpr|data (is )?stored|apac/i, weight: 1, ids: ['article-residency', 'blog-residency', 'article-gdpr-dsr'],
+      build: () => `<div class="answer-surface">
+        <div class="answer-body">
+          <p>EU customer data stays in the EU region${citeChip(1, 'article-residency', 'Where customer data is stored per region, and what changes on an enterprise contract.')}.
+          For APAC the corpus is thinner: the article covers the region but is <strong>due for review</strong>, and the
+          public explainer restates it rather than adding anything${citeChip(2, 'blog-residency', 'Public-facing explainer. Points at the residency article, which is due.')}.</p>
+          <p>A customer asked exactly this nine days ago and the ticket is still open with legal.</p>
+        </div>
+        <div class="source-list">${sourceRow(1, 'article-residency')}${sourceRow(2, 'blog-residency')}</div>
+        <div class="trust-disclosure">
+          <div class="td-row is-warn">${ICO.clock}<span class="td-text"><strong>One source has not been cited in
+          four months.</strong> Nothing was withheld from this answer — every document in scope was available.</span></div>
+        </div>
+        ${applyBtn(['article-residency', 'blog-residency', 'article-gdpr-dsr'])}
+      </div>` },
+
+    /* Weightier than the topic answers: "which articles contradict each other
+       on refunds?" names refunds and asks about the contradiction, and taking
+       the first pattern that matched answered the wrong half of it. */
+    { match: /contradict|conflict|disagree/i, weight: 2, ids: ['article-refund', 'article-returns-faq'],
+      build: () => `<div class="answer-surface">
+        <div class="answer-body">
+          <p>One live contradiction, on refunds after activation.</p>
+          <p><strong>Refund eligibility — EU customers</strong> states a 30-day window with no exception for activated
+          items. <strong>Returns FAQ — activated items</strong> states that activation ends eligibility outright.</p>
+          <p>They are not describing the same thing: the first is scoped to the EU storefront, the second is not scoped
+          at all. The unscoped one is the problem.</p>
+        </div>
+        <div class="trust-disclosure">
+          <div class="td-row is-warn">${ICO.warn}<span class="td-text">Status cannot separate these — both are
+          answerable, and the one in better condition is the one that is wrong. This needs a human ruling.</span></div>
+        </div>
+        ${applyBtn(['article-refund', 'article-returns-faq'], 'Put both on the surface')}
+      </div>` }
+  ];
+
+  /* A comparison is not a conclusion, so it ends in the choice rather than in
+     prose about the choice. Both buttons are the same commit surface with the
+     winner swapped. */
+  function conflictAnswer(a, b) {
+    const row = (o, other) => `<div class="conflict-side">
+      <div class="conflict-head">${statusBadge(o.status)}<span class="conflict-title">${esc(o.title)}</span></div>
+      <p class="conflict-body">${esc(o.sum)}</p>
+      <div class="conflict-meta">${esc(SRC[o.src].label)} · ${esc(o.owner)} · used ${esc(usedLabel(o).toLowerCase())},
+        ${o.uses} times in 90 days</div>
+      ${entryAction('review', 'Make this the one', `data-resolve="${o.id}"`)}
+    </div>`;
+    return `<div class="answer-surface">
+      <div class="answer-body">
+        <p>These two disagree, and both are answering. Whichever you keep supersedes the other.</p>
+      </div>
+      <div class="conflict-pair">${row(a, b)}${row(b, a)}</div>
+      <div class="trust-disclosure">
+        <div class="td-row is-warn">${ICO.warn}<span class="td-text">Usage is the only thing separating them, and it
+        is not evidence of which is correct.</span></div>
+      </div>
+    </div>`;
+  }
+
+  function noGroundingAnswer(q, scope, st) {
+    /* Where it looked, so the claim is checkable. "Nothing grounds that" is a
+       strong thing to say and it should say what it searched. */
+    const where = scope && scope.axis ? 'the ' + scope.docs.length + ' documents in scope'
+      : scope && !scope.broad ? 'the corpus' : 'the corpus';
+    return `<div class="answer-surface">
+      <div class="answer-body">
+        <p>Nothing in ${esc(where)} grounds an answer to that.</p>
+        <p>I would rather say so than assemble something plausible from adjacent content — a confident answer with no
+        source behind it is the failure this product exists to remove.</p>
+      </div>
+      <div class="trust-disclosure has-exclusion">
+        <div class="td-row is-err">${ICO.slash}<span class="td-text"><strong>0 sources matched.</strong> This is a
+        genuine coverage gap, not a retrieval or a permission problem.</span></div>
+        <button class="td-action" data-raise-gap="${esc(q).slice(0, 80)}">Raise it as a coverage gap →</button>
+      </div>
+    </div>`;
+  }
+
+  /* Scope is set before the query runs and stays visible throughout the
+     answer. Here the scope IS the filter state, which is the whole point: what
+     you can see and what AiMY may answer from are the same set. */
+  function scopeBasis(st) {
+    /* An open document is the basis. Saying "the whole corpus" while someone is
+       reading one article is the canvas failing to show what it is standing on. */
+    if (st.doc && byId(st.doc)) {
+      const o = byId(st.doc);
+      return [o.title, TYPES[o.t].label, COLLECTIONS[o.col], STATUS[o.status].label];
+    }
+    const chips = activeChips(st);
+    if (!chips.length) return ['Your collections', LIVE.length + ' objects'];
+    const labels = [];
+    if (st.ids.length) labels.push(st.ids.length + ' documents');
+    LIST_KEYS.concat(DATE_KEYS).forEach((k) => {
+      if (k === 'ids') return;
+      const v = st[k];
+      (Array.isArray(v) ? v : v ? [v] : []).forEach((x) => labels.push(valueLabel(k, x)));
+    });
+    if (st.mine) labels.push('Owned by you');
+    if (st.q) labels.push('“' + st.q + '”');
+    return labels.slice(0, 4);
+  }
+
+  /* What AiMY may ground on. Exclusion is now a fact about replacement, not
+     about age: a superseded document has a successor and an archived one is out
+     of the corpus, so quoting either is quoting something that has been
+     withdrawn. Everything else answers, and the answer discloses its condition —
+     nothing is silently withheld because a clock ran out. */
+  const answerable = (o) => o && !o.arch && !STATUS[o.status].excluded;
+
+  /* What the answer stands on, resolved the same way the answer is — otherwise
+     the grid fills with one set while the prose cites another. */
+  const answerIds = (q) => {
+    const topic = topicFor(q);
+    if (topic && !questionShape(q)) return topic.ids.filter((id) => answerable(byId(id)));
+    const scope = questionScope(q, readURL(), questionShape(q));
+    return scope.broad ? [] : scope.docs.slice(0, 4).map((o) => o.id);
+  };
+
+  /* Put a set of documents on the surface and offer the way back. Used both by
+     the automatic surfacing above and by the explicit button on every answer,
+     so the two cannot drift apart. */
+  function surfaceIds(ids, when) {
+    const before = location.search;
+    const next = readURL0();
+    next.ids = ids;
+    rememberFilter();
+    writeURL(next);
+    undoStack = () => { location.href = location.pathname + before; };
+    toast('The surface now holds the ' + ids.length + ' documents this answer stands on',
+      'Undo', when ? 'Applied ' + when + ' — Undo restores your filters' : 'Undo restores your filters');
+  }
+
+  /* ── Answering the question that was asked ──
+
+     Three hand-written topics used to be the whole of it, matched on a noun.
+     "Can EU customers get a refund after activating?" and "What changed in the
+     refund policy?" both contain *refund* and are not the same question;
+     returning the same paragraph for both is keyword matching wearing
+     comprehension as a costume. And everything outside those three nouns fell
+     to "nothing in the corpus grounds an answer to that" — which is a strong
+     claim to make about a question the corpus can plainly answer.
+
+     So: what the question ASKS decides the shape of the answer, and what its
+     words NAME decides the documents it is answered from. Both are computed
+     from the live corpus, which is what keeps them related to the question. */
+  const STOP = ('what which whats who whom whose does did do done is are was were the a an and or of in on at to for '
+    + 'about that this these those there here have has had been being will would should could can cannot may might '
+    + 'me my our your their it its from with when where why how any some all still need needs want get got say says '
+    + 'tell show find look into out over under document documents doc docs article articles thing things corpus '
+    + 'knowledge base please').split(' ');
+
+  const QUESTION_SHAPE = [
+    ['owner',   /\bwho\b.{0,20}\b(owns?|maintains?|responsible|looks after)\b|\bowner(ship)?\b|\bunowned\b/i],
+    ['changed', /\bwhat.{0,15}\b(changed|new|updated?)\b|\brecently\b|\bsince\b|\blatest\b|\bmost recent\b/i],
+    ['stale',   /\bout of date\b|\boutdated\b|\bstale\b|\bbehind\b|\bre-?sync/i],
+    ['unused',  /\bunused\b|\bnobody\b.{0,18}\b(use|uses|read|reads|cite|cites|open|opens|need|needs)\b|\bno ?one\b.{0,18}\b(use|uses|read|reads)\b|\bnot been (used|cited|opened)\b|\bworth keeping\b|\bstopped being used\b/i],
+    ['count',   /\bhow many\b|\bhow much\b|\bcount\b|\bhow big\b/i],
+    ['source',  /\bwhere\b.{0,20}\bcome from\b|\bwhich source\b|\bsyncing\b|\bnot syncing\b|\bsources?\b.{0,12}\b(broken|down|failing|stopped)\b/i]
+  ];
+
+  const questionShape = (q) => (QUESTION_SHAPE.find(([, re]) => re.test(q)) || [null])[0];
+
+  /* The words that carry the QUESTION are not words to search for. "Which
+     documents does nobody use?" was scoping itself to the one document whose
+     summary happens to contain the word *nobody*, and then answering about that
+     document — the asking words were being read as the subject. */
+  const SHAPE_WORDS = {
+    owner:   ['owns', 'owner', 'owners', 'ownership', 'unowned', 'maintains', 'responsible', 'assigned', 'unassigned'],
+    changed: ['changed', 'change', 'changes', 'updated', 'update', 'updates', 'recent', 'recently', 'latest', 'newest'],
+    stale:   ['outdated', 'stale', 'behind', 'resync', 'date', 'dates'],
+    unused:  ['unused', 'nobody', 'uses', 'used', 'using', 'reads', 'reading', 'cites', 'cited', 'keeping'],
+    count:   ['many', 'much', 'count', 'total', 'number'],
+    source:  ['source', 'sources', 'syncing', 'synced', 'connected', 'broken', 'failing', 'stopped']
+  };
+
+  /* The documents a question is about: a plain term match over what each
+     document says about itself, inside whatever the surface is already showing.
+     This is the retrieval step, and having one is what makes "nothing grounds
+     that" a true statement on the occasions it appears rather than the default
+     for everything unrecognised. */
+  function questionScope(q, st, shape) {
+    const onSurface = applyFilters(st).filter(answerable);
+    let pool = onSurface.length ? onSurface : ENTITLED.filter(answerable);
+    let axisScoped = false;
+
+    /* A word that names a real axis — a collection, a source, a service, a
+       region — is never a coincidence, so it scopes the answer whatever its
+       frequency. The lexicon already knows the whole taxonomy; asking it again
+       here is reuse, not a second vocabulary that can drift from the first. */
+    const axes = parseFilters(q).set;
+    const axisKeys = Object.keys(axes).filter((k) => k !== 'q' && LIST_KEYS.indexOf(k) > -1 && axes[k].length);
+    if (axisKeys.length) {
+      const scoped = pool.filter((o) => axisKeys.every((k) => {
+        const v = axes[k];
+        return k === 'tag' ? v.some((x) => o.tags.indexOf(x) > -1)
+          : k === 'service' ? v.some((x) => o.services.indexOf(x) > -1)
+          : k === 'type' ? v.indexOf(o.t) > -1
+          : k === 'collection' ? v.indexOf(o.col) > -1
+          : k === 'source' ? v.indexOf(o.src) > -1
+          : v.indexOf(o[k]) > -1;
+      }));
+      /* An axis narrows WHERE to look. It is not evidence that the answer is in
+         there — "what is our policy on office dogs?" names the Policies
+         collection and the collection says nothing about dogs. So the terms are
+         still scored, inside the narrowed pool. */
+      if (scoped.length) { pool = scoped; axisScoped = true; }
+    }
+
+    const drop = (SHAPE_WORDS[shape] || []).concat(STOP);
+    const words = String(q).toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/)
+      .filter((w) => w.length > 3 && drop.indexOf(w) < 0);
+    if (!words.length) return { docs: pool, terms: [], broad: true, axis: axisScoped };
+    /* A term that hits a quarter of the corpus is not evidence that the corpus
+       covers the question — "what is our policy on office dogs?" matches every
+       document with the word *policy* in it, and answering from those would be
+       claiming coverage that does not exist. Only distinctive terms count. */
+    const hay = (o) => (o.title + ' ' + o.sum + ' ' + o.tags.join(' ') + ' ' + COLLECTIONS[o.col]).toLowerCase();
+    const generic = words.filter((w) => pool.filter((o) => hay(o).indexOf(w) > -1).length > pool.length * 0.25);
+    const sharp = words.filter((w) => generic.indexOf(w) < 0);
+    const scored = pool.map((o) => {
+      const h = hay(o);
+      return { o: o, n: sharp.filter((w) => h.indexOf(w) > -1).length };
+    }).filter((x) => x.n > 0).sort((a, b) => b.n - a.n || a.o.upd - b.o.upd);
+    /* Naming nothing the corpus recognises does not make the question empty:
+       "what is out of date?" is about the whole surface. Only a question whose
+       words match no document AND asks nothing computable is a coverage gap. */
+    return { docs: scored.length ? scored.map((x) => x.o) : pool, terms: words,
+             broad: !scored.length, axis: axisScoped };
+  }
+
+  const scopeLine = (scope, st) => scope.axis
+    ? 'across the ' + scope.docs.length + ' in scope'
+    : scope.broad
+      ? (activeChips(st).length ? 'across what is on your surface' : 'across your four collections')
+      : scope.docs.length === 1 ? 'in the one document that mentions it'
+        : 'across the ' + scope.docs.length + ' documents that mention it';
+
+  /* Every computed answer cites what it counted. A number with no way to see
+     what is behind it is the same unsourced confidence this product exists to
+     remove — it just looks more objective. */
+  const citedList = (docs, note) => docs.length
+    ? `<div class="source-list">${docs.slice(0, 4).map((o, i) => sourceRow(i + 1, o.id)).join('')}</div>`
+      + (note ? `<div class="trust-disclosure"><div class="td-row is-warn">${ICO.warn}
+          <span class="td-text">${note}</span></div></div>` : '')
+    : '';
+
+  const COMPUTED = {
+    owner(scope, st, q) {
+      const docs = scope.docs;
+      /* "Who owns this" means "who do I ask". Some documents carry an
+         ingestion marker in that field rather than a person — counting
+         "Ingested · Zendesk" as an owner answers the question with something
+         you cannot send a message to. */
+      const named = (o) => OWNERS.indexOf(o.owner) > -1 && o.owner !== 'Unassigned';
+      const by = {};
+      docs.filter(named).forEach((o) => { by[o.owner] = (by[o.owner] || 0) + 1; });
+      const top = Object.keys(by).sort((a, b) => by[b] - by[a]).slice(0, 3);
+      const nobody = docs.filter((o) => !named(o));
+      const unassigned = nobody.filter((o) => o.owner === 'Unassigned');
+      const ingested = nobody.length - unassigned.length;
+      return `<div class="answer-surface">
+        <div class="answer-body">
+          <p>${top.length
+            ? top.map((n) => `<strong>${esc(n)}</strong> owns ${by[n]}`).join(', ') +
+              ' ' + scopeLine(scope, st) + '.'
+            : 'Nobody has their name on any of it ' + scopeLine(scope, st) + '.'}</p>
+          ${nobody.length
+            ? `<p><strong>${nobody.length}</strong> ${nobody.length === 1 ? 'has' : 'have'} nobody to ask${
+                unassigned.length && ingested
+                  ? ` — ${unassigned.length} unassigned, and ${ingested} that arrived from a source with no person attached`
+                  : ingested ? ' — they arrived from a source with no person attached' : ''}.
+               That is the part worth acting on.</p>`
+            : '<p>Every one of them has a named owner.</p>'}
+        </div>
+        ${citedList(docs)}
+        ${nobody.length
+          ? applyBtn(nobody.map((o) => o.id), 'Show the ' + nobody.length + ' with nobody to ask')
+          : applyBtn(docs.slice(0, 8).map((o) => o.id))}
+      </div>`;
+    },
+
+    changed(scope, st, q) {
+      const docs = scope.docs.slice().sort((a, b) => a.upd - b.upd);
+      const recent = docs.filter((o) => o.upd <= 30).slice(0, 5);
+      const list = recent.length ? recent : docs.slice(0, 3);
+      return `<div class="answer-surface">
+        <div class="answer-body">
+          <p>${recent.length
+            ? `<strong>${recent.length}</strong> changed in the last month ${scopeLine(scope, st)}.`
+            : `Nothing changed in the last month ${scopeLine(scope, st)}. The most recent ${list.length === 1 ? 'is' : 'are'} below.`}</p>
+          ${list.map((o) => `<p>${citeChip(list.indexOf(o) + 1, o.id, o.sum.slice(0, 120))}
+            <strong>${esc(o.title)}</strong> — ${esc(fmtDate(o.upd))}${o.versions && o.versions[0]
+              ? ', ' + esc(String(o.versions[0].label).toLowerCase()) : ''}.</p>`).join('')}
+        </div>
+        ${citedList(list, 'A change to the stored copy is not the same as a change at the source. Where the two differ, the document says so.')}
+        ${applyBtn(list.map((o) => o.id))}
+      </div>`;
+    },
+
+    stale(scope, st, q) {
+      const docs = scope.docs.filter((o) => o.status === 'outdated');
+      if (!docs.length) return `<div class="answer-surface">
+        <div class="answer-body">
+          <p>Nothing is behind its source ${scopeLine(scope, st)}. Every stored copy matches what the source last said.</p>
+        </div>
+        ${applyBtn(scope.docs.slice(0, 8).map((o) => o.id), 'Show what is in scope')}
+      </div>`;
+      const bySrc = {};
+      docs.forEach((o) => { bySrc[o.src] = (bySrc[o.src] || 0) + 1; });
+      const dead = Object.keys(bySrc).filter((k) => SRC[k].health !== 'ok');
+      return `<div class="answer-surface">
+        <div class="answer-body">
+          <p><strong>${docs.length}</strong> ${docs.length === 1 ? 'document is' : 'documents are'} behind ${
+            Object.keys(bySrc).map((k) => `${esc(SRC[k].label)} (${bySrc[k]})`).join(', ')}.</p>
+          <p>${dead.length
+            ? `${dead.map((k) => `<strong>${esc(SRC[k].label)}</strong>`).join(' and ')} ${dead.length === 1 ? 'is' : 'are'}
+               not connected, so re-syncing those would queue rather than run — the connection is the thing to fix first.`
+            : 'All of those sources are connected, so each one can be pulled again now.'}</p>
+        </div>
+        ${citedList(docs, 'Out of date is a condition, not an exclusion. These still answer, and every answer citing them says so.')}
+        <div class="answer-apply">
+          ${dead.length ? entryAction('review', 'Settings for ' + SRC[dead[0]].label, `data-settings="source:${dead[0]}"`) : ''}
+          ${entryAction('direct', 'Show these ' + docs.length, `data-apply-ids="${docs.map((o) => o.id).join(',')}"`)}
+        </div>
+      </div>`;
+    },
+
+    unused(scope, st, q) {
+      const docs = scope.docs.filter((o) => o.status === 'unused' || o.used > 120)
+        .sort((a, b) => b.used - a.used).slice(0, 6);
+      if (!docs.length) return `<div class="answer-surface">
+        <div class="answer-body"><p>Everything ${scopeLine(scope, st)} has been cited in the last four months.</p></div>
+        ${applyBtn(scope.docs.slice(0, 8).map((o) => o.id), 'Show what is in scope')}
+      </div>`;
+      return `<div class="answer-surface">
+        <div class="answer-body">
+          <p><strong>${docs.length}</strong> ${docs.length === 1 ? 'has' : 'have'} not been cited in months
+          ${scopeLine(scope, st)}.</p>
+          ${docs.slice(0, 4).map((o, i) => `<p>${citeChip(i + 1, o.id, o.sum.slice(0, 120))}
+            <strong>${esc(o.title)}</strong> — ${esc(usedLabel(o).toLowerCase())}, ${o.uses} times in 90 days.</p>`).join('')}
+        </div>
+        ${citedList(docs, 'Low usage is not evidence that a document is wrong. It may be that something else is found first.')}
+        <div class="answer-apply">
+          ${entryAction('investigate', 'Is the first one worth keeping?', `data-act="triage" data-obj="${docs[0].id}"`)}
+          ${entryAction('direct', 'Show these ' + docs.length, `data-apply-ids="${docs.map((o) => o.id).join(',')}"`)}
+        </div>
+      </div>`;
+    },
+
+    count(scope, st, q) {
+      const docs = scope.docs;
+      const byStatus = {};
+      docs.forEach((o) => { byStatus[o.status] = (byStatus[o.status] || 0) + 1; });
+      const rows = Object.keys(byStatus).sort((a, b) => byStatus[b] - byStatus[a]);
+      return `<div class="answer-surface">
+        <div class="answer-body">
+          <p><strong>${docs.length}</strong> ${docs.length === 1 ? 'document' : 'documents'} ${scopeLine(scope, st)}.</p>
+        </div>
+        ${factRow(rows.map((s) => [byStatus[s], STATUS[s].label.toLowerCase()]))}
+        ${applyBtn(docs.slice(0, 12).map((o) => o.id))}
+      </div>`;
+    },
+
+    source(scope, st, q) {
+      const keys = Object.keys(SRC).filter((k) => k !== 'upload');
+      const named = keys.filter((k) => q.toLowerCase().indexOf(SRC[k].label.toLowerCase()) > -1);
+      const list = named.length ? named : keys.filter((k) => SRC[k].health !== 'ok');
+      const shown = list.length ? list : keys;
+      return `<div class="answer-surface">
+        <div class="answer-body">
+          <p>${list.length && !named.length
+            ? `<strong>${list.length}</strong> of ${keys.length} sources ${list.length === 1 ? 'is' : 'are'} not syncing.`
+            : shown.map((k) => `<strong>${esc(SRC[k].label)}</strong> ${SRC[k].health === 'ok' ? 'is syncing' : 'is not syncing'}`).join('; ') + '.'}</p>
+          ${shown.map((k) => `<p>${esc(SRC[k].label)} — ${esc(SRC[k].note)}.
+            ${LIVE.filter((o) => o.src === k).length} documents come from it.</p>`).join('')}
+        </div>
+        <div class="answer-apply">
+          ${shown.slice(0, 2).map((k) => entryAction('review', 'Settings for ' + SRC[k].label,
+            `data-settings="source:${k}"`)).join('')}
+        </div>
+      </div>`;
+    }
+  };
+
+  /* When the question names something the corpus holds but asks nothing this
+     product computes, the honest answer is what those documents say — with the
+     citations that let you check. It beats "nothing grounds that", which was
+     being said about questions the corpus could plainly answer. */
+  function corpusAnswer(scope, st, q) {
+    const docs = scope.docs.slice(0, 3);
+    return `<div class="answer-surface">
+      <div class="answer-body">
+        <p>${docs.length} document${docs.length === 1 ? '' : 's'} in scope ${docs.length === 1 ? 'covers' : 'cover'} that.</p>
+        ${docs.map((o, i) => `<p>${citeChip(i + 1, o.id, o.sum.slice(0, 140))}
+          <strong>${esc(o.title)}</strong> — ${esc(o.sum.slice(0, 160))}${o.sum.length > 160 ? '…' : ''}</p>`).join('')}
+      </div>
+      ${citedList(docs, 'This is what those documents say, not a synthesis of them. Where they disagree, comparing them is one click from either one.')}
+      ${applyBtn(docs.map((o) => o.id))}
+    </div>`;
+  }
+
+  /* The most specific topic that matches, not the first one declared. */
+  const topicFor = (q) => ANSWERS.filter((a) => a.match.test(q))
+    .sort((a, b) => (b.weight || 1) - (a.weight || 1))[0] || null;
+
+  function answerFor(q, st) {
+    /* Order matters, and it is the whole fix. What the question ASKS comes
+       first: "what changed in the refund policy" and "can EU customers get a
+       refund after activating" share a noun and are different questions, and
+       the topic match cannot tell them apart. Only once the question asks
+       nothing computable does the noun get to choose the answer. */
+    const shape = questionShape(q);
+    const scope = questionScope(q, st, shape);
+    if (shape && COMPUTED[shape] && (scope.docs.length || shape === 'source')) {
+      return COMPUTED[shape](scope, st, q);
+    }
+
+    const topic = topicFor(q);
+    /* Nothing recognised, but the corpus holds documents about it: say what
+       they say. "Nothing grounds an answer to that" is a strong claim and it
+       was being made about questions the corpus could plainly answer. */
+    if (!topic) return scope.docs.length && !scope.broad ? corpusAnswer(scope, st, q) : noGroundingAnswer(q, scope, st);
+    /* Results first: the matching objects arrive before the prose resolves, so
+       latency is filled with something useful rather than a spinner. */
+    const results = applyFilters(st).filter((o) => topic.ids.indexOf(o.id) > -1).slice(0, 2);
+    const body = topic.build();
+    if (!results.length) return body;
+    const head = `<div class="rs-head"><span class="rs-label">Matches</span>
+      <span class="rs-note">already on your surface</span></div>
+      <div class="rs-list">${results.map((o) => typeCard(o, true)).join('')}</div>`;
+    return body.replace('<div class="answer-surface">', `<div class="answer-surface">${head}`);
+  }
+
+  /* ═══════════════════════════════════════════════
+     TOAST + COMMIT SURFACES
+  ═══════════════════════════════════════════════ */
+  let undoStack = null;
+
   function toast(msg, undoLabel, sub) {
     const host = $('#toastHost');
     if (!host) return;
-    /* Built to the #canvas-toast anatomy table, which the library's own CSS
-       contradicts — see the correction in knowledge.css. Icon, body, divider
-       and undo are siblings in a row; the countdown is absolutely positioned
-       along the bottom edge. */
     host.innerHTML =
       `<div class="aimy-toast" role="status" aria-live="polite">
         <div class="aimy-toast-icon">${AIMY_MARK(13, 15)}</div>
@@ -905,1293 +3115,22 @@
         <button class="aimy-toast-undo" data-toast-undo>${esc(undoLabel)}</button>` : ''}
         <div class="aimy-toast-progress"><div class="aimy-toast-progress-fill"></div></div>
       </div>`;
-    /* .aimy-toast enters at opacity 0 and .visible is what reveals it.
-       Forcing a reflow between insertion and the class is what makes the
-       transition run from the start value — requestAnimationFrame looks like
-       the same thing but is throttled in background and offscreen contexts,
-       where the callback never fires and the toast lives out its whole life
-       at opacity 0. Every toast here was invisible under exactly that. */
     const el = $('.aimy-toast', host);
     if (el) { void el.offsetWidth; el.classList.add('visible'); }
     clearTimeout(toast._t);
-    /* Matches the countdown's documented 5s — the bar is a claim about
-       remaining time, so the dismiss has to honour it. */
     toast._t = setTimeout(() => { host.innerHTML = ''; }, 5000);
   }
 
-  /* ═══════════════════════════════════════════════
-     ANSWERS
-
-     The doctrine names the failure this guards against: during the QA v2
-     review "a Quality Score question received the previous SLA answer —
-     visual context handoff existed; thread binding did not." An answer that
-     does not depend on the question is that failure, and it is the one users
-     never forgive because it is invisible until it matters.
-
-     Two shapes, deliberately different:
-
-       CORPUS answers are grounded in knowledge objects. They carry inline
-       citations, a source list and a trust disclosure, because the user has to
-       be able to check them.
-
-       SYSTEM answers are derived from configuration and state — exposure,
-       cadence, sync health, the queue. They carry no citations, because there
-       is no document to cite. Dressing a state read in citation chrome would
-       be the more dangerous lie: it looks checkable and is not.
-
-     Anything unmatched gets an honest miss, not a confident paraphrase.
-  ═══════════════════════════════════════════════ */
-  function citeChip(n, title, passage, src, trust) {
-    return `<span class="cite-wrap"><span class="cite" tabindex="0" role="button" aria-describedby="kcp${n}">${n}</span>` +
-      `<span class="cite-preview" id="kcp${n}" role="tooltip">` +
-      `<span class="cp-head"><span class="cp-title">${esc(title)}</span>${trustState(trust)}</span>` +
-      `<span class="cp-passage">“${esc(passage)}”</span>` +
-      `<span class="cp-foot"><span class="cp-src">${esc(src)}</span>` +
-      `<button class="cite-action is-flag" data-flag="${n}">${ICO.flag}Flag</button></span></span></span>`;
-  }
-
-  function sourceRow(n, title, src, trust) {
-    return `<div class="source-item"><span class="cite">${n}</span>${esc(title)}` +
-      `<span class="source-domain">${esc(src)}</span>${trustState(trust)}</div>`;
-  }
-
-  /* A system answer states where the fact lives and routes there. No citations. */
-  function systemAnswer(bodyHtml, o) {
-    return `<div class="answer-surface">
-      <div class="answer-body">${bodyHtml}</div>
-      <div class="trust-disclosure">
-        <div class="td-row">${ICO.shield}<span class="td-text">Read from <strong>${esc(o.from)}</strong> as it
-        stands now — this is current configuration, not a document, so there is nothing to cite and nothing that
-        can be out of date.</span></div>
-      </div>
-      ${o.action ? `<div class="k-row k-gap-2">${o.action}</div>` : ''}
-    </div>`;
-  }
-
-  const ANSWERS = [
-    /* ── Corpus: the refund contradiction ── */
-    {
-      match: /refund|activat|return/i,
-      build: () => `<div class="answer-surface">
-        <div class="answer-body">
-          <p>Customers who purchased through the EU storefront may request a full refund within <strong>30 days</strong>
-          of purchase${citeChip(1, 'Refund eligibility — EU customers',
-            '…may request a full refund within 30 days of purchase, provided the item has not been activated.',
-            'Confluence · Policies', 'expired')}, provided the item has not been
-          activated${citeChip(2, 'Returns FAQ — activated items',
-            'Activation ends refund eligibility. Faults are handled under warranty instead.',
-            'Zendesk · Help Center', 'verified')}.</p>
-          <p>The two sources disagree on what happens after activation, so treat the second clause as contested.</p>
-        </div>
-        <div class="source-list">
-          ${sourceRow(1, 'Refund eligibility — EU customers', 'Confluence · Policies', 'expired')}
-          ${sourceRow(2, 'Returns FAQ — activated items', 'Zendesk · Help Center', 'verified')}
-        </div>
-        <div class="trust-disclosure has-exclusion">
-          <div class="td-row is-err">${ICO.slash}<span class="td-text"><strong>1 relevant source was excluded</strong>
-          because it is past its review date. This answer is thinner than the corpus can actually support.</span></div>
-          <div class="td-row is-warn">${ICO.clock}<span class="td-text">“Refund eligibility — EU customers” expired
-          102 days ago · owner <strong>A. Mahfouz</strong></span></div>
-          <button class="td-action" data-act="verify-expired">Request verification →</button>
-        </div>
-        ${answerScope(14, 2)}
-        <div class="k-row k-gap-2">
-          <button class="btn btn-ghost btn-sm" data-promote="article-refund">Promote “Refund eligibility”</button>
-          <button class="btn btn-ghost btn-sm" data-act="compare">Resolve the contradiction</button>
-        </div>
-      </div>`
-    },
-
-    /* ── Corpus: what is expired, ranked by cost ── */
-    {
-      match: /expired|lapsed|past (its |their )?review|stale/i,
-      build: () => `<div class="answer-surface">
-        <div class="answer-body">
-          <p>Four articles you own are past their review date and excluded from answers. Ranked by what the exclusion
-          actually costs, not by how long they have been expired:</p>
-          <p><strong>Refund eligibility — EU customers</strong>${citeChip(1, 'Refund eligibility — EU customers',
-            '…may request a full refund within 30 days of purchase, provided the item has not been activated.',
-            'Confluence · Policies', 'expired')} carried <strong>61 questions</strong> in the last 30 days and expired
-          102 days ago. <strong>Returns FAQ — activated items</strong> carried 34. The remaining two carried none
-          between them, which is a reason to retire rather than re-verify.</p>
-        </div>
-        <div class="source-list">
-          ${sourceRow(1, 'Refund eligibility — EU customers', 'Confluence · Policies', 'expired')}
-        </div>
-        <div class="trust-disclosure has-exclusion">
-          <div class="td-row is-err">${ICO.slash}<span class="td-text"><strong>All four are excluded from answers.</strong>
-          Questions that would have resolved from them now resolve from weaker sources or not at all.</span></div>
-          <button class="td-action" data-act="verify-expired">Request verification for 4 objects →</button>
-        </div>
-        ${answerScope(4, 1)}
-      </div>`
-    },
-
-    /* ── Corpus: where coverage is thin ── */
-    {
-      match: /weakest|gap|missing|not cover|thin/i,
-      build: () => `<div class="answer-surface">
-        <div class="answer-body">
-          <p>Thinnest where the corpus is asked most. <strong>Refunds after activation</strong> drew 11 questions in
-          30 days with no source covering it — though 11 resolved tickets answer it consistently, so it is draftable.
-          <strong>Data residency — EU</strong> drew 7 and has no material at all; drafting that one would be invention.</p>
-          <p>Both are already in the queue as decisions rather than sitting here as observations.</p>
-        </div>
-        <div class="trust-disclosure">
-          <div class="td-row is-warn">${ICO.warn}<span class="td-text">This is measured from questions asked, not from
-          a content inventory — a topic nobody asks about will never appear here, however thin it is.</span></div>
-        </div>
-        ${answerScope(30, 0)}
-        <div class="k-row k-gap-2">
-          <a class="btn btn-ghost btn-sm" href="requests.html">Open both in Requests</a>
-        </div>
-      </div>`
-    },
-
-    /* ── Corpus: why confidence was low ── */
-    {
-      match: /low confidence|confidence|why.*(unsure|uncertain)/i,
-      build: () => `<div class="answer-surface">
-        <div class="answer-body">
-          <p>Seven answers came out at low confidence this week and <strong>five trace to the same pair of
-          objects</strong> — the refund contradiction. Confidence dropped because two verified sources disagreed, not
-          because the corpus was thin.</p>
-          <p>That distinction matters: adding content would not have helped. Resolving which object is authoritative
-          would.</p>
-        </div>
-        <div class="source-list">
-          ${sourceRow(1, 'Refund eligibility — EU customers', 'Confluence · Policies', 'expired')}
-          ${sourceRow(2, 'Returns FAQ — activated items', 'Zendesk · Help Center', 'verified')}
-        </div>
-        ${answerScope(7, 2)}
-        <div class="k-row k-gap-2">
-          <button class="btn btn-ghost btn-sm" data-act="compare">Resolve the contradiction</button>
-        </div>
-      </div>`
-    },
-
-    /* ── System: per-agent exposure ── */
-    {
-      match: /ground answers in|exposure|which agent|connect can|can connect|expose/i,
-      build: () => {
-        const rows = GOV_COLLECTIONS.filter((c) => GOV_EXPOSURE[c.name].connect);
-        const ext = GOV_AGENTS.find((a) => a.id === 'connect');
-        return systemAnswer(
-          `<p><strong>${esc(ext.name)}</strong> can ground answers in
-           <strong>${rows.map((r) => esc(r.name)).join('</strong>, <strong>')}</strong> —
-           ${rows.reduce((n, r) => n + r.objects, 0).toLocaleString()} objects in total.</p>
-           <p>Connect is customer-facing, so that permission is doing more work than the others: it is the difference
-           between a colleague reading something with judgement and an autonomous agent paraphrasing it to a customer.</p>`,
-          { from: 'the exposure matrix',
-            action: '<button class="btn btn-ghost btn-sm" data-goto-tab="govRules">Open the exposure matrix</button>' }
-        );
-      }
-    },
-
-    /* ── System: cadence change impact ── */
-    {
-      match: /cadence|90 days|tighten|verification interval/i,
-      build: () => {
-        const t = GOV_TYPES.find((x) => x.type === 'Article');
-        return systemAnswer(
-          `<p>Tightening the Article cadence from ${esc(t.cadence)} to 90 days re-schedules
-           <strong>${t.count.toLocaleString()} objects</strong>. Anything already older than 90 days moves to
-           <strong>due</strong> the moment it is applied.</p>
-           <p>Nothing is excluded from answers by the change itself — exclusion happens when a due date passes
-           unattended. What it does is move that cliff closer for a lot of content at once.</p>`,
-          { from: 'the type rules',
-            action: '<button class="btn btn-ghost btn-sm" data-gov-cadence="0">Review the change</button>' }
-        );
-      }
-    },
-
-    /* ── System: what a failing source costs ── */
-    {
-      match: /zendesk|sync|stopped syncing|missed since|source health|connector/i,
-      build: () => {
-        const z = SOURCES.find((s) => s.id === 'zendesk');
-        const dead = SOURCES.filter((s) => srcStatus(s) === SRC_STATUS.failed);
-        return systemAnswer(
-          `<p><strong>${z.behind} tickets</strong> resolved since ${esc(z.lastOk)} are not in the corpus and cannot be
-           cited. The failure is a credential one — the token was revoked at the source — so nothing will recover
-           until it is replaced.</p>
-           <p>${dead.length} source${dead.length === 1 ? ' is' : 's are'} in this state.
-           ${esc(dead.map((s) => s.name).join(' and '))}. The cost is invisible on the answer surface: answers stay
-           confident and get quietly thinner.</p>`,
-          { from: 'connector sync state',
-            action: '<button class="btn btn-ghost btn-sm" data-goto-src="zendesk">Open Zendesk</button>' }
-        );
-      }
-    },
-
-    /* ── System: the queue ── */
-    {
-      match: /request|queue|open longest|awaiting|decide|reject the/i,
-      build: () => {
-        const open = REQUESTS.filter((r) => !decisions[r.id]);
-        const oldest = open[open.length - 1];
-        return systemAnswer(
-          `<p><strong>${open.length}</strong> request${open.length === 1 ? '' : 's'} are open. The oldest is
-           <strong>${esc(oldest ? oldest.title : '—')}</strong>, waiting ${esc(oldest ? oldest.age : '—')}.</p>
-           <p>Three of them are stuck on the same thing rather than on your attention: an object with no owner has
-           nobody to route a verification request to, so it waits regardless of how long it sits there.</p>`,
-          { from: 'the decision queue',
-            action: '<a class="btn btn-ghost btn-sm" href="requests.html">Open Requests</a>' }
-        );
-      }
-    },
-
-    /* ── System: single-source dependency ── */
-    {
-      match: /depend|single source|only source/i,
-      build: () => systemAnswer(
-        `<p><strong>Policies</strong> depends entirely on Confluence, which is one of the two sources currently
-         failing. Every other collection has at least two connectors feeding it.</p>
-         <p>That is why the Confluence failure reads differently from the Zendesk one: there is no second path to the
-         same content.</p>`,
-        { from: 'source coverage',
-          action: '<button class="btn btn-ghost btn-sm" data-goto-src="confluence">Open Confluence</button>' }
-      )
-    }
-  ];
-
-  /* An honest miss. Says what was searched, that nothing grounds it, and turns
-     the gap into a queued decision — §1.2 requires a stated reason where no
-     action exists, and this one does have an action. */
-  function noGroundingAnswer(q) {
-    return `<div class="answer-surface">
-      <div class="answer-body">
-        <p>Nothing in the corpus grounds an answer to that.</p>
-        <p>I would rather say so than assemble something plausible from adjacent content — a confident answer with no
-        source behind it is the failure this product exists to remove.</p>
-      </div>
-      <div class="trust-disclosure has-exclusion">
-        <div class="td-row is-err">${ICO.slash}<span class="td-text"><strong>0 sources matched.</strong> This is a
-        genuine coverage gap, not a retrieval or permission problem.</span></div>
-        <button class="td-action" data-raise-gap="${esc(q).slice(0, 80)}">Raise it as a coverage gap →</button>
-      </div>
-      ${answerScope(0, 0)}
-    </div>`;
-  }
-
-  function answerScope(considered, cited) {
-    return `<div class="answer-scope">
-      ${ICO.search.replace('<svg', '<svg style="width:12px;height:12px"')}
-      <span>Scoped to ${esc(scopeBasis().join(' · '))} · ${considered} source${considered === 1 ? '' : 's'}
-      considered, ${cited} cited.</span>
-    </div>`;
-  }
-
-  /* ═══════════════════════════════════════════════
-     ENTRY-MODE ROUTING — the same click must not always do the same thing
-  ═══════════════════════════════════════════════ */
-  const ACTS = {
-    'verify-expired': {
-      mode: 'review',
-      run() { openCommit('verify-expired'); }
-    },
-    'verify-due': {
-      mode: 'review',
-      run() { openCommit('verify-due'); }
-    },
-    'compare': {
-      mode: 'investigate',
-      run() {
-        canvas.ask(
-          'Compare the two objects that conflict on refunds after activation',
-          ['Contradiction · 2 objects', 'Collection: Policies', 'Both verified'],
-          `<p>Both objects are verified and both are retrievable, which is why the answer moves depending on ranking.</p>
-           <p><strong>Refund eligibility — EU customers</strong> states a 30-day window with no exception for activated
-           items. <strong>Returns FAQ — activated items</strong> states that activation ends eligibility outright.</p>
-           <p>They are not describing the same thing: the first is scoped to the EU storefront, the second is not scoped
-           at all. The unscoped one is the problem.</p>
-           <div class="trust-disclosure" style="margin-top:10px">
-             <div class="td-row is-warn">${ICO.warn}<span class="td-text">Both sources are verified, so trust state
-             cannot separate them. This needs a human ruling, not a re-verification.</span></div>
-           </div>`
-        );
-      }
-    },
-    'lowconf': {
-      mode: 'investigate',
-      run() {
-        canvas.ask(
-          'What limited the nine low-confidence answers this week?',
-          ['9 answers · last 7 days', 'Grouped by limiting factor'],
-          `<p>Seven of the nine share one cause: no retrievable source states the activated-item exception. The article
-          that covers it — <em>Refund eligibility — EU customers</em> — is expired, so retrieval excluded it.</p>
-          <div class="trust-disclosure has-exclusion" style="margin-top:10px">
-            <div class="td-row is-err">${ICO.slash}<span class="td-text"><strong>1 relevant source was excluded</strong>
-            because it is past its review date. Seven answers were thinner than the corpus can actually support.</span></div>
-            <div class="td-row is-warn">${ICO.clock}<span class="td-text">“Refund eligibility — EU customers” expired
-            102 days ago · owner <strong>A. Mahfouz</strong></span></div>
-            <button class="td-action" data-act="verify-expired">Request verification →</button>
-          </div>`
-        );
-      }
-    },
-    'draft-gap': {
-      mode: 'prompt',
-      run() {
-        canvas.stage(
-          'Draft an article covering refunds after activation, grounded in the 11 tickets that asked about it.',
-          ['Coverage gap · 11 questions', 'Source: 11 resolved tickets', 'Scope: Policies']
-        );
-      }
-    },
-    'drafts': {
-      mode: 'review',
-      run() { openCommit('drafts'); }
-    },
-    'reconnect': {
-      mode: 'direct',
-      run() {
-        toast('Reconnecting Zendesk — sync queued', 'Undo');
-      }
-    },
-    'audit': {
-      mode: 'direct',
-      run() { location.href = 'workbench.html?open=article-sso'; }
-    }
-  };
-
-  /* Reviewed actions land on a structured commit surface with explicit scope.
-     Routing a consequential write through free-text would invert
-     Knowledge-to-Action (§1.4), so these never go to the canvas. */
-  const COMMITS = {
-    'verify-expired': {
-      title: 'Request verification — 4 expired articles',
-      current: 'Expired · excluded from answers',
-      proposed: 'Verification requested · owner notified',
-      rationale: 'Four articles you own are past review and excluded from retrieval. Two of them carried 61 questions ' +
-        'in the last 30 days.',
-      effects: [
-        ['ok', 'Send a verification request to <strong>3 owners</strong> covering <strong>4 articles</strong>.'],
-        ['warn', '<strong>1 article has no owner</strong> and will be routed to the Policies collection lead instead.'],
-        ['skip', '<strong>1 article is superseded</strong> and will be skipped — its successor is already verified.']
-      ],
-      confirm: 'Send 3 requests'
-    },
-    'verify-due': {
-      title: 'Verify or update — 6 articles due',
-      current: 'Verified · due within 14 days',
-      proposed: 'Verification confirmed · cadence reset',
-      rationale: 'Six articles reach their review date within 14 days, ranked by query volume so the most-used ' +
-        'content is verified first.',
-      effects: [
-        ['ok', 'Reset the review cadence on <strong>6 articles</strong> once each owner confirms.'],
-        ['warn', '<strong>2 articles</strong> have changed since last verification and will need a read, not a click.']
-      ],
-      confirm: 'Send 6 requests'
-    },
-    'drafts': {
-      title: 'Review 3 AiMY drafts',
-      current: 'Drafted · not published, not retrievable',
-      proposed: 'Published · verified · available to answers',
-      rationale: 'Each draft generalises from 3–5 resolved tickets. Publishing makes them retrievable by every agent ' +
-        'grounded in this corpus.',
-      effects: [
-        ['ok', 'Publish <strong>3 articles</strong> into <strong>Support</strong> with you as owner.'],
-        ['warn', 'These become available to <strong>4 consuming agents</strong>, including one customer-facing.'],
-        ['skip', '<strong>1 draft overlaps</strong> an existing article and will open as a suggested edit instead.']
-      ],
-      confirm: 'Publish 2, open 1 as an edit'
-    }
-  };
-
-  /* Adapter onto the one commit surface — the briefing's reviewed actions
-     carry an effect list rather than a blast radius. */
-  function openCommit(key) {
-    const c = COMMITS[key];
-    if (!c) return;
-    govCommit({ title: c.title, current: c.current, proposed: c.proposed,
-                rationale: c.rationale, effects: c.effects, confirm: c.confirm, width: 520 });
-  }
-
-  /* ═══════════════════════════════════════════════
-     WORKBENCH
-  ═══════════════════════════════════════════════ */
-  const CORPUS = [
-    { id: 'article-refund', type: 'Article', ico: ICO.doc, trust: 'expired', title: 'Refund eligibility — EU customers',
-      summary: '30-day window from purchase, provided the item has not been activated.',
-      owner: 'A. Mahfouz', verified: '14 Jan', collection: 'Policies',
-      fields: [['Applies to', 'EU storefront · all plans'], ['Collection', 'Policies']],
-      action: ['review', 'Re-verify against source'] },
-    { id: 'article-warranty', type: 'Article', ico: ICO.doc, trust: 'verified', title: 'Warranty process — EU',
-      summary: 'What happens after activation, and where the 30-day refund window stops applying.',
-      owner: 'A. Mahfouz', verified: '2 Jul', collection: 'Policies',
-      fields: [['Applies to', 'EU storefront · activated items'], ['Collection', 'Policies']],
-      action: ['direct', 'Open article'] },
-    { id: 'article-sso', type: 'Article', ico: ICO.doc, trust: 'verified', title: 'SSO provisioning — enterprise',
-      summary: 'SCIM provisioning, group mapping, and the two failure modes support sees most.',
-      owner: 'N. Wael', verified: '18 Jul', collection: 'Support',
-      fields: [['Applies to', 'Enterprise tier'], ['Collection', 'Support']],
-      action: ['direct', 'Open article'] },
-    { id: 'ticket-48120', type: 'Ticket', ico: ICO.ticket, trust: 'unverified', title: '#48120 — Refund declined after activation',
-      owner: 'Ingested · Zendesk', verified: '2 Mar', collection: 'Support',
-      fields: [['Requester', 'Nordwind GmbH'], ['Status', '<span class="tag tag-ok">Resolved</span>'],
-               ['Resolution', 'Goodwill credit issued; policy exception logged.']],
-      action: ['investigate', 'Investigate pattern'] },
-    { id: 'icp-bpo', type: 'ICP', ico: ICO.target, trust: 'due', title: 'Mid-market BPO — EMEA',
-      owner: 'Sales Ops', verified: '9 Feb', collection: 'Sales',
-      fields: [['Segment', '200–2,000 seats · outsourced support']],
-      list: ['Multi-client contact centre operation', 'Existing QA function with named owner'],
-      negative: ['Single-client captive centres', 'Under 200 seats — no QA budget'],
-      action: ['review', 'Review fit criteria'] },
-    { id: 'campaign-q3', type: 'Campaign', ico: ICO.megaphone, trust: 'verified', title: 'Q3 — Quality at scale',
-      owner: 'Marketing', verified: '28 Jun', collection: 'Marketing',
-      fields: [['Objective', 'Pipeline from mid-market BPO'], ['Window', '<strong>1 Jul – 30 Sep</strong> · active']],
-      tags: ['6 assets', '3 landing pages'],
-      action: ['direct', 'Open campaign'] },
-    { id: 'asset-onepager', type: 'Marketing Asset', ico: ICO.image, trust: 'verified', title: 'Quality at scale — one-pager',
-      owner: 'Brand', verified: '3 Jul', collection: 'Marketing',
-      fields: [['Format', 'PDF · A4 · 2pp'], ['Usage', 'External — customer-facing'],
-               ['Approval', '<span class="tc-approval is-approved">' + ICO.check.replace('<svg', '<svg style="width:11px;height:11px"') + 'Approved</span>']],
-      action: ['direct', 'Download asset'] },
-    { id: 'story-nordwind', type: 'Success Story', ico: ICO.trophy, trust: 'verified', title: 'Nordwind — 31% faster resolution',
-      owner: 'Marketing', verified: '21 Jun', collection: 'Marketing',
-      fields: [['Customer', 'Nordwind GmbH · 800 seats'], ['Outcome', '<strong>31%</strong> faster first resolution'],
-               ['Approval', '<span class="tc-approval is-pending">' + ICO.clock.replace('<svg', '<svg style="width:11px;height:11px"') + 'Awaiting customer sign-off</span>']],
-      quote: 'We stopped guessing which conversations to review.',
-      action: ['review', 'Review before external use'] },
-    { id: 'page-pricing', type: 'Web Page', ico: ICO.globe, trust: 'expired', title: 'Pricing — Enterprise tier',
-      owner: 'Unassigned', verified: '18 Mar', collection: 'Marketing',
-      fields: [['Source URL', 'aimy.app/pricing/enterprise'], ['Last crawl', '18 Mar'],
-               ['Changes', '<span class="tag tag-warn">Detected 4 Jul</span>']],
-      action: ['review', 'Re-verify against source'] }
-  ];
-
-  function typeCard(o, compact) {
-    const body = compact ? '' : `<div class="tc-body">
-      ${o.fields ? `<div class="tc-fields">${o.fields.map(([l, v]) =>
-        `<span class="tc-field-label">${esc(l)}</span><span class="tc-field-val">${v}</span>`).join('')}</div>` : ''}
-      ${o.list ? `<ul class="tc-list">${o.list.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}
-      ${o.negative ? `<ul class="tc-list is-negative">${o.negative.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}
-      ${o.quote ? `<div class="tc-quote">“${esc(o.quote)}”</div>` : ''}
-      ${o.tags ? `<div class="tc-tags">${o.tags.map((t) => `<span class="tag tag-neutral">${esc(t)}</span>`).join('')}</div>` : ''}
-    </div>`;
-
-    return `<div class="type-card${compact ? ' is-compact' : ''}" data-obj="${o.id}" data-trust-state="${o.trust}">
-      <div class="tc-head">
-        <span class="tc-type">${o.ico}${esc(o.type)}</span>
-        ${trustState(o.trust)}
-      </div>
-      <div class="tc-title">${esc(o.title)}</div>
-      ${!compact && o.summary ? `<div class="tc-summary">${esc(o.summary)}</div>` : ''}
-      ${body}
-      <div class="tc-gov">Owner <strong>${esc(o.owner)}</strong><span class="tc-gov-sep">·</span>Verified <strong>${esc(o.verified)}</strong></div>
-      <div class="tc-action">${entryAction(o.action[0], o.action[1], `data-open-obj="${o.id}"`)}</div>
-    </div>`;
-  }
-
-  /* The working set: the objects currently in play. A state concept, not a
-     component — it renders as type cards, a viewer, or an editor depending on
-     what is in it (§5.2, §5.4). Persists across overlay open/close. */
-  const workingSet = {
-    key: 'aimy-knowledge-ws',
-    ids: [],
-    open: null,
-
-    load() {
-      try { this.ids = JSON.parse(sessionStorage.getItem(this.key)) || []; } catch (e) { this.ids = []; }
-    },
-    save() {
-      try { sessionStorage.setItem(this.key, JSON.stringify(this.ids)); } catch (e) {}
-    },
-    add(id, quiet) {
-      if (this.ids.includes(id)) return false;
-      this.ids.push(id);
-      this.save();
-      if (!quiet) toast('Promoted to working set', 'Undo');
-      return true;
-    },
-    remove(id) {
-      this.ids = this.ids.filter((x) => x !== id);
-      this.save();
-    },
-    clear() { this.ids = []; this.open = null; this.save(); }
-  };
-
-  function renderWorkbench() {
-    const stage = $('#wbStage');
-    if (!stage) return;
-    const floatWrap = $('#aimyFloatWrap');
-
-    /* Empty working set: the float bar sits centred on the canvas. It docks
-       the moment work exists (§5.2). */
-    if (!workingSet.ids.length) {
-      if (floatWrap) floatWrap.classList.add('is-centred');
-      stage.innerHTML = `<div class="wb-blank">
-        <div class="wb-blank-title">Nothing in the working set</div>
-        <div class="wb-blank-body">Ask a question, or type the name of something you already know — a title, a person,
-        a ticket number. Naming a known object opens it directly; nothing is generated for a lookup.</div>
-      </div>`;
-      return;
-    }
-    if (floatWrap) floatWrap.classList.remove('is-centred');
-
-    if (workingSet.open) { renderViewer(workingSet.open); return; }
-
-    const objs = workingSet.ids.map((id) => CORPUS.find((o) => o.id === id)).filter(Boolean);
-    stage.innerHTML = `
-      <div class="ws-head">
-        <span class="ws-head-title">Working set</span>
-        <span class="ws-head-count">${objs.length} object${objs.length === 1 ? '' : 's'}</span>
-        <span class="ws-head-end">
-          <button class="btn btn-ghost btn-sm" data-ws-clear>Clear</button>
-        </span>
-      </div>
-      <div id="setScopeHost"></div>
-      <div class="ws-grid">
-        ${objs.map((o) => `<div class="ws-item" data-item="${o.id}">
-          <!-- The label is visually a bare checkbox, so the accessible name has
-               to name the object it selects — otherwise a keyboard user hears
-               "checkbox" nine times with nothing to distinguish them. -->
-          <label class="ds-choice ws-item-pick"><input type="checkbox" data-pick="${o.id}"
-                 aria-label="Select ${esc(o.title)}"><span></span></label>
-          ${typeCard(o)}
-        </div>`).join('')}
-      </div>`;
-  }
-
-  /* Set-scope bar. The scope statement and the skip line are both mandatory:
-     a bulk operation that silently no-ops on part of its selection reports a
-     success the user has no reason to distrust (§4, D3). */
-  function renderSetScope() {
-    const host = $('#setScopeHost');
-    if (!host) return;
-    const picked = $$('[data-pick]:checked').map((i) => i.getAttribute('data-pick'));
-    if (!picked.length) { host.innerHTML = ''; return; }
-
-    const objs = picked.map((id) => CORPUS.find((o) => o.id === id));
-    const excluded = objs.filter((o) => TRUST[o.trust].excluded);
-    const unowned = objs.filter((o) => o.owner === 'Unassigned');
-    const actionable = objs.length - excluded.filter((o) => o.trust === 'superseded').length;
-
-    host.innerHTML = `
-      <div class="set-scope-bar">
-        <span class="ss-count"><span class="ss-num">${picked.length}</span> selected</span>
-        <span class="ss-scope">of <strong>${CORPUS.length} in the working set</strong> · ${workingSet.ids.length} of
-        <strong>2,480 in the corpus</strong>. This selection is what you ticked, not a filter.</span>
-        <span class="ss-actions">
-          <button class="btn btn-ghost btn-sm" data-ss-clear>Clear</button>
-          ${entryAction('review', 'Request verification', 'data-ss-run="1"')}
-        </span>
-      </div>
-      <div class="ss-preview" id="ssPreview" hidden>
-        <div class="ss-preview-head">What this will do</div>
-        <div class="ss-effect is-ok">${ICO.check}<span>Send a verification request covering
-        <strong>${actionable - unowned.length} object${actionable - unowned.length === 1 ? '' : 's'}</strong>.</span></div>
-        ${unowned.length ? `<div class="ss-effect is-warn">${ICO.warn}<span><strong>${unowned.length} object${unowned.length === 1 ? ' has' : 's have'} no owner</strong>
-        and will be routed to the collection lead instead.</span></div>` : ''}
-        ${excluded.length ? `<div class="ss-effect is-skip">${ICO.slash}<span><strong>${excluded.length} object${excluded.length === 1 ? ' is' : 's are'} already excluded</strong>
-        from retrieval — verification will still be requested, but nothing changes for answers until it is confirmed.</span></div>` : ''}
-        <div style="display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--hairline)">
-          <button class="btn btn-brand btn-sm" data-ss-confirm="${actionable - unowned.length}">Send ${actionable - unowned.length} request${actionable - unowned.length === 1 ? '' : 's'}</button>
-          <button class="btn btn-ghost btn-sm" data-ss-cancel>Cancel</button>
-        </div>
-      </div>`;
-  }
-
-  function renderViewer(id) {
-    const o = CORPUS.find((x) => x.id === id);
-    const stage = $('#wbStage');
-    if (!o || !stage) return;
-    const t = TRUST[o.trust];
-
-    const notice = t.excluded ? `
-      <div class="dv-notice is-${o.trust === 'superseded' ? 'superseded' : 'expired'}">
-        ${o.trust === 'superseded' ? ICO.arrow : ICO.slash}
-        <span class="dv-notice-text"><strong>${o.trust === 'superseded' ? 'Replaced 12 Mar 2026.' : 'Excluded from answers.'}</strong>
-        ${o.trust === 'superseded'
-          ? 'You are reading a superseded version. It is kept for reference and is not used to answer questions.'
-          : 'This content is past its review date and AiMY will not ground answers in it. It remains readable — exclusion governs retrieval, not human access.'}</span>
-        <button class="dv-notice-link" data-act="verify-expired">${o.trust === 'superseded' ? 'Go to current version →' : 'Request verification →'}</button>
-      </div>` : '';
-
-    stage.innerHTML = `
-      <button class="wb-back" data-ws-back>${ICO.left}Back to working set</button>
-      <div class="ws-single">
-        <div class="doc-view" data-trust-state="${o.trust}">
-          <div class="dv-head">
-            <div class="dv-meta">
-              <span class="tc-type">${o.ico}${esc(o.type)}</span>
-              <span class="tag tag-neutral">${esc(o.collection)}</span>
-              ${trustState(o.trust)}
-            </div>
-            <div class="dv-title">${esc(o.title)}</div>
-          </div>
-          <div class="dv-gov">
-            <div class="dv-gov-item"><span class="dv-gov-label">Owner</span><span class="dv-gov-val">${esc(o.owner)}</span></div>
-            <div class="dv-gov-item"><span class="dv-gov-label">Last verified</span><span class="dv-gov-val">${esc(o.verified)} 2026</span></div>
-            <div class="dv-gov-item"><span class="dv-gov-label">Review due</span><span class="dv-gov-val${t.excluded ? ' is-overdue' : ''}">${t.excluded ? '102 days ago' : 'in 34 days'}</span></div>
-            <div class="dv-gov-item"><span class="dv-gov-label">Source</span><span class="dv-gov-val">Confluence · ${esc(o.collection)}</span></div>
-          </div>
-          ${notice}
-          <div class="dv-body">
-            <p>${esc(o.summary || o.title)}</p>
-            <h4>Exceptions</h4>
-            <p>Activated products are handled case by case. Where a fault is demonstrated the standard window does not
-            apply and the warranty process takes over.</p>
-          </div>
-          <div class="dv-rel">
-            <div class="dv-rel-group">
-              <span class="dv-rel-label">Related</span>
-              <span class="dv-rel-items">
-                <button class="dv-rel-item" data-open-obj="article-warranty">${ICO.doc}<span>Warranty process — EU</span></button>
-              </span>
-            </div>
-            <div class="dv-rel-group">
-              <span class="dv-rel-label">Contradicts</span>
-              <span class="dv-rel-items">
-                <button class="dv-rel-item is-contradiction" data-act="compare">${ICO.warn}<span>Returns FAQ — activated items</span></button>
-              </span>
-            </div>
-          </div>
-          <div class="dv-actions">
-            ${entryAction('review', 'Verify now', 'data-act="verify-expired"')}
-            <button class="btn btn-ghost" data-edit-obj="${o.id}">Edit</button>
-            <span class="dv-actions-end">
-              <button class="cite-action" data-act="report">${ICO.flag}Report a problem</button>
-              <button class="cite-action">${ICO.quote}Cite</button>
-            </span>
-          </div>
-        </div>
-      </div>`;
-  }
-
-  /* ═══════════════════════════════════════════════
-     RETRIEVAL — one input, routed on intent (§7.1)
-
-     Someone looking for a known object, someone asking a question, and
-     someone exploring a topic have different intents and should not have to
-     declare which they are. The route is decided on the shape of what was
-     typed, never on a mode switch.
-  ═══════════════════════════════════════════════ */
-  /* §7.1 routes on the shape of what was typed. The distinction that matters
-     is between "I know what I want" and "I am asking about a topic", and it
-     turns on how MANY objects the input identifies:
-
-       exactly one, and substantially its title → object lookup, no generation
-       question-shaped                          → generated answer
-       anything else, including a term that      → ambiguous: results first,
-       matches several objects                     answer resolving beneath
-
-     Matching on any substring made a bare "refund" — which matches two
-     objects — open one of them without asking. Opening a specific document
-     when the user named a topic is a confident guess wearing the clothes of a
-     direct action, and it is the case §7.1's third branch exists to catch. */
-  function classifyQuery(q) {
-    const s = q.trim();
-    if (!s) return 'empty';
-    if (/^(what|why|how|when|who|which|can|does|do|is|are|should)\b/i.test(s) || s.endsWith('?')) return 'question';
-
-    const lower = s.toLowerCase();
-    const hits = CORPUS.filter((o) => {
-      const t = o.title.toLowerCase();
-      return t.includes(lower) || lower.includes(t.slice(0, 14));
-    });
-
-    /* One object, and the input covers enough of its title to be a name
-       rather than a keyword that happens to appear in it. */
-    if (hits.length === 1 && lower.length >= hits[0].title.length * 0.5) return 'object';
-    return 'ambiguous';
-  }
-
-  function runQuery(q) {
-    const kind = classifyQuery(q);
-    const match = CORPUS.find((o) =>
-      o.title.toLowerCase().includes(q.trim().toLowerCase()) ||
-      q.trim().toLowerCase().includes(o.title.toLowerCase().slice(0, 14)));
-
-    /* Known object: generation was never needed, so the correct route is a
-       direct action straight to the object. The overlay never opens (§5.2). */
-    if (kind === 'object' && match) {
-      workingSet.add(match.id, true);
-      workingSet.open = match.id;
-      renderWorkbench();
-      toast(`Opened “${match.title}”`, null);
-      return;
-    }
-
-    /* Ambiguous input returns results first, with the answer resolving
-       beneath them — which also fills generation latency with something
-       useful rather than a spinner (§7.1). */
-    const words = q.toLowerCase().split(/\W+/).filter((x) => x.length > 3);
-    const results = CORPUS
-      .map((o) => ({ o, hits: words.filter((wd) => (o.title + ' ' + (o.summary || '')).toLowerCase().includes(wd)).length }))
-      /* Only genuine matches. Padding the list with Policies objects meant a
-         query nothing matched still showed two results above an answer saying
-         "0 sources matched" — the surface contradicting itself in the one case
-         where it most needs to be believed. */
-      .filter((x) => x.hits > 0)
-      .sort((a, b) => b.hits - a.hits)
-      .slice(0, 3)
-      .map((x) => x.o);
-
-    canvas.ask(q, scopeBasis(), answerFor(q, results, kind));
-  }
-
-  /* Scope is set before the query runs and stays visible throughout the
-     answer — an answer read without knowing its scope cannot be judged (§7.2). */
-  function scopeBasis() {
-    const chips = $$('#floatFilterTray .filter-chip.active').map((c) => c.textContent.trim());
-    return chips.length ? chips : ['the whole corpus'];
-  }
-
-  /* Scope was only visible while the tray was open, which meant it silently
-     narrowed every answer from behind a control nobody had reason to reopen.
-     Once scope exists it becomes permanent chrome and stays until cleared. */
-  function paintScopeStrip() {
-    const host = $('#scopeStrip');
-    if (!host) return;
-    const active = $$('#floatFilterTray .filter-chip.active');
-    if (!active.length) { host.innerHTML = ''; host.classList.add('k-hidden'); return; }
-    host.classList.remove('k-hidden');
-    host.innerHTML = `<div class="afs">
-      <span class="afs-label">Scope</span>
-      ${active.map((c) => `<button class="afs-chip" data-scope-drop="${esc(c.textContent.trim())}">
-        ${esc(c.textContent.trim())}&nbsp;<span class="x">×</span></button>`).join('')}
-      <button class="afs-clear" data-scope-clear>Clear scope</button>
-    </div>`;
-  }
-
-  /* The answer surface. Built as a self-contained fragment: no Knowledge
-     navigation, no Knowledge layout, and no --accent anywhere inside it, so
-     it renders identically inside a consuming agent's canvas (§8.1). */
-  /* Routes the question to a topical answer. The match is on what was asked,
-     so the same input on a different surface still gets the answer that belongs
-     to it — and an unmatched question gets an honest miss rather than the last
-     answer that happened to be built. */
-  function answerFor(q, results, kind) {
-    const topic = ANSWERS.find((a) => a.match.test(q));
-    const body = topic ? topic.build() : noGroundingAnswer(q);
-
-    if (kind !== 'ambiguous') return body;
-
-    /* Ambiguous input resolves results first, then the answer beneath (§7.1). */
-    const head = `<div class="rs-head"><span class="rs-label">Matches</span>
-      <span class="rs-note">shown first — the answer resolves below</span></div>
-      <div class="rs-list">${results.slice(0, 2).map((o) => typeCard(o, true)).join('')}</div>`;
-    return body.replace('<div class="answer-surface">', `<div class="answer-surface">${head}`);
-  }
-
-  /* ═══════════════════════════════════════════════
-     REQUESTS — the decision queue (§4)
-
-     Contested items where a person must decide, the decision must be recorded,
-     and it must be reversible. Deliberately separate from the workbench:
-     mixing the two would make routine editing feel consequential and
-     consequential decisions feel routine.
-
-     Four origins, one shape. Every item carries its evidence, a structured
-     decision surface offering Accept · Edit · Reject, and an audit trail.
-  ═══════════════════════════════════════════════ */
-  const RQ_KIND = {
-    verification:  { label: 'Verification', ico: ICO.shield },
-    contradiction: { label: 'Contradiction', ico: ICO.warn },
-    gap:           { label: 'Coverage gap', ico: ICO.search },
-    draft:         { label: 'Draft review', ico: ICO.pen }
-  };
-
-  const REQUESTS = [
-    {
-      id: 'rq-1', kind: 'verification', state: ['staged', 'Awaiting you'], severity: 'busy',
-      title: 'Refund eligibility — EU customers',
-      sub: 'Expired 102 days ago · 61 questions affected',
-      age: '2h', requester: 'AiMY', object: 'article-refund', trust: 'expired',
-      evidence: [
-        ['Owner', 'A. Mahfouz'],
-        ['Last verified', '14 Jan 2026 · 102 days ago'],
-        ['Retrieval', 'Excluded — not used to answer questions'],
-        ['Questions affected', '61 in the last 30 days'],
-        ['Raised by', 'Expired-and-excluded briefing block']
-      ],
-      prompt: 'Confirm “Refund eligibility — EU customers” is still accurate and return it to answers?',
-      consequence: 'Returns the article to retrieval immediately and resets its review cadence to 180 days. ' +
-        'The contradiction with “Returns FAQ — activated items” is not resolved by this and stays open.',
-      acceptLabel: 'Confirm and return to answers', editLabel: 'Open and edit first',
-      rejectLabel: 'Not accurate — keep it excluded',
-      audit: [
-        { tone: 'is-warn', ico: ICO.clock, action: 'Excluded from retrieval — review date passed',
-          who: 'AiMY', detail: 'automatic, under the verification cadence rule', time: '102d ago', irreversible: 'Policy' },
-        { tone: 'is-ai', ico: null, action: 'Verification requested from A. Mahfouz',
-          who: 'AiMY', detail: 'raised from the corpus briefing', time: '2h ago', revert: 'Withdraw' }
-      ]
-    },
-    {
-      id: 'rq-2', kind: 'contradiction', state: ['detected'], severity: 'busy',
-      title: 'Refunds after activation',
-      sub: 'Two verified objects disagree',
-      age: '5h', requester: 'AiMY',
-      evidence: [
-        ['Object A', '“Refund eligibility — EU customers” · 30-day window, no activation exception'],
-        ['Object B', '“Returns FAQ — activated items” · activation ends eligibility outright'],
-        ['Trust', 'Both verified — trust state cannot separate them'],
-        ['Scope', 'A is scoped to the EU storefront. B is not scoped at all'],
-        ['Impact', '7 low-confidence answers this week trace to this pair']
-      ],
-      prompt: 'Which object is authoritative on refunds after activation?',
-      consequence: 'The one not chosen is marked superseded and leaves retrieval, resolving to its successor. ' +
-        'Nothing is deleted and readers who follow an old link still see the content with the relationship stated.',
-      acceptLabel: 'Make A authoritative', editLabel: 'Scope both instead', rejectLabel: 'Not a contradiction',
-      audit: [
-        { tone: 'is-ai', ico: null, action: 'Conflicting passages detected across 2 objects',
-          who: 'AiMY', detail: 'automatic investigation · confidence medium', time: '5h ago' }
-      ]
-    },
-    {
-      id: 'rq-3', kind: 'gap', state: ['detected'], severity: 'away',
-      title: 'Refunds after activation — no source covers it',
-      sub: '11 questions in 30 days, asked every week',
-      age: '1d', requester: 'AiMY',
-      evidence: [
-        ['Questions', '11 in the last 30 days'],
-        ['Pattern', 'Asked in every week of the window'],
-        ['Nearest content', '“Returns FAQ” — mentions activation but not the refund consequence'],
-        ['Available material', '11 resolved Zendesk tickets answering it consistently']
-      ],
-      prompt: 'Draft an article covering refunds after activation from the 11 resolved tickets?',
-      consequence: 'Creates a draft owned by you. Nothing is published and nothing enters retrieval until you ' +
-        'review and accept it. Declining records the gap as a deliberate non-decision, not an oversight.',
-      acceptLabel: 'Draft it', editLabel: 'Adjust the brief', rejectLabel: 'Do not fill',
-      audit: [
-        { tone: 'is-ai', ico: null, action: 'Coverage gap clustered from 11 unanswered questions',
-          who: 'AiMY', detail: 'raised from the coverage-gaps briefing block', time: '1d ago' }
-      ]
-    },
-    {
-      id: 'rq-4', kind: 'draft', state: ['drafted'], severity: 'online',
-      title: 'SSO provisioning — enterprise',
-      sub: 'AiMY-drafted from 5 resolved tickets',
-      age: '1d', requester: 'AiMY', object: 'article-sso',
-      evidence: [
-        ['Source tickets', '5 resolved · all Enterprise tier'],
-        ['Confidence', 'Medium — generalises from 5 tickets, edge cases unsettled'],
-        ['Collection', 'Support'],
-        ['On publish', 'Available to 4 consuming agents, one customer-facing']
-      ],
-      prompt: 'Publish “SSO provisioning — enterprise” into Support with you as owner?',
-      consequence: 'Enters retrieval immediately and becomes citable by every agent grounded in this corpus, ' +
-        'including one customer-facing. Reversible for 24 hours; after that, unpublishing is a new request.',
-      acceptLabel: 'Publish', editLabel: 'Edit before publishing', rejectLabel: 'Discard the draft',
-      audit: [
-        { tone: 'is-ai', ico: null, action: 'Article drafted from 5 resolved tickets',
-          who: 'AiMY', detail: 'staged, not published — nothing entered retrieval', time: '1d ago', irreversible: 'Not yet applied' }
-      ]
-    },
-    {
-      id: 'rq-5', kind: 'verification', state: ['staged', 'Awaiting an owner'], severity: 'busy',
-      title: 'Pricing — Enterprise tier',
-      sub: 'Expired · no owner to route to',
-      age: '3d', requester: 'AiMY', object: 'page-pricing', trust: 'expired',
-      evidence: [
-        ['Owner', 'Unassigned — this is why the request is stuck'],
-        ['Source', 'aimy.app/pricing/enterprise · last crawl 18 Mar'],
-        ['Change detection', 'Source page changed 4 Jul; the corpus copy did not'],
-        ['Retrieval', 'Excluded — not used to answer questions']
-      ],
-      prompt: 'Assign an owner to “Pricing — Enterprise tier” so verification can be requested?',
-      consequence: 'Assignment is the decision here — verification cannot be requested without an owner. ' +
-        'The page stays excluded from answers until someone confirms it against the live source.',
-      acceptLabel: 'Assign to Marketing', editLabel: 'Choose a different owner', rejectLabel: 'Retire the page',
-      audit: [
-        { tone: 'is-err', ico: ICO.x, action: 'Verification request could not be routed',
-          who: 'AiMY', detail: 'no owner on the object and no collection lead for Marketing', time: '3d ago' },
-        { tone: 'is-warn', ico: ICO.warn, action: 'Source page changed since last crawl',
-          who: 'AiMY', detail: 'change detection · corpus copy is now behind the live page', time: '4 Jul' }
-      ]
-    },
-    {
-      id: 'rq-6', kind: 'gap', state: ['detected'], severity: 'away',
-      title: 'Data residency — EU',
-      sub: '7 questions in 30 days',
-      age: '4d', requester: 'AiMY',
-      evidence: [
-        ['Questions', '7 in the last 30 days'],
-        ['Nearest content', 'None — no object in the corpus mentions residency'],
-        ['Asked by', 'Support (4) · Sales (3)'],
-        ['Available material', 'No resolved tickets settle it consistently']
-      ],
-      prompt: 'Request content on EU data residency from a subject-matter owner?',
-      consequence: 'Routes a content request to the Policies collection lead rather than drafting. ' +
-        'AiMY has no consistent source material for this one, so a draft would be invention.',
-      acceptLabel: 'Request from Policies lead', editLabel: 'Change the recipient', rejectLabel: 'Do not fill',
-      audit: [
-        { tone: 'is-ai', ico: null, action: 'Coverage gap detected — no grounding material available',
-          who: 'AiMY', detail: 'drafting withheld: no consistent source to generalise from', time: '4d ago' }
-      ]
-    },
-    {
-      id: 'rq-7', kind: 'draft', state: ['drafted'], severity: 'online',
-      title: 'Contract exit terms',
-      sub: 'AiMY-drafted · overlaps an existing article',
-      age: '6d', requester: 'AiMY',
-      evidence: [
-        ['Source tickets', '3 resolved · mid-market'],
-        ['Confidence', 'Low — 3 tickets, and two contradict each other on notice period'],
-        ['Overlap', '“Contract terms — standard” already covers 60% of this'],
-        ['Recommendation', 'Merge as a suggested edit rather than publish separately']
-      ],
-      prompt: 'Open this draft as a suggested edit to “Contract terms — standard” instead of publishing it?',
-      consequence: 'Nothing new enters the corpus. The draft becomes a reviewable diff on the existing article, ' +
-        'which keeps one answer for one question instead of two that partly disagree.',
-      acceptLabel: 'Open as suggested edit', editLabel: 'Publish separately anyway', rejectLabel: 'Discard draft',
-      audit: [
-        { tone: 'is-warn', ico: ICO.warn, action: 'Draft withheld from publishing — overlap detected',
-          who: 'AiMY', detail: 'confidence low · two source tickets disagree on notice period', time: '6d ago', irreversible: 'Not yet applied' }
-      ]
-    }
-  ];
-
-  /* Decisions taken this session. A decision is recorded and reversible — the
-     resolved state replaces the decision zone rather than removing it, so the
-     item never loses the record of what was decided (§4). */
-  const decisions = {};
-  let rqFilter = 'all';
-  let rqOpen = null;
-
-  function rqVisible() {
-    return REQUESTS.filter((r) => rqFilter === 'all' || r.kind === rqFilter);
-  }
-
-  function renderRequests() {
-    const queue = $('#rqQueue');
-    if (!queue) return;
-    const items = rqVisible();
-
-    const counts = { all: REQUESTS.length };
-    Object.keys(RQ_KIND).forEach((k) => { counts[k] = REQUESTS.filter((r) => r.kind === k).length; });
-    $$('#rqFilter .seg-btn').forEach((b) => {
-      const k = b.getAttribute('data-rq-filter');
-      b.classList.toggle('active', k === rqFilter);
-      b.setAttribute('aria-pressed', k === rqFilter ? 'true' : 'false');
-      const n = b.querySelector('.rq-count');
-      if (n) n.textContent = counts[k];
-    });
-
-    if (!items.length) {
-      queue.innerHTML = `<div class="empty-state" style="padding:32px 20px">
-        <div class="empty-state-title">Nothing of this kind waiting</div>
-        <div class="empty-state-desc">No ${esc(RQ_KIND[rqFilter] ? RQ_KIND[rqFilter].label.toLowerCase() : '')} requests are open.</div>
-      </div>`;
-    } else {
-      queue.classList.add('k-stagger');
-      queue.innerHTML = items.map((r, qi) => {
-        const d = decisions[r.id];
-        const k = RQ_KIND[r.kind];
-        return `<button class="list-row rq-row${rqOpen === r.id ? ' is-selected' : ''}" data-rq="${r.id}"
-                        style="--i:${qi}"
-                        aria-current="${rqOpen === r.id ? 'true' : 'false'}">
-          <span class="list-main">
-            <span class="rq-row-kind">${k.ico}${esc(k.label)}</span>
-            <span class="list-title">${esc(r.title)}</span>
-            <span class="list-sub">${esc(r.sub)}</span>
-          </span>
-          <span class="rq-row-end">
-            ${d ? workState(d.state, d.label) : workState(r.state[0], r.state[1])}
-            <span class="list-meta">${esc(r.age)}</span>
-          </span>
-        </button>`;
-      }).join('');
-    }
-
-    renderRequestDetail();
-  }
-
-  function renderRequestDetail() {
-    const host = $('#rqDetail');
-    if (!host) return;
-    const r = REQUESTS.find((x) => x.id === rqOpen);
-
-    if (!r) {
-      host.innerHTML = `<div class="empty-state">
-        <div class="empty-state-icon">${ICO.scales.replace('<svg', '<svg width="22" height="22"')}</div>
-        <div class="empty-state-title">Select a request</div>
-        <div class="empty-state-desc">Every item here is a decision someone has to make, with its evidence and a
-        record of what happens next. ${REQUESTS.length} are open.</div>
-      </div>`;
-      return;
-    }
-
-    const k = RQ_KIND[r.kind];
-    const d = decisions[r.id];
-
-    host.innerHTML = `
-      <div class="rq-head">
-        <div class="rq-head-meta">
-          <span class="tc-type">${k.ico}${esc(k.label)}</span>
-          ${r.trust ? trustState(r.trust) : ''}
-          ${d ? workState(d.state, d.label) : workState(r.state[0], r.state[1])}
-        </div>
-        <h2 class="rq-title">${esc(r.title)}</h2>
-        <div class="rq-sub">Raised by <strong>${esc(r.requester)}</strong> · ${esc(r.age)} ago${
-          r.object ? ` · <button class="link" data-open-in-wb="${r.object}">Open the object</button>` : ''}</div>
-      </div>
-
-      <div class="rq-section">
-        <div class="rq-section-label">Evidence</div>
-        <dl class="desc-list rq-evidence">
-          ${r.evidence.map(([k2, v]) => `<dt>${esc(k2)}</dt><dd>${esc(v)}</dd>`).join('')}
-        </dl>
-      </div>
-
-      <div class="rq-section">
-        <div class="rq-section-label">Decision</div>
-        ${d ? resolvedZone(r, d) : decisionZone(r)}
-      </div>
-
-      <div class="rq-section">
-        <div class="rq-section-label">Audit trail</div>
-        <div class="audit-trail">
-          ${(d ? [d.entry] : []).concat(r.audit).map(auditEntry).join('')}
-        </div>
-      </div>`;
-  }
-
-  function decisionZone(r) {
-    return `<div class="decision-zone">
-      <p class="dz-prompt">${esc(r.prompt)}</p>
-      <div class="dz-consequence">
-        ${ICO.warn.replace('<svg', '<svg width="13" height="13" style="flex-shrink:0;margin-top:2px"')}
-        <span>${r.consequence}</span>
-      </div>
-      <div class="dz-actions">
-        <button class="btn btn-brand btn-sm" data-decide="${r.id}|accept">${esc(r.acceptLabel || 'Accept')}</button>
-        <button class="btn btn-ghost btn-sm" data-decide="${r.id}|edit">${esc(r.editLabel || 'Edit')}</button>
-        <button class="btn btn-ghost btn-sm" data-decide="${r.id}|reject">${esc(r.rejectLabel || 'Reject')}</button>
-        <span class="dz-spacer"></span>
-        ${workState(r.state[0], r.state[1])}
-      </div>
-      <div class="dz-meta">
-        <span>Proposed by ${esc(r.requester)}</span><span>·</span>
-        <span>Requires: <strong style="color:var(--d300)">Knowledge owner</strong></span><span>·</span>
-        <span>Decision is logged</span>
-      </div>
-    </div>`;
-  }
-
-  function resolvedZone(r, d) {
-    const tint = d.outcome === 'reject' ? 'rgba(240,68,56,0.24)'
-               : d.outcome === 'edit'   ? 'rgba(247,144,9,0.28)'
-               : 'rgba(23,178,106,0.28)';
-    return `<div class="decision-zone" style="border-color:${tint}">
-      <p class="dz-prompt" style="margin-bottom:10px">${esc(d.summary)}</p>
-      <div class="dz-actions">
-        ${workState(d.state, d.label)}
-        <span class="dz-spacer"></span>
-        <button class="btn btn-ghost btn-sm" data-undecide="${r.id}">Undo</button>
-      </div>
-      <div class="dz-meta"><span>Decided by ${esc(activeProfile().name)} · just now · reversible for 24h</span></div>
-    </div>`;
-  }
-
-  function auditEntry(e) {
-    const ico = e.ico
-      ? e.ico.replace('<svg', '<svg width="11" height="11"')
-      : '<svg width="9" height="10" viewBox="0 0 18 20"><use href="#aimy-logo-small"/></svg>';
-    return `<div class="audit-entry ${e.tone || ''}">
-      <span class="audit-ico">${ico}</span>
-      <div class="audit-main">
-        <div class="audit-action">${esc(e.action)}</div>
-        <div class="audit-actor"><span class="audit-who">${esc(e.who)}</span> · ${esc(e.detail)}</div>
-      </div>
-      <div class="audit-side">
-        <span class="audit-time">${esc(e.time)}</span>
-        ${e.revert ? `<button class="audit-revert">${esc(e.revert)}</button>`
-                   : e.irreversible ? `<span class="audit-irreversible">${esc(e.irreversible)}</span>` : ''}
-      </div>
-    </div>`;
-  }
-
-  /* Accept · Edit · Reject all record a decision. Edit is not a cancel — it
-     routes to the surface where the proposal can be changed, and the item
-     stays in the queue until that edit is itself committed. */
-  function decide(id, outcome) {
-    const r = REQUESTS.find((x) => x.id === id);
-    if (!r) return;
-
-    if (outcome === 'edit') {
-      if (r.object) {
-        toast('Opening in the workbench to edit', null);
-        setTimeout(() => { location.href = 'workbench.html?open=' + encodeURIComponent(r.object); }, 400);
-      } else {
-        canvas.stage(`Revise this proposal before I decide: ${r.prompt}`,
-          [RQ_KIND[r.kind].label, r.title, 'Decision pending']);
-      }
-      return;
-    }
-
-    const accepted = outcome === 'accept';
-    decisions[id] = {
-      outcome,
-      state: accepted ? 'completed' : 'failed',
-      label: accepted ? 'Accepted' : 'Rejected',
-      summary: accepted
-        ? `${r.acceptLabel || 'Accepted'} — ${r.title}.`
-        : `Rejected — ${r.title} is unchanged.`,
-      entry: {
-        tone: accepted ? 'is-ok' : 'is-err',
-        ico: accepted ? ICO.check : ICO.x,
-        action: accepted ? `${r.acceptLabel || 'Accepted'} — ${r.title}` : `Rejected — no change was written`,
-        who: activeProfile().name,
-        detail: accepted ? 'decision recorded · reversible for 24h' : 'decision recorded with the item left open',
-        time: 'just now',
-        revert: 'Revert'
-      }
-    };
-    renderRequests();
-    paintNavSignals();
-    toast('Decision recorded', 'Undo');
-  }
-
-  /* ═══════════════════════════════════════════════
-     GOVERNANCE (§4, §1.1, §8.1)
-
-     Not a settings page. One corpus feeds many agents, which makes "may this
-     agent ground answers in this collection" an operational decision with
-     consequences — a source safe for an internal reviewer is not automatically
-     safe for a customer-facing autonomous agent.
-
-     Everything here is a governed write, so nothing commits from the control
-     itself. Cadence and ownership go to rung 3 (reviewed action with an
-     explicit diff); exposure goes to rung 4 (type-to-confirm + audit), per the
-     confirmation ladder's own binding table.
-  ═══════════════════════════════════════════════ */
-  const CADENCES = ['30 days', '90 days', '180 days', '365 days', 'No cadence'];
-
-  const GOV_TYPES = [
-    { type: 'Article',         ico: ICO.doc,       cadence: '180 days', owner: true,  approval: false, count: 412 },
-    { type: 'Ticket',          ico: ICO.ticket,    cadence: 'No cadence', owner: false, approval: false, count: 1284 },
-    { type: 'ICP',             ico: ICO.target,    cadence: '90 days',  owner: true,  approval: false, count: 14 },
-    { type: 'Campaign',        ico: ICO.megaphone, cadence: '90 days',  owner: true,  approval: false, count: 23 },
-    { type: 'Marketing Asset', ico: ICO.image,     cadence: '180 days', owner: true,  approval: true,  count: 96 },
-    { type: 'Success Story',   ico: ICO.trophy,    cadence: '365 days', owner: true,  approval: true,  count: 31 },
-    { type: 'Blog',            ico: ICO.book,      cadence: '365 days', owner: true,  approval: true,  count: 88 },
-    { type: 'Web Page',        ico: ICO.globe,     cadence: '90 days',  owner: true,  approval: false, count: 532 }
-  ];
-
-  const GOV_COLLECTIONS = [
-    { name: 'Policies',  owner: 'A. Mahfouz',  objects: 148, cadence: 'Inherit from type' },
-    { name: 'Support',   owner: 'N. Wael',     objects: 1310, cadence: '90 days' },
-    { name: 'Marketing', owner: 'Brand team',  objects: 238, cadence: 'Inherit from type' },
-    { name: 'Sales',     owner: 'Sales Ops',   objects: 84,  cadence: 'Inherit from type' }
-  ];
-
-  /* Consuming agents. `external` marks the ones that speak to customers —
-     the exposure decision is materially different for those. */
-  const GOV_AGENTS = [
-    { id: 'qa',      name: 'QA',      external: false },
-    { id: 'talent',  name: 'Talent',  external: false },
-    { id: 'sales',   name: 'Sales',   external: false },
-    { id: 'connect', name: 'Connect', external: true }
-  ];
-
-  /* collection → agent → may ground answers in it */
-  const GOV_EXPOSURE = {
-    Policies:  { qa: true,  talent: true,  sales: true,  connect: true  },
-    Support:   { qa: true,  talent: false, sales: false, connect: true  },
-    Marketing: { qa: false, talent: false, sales: true,  connect: false },
-    Sales:     { qa: false, talent: false, sales: true,  connect: false }
-  };
-
-  const GOV_AUDIT = [
-    { tone: 'is-warn', ico: ICO.shield, action: 'Support exposed to Connect (customer-facing)',
-      who: 'A. Mahfouz', detail: 'typed confirmation · 1,310 objects became citable externally', time: '6 Apr', revert: 'Revert' },
-    { tone: 'is-ok', ico: ICO.check, action: 'Verification cadence on Web Page tightened 180 → 90 days',
-      who: 'N. Wael', detail: 'accepted an AiMY proposal · 532 objects re-scheduled', time: '2 Apr', revert: 'Revert' },
-    { tone: 'is-ai', ico: null, action: 'Approval requirement added to Success Story',
-      who: 'AiMY', detail: 'proposed after a story was cited externally before sign-off', time: '28 Mar' }
-  ];
-
-  function govPill(on, label) {
-    return `<span class="tag ${on ? 'tag-ok' : 'tag-neutral'}">${esc(label || (on ? 'Required' : 'Not required'))}</span>`;
-  }
-
-  function renderGovernance() {
-    const host = $('#govTypes');
-    if (!host) return;
-
-    host.innerHTML = `<table class="dtable">
-      <thead><tr><th>Type</th><th>Objects</th><th>Verification cadence</th><th>Owner</th><th>Approval</th><th></th></tr></thead>
-      <tbody>${GOV_TYPES.map((t, i) => `<tr>
-        <td><span class="tc-type">${t.ico}${esc(t.type)}</span></td>
-        <td class="gov-num">${t.count.toLocaleString()}</td>
-        <td>${esc(t.cadence)}</td>
-        <td>${govPill(t.owner, t.owner ? 'Owner required' : 'No owner')}</td>
-        <td>${govPill(t.approval, t.approval ? 'Approval required' : '—')}</td>
-        <td class="gov-act"><button class="btn btn-ghost btn-sm" data-gov-cadence="${i}"
-          aria-label="Change verification cadence for ${esc(t.type)}">Change cadence</button></td>
-      </tr>`).join('')}</tbody>
-    </table>`;
-
-    const cols = $('#govCollections');
-    if (cols) {
-      cols.innerHTML = GOV_COLLECTIONS.map((c, i) => `<div class="settings-row">
-        <div class="sr-main">
-          <div class="sr-title">${esc(c.name)}</div>
-          <div class="sr-desc">${c.objects.toLocaleString()} objects · cadence: ${esc(c.cadence)}</div>
-        </div>
-        <span class="list-meta">Owner <strong style="color:var(--d200)">${esc(c.owner)}</strong></span>
-        <button class="btn btn-ghost btn-sm" data-gov-owner="${i}"
-          aria-label="Reassign owner of ${esc(c.name)}">Reassign</button>
-      </div>`).join('');
-    }
-
-    const mx = $('#govExposure');
-    if (mx) {
-      mx.innerHTML = `<table class="dtable gov-matrix">
-        <thead><tr>
-          <th>Collection</th>
-          <th class="gov-human">Human access</th>
-          ${GOV_AGENTS.map((a) => `<th class="gov-agent-col">${esc(a.name)}${
-            a.external ? '<span class="gov-ext">customer-facing</span>' : ''}</th>`).join('')}
-        </tr></thead>
-        <tbody>${GOV_COLLECTIONS.map((c) => `<tr>
-          <td><strong style="color:var(--d100)">${esc(c.name)}</strong></td>
-          <td class="gov-human"><span class="tag tag-neutral">By entitlement</span></td>
-          ${GOV_AGENTS.map((a) => {
-            const on = GOV_EXPOSURE[c.name][a.id];
-            return `<td class="gov-cell">
-              <button class="gov-toggle${on ? ' is-on' : ''}${a.external && on ? ' is-external' : ''}"
-                      data-gov-expose="${esc(c.name)}|${a.id}"
-                      aria-pressed="${on}"
-                      aria-label="${esc(c.name)} grounding for ${esc(a.name)}: ${on ? 'allowed' : 'not allowed'}">
-                ${on ? ICO.check : ICO.x}<span>${on ? 'Allowed' : 'Blocked'}</span>
-              </button></td>`;
-          }).join('')}
-        </tr>`).join('')}</tbody>
-      </table>`;
-    }
-
-    const aud = $('#govAudit');
-    if (aud) aud.innerHTML = `<div class="audit-trail">${GOV_AUDIT.map(auditEntry).join('')}</div>`;
-  }
-
-  /* Rung 3 — a governed change gets a diff, a rationale, a blast radius and an
-     audit note before it can be accepted. */
   let pendingCommit = null;
-  /* The single commit surface for every governed write. Both the briefing's
-     reviewed actions and the governance rungs come through here, so the
-     reversibility promise looks identical wherever it is made — it is the
-     thing that makes a consequential write feel safe, and a promise phrased
-     differently each time reads as incidental rather than guaranteed.
 
-     Accepts either `effects` (a list of ok/warn/skip outcomes) or `blast`
-     (a single-line radius), never both. */
-  function govCommit(o) {
+  /* One structured commit surface, used by every consequential write. Free
+     text never performs one — it only ever stages one. */
+  function commit(o) {
     const host = $('#commitHost');
     if (!host) return;
     pendingCommit = o.onRun || null;
-
-    /* Reversibility is an EFFECT of the action, not a disclaimer about it, so
-       it closes the effect list rather than sitting in the action row. The
-       footer holds decisions only. */
-    const effects = (o.effects || []).concat([
-      ['rev', o.reversible || 'Reversible for 24h · logged to the audit trail']
-    ]);
-    const effIco = (k) => k === 'ok' ? ICO.check : k === 'warn' ? ICO.warn
-                        : k === 'rev' ? ICO.shield : ICO.slash;
+    const effects = (o.effects || []).concat([['rev', o.reversible || 'Reversible for 24h · logged to the audit trail']]);
+    const effIco = (k) => k === 'ok' ? ICO.check : k === 'warn' ? ICO.warn : k === 'rev' ? ICO.shield : ICO.slash;
 
     host.innerHTML = `
       <div class="modal-backdrop" style="display:flex" data-hide-on-backdrop>
@@ -2201,1014 +3140,1906 @@
             <button class="modal-close" data-commit-close aria-label="Close">${ICO.x.replace('<svg', '<svg width="14" height="14"')}</button>
           </div>
           <div class="modal-body">
-            <div class="gov-cr-diff">
+            ${o.current ? `<div class="gov-cr-diff">
               <div class="gov-cr-current"><span class="gov-cr-label">Now</span><div class="gov-cr-val">${esc(o.current)}</div></div>
               <span class="gov-cr-arrow">${ICO.arrow.replace('<svg', '<svg width="16" height="16"')}</span>
               <div class="gov-cr-proposed"><span class="gov-cr-label">After</span><div class="gov-cr-val">${esc(o.proposed)}</div></div>
-            </div>
-            <p class="gov-cr-rationale">${o.rationale}</p>
-            ${o.blast ? `<div class="gov-cr-blast">
-              ${ICO.warn.replace('<svg', '<svg width="13" height="13"')}${o.blast}
             </div>` : ''}
+            <p class="gov-cr-rationale">${o.rationale}</p>
             <div class="ss-preview">
               <div class="ss-preview-head">What this will do</div>
-              ${effects.map(([k, t]) =>
-                `<div class="ss-effect is-${k === 'rev' ? 'ok' : k}">${effIco(k)}<span>${t}</span></div>`).join('')}
+              ${effects.map(([k, t]) => `<div class="ss-effect is-${k === 'rev' ? 'ok' : k}">${effIco(k)}<span>${t}</span></div>`).join('')}
             </div>
+            ${o.typed ? `<div class="ds-field" style="max-width:none;margin-top:16px">
+              <label class="field-label" for="commitTyped">Type <strong style="color:var(--d50)">${esc(o.typed)}</strong> to confirm</label>
+              <input class="field-input" type="text" id="commitTyped" autocomplete="off" spellcheck="false"
+                     placeholder="${esc(o.typed)}" data-typed="${esc(o.typed)}">
+            </div>` : ''}
           </div>
-          <!-- Decisions only, both at the default .btn size. Rank is carried by
-               fill — brand against ghost — not by making one button shorter.
-               Adjacent buttons at different heights read as a rendering fault,
-               which is the opposite of the confidence a commit surface needs. -->
           <div class="modal-footer">
             <button class="btn btn-ghost" data-commit-close>Cancel</button>
-            <button class="btn btn-brand" data-commit-run="${esc(o.confirm)}">${esc(o.confirm)}</button>
+            ${o.extra || ''}
+            <button class="btn ${o.danger ? 'btn-err' : 'btn-brand'}" id="commitRun"
+                    ${o.typed ? 'disabled style="opacity:.45;cursor:not-allowed"' : ''}
+                    data-commit-run="${esc(o.done || o.confirm)}">${esc(o.confirm)}</button>
           </div>
         </div>
       </div>`;
   }
 
-  /* Rung 4 — exposure changes are typed to confirm and audited. The name to
-     type is the collection, so the thing being changed has to be read. */
-  function govExposureConfirm(collection, agent, turningOn) {
-    const host = $('#commitHost');
-    if (!host) return;
-    const a = GOV_AGENTS.find((x) => x.id === agent);
-    const c = GOV_COLLECTIONS.find((x) => x.name === collection);
-
-    host.innerHTML = `
-      <div class="modal-backdrop" style="display:flex" data-hide-on-backdrop>
-        <div class="modal" role="dialog" aria-modal="true" aria-label="Change source exposure" style="width:480px;max-width:100%">
-          <div class="modal-header">
-            <div class="modal-title">${turningOn ? 'Allow' : 'Block'} ${esc(a.name)} on ${esc(collection)}?</div>
-            <button class="modal-close" data-commit-close aria-label="Close">${ICO.x}</button>
-          </div>
-          <div class="modal-body">
-            ${turningOn
-              ? `<p><strong style="color:var(--d50)">${esc(a.name)}</strong> will be able to ground answers in all
-                 <strong style="color:var(--d50)">${c.objects.toLocaleString()}</strong> objects in ${esc(collection)},
-                 and cite them to whoever it is talking to.</p>
-                 ${a.external ? `<div class="banner err" style="margin-top:12px">
-                   <span class="banner-ico">${ICO.warn.replace('<svg', '<svg width="15" height="15"')}</span>
-                   <span class="banner-body"><strong>${esc(a.name)} is customer-facing.</strong> Content a colleague can
-                   read with judgement is not automatically content an autonomous agent should paraphrase to a customer.
-                   Human access and agent grounding are separate permissions for exactly this reason.</span>
-                 </div>` : ''}`
-              : `<p><strong style="color:var(--d50)">${esc(a.name)}</strong> will stop grounding answers in
-                 ${esc(collection)}. Answers it has already given are unaffected; future ones will be thinner, and
-                 ${esc(a.name)} will say so rather than failing silently.</p>`}
-          </div>
-          <div class="ss-preview" style="margin-bottom:16px">
-            <div class="ss-effect is-ok">${ICO.shield.replace('<svg', '<svg width="13" height="13"')}<span>Logged to the audit trail with your name and the time.</span></div>
-          </div>
-          <div class="ds-field" style="max-width:none;margin-bottom:18px">
-            <label class="field-label" for="govConfirmInput">Type <strong style="color:var(--d50)">${esc(collection)}</strong> to confirm</label>
-            <input class="field-input" type="text" id="govConfirmInput" autocomplete="off" spellcheck="false"
-                   placeholder="${esc(collection)}" data-gov-typed="${esc(collection)}">
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-ghost" data-commit-close>Cancel</button>
-            <button class="btn ${turningOn ? 'btn-brand' : 'btn-err'}" id="govConfirmBtn" disabled
-                    style="opacity:.45;cursor:not-allowed"
-                    data-gov-apply="${esc(collection)}|${agent}|${turningOn ? '1' : '0'}">
-              ${turningOn ? 'Allow grounding' : 'Block grounding'}
-            </button>
-          </div>
-        </div>
-      </div>`;
-  }
+  function closeCommit() { const h = $('#commitHost'); if (h) h.innerHTML = ''; pendingCommit = null; }
 
   /* ═══════════════════════════════════════════════
-     SOURCES (§4)
+     THE WRITE ROUTE
 
-     Connected systems, sync status and history, ingestion errors, coverage.
-     Corpus quality is bounded by source health — a source that stopped syncing
-     six days ago is six days of answers nobody knows are stale — which is why
-     source health is briefing material and not buried here.
+     A write typed into the input never runs. It resolves to a scope and stages
+     the commit surface for it. Routing a consequential write through free text
+     is the inversion the doctrine bans, and the fact that the sentence parsed
+     cleanly is not evidence that the user meant every object it selected.
   ═══════════════════════════════════════════════ */
-  const SOURCES = [
-    {
-      id: 'zendesk', name: 'Zendesk', sub: 'Support tickets', status: 'failed',
-      lastOk: '6 days ago', collection: 'Support', objects: 1284, behind: 214,
-      cadence: 'Every 15 minutes', auth: 'API token · zd_live_••••••••4f2a',
-      error: {
-        title: 'Authentication rejected since 23 Jul',
-        detail: 'The API token was revoked or rotated at the source. Every sync since has failed the same way, ' +
-          'so this is a credential problem rather than an outage.',
-        code: '401 · invalid_token'
-      },
-      coverage: [['Support', 0.94], ['Policies', 0.12]],
-      history: [
-        ['err',  'Sync failed', '23 Jul, 04:15', '401 invalid_token · 0 objects written. Failing identically every 15 minutes since.'],
-        ['warn', 'Token expiry warning ignored', '21 Jul, 09:00', 'The connector warned 48 hours before expiry. No owner was assigned to the source, so nothing was routed.'],
-        ['ok',   'Sync completed', '23 Jul, 04:00', '1,284 tickets in corpus · 31 new, 4 updated.']
-      ],
-      errors: [
-        ['23 Jul 04:15', '401 invalid_token', 'All', 'Every sync since'],
-        ['21 Jul 09:00', 'token_expiry_warning', 'All', '1 occurrence']
-      ]
-    },
-    {
-      id: 'confluence', name: 'Confluence', sub: 'Policies space', status: 'failed',
-      lastOk: '2 days ago', collection: 'Policies', objects: 148, behind: 6,
-      cadence: 'Hourly', auth: 'OAuth · connected as knowledge-bot',
-      error: {
-        title: 'Space permissions changed',
-        detail: 'The connector can still authenticate but can no longer read the Policies space. Six pages edited ' +
-          'since Thursday are not in the corpus, and two of them are cited by live answers.',
-        code: '403 · space_forbidden'
-      },
-      coverage: [['Policies', 0.96]],
-      history: [
-        ['err', 'Sync failed', '27 Jul, 11:00', '403 space_forbidden · read access removed from knowledge-bot.'],
-        ['ok',  'Sync completed', '27 Jul, 10:00', '148 pages in corpus · 2 updated.']
-      ],
-      errors: [['27 Jul 11:00', '403 space_forbidden', 'Policies space', 'Every sync since']]
-    },
-    {
-      id: 'notion', name: 'Notion', sub: 'Runbooks', status: 'ok',
-      lastOk: '12 minutes ago', collection: 'Support', objects: 232, behind: 0,
-      cadence: 'Every 30 minutes', auth: 'Internal integration · ntn_••••••••9b1c',
-      coverage: [['Support', 0.61]],
-      history: [
-        ['ok', 'Sync completed', 'Today, 14:12', '232 pages in corpus · no changes.'],
-        ['ok', 'Sync completed', 'Today, 13:42', '232 pages in corpus · 1 updated.']
-      ],
-      errors: []
-    },
-    {
-      id: 'web', name: 'Web crawler', sub: 'aimy.app marketing pages', status: 'warn',
-      lastOk: '4 hours ago', collection: 'Marketing', objects: 532, behind: 1,
-      cadence: 'Daily', auth: 'Public — no credential',
-      warn: {
-        title: 'Change detected but not ingested',
-        detail: 'The pricing page changed on 4 Jul and the corpus copy has not been updated since 18 Mar. ' +
-          'The page is expired and already excluded from answers, so the stale copy is not being served.'
-      },
-      coverage: [['Marketing', 0.88]],
-      history: [
-        ['warn', 'Change detected, ingestion skipped', 'Today, 10:04', 'Pricing — Enterprise tier changed. Object has no owner, so no verification could be requested.'],
-        ['ok',   'Crawl completed', 'Today, 10:00', '532 pages · 1 changed, 0 ingested.']
-      ],
-      errors: [['4 Jul', 'change_unresolved', 'Pricing — Enterprise tier', 'Open 25 days']]
-    },
-    {
-      id: 'drive', name: 'Google Drive', sub: 'Sales and brand assets', status: 'ok',
-      lastOk: '1 hour ago', collection: 'Marketing', objects: 127, behind: 0,
-      cadence: 'Every 6 hours', auth: 'Service account · knowledge@aimy.iam',
-      coverage: [['Marketing', 0.72], ['Sales', 0.45]],
-      history: [['ok', 'Sync completed', 'Today, 13:20', '127 files in corpus · 3 new.']],
-      errors: []
-    }
-  ];
-
-  const SRC_STATUS = {
-    ok:     { dot: 'online', label: 'Healthy',  tag: 'tag-ok' },
-    warn:   { dot: 'away',   label: 'Attention', tag: 'tag-warn' },
-    failed: { dot: 'busy',   label: 'Failing',  tag: 'tag-err' }
+  const WRITE_SPEC = {
+    archive:  { title: 'Archive documents', confirm: 'Archive', danger: true, typed: 'archive',
+                verb: 'archived', rung: 'Destructive — typed confirmation and an audit entry' },
+    delete:   { title: 'Delete permanently', confirm: 'Delete for good', danger: true, typed: 'delete',
+                verb: 'deleted for good', rung: 'Not reversible — typed confirmation and an audit entry' },
+    remove:   { title: 'Delete permanently', confirm: 'Delete for good', danger: true, typed: 'delete',
+                verb: 'deleted for good', rung: 'Not reversible — typed confirmation and an audit entry' },
+    verify:   { title: 'Re-sync from source', confirm: 'Re-sync', verb: 're-synced' },
+    publish:  { title: 'Publish documents', confirm: 'Publish', danger: true, typed: 'publish', verb: 'published' },
+    expire:   { title: 'Expire documents', confirm: 'Expire', danger: true, typed: 'expire', verb: 'expired' },
+    restore:  { title: 'Restore a version', confirm: 'Restore', verb: 'restored' },
+    approve:  { title: 'Approve for external use', confirm: 'Approve', verb: 'approved' },
+    reassign: { title: 'Reassign ownership', confirm: 'Reassign', verb: 'reassigned' },
+    tag:      { title: 'Tag documents', confirm: 'Apply tag', verb: 'tagged' }
   };
 
-  let srcOpen = null;
-  const reconnected = {};
+  function runWrite(intent, st) {
+    const key = intent.verb.replace(/^re-?verify$/, 'verify').replace(/^review$/, 'verify');
 
-  function srcStatus(s) {
-    return reconnected[s.id] ? SRC_STATUS.ok : SRC_STATUS[s.status];
-  }
-
-  function renderSources() {
-    const list = $('#srcList');
-    if (!list) return;
-
-    /* "Not syncing" and "needs attention" are different failures and must not
-       be summed — a crawler with an unresolved change is still syncing. The
-       dashboard's source-health block counts the same way, and the two numbers
-       have to agree or one of the surfaces is lying. */
-    const failing = SOURCES.filter((s) => srcStatus(s) === SRC_STATUS.failed).length;
-    const attention = SOURCES.filter((s) => srcStatus(s) === SRC_STATUS.warn).length;
-
-    /* The failing count used to be the Sources nav badge. Folding the page in
-       must not lose that signal — it moves to the tab, so a failing source is
-       still visible without opening the panel. Labelled, because a bare "2"
-       beside "Sources" reads as a total rather than a fault count. */
-    const tabCount = $('#govSrcCount');
-    if (tabCount) {
-      tabCount.textContent = failing || '';
-      tabCount.className = 'tab-count' + (failing ? ' is-err' : '');
-      tabCount.setAttribute('aria-label', failing ? `${failing} not syncing` : '');
-      tabCount.hidden = !failing;
-    }
-    paintNavSignals();
-    const banner = $('#srcBanner');
-    if (banner) {
-      if (failing) {
-        banner.className = 'banner err';
-        banner.innerHTML = `<span class="banner-ico">${ICO.warn.replace('<svg', '<svg width="15" height="15"')}</span>
-          <span class="banner-body"><strong>${failing} source${failing === 1 ? '' : 's'} not syncing.</strong>
-          Content changed at the source since then is not in the corpus and cannot be cited. Answers keep sounding
-          confident while quietly getting thinner. Reconnect the source to close the gap.${
-            attention ? ` A further ${attention} source${attention === 1 ? ' is syncing but needs' : 's are syncing but need'} attention.` : ''}</span>`;
-      } else if (attention) {
-        banner.className = 'banner warn';
-        banner.innerHTML = `<span class="banner-ico">${ICO.warn.replace('<svg', '<svg width="15" height="15"')}</span>
-          <span class="banner-body"><strong>Every source is syncing.</strong> ${attention} needs attention —
-          a change was detected at the source but not ingested.</span>`;
-      } else {
-        banner.className = 'banner ok';
-        banner.innerHTML = `<span class="banner-ico">${ICO.check.replace('<svg', '<svg width="15" height="15"')}</span>
-          <span class="banner-body"><strong>Every source is syncing.</strong> The corpus is current with all five
-          connected systems.</span>`;
-      }
-    }
-
-    list.innerHTML = SOURCES.map((s) => {
-      const st = srcStatus(s);
-      return `<button class="list-row src-row${srcOpen === s.id ? ' is-selected' : ''}" data-src="${s.id}"
-                      aria-current="${srcOpen === s.id ? 'true' : 'false'}">
-        <span class="status-dot ${st.dot}"></span>
-        <span class="list-main">
-          <span class="list-title">${esc(s.name)}</span>
-          <span class="list-sub">${esc(s.sub)}</span>
-        </span>
-        <span class="list-meta">${esc(reconnected[s.id] ? 'just now' : s.lastOk)}</span>
-      </button>`;
-    }).join('');
-
-    renderSourceDetail();
-  }
-
-  function renderSourceDetail() {
-    const host = $('#srcDetail');
-    if (!host) return;
-    const s = SOURCES.find((x) => x.id === srcOpen);
-
-    if (!s) {
-      host.innerHTML = `<div class="empty-state">
-        <div class="empty-state-icon">${ICO.refresh.replace('<svg', '<svg width="22" height="22"')}</div>
-        <div class="empty-state-title">Select a source</div>
-        <div class="empty-state-desc">Corpus quality is bounded by source health. A source that stopped syncing is
-        content the corpus does not know it is missing.</div>
-      </div>`;
+    /* Creating is not a bulk operation over the surface, so it does not go
+       through the scope machinery below — it goes to the same commit surface
+       the New document button uses. */
+    if (['add', 'create', 'new', 'draft'].indexOf(key) > -1) {
+      const named = Object.keys(TYPES).find((k) => new RegExp('\\b' + k + '\\b', 'i').test(intent.text)) ||
+                    (intent.set && intent.set.type ? intent.set.type[0] : '');
+      newDocument(named || 'article');
       return;
     }
 
-    const st = srcStatus(s);
-    const isOk = st === SRC_STATUS.ok;
-    const problem = !isOk && (s.error || s.warn);
+    const spec = WRITE_SPEC[key] || WRITE_SPEC.verify;
 
-    host.innerHTML = `
-      <div class="src-head">
-        <div class="src-head-meta">
-          <span class="status-dot ${st.dot}"></span>
-          <span class="tag ${st.tag}">${esc(st.label)}</span>
-          <span class="list-meta">Last successful sync ${esc(reconnected[s.id] ? 'just now' : s.lastOk)}</span>
-        </div>
-        <h2 class="src-title">${esc(s.name)}</h2>
-        <div class="src-sub">${esc(s.sub)} · ${esc(s.cadence)}</div>
+    const scope = isComposed(st) ? composedSet() : applyFilters(st);
+    const from = 'everything on the surface';
+
+    const excluded = scope.filter((o) => STATUS[o.status].excluded);
+    const unowned  = scope.filter((o) => o.owner === 'Unassigned');
+    const willAct  = scope.length - (key === 'verify' ? unowned.length : 0);
+
+    commit({
+      title: spec.title,
+      rationale: `You typed <strong>“${esc(intent.text)}”</strong>. AiMY resolved that to ${esc(from)} —
+        <strong>${scope.length} document${scope.length === 1 ? '' : 's'}</strong> — and staged it rather than running
+        it. Writes with consequence do not go through free text.`,
+      current: scope.length + ' document' + (scope.length === 1 ? '' : 's') + ' on the surface',
+      proposed: willAct + ' ' + spec.verb,
+      danger: spec.danger, typed: spec.typed, confirm: spec.confirm,
+      done: spec.title,
+      effects: [
+        ['ok', `<strong>${willAct}</strong> document${willAct === 1 ? '' : 's'} will be ${esc(spec.verb)}.`],
+        unowned.length ? ['warn', `<strong>${unowned.length}</strong> ${unowned.length === 1 ? 'has' : 'have'} no owner —
+          ${key === 'verify' ? 'routed to the collection lead instead' : 'the action still applies, but nobody is accountable for the result'}.`] : null,
+        excluded.length ? ['skip', `<strong>${excluded.length}</strong> ${excluded.length === 1 ? 'is' : 'are'} already
+          excluded from retrieval, so answers do not change until this is confirmed.`] : null,
+        spec.rung ? ['warn', esc(spec.rung)] : null
+      ].filter(Boolean)
+    });
+  }
+
+  /* ═══════════════════════════════════════════════
+     GOVERNANCE AND SOURCES, AS CONVERSATIONS
+
+     These used to be a panel above the grid: a slab of facts and controls
+     sitting there permanently whether or not anyone had asked. They are not a
+     surface — they are the answer to a question about a collection or a source,
+     and the canvas is where questions are answered.
+
+     Each one ends in the same structured commit surface it always did.
+     Conversation for the judgement, commit for the consequence.
+  ═══════════════════════════════════════════════ */
+  const factRow = (pairs) => `<div class="conv-facts">${pairs.filter(Boolean).map(([v, l]) =>
+    `<span class="conv-fact"><span class="conv-fact-v">${v}</span><span class="conv-fact-l">${esc(l)}</span></span>`).join('')}</div>`;
+
+
+
+  /* ── The settings sheet's contents ──
+
+     Real controls that write as you use them. Every change here is a rung-2
+     change — reversible, scoped, and stated on the row it belongs to — so it
+     applies on selection with an Undo, and the dialog each one used to open was
+     ceremony. The two that are NOT rung 2 keep their confirmation: turning a
+     customer-facing agent on, and deleting. */
+  const setDropdown = (key, arg, label, rows, cur) => `
+    <div class="v2-dropdown k-prop" data-set-key="${esc(key)}" data-set-arg="${esc(arg)}">
+      <button class="v2-dropdown-btn" type="button" aria-haspopup="listbox" aria-expanded="false"
+              aria-label="${esc(label)}">
+        <span class="dd-label-text">${esc(rows.reduce((a, r) => (String(r[0]) === String(cur) ? r[1] : a), '—'))}</span>
+        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+      </button>
+      <div class="v2-dropdown-panel" role="listbox">
+        ${rows.map(([v, l]) => `<div class="v2-dropdown-option${String(v) === String(cur) ? ' selected' : ''}"
+          role="option" aria-selected="${String(v) === String(cur)}" data-value="${esc(l)}" data-slug="${esc(v)}">${esc(l)}</div>`).join('')}
       </div>
+    </div>`;
 
-      ${problem ? `<div class="error-state src-error">
-        <div class="error-state-icon">${(s.error ? ICO.x : ICO.warn).replace('<svg', '<svg width="20" height="20"')}</div>
-        <div class="error-state-title">${esc(problem.title)}</div>
-        <div class="error-state-desc">${esc(problem.detail)}</div>
-        ${problem.code ? `<div class="src-code">${esc(problem.code)}</div>` : ''}
-        <div class="src-error-actions">
-          ${entryAction('direct', s.error ? 'Reconnect ' + s.name : 'Ingest the change now', `data-src-reconnect="${s.id}"`)}
-          <span class="k-action-note">Direct action · completes in place, with Undo.</span>
-        </div>
-      </div>` : ''}
+  const setRow = (label, control, note) => `
+    <div class="set-row">
+      <span class="set-label">${esc(label)}</span>
+      <div class="set-control">${control}${note ? `<span class="set-note">${note}</span>` : ''}</div>
+    </div>`;
 
-      <div class="src-stats">
-        <div class="stat-card"><div class="stat-label">Objects in corpus</div><div class="stat-value">${s.objects.toLocaleString()}</div></div>
-        <div class="stat-card"><div class="stat-label">Behind the source</div>
-          <div class="stat-value">${reconnected[s.id] ? 0 : s.behind}</div></div>
-        <div class="stat-card"><div class="stat-label">Open errors</div>
-          <div class="stat-value">${reconnected[s.id] ? 0 : s.errors.length}</div></div>
-      </div>
+  const setChrome = (title, sub) => `
+    <div class="doc-bar">
+      <span class="doc-bar-crumb">Settings<span class="doc-bar-sep">/</span>${esc(title)}</span>
+      <span class="doc-bar-end">
+        ${sub ? `<span class="set-sub">${esc(sub)}</span>` : ''}
+        <button class="doc-close" data-set-close aria-label="Close settings">
+          ${ICO.x.replace('<svg', '<svg width="15" height="15"')}</button>
+      </span>
+    </div>`;
 
-      <div class="src-section">
-        <div class="src-section-label">Coverage by collection</div>
-        ${s.coverage.map(([name, v]) => `<div class="progress-bar-wrap">
-          <div class="progress-bar-header">
-            <span class="progress-bar-label">${esc(name)}</span>
-            <span class="progress-bar-value">${Math.round(v * 100)}%</span>
+  function sourceSettings(key) {
+    const src = SRC[key];
+    const mine = LIVE.filter((o) => o.src === key);
+    const behind = mine.filter((o) => o.status === 'outdated');
+    const blocked = mine.filter((o) => o.work === 'failed');
+    const ok = src.health === 'ok';
+    return setChrome(src.label, ok ? 'Connected' : 'Not connected') + `
+      <div class="doc-scroll">
+        <div class="set-panel">
+          <p class="set-lead">${esc(src.note)}.
+            ${behind.length ? `${behind.length} document${behind.length === 1 ? ' is' : 's are'} behind what the source now says.`
+                            : 'Nothing here is behind its source.'}</p>
+
+          ${factRow([
+            [mine.length, 'documents from it'],
+            [src.queued ? 'queued' : src.last === 0 ? 'Today' : src.last + 'd ago', 'last successful sync'],
+            blocked.length ? [blocked.length, 'ingestion blocked'] : null,
+            src.code ? [`<span class="conv-code">${esc(src.code)}</span>`, 'error'] : null
+          ])}
+
+          <div class="set-group">
+            ${setRow('Sync every', setDropdown('cadence', key, 'Sync schedule',
+              SYNC_SCHEDULES.map((x) => [x, x]), src.cadence),
+              'How often this source is checked for changes. Between runs a document can be behind what the source says, and it says so when it is.')}
+            ${setRow(ok ? 'Run now' : 'Connection',
+              ok ? `<button class="btn btn-ghost btn-sm" data-sync-source="${key}">Sync now</button>`
+                 : `<button class="btn btn-brand btn-sm" data-reconnect="${key}">Reconnect</button>`,
+              ok ? 'Runs once, outside the schedule.' : 'Nothing ingests from here until it is connected.')}
           </div>
-          <div class="progress-bar-track">
-            <div class="progress-bar-fill ${v > 0.8 ? 'ok' : v > 0.5 ? 'warn' : 'err'}" style="--fill:${v}"></div>
+
+          <div class="set-group">
+            <span class="conv-label">Recent runs</span>
+            <div class="conv-log">
+              ${src.history.slice(0, 4).map(([d, st2, note]) => `<div class="conv-log-row">
+                <span class="status-dot ${st2 === 'ok' ? 'sd-ok' : st2 === 'warn' ? 'sd-warn' : 'sd-err'}"></span>
+                <span class="conv-log-when">${esc(d === 0 ? 'Today' : d + 'd ago')}</span>
+                <span class="conv-log-note">${esc(note)}</span></div>`).join('')}
+            </div>
           </div>
-        </div>`).join('')}
-      </div>
 
-      <div class="src-section">
-        <div class="src-section-label">Sync history</div>
-        <div class="timeline src-timeline">
-          ${s.history.map(([tone, title, time, body]) => `<div class="tl-item">
-            <span class="tl-dot ${tone}"></span>
-            <div class="tl-title">${esc(title)}</div>
-            <div class="tl-time">${esc(time)}</div>
-            <div class="tl-body">${esc(body)}</div>
-          </div>`).join('')}
-        </div>
-      </div>
-
-      ${s.errors.length && !reconnected[s.id] ? `<div class="src-section">
-        <div class="src-section-label">Ingestion errors</div>
-        <div class="gov-table-wrap">
-          <table class="dtable">
-            <thead><tr><th>First seen</th><th>Code</th><th>Scope</th><th>Recurrence</th></tr></thead>
-            <tbody>${s.errors.map((e) => `<tr>
-              <td class="gov-num">${esc(e[0])}</td><td><code>${esc(e[1])}</code></td>
-              <td>${esc(e[2])}</td><td>${esc(e[3])}</td></tr>`).join('')}</tbody>
-          </table>
-        </div>
-      </div>` : ''}
-
-      <div class="src-section">
-        <div class="src-section-label">Connection</div>
-        <div class="settings-list gov-collections">
-          <div class="settings-row">
-            <div class="sr-main"><div class="sr-title">Credential</div><div class="sr-desc">${esc(s.auth)}</div></div>
-            <button class="btn btn-ghost btn-sm" data-src-setting="${s.id}|auth">Replace</button>
-          </div>
-          <div class="settings-row">
-            <div class="sr-main"><div class="sr-title">Sync frequency</div><div class="sr-desc">${esc(s.cadence)}</div></div>
-            <button class="btn btn-ghost btn-sm" data-src-setting="${s.id}|cadence">Change</button>
+          <div class="set-foot">
+            ${entryAction('direct', 'Show its ' + mine.length + ' documents', `data-open-axis="source:${key}"`)}
           </div>
         </div>
       </div>`;
   }
 
-  /* Nav badges are derived, not written into the markup. Sources folded into
-     Governance, and a count that lives in five HTML files drifts the first
-     time one of them is edited. Runs on every page so the signal survives
-     wherever the user happens to be. */
-  /* The library's dsTab() toggles .active and nothing else, so a tablist keeps
-     whatever aria-selected the markup shipped with — a screen reader is told
-     the wrong tab is current. Corrected here rather than in the extracted
-     aimy-ds.js, which would fork the design system. Filed in ../GAPS.md. */
-  function syncTabAria(clicked) {
-    const strip = clicked.closest('[role="tablist"]');
-    if (!strip) return;
-    strip.querySelectorAll('.ds-tab').forEach((t) => {
-      t.setAttribute('aria-selected', t.classList.contains('active') ? 'true' : 'false');
-    });
+  function collectionSettings(col) {
+    const m = COLLECTION_META[col];
+    const live = LIVE.filter((o) => o.col === col);
+    const stale = live.filter((o) => o.status === 'outdated' || o.status === 'unused');
+    const unowned = live.filter((o) => o.owner === 'Unassigned');
+    const external = AGENTS.filter((a) => a.external && m.grounding[a.id]);
+    return setChrome(COLLECTIONS[col], 'Owned by ' + m.owner) + `
+      <div class="doc-scroll">
+        <div class="set-panel">
+          <p class="set-lead">${stale.length
+            ? `${stale.length} of its ${live.length} documents are out of date or unused.`
+            : `All ${live.length} are in use and match their sources.`}</p>
+
+          ${factRow([
+            [live.length, 'documents'],
+            [stale.length, 'out of date or unused'],
+            [unowned.length, 'unowned']
+          ])}
+
+          <div class="set-group">
+            <span class="conv-label">Which agents may answer from this</span>
+            <div class="set-checks">
+              ${AGENTS.map((a) => `<label class="ds-choice set-check">
+                <input type="checkbox" data-set-ground="${a.id}" data-set-col="${col}"
+                       ${m.grounding[a.id] ? 'checked' : ''}><span></span>
+                <span class="commit-choice-label">${esc(a.name)}${a.external
+                  ? '<span class="gov-ext">Customer-facing</span>' : ''}</span>
+              </label>`).join('')}
+            </div>
+            <span class="set-note">Human access and agent grounding are separate permissions. Content a colleague can
+            read with judgement is not automatically content an autonomous agent should paraphrase to a customer.</span>
+            ${external.length ? `<div class="trust-disclosure">
+              <div class="td-row is-warn">${ICO.warn}<span class="td-text"><strong>${external.map((a) => esc(a.name)).join(', ')}
+              is customer-facing</strong> and may paraphrase anything here to a customer.</span></div>
+            </div>` : ''}
+          </div>
+
+          <div class="set-group">
+            ${setRow('Auto-archive', setDropdown('retain', col, 'Retention', RETAIN_OPTIONS, m.retain),
+              `Counted from a document's last update. Archiving takes it out of answers; it does not delete it, and it
+               can be restored. Archived documents are kept <strong>${Math.round(m.purge / 30)} months</strong>
+               before they can be deleted for good.`)}
+          </div>
+
+          <div class="set-foot">
+            ${entryAction('direct', 'Show its ' + live.length + ' documents', `data-open-axis="collection:${col}"`)}
+          </div>
+        </div>
+      </div>`;
   }
 
-  function paintNavSignals() {
-    const set = (href, n, label) => {
-      const el = $(`.nav-item[href="${href}"] .nav-count`);
-      if (!el) return;
-      el.textContent = n || '';
-      el.hidden = !n;
-      if (n) el.setAttribute('aria-label', label);
-    };
-    set('requests.html', REQUESTS.filter((r) => !decisions[r.id]).length, 'open requests');
-    set('governance.html', SOURCES.filter((s) => srcStatus(s) === SRC_STATUS.failed).length,
-        'sources not syncing');
+  function dataSettings() {
+    const cols = USER.collections;
+    const auto = cols.filter((c) => COLLECTION_META[c].retain > 0);
+    const archived = CORPUS.filter((o) => o.arch);
+    return setChrome('Archiving & deleting', archived.length + ' archived') + `
+      <div class="doc-scroll">
+        <div class="set-panel">
+          <p class="set-lead">${auto.length
+            ? `<strong>${auto.length} of ${cols.length}</strong> collections archive on their own.`
+            : 'No collection archives on its own.'}
+            Nothing is ever deleted automatically — retention archives, and archiving is reversible.</p>
+
+          <div class="set-group">
+            <span class="conv-label">Auto-archive, per collection</span>
+            ${cols.map((c) => setRow(COLLECTIONS[c],
+              setDropdown('retain', c, 'Retention for ' + COLLECTIONS[c], RETAIN_OPTIONS, COLLECTION_META[c].retain),
+              `Kept ${Math.round(COLLECTION_META[c].purge / 30)} months after archiving.`)).join('')}
+          </div>
+
+          <div class="set-group">
+            <span class="conv-label">The archive</span>
+            <span class="set-note">Delete for good is reachable only from an archived document — you have to have
+            archived something and come back for it.</span>
+            ${archived.length
+              ? `<div class="rs-list">${archived.map((o) => typeCard(o, true)).join('')}</div>`
+              : '<p class="set-lead">Nothing is archived.</p>'}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  /* A change the input asked for, not yet made. It is shown as a proposal above
+     the control it would move, because "I typed it and it happened" and "I typed
+     it and I can see what it would do" are different products — and the second
+     is the one the rest of this surface is. */
+  let stagedSetting = null;
+
+  function stagedBanner() {
+    if (!stagedSetting) return '';
+    const label = stagedSetting.key === 'cadence'
+      ? 'Sync every ' + stagedSetting.value.replace(/^Every /, '').toLowerCase()
+      : 'Auto-archive ' + ((RETAIN_OPTIONS.find(([v]) => String(v) === stagedSetting.value) || [0, ''])[1]).toLowerCase();
+    return `<div class="set-staged">
+      ${AIMY_MARK(13, 15)}
+      <span class="set-staged-text">From what you typed: <strong>${esc(label)}</strong>. Nothing has changed yet.</span>
+      <span class="set-staged-end">
+        <button class="btn btn-ghost btn-sm" data-stage-drop>Discard</button>
+        <button class="btn btn-brand btn-sm" data-stage-run>Apply it</button>
+      </span>
+    </div>`;
+  }
+
+  /* One entry point, so the rail, the URL and the input all land in the same
+     place holding the same state. */
+  function renderSettings(st) {
+    const parts = String(st.settings).split(':');
+    const kind = parts[0], value = parts[1];
+    const html = kind === 'source' && SRC[value] ? sourceSettings(value)
+      : kind === 'collection' && COLLECTIONS[value] ? collectionSettings(value)
+      : kind === 'data' ? dataSettings()
+      : '';
+    if (!html) { patch({ settings: '' }, { replace: true }); stagedSetting = null; return; }
+    /* The banner sits at the top of the panel, above the control it would move. */
+    setModal.show(html.replace('<div class="set-panel">', '<div class="set-panel">' + stagedBanner()), st.settings);
+  }
+
+  /* "Find a source for this" is a question about grounding, not a rewrite. It
+     asks whether anything in the corpus supports what the document says — which
+     is answered with evidence and a set, so it belongs in the canvas. */
+  function groundingAnswer(o, passage) {
+    const near = LIVE.filter((x) => x.id !== o.id &&
+      x.tags.some((tg) => o.tags.indexOf(tg) > -1)).slice(0, 3);
+    canvas.close();
+    canvas.ask(passage ? 'What supports "' + passage.slice(0, 60) + '"?' : 'What supports ' + o.title + '?',
+      [o.title, COLLECTIONS[o.col]].concat(passage ? ['selection'] : []),
+      () => `<div class="answer-surface">
+        <div class="answer-body">
+          <p>${near.length
+            ? `${near.length} document${near.length === 1 ? '' : 's'} in the corpus cover${near.length === 1 ? 's' : ''} the same ground. ` +
+              `Nothing in ${esc(SRC[o.src].label)} contradicts what this says.`
+            : `Nothing else in the corpus covers this. It stands on its own source, and an answer that cites it cites only it.`}</p>
+        </div>
+        ${near.length ? `<div class="rs-list">${near.map((x) => typeCard(x, true)).join('')}</div>` : ''}
+        <div class="trust-disclosure">
+          <div class="td-row is-warn">${ICO.warn}<span class="td-text">Overlap is not corroboration. These share tags with it;
+          whether they agree is a reading, and the comparison is one click away.</span></div>
+        </div>
+        <div class="answer-apply">
+          ${near.length ? entryAction('investigate', 'Compare with ' + near[0].title,
+            `data-set-conflict="${o.id}:${near[0].id}"`) : ''}
+          ${entryAction('direct', 'Back to the document', `data-open-doc="${o.id}"`)}
+        </div>
+      </div>`);
+  }
+
+  /* Retention, archiving and deletion, across every collection at once. The
+     per-collection conversation can say what one of them does; this is the only
+     place that says what the rules add up to — and the only route to the
+     archive, which is the only place Delete exists. */
+
+  /* One entry point for both, so the chip, the briefing and a typed question
+     all arrive at the same conversation. */
+
+
+
+  /* ── The consequential changes the panel offers ── */
+  /* The typed confirmation is owed to one specific change — turning a
+     customer-facing agent ON — not to opening the form. Gating it on the state
+     the collection happens to be in meant you had to type the collection name
+     to allow an internal agent, which is a rung-4 ceremony for a rung-3 change
+     and teaches people to type past it. It appears when you make the change
+     that earns it. */
+
+  /* The sync trigger. This was wired to a function that was never written, so
+     "Change schedule" has been throwing since the day it appeared — the button
+     was there, the handler was there, and the thing it called was not. */
+
+
+
+
+
+
+  /* ═══════════════════════════════════════════════
+     NON-HAPPY STATES
+
+     Designed, not discovered. AI-unavailable is the interesting one here: the
+     filters, the grid, the viewer and the editor are all plain state reads and
+     keep working. Only the parse and the canvas degrade, and the input says so
+     rather than silently doing nothing.
+  ═══════════════════════════════════════════════ */
+  const forcedState = new URLSearchParams(location.search).get('state') || '';
+
+  function renderState(kind) {
+    const stage = $('#wbStage');
+    if (kind === 'loading') {
+      stage.innerHTML = `<div class="ws-grid">${Array.from({ length: 6 }).map(() =>
+        `<div class="skeleton-card"><div class="skeleton skeleton-line" style="width:38%"></div>
+          <div class="skeleton skeleton-line" style="width:80%;height:15px"></div>
+          <div class="skeleton skeleton-line" style="width:64%"></div>
+          <div class="skeleton skeleton-line" style="width:52%"></div></div>`).join('')}</div>`;
+      return true;
+    }
+    if (kind === 'error') {
+      stage.innerHTML = `<div class="error-state">
+        <div class="error-state-icon">${ICO.warn.replace('<svg', '<svg width="20" height="20"')}</div>
+        <div class="error-state-title">Could not load</div>
+        <div class="error-state-desc">Your filters are intact. Nothing changed — retrying is safe.</div>
+        <button class="btn btn-brand btn-sm" data-retry>Retry</button>
+      </div>`;
+      return true;
+    }
+    return false;
+  }
+
+  function renderAiState() {
+    const bar = $('#aimyFloatBar');
+    const input = $('#floatInput');
+    if (forcedState !== 'ai-down') return;
+    if (bar) bar.classList.add('is-degraded');
+    if (input) {
+      input.placeholder = 'AiMY is unavailable — the filters still work';
+      input.disabled = true;
+    }
+    const tray = $('#floatFilterTray');
+    if (tray) tray.classList.add('is-forced');
   }
 
   /* ═══════════════════════════════════════════════
-     WIRING
+     RENDER — one entry point, driven by the URL
   ═══════════════════════════════════════════════ */
-  /* The most recently dismissed briefing slot, held for Undo. */
-  let dismissed = null;
+  function render() {
+    const st = readURL();
+    renderBrief(st);
+    renderFilters(st);
+    renderChips(st);
+
+    if (forcedState === 'loading' || forcedState === 'error') { renderState(forcedState); return; }
+
+    /* The grid always renders. A document opens over it, so the surface a
+       person was working on is still there when they close the document —
+       there is no "back", because they never left. */
+    renderGrid(st);
+
+    if (st.settings) renderSettings(st);
+    else if (setModal.open) setModal.close();
+
+    if (st.doc) {
+      if (st.mode === 'edit') renderEditor(st); else renderViewer(st);
+    } else if (docModal.open) {
+      docModal.close();
+    }
+
+    /* The thread is part of the surface, not a transcript beside it. */
+    canvas.repaint();
+  }
+
+  /* ═══════════════════════════════════════════════
+     THE INPUT HANDLER — where the four routes actually diverge
+  ═══════════════════════════════════════════════ */
+  function submit(text) {
+    const st = readURL();
+    const intent = parseIntent(text);
+    if (intent.route === 'empty') return;
+
+    /* ── Reviewed: a write is staged, never run ── */
+    if (intent.route === 'write') { runWrite(intent, st); return; }
+
+    /* ── Settings: the sheet, with the change staged, never applied ── */
+    if (intent.route === 'settings') {
+      stagedSetting = intent.stage;
+      patch({ settings: intent.target });
+      return;
+    }
+
+    /* ── Direct: a known title opens its document. No generation, no canvas ── */
+    if (intent.route === 'object') {
+      patch({ doc: intent.id, mode: 'view' });
+      toast('Opened “' + byId(intent.id).title + '”', null, 'Named exactly — nothing was generated');
+      return;
+    }
+
+    /* ── Filters always apply, and a question always answers ──
+
+       The two are not alternatives. A sentence carrying both — "expired ICPs,
+       why did they lapse?" — narrows the surface AND answers within what it
+       narrowed to. A sentence carrying only filter tokens narrows and stops. A
+       sentence carrying only a question answers, and the surface becomes the
+       sources that answer stands on. */
+    const set = intent.set || {};
+    let hasFilters = Object.keys(set).some((k) => k !== 'q') || (set.q && intent.route === 'filter');
+
+    /* One exception, and it is the Notion-AI case: while a document is open, a
+       question is about THAT document. The words it happens to share with the
+       lexicon are not a request to re-filter — acting on them would close what
+       you are reading and pull the ground out from under the question. An
+       explicit filter phrase still filters; a question does not. */
+    const reading = st.doc && intent.route === 'question';
+    if (reading) hasFilters = false;
+
+    if (hasFilters) applyTyped(set, text);
+
+    if (intent.route === 'question') {
+      /* The scope the answer is judged against is the scope that was just set,
+         not the one that was there a moment ago. */
+      const scoped = hasFilters ? readURL() : st;
+      canvas.ask(text, scopeBasis(scoped), answerFor(text, scoped), { autoSurface: !hasFilters && !reading });
+    }
+  }
+
+  /* Writes a parsed filter set into the URL. What AiMY understood shows up in
+     the filter controls lighting up — there is nothing to restate underneath
+     them.
+
+     A typed phrase REPLACES the filter state; it does not add to it. A sentence
+     is a statement of what you want to see, and merging it into whatever was
+     there before produces a view nobody asked for and cannot read back. The
+     controls and the chips are the incremental way in. */
+  function applyTyped(set, text) {
+    const next = readURL0();
+    let matched = 0;
+    Object.keys(set).forEach((k) => {
+      const v = set[k];
+      if (LIST_KEYS.indexOf(k) > -1)        { next[k] = v.slice(); matched++; }
+      else if (k === 'q')                   { next.q = v; }
+      else if (FLAG_KEYS.indexOf(k) > -1)   { next[k] = true; matched++; }
+      else                                  { next[k] = v; matched++; }
+    });
+    /* Nothing recognised: keep it as a search rather than clearing the surface
+       and calling that a result. */
+    if (!matched && !set.q) next.q = text;
+    next.doc = ''; next.mode = 'view';
+    rememberFilter();
+    writeURL(next);
+  }
+
+  /* ═══════════════════════════════════════════════
+     WIRING — delegated, no inline handlers
+  ═══════════════════════════════════════════════ */
+  const DEMO = {
+    filter:   'expired ICPs updated this year',
+    object:   'Refund eligibility — EU customers',
+    question: 'Can EU customers get a refund after activating?',
+    write:    'archive all of these',
+    settings: 'sync confluence hourly'
+  };
+
+  /* ── The prototype panel ──
+
+     Built from the live corpus, not hard-coded. Every condition this product
+     designs for — a document nothing has cited in a year, one whose source is
+     down, one marked superseded with no replacement recorded — is real in the
+     fixtures but tedious to reach by clicking, and those are exactly the
+     screens worth looking at in a review. A link that cannot resolve is not
+     rendered, so nothing here leads nowhere either. */
+  function protoFirst(fn) {
+    const o = (ENTITLED.filter(fn) || [])[0];
+    return o ? o.id : '';
+  }
+
+  function protoGroups() {
+    const deadSrc = Object.keys(SRC).find((k) => k !== 'upload' && SRC[k].health !== 'ok');
+    const superseded = protoFirst((o) => !o.arch && o.status === 'superseded' && !(RELATED[o.id] || {}).supersededBy);
+    const anySuperseded = protoFirst((o) => !o.arch && o.status === 'superseded');
+
+    return [
+      ['Input routes', 'Fills the input. Press Enter to run it.', [
+        ['filter', 'demo:filter'], ['a document', 'demo:object'],
+        ['a question', 'demo:question'], ['a write', 'demo:write'],
+        ['settings', 'demo:settings']
+      ]],
+      ['A document in each state', 'Opens one that really is in that state.', [
+        ['out of date', 'doc:' + protoFirst((o) => !o.arch && o.status === 'outdated')],
+        ['conflicting', 'doc:' + protoFirst((o) => !o.arch && o.status === 'conflicting')],
+        ['superseded, unlinked', 'doc:' + superseded],
+        ['superseded', superseded ? '' : 'doc:' + anySuperseded],
+        ['unused', 'doc:' + protoFirst((o) => !o.arch && o.status === 'unused')],
+        ['unowned', 'doc:' + protoFirst((o) => !o.arch && o.status === 'unowned')],
+        ['a draft', 'doc:' + protoFirst((o) => !o.arch && o.status === 'draft')],
+        ['archived', 'arch:' + protoFirst((o) => o.arch)]
+      ]],
+      ['Surfaces', '', [
+        ['editor', 'edit:' + protoFirst((o) => !o.arch && o.owner === USER.owner)],
+        ['new document', 'new:1'],
+        ['settings — a source', 'set:source:' + (deadSrc || 'confluence')],
+        ['settings — a collection', 'set:collection:' + USER.collections[0]],
+        ['settings — archiving', 'set:data'],
+        ['the canvas', 'canvas:1']
+      ]],
+      /* Two states you cannot reach by clicking, because they only exist once
+         somebody overrules the computation — and they are the ones with the
+         most design in them: both open a picker rather than a destination. */
+      ['Make a condition', 'Sets the status by hand, as a person would.', [
+        ['superseded, nothing linked', 'mk:superseded'],
+        ['conflicting, nothing linked', 'mk:conflicting']
+      ]],
+      ['Non-happy states', '', [
+        ['loading', 'url:?state=loading'],
+        ['error', 'url:?state=error'],
+        ['AI down', 'url:?state=ai-down']
+      ]],
+      ['This URL is the whole state', '', [
+        ['copy it', 'copy:1'],
+        ['clear filters', 'url:?'],
+        ['reload the fixtures', 'reload:1']
+      ]]
+    ];
+  }
+
+  function renderProto() {
+    const host = $('#protoPanel');
+    if (!host) return;
+    host.innerHTML = protoGroups().map(([label, note, items]) => {
+      /* A row whose target did not resolve is dropped rather than rendered
+         dead — the same rule the product holds itself to. */
+      const live = items.filter(([, go]) => go && !/:$/.test(go));
+      if (!live.length) return '';
+      return `<div class="proto-group">
+        <span class="proto-group-label">${esc(label)}</span>
+        ${note ? `<span class="proto-group-note">${esc(note)}</span>` : ''}
+        <div class="proto-links">
+          ${live.map(([text, go]) => `<button class="proto-link" data-proto="${esc(go)}">${esc(text)}</button>`).join('')}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function protoRun(go) {
+    const i = go.indexOf(':');
+    const kind = go.slice(0, i), arg = go.slice(i + 1);
+    const fb = $('#floatInput');
+
+    if (kind === 'demo') { if (fb) { fb.value = DEMO[arg]; fb.focus(); } return; }
+    if (kind === 'doc')  { patch({ doc: arg, mode: 'view' }); return; }
+    if (kind === 'edit') { patch({ doc: arg, mode: 'edit' }); return; }
+    if (kind === 'arch') { patch({ archived: true, doc: arg, mode: 'view' }); return; }
+    if (kind === 'set')  { patch({ settings: arg }); return; }
+    if (kind === 'new')  { newDocument('article'); return; }
+    if (kind === 'canvas') { canvas.show(['Prototype']); return; }
+    if (kind === 'url')  { location.search = arg.replace(/^\?/, ''); return; }
+    if (kind === 'reload') { location.href = location.pathname; return; }
+    if (kind === 'mk') {
+      /* A plain document with nothing recorded either way, so the picker really
+         does have nothing to go on — which is the case being demonstrated. */
+      const o = ENTITLED.filter((x) => !x.arch && x.status === 'current' &&
+        !(RELATED[x.id] || {}).supersededBy && !((RELATED[x.id] || {}).contradicts || []).length)[0];
+      if (!o) { toast('Nothing plain enough left', null, 'Reload the fixtures and try again'); return; }
+      o.statusSet = arg;
+      o.statusBy = USER.owner;
+      recompute();
+      patch({ doc: o.id, mode: 'view' });
+      markCard(o.id);
+      toast('Set to ' + STATUS[arg].label, 'Undo', esc(o.title) + ' · nothing is linked to it');
+      undoStack = () => { delete o.statusSet; delete o.statusBy; recompute(); render(); };
+      return;
+    }
+    if (kind === 'copy') {
+      const url = location.href;
+      const done = () => toast('URL copied', null, 'Paste it anywhere — it rebuilds this exact surface');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(done, () => toast('Copy it from the address bar', null, url));
+      } else {
+        toast('Copy it from the address bar', null, url);
+      }
+    }
+  }
+
+  const proto = {
+    open: false,
+    toggle(next) {
+      const panel = $('#protoPanel'), btn = $('#protoToggle');
+      if (!panel || !btn) return;
+      this.open = next === undefined ? !this.open : next;
+      if (this.open) renderProto();
+      panel.hidden = !this.open;
+      btn.setAttribute('aria-expanded', String(this.open));
+      $('#proto').classList.toggle('is-open', this.open);
+    }
+  };
 
   function wire() {
+    /* Submit */
+    const fb = $('#floatInput');
+    if (fb) fb.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); const v = fb.value.trim(); fb.value = ''; submit(v); }
+    });
+    const fs = $('#floatSend');
+    if (fs) fs.addEventListener('click', () => { const v = fb.value.trim(); fb.value = ''; submit(v); });
+
+    /* The canvas input runs the same router as the float bar. Typing a filter
+       phrase here narrows the surface behind the glass rather than being read
+       as a question about nothing — one input contract, two places to reach it. */
+    const oi = $('#overlayInput');
+    if (oi) oi.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const v = oi.value.trim();
+        if (!v) return;
+        oi.value = '';
+        submit(v);
+      }
+    });
+    const os = $('#overlaySend');
+    if (os) os.addEventListener('click', () => {
+      const v = oi.value.trim();
+      if (!v) return;
+      oi.value = '';
+      submit(v);
+    });
+
+    window.addEventListener('popstate', render);
+
+    /* The filter controls. `dd:change` reports the label, so the machine value
+       is read off the option the component marked selected. Choosing replaces
+       the axis rather than adding to it — the control is single-select and
+       pretending otherwise would leave it showing something untrue. */
+    /* Property dropdowns in the editor write straight to the object. */
+    document.addEventListener('dd:change', (e) => {
+      const dd = e.target.closest('.v2-dropdown[data-prop-key]');
+      if (!dd) return;
+      const o = byId(readURL().doc);
+      if (!o) return;
+      const key = dd.getAttribute('data-prop-key');
+      const opt = dd.querySelector('.v2-dropdown-option[aria-selected="true"]');
+      const val = opt ? (opt.dataset.slug || '') : '';
+      /* The override is the one property that is not just a field: clearing it
+         hands the document back to the computation, and setting it records who
+         did so. Same path chat uses. */
+      if (key === 'statusSet') {
+        if (val) { o.statusSet = val; o.statusBy = USER.owner; }
+        else { delete o.statusSet; delete o.statusBy; }
+        repaintEditor();
+        return;
+      }
+      o[key] = val;
+      /* Changing the type changes which fields the card and viewer draw, so the
+         type-specific bag has to gain the shape the new type expects. */
+      if (key === 't') o.x = Object.assign({}, BLANK_X[o.t] || {}, o.x);
+      repaintEditor();
+    });
+
+    /* ── The settings sheet's controls ──
+
+       These write on selection. Every one of them is reversible, scoped and
+       stated on the row it belongs to, which is rung 2 — a dialog per field was
+       ceremony standing in for feedback, and the feedback is now the control
+       itself changing plus an Undo. */
+    document.addEventListener('dd:change', (e) => {
+      const dd = e.target.closest('.v2-dropdown[data-set-key]');
+      if (!dd) return;
+      const key = dd.getAttribute('data-set-key');
+      const arg = dd.getAttribute('data-set-arg');
+      const opt = dd.querySelector('.v2-dropdown-option[aria-selected="true"]');
+      const val = opt ? (opt.dataset.slug || '') : '';
+
+      if (key === 'cadence') {
+        const src = SRC[arg];
+        if (!src || val === src.cadence) return;
+        const was = src.cadence;
+        src.cadence = val;
+        src.history.unshift([0, 'ok', 'Schedule changed to ' + val.toLowerCase() + ' by ' + USER.owner]);
+        undoStack = () => { src.cadence = was; src.history.shift(); render(); };
+        render();
+        markAfter('.set-group', $('#setSheet'));
+        toast('Sync schedule saved', 'Undo', src.label + ' · ' + val.toLowerCase());
+        return;
+      }
+
+      if (key === 'retain') {
+        const m = COLLECTION_META[arg];
+        if (!m || +val === m.retain) return;
+        const was = m.retain;
+        m.retain = +val;
+        undoStack = () => { m.retain = was; render(); };
+        render();
+        markAfter('.set-group', $('#setSheet'));
+        toast('Auto-archive saved', 'Undo', COLLECTIONS[arg] + ' · ' +
+          (m.retain ? 'archives after ' + Math.round(m.retain / 30) + ' months' : 'never archives on its own'));
+      }
+    });
+
+    /* Grounding is the one setting where the rung depends on WHICH way it
+       moves. Letting an internal agent read a collection is reversible and
+       nobody outside sees it. Letting a customer-facing one read it puts this
+       content in front of customers, and that earns the typed confirmation —
+       which is why the checkbox reverts until the confirmation is completed. */
+    document.addEventListener('change', (e) => {
+      const cb = e.target.closest && e.target.closest('[data-set-ground]');
+      if (!cb) return;
+      const id = cb.getAttribute('data-set-ground');
+      const col = cb.getAttribute('data-set-col');
+      const m = COLLECTION_META[col];
+      const agent = AGENTS.find((a) => a.id === id);
+      if (!m || !agent) return;
+
+      if (cb.checked && agent.external) {
+        cb.checked = false;                       // not until it is confirmed
+        commit({
+          title: agent.name + ' may answer from ' + COLLECTIONS[col],
+          danger: true, typed: COLLECTIONS[col], confirm: 'Allow it',
+          current: 'Internal only', proposed: agent.name + ' may cite it to customers',
+          rationale: `<strong>${esc(agent.name)}</strong> is customer-facing. Allowing it means anything in
+            <strong>${esc(COLLECTIONS[col])}</strong> can be paraphrased to a customer without a person reading
+            it first.`,
+          effects: [
+            ['warn', `All <strong>${LIVE.filter((o) => o.col === col).length}</strong> live documents here become
+              answerable to customers.`],
+            ['ok', 'Reversible — unticking it stops new answers immediately.'],
+            ['ok', 'Logged to the audit trail with your name and the time.']
+          ],
+          onRun: () => {
+            m.grounding[id] = true;
+            render();
+            markAfter('.set-checks', $('#setSheet'));
+            toast(agent.name + ' allowed', 'Undo', 'It may now cite ' + COLLECTIONS[col]);
+            undoStack = () => { m.grounding[id] = false; render(); };
+            return true;
+          }
+        });
+        return;
+      }
+
+      const was = m.grounding[id];
+      m.grounding[id] = cb.checked;
+      undoStack = () => { m.grounding[id] = was; render(); };
+      render();
+      markAfter('.set-checks', $('#setSheet'));
+      toast(cb.checked ? agent.name + ' may answer from ' + COLLECTIONS[col]
+                       : agent.name + ' no longer answers from ' + COLLECTIONS[col],
+        'Undo', cb.checked ? 'Internal only — not customer-facing' : 'Existing answers are unaffected');
+    });
+
+    document.addEventListener('dd:change', (e) => {
+      const dd = e.target.closest('.v2-dropdown[data-filter-key]');
+      if (!dd) return;
+      const key = dd.getAttribute('data-filter-key');
+      const slug = (dd.querySelector('.v2-dropdown-option[aria-selected="true"]') || {}).dataset;
+      const value = slug ? (slug.slug || '') : '';
+      const st = readURL();
+      if (FLAG_KEYS.indexOf(key) > -1) st[key] = !!value;
+      else if (DATE_KEYS.indexOf(key) > -1) st[key] = value;
+      else st[key] = value ? [value] : [];
+      st.doc = ''; st.mode = 'view';
+      rememberFilter();
+      writeURL(st);
+    });
+
+    const gateRun = (locked) => {
+      const btn = $('#commitRun');
+      if (!btn) return;
+      btn.disabled = locked;
+      btn.style.opacity = locked ? '.45' : '';
+      btn.style.cursor = locked ? 'not-allowed' : '';
+    };
+
+    document.addEventListener('input', (e) => {
+      const t = e.target;
+      if (t.hasAttribute && t.hasAttribute('data-typed')) {
+        gateRun(t.value.trim().toLowerCase() !== t.getAttribute('data-typed').toLowerCase());
+      }
+    });
+
+    /* Editor: audience checkboxes and the custom-property fields. */
+    document.addEventListener('change', (e) => {
+      const t = e.target;
+      const o = byId(readURL().doc);
+      if (!o || !t.hasAttribute) return;
+      if (t.hasAttribute('data-aud')) {
+        const a = t.getAttribute('data-aud');
+        o.aud = t.checked ? o.aud.concat([a]).filter((x, i, arr) => arr.indexOf(x) === i)
+                          : o.aud.filter((x) => x !== a);
+        repaintEditor();
+      }
+    });
+
+    /* A toolbar button steals focus on mousedown and collapses the selection
+       before execCommand ever runs, which is why none of these appeared to do
+       anything. Cancelling the default keeps the caret where it was. */
+    document.addEventListener('mousedown', (e) => {
+      if (e.target.closest && e.target.closest('[data-fmt]')) e.preventDefault();
+    });
+
+    /* Keep the toolbar honest about where the caret is. */
+    document.addEventListener('selectionchange', () => {
+      if ($('#docSheet [data-fmt]')) syncToolbar();
+    });
+
+    /* The body writes through on every keystroke so the Publish gate is honest
+       the instant there is something to publish. No repaint — that would take
+       the caret with it — just the one button that depends on it. */
+    document.addEventListener('input', (e) => {
+      if (!e.target.id || e.target.id !== 'editBody') return;
+      const o = byId(readURL().doc);
+      if (!o) return;
+      writeBody(e.target);
+      noteSave(o);
+    }, true);
+
+    /* Property key/value edits are committed on blur rather than on every
+       keystroke — repainting mid-word would take the caret with it. */
+    document.addEventListener('focusout', (e) => {
+      const t = e.target;
+      const o = byId(readURL().doc);
+      if (!o || !t.hasAttribute) return;
+      if (t.hasAttribute('data-prop-k')) {
+        const was = t.getAttribute('data-prop-k'), now = t.value.trim();
+        if (now && now !== was) { o.props[now] = o.props[was]; delete o.props[was]; repaintEditor(); }
+      } else if (t.hasAttribute('data-prop-v')) {
+        o.props[t.getAttribute('data-prop-v')] = t.value.trim();
+      } else if (t.id === 'editBody') {
+        /* Leaving the body is when the derived status can safely catch up —
+           mid-word it would repaint under the caret. */
+        writeBody(t);
+        recompute();
+        repaintEditor();
+      } else if (t.hasAttribute('data-edit-title')) {
+        const v = t.textContent.trim();
+        if (v && v !== o.title) { o.title = v; repaintEditor(); }
+      }
+    }, true);
+
+    /* Tag entry. Enter commits a token, Backspace on an empty field removes the
+       last one — the two things every tag field is expected to do. */
+    document.addEventListener('keydown', (e) => {
+      const t = e.target;
+      if (!t.hasAttribute || !t.hasAttribute('data-tag-add')) return;
+      const o = byId(readURL().doc);
+      if (!o) return;
+      const key = t.getAttribute('data-tag-add');
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const v = t.value.trim().toLowerCase().replace(/\s+/g, '-');
+        if (!v) return;
+        if (o[key].indexOf(v) === -1) o[key] = o[key].concat([v]);
+        t.value = '';
+        repaintEditor();
+      } else if (e.key === 'Backspace' && !t.value && o[key].length) {
+        e.preventDefault();
+        o[key] = o[key].slice(0, -1);
+        repaintEditor();
+      }
+    });
+
     document.addEventListener('click', (e) => {
       const t = e.target;
       let el;
 
+      /* ── prototype panel ── */
+      if (t.closest('#protoToggle')) { proto.toggle(); return; }
+      if ((el = t.closest('[data-proto]'))) {
+        protoRun(el.getAttribute('data-proto'));
+        /* It closes behind you: it is scaffolding for getting somewhere, not
+           somewhere to be. Copy is the one that leaves it open, because you may
+           well want the next link too. */
+        if (el.getAttribute('data-proto').indexOf('copy') !== 0) proto.toggle(false);
+        return;
+      }
+      if (proto.open && !t.closest('#proto')) proto.toggle(false);
+
+      /* ── chips and filters ── */
+      if ((el = t.closest('[data-chip-drop]'))) {
+        const c = el.closest('[data-chip]') || el;
+        dropChip(c.getAttribute('data-chip'), c.getAttribute('data-chip-val'));
+        return;
+      }
+      if (t.closest('[data-clear-all]')) { writeURL(readURL0()); return; }
+      if ((el = t.closest('[data-quick]'))) {
+        const [k, v] = el.getAttribute('data-quick').split('=');
+        addFilter(k, v);
+        return;
+      }
+      /* Every labelled value on a card or a document is a filter link. Clicking
+         a tag, a region, a service, an audience or a custom property narrows
+         the surface to it — which is how the modal stays a reading surface and
+         still gets you back to the set. */
+      if ((el = t.closest('[data-add-tag]')))      { addFilter('tag', el.getAttribute('data-add-tag')); return; }
+      if ((el = t.closest('[data-add-client]')))   { addFilter('client', el.getAttribute('data-add-client')); return; }
+      if ((el = t.closest('[data-add-region]')))   { addFilter('region', el.getAttribute('data-add-region')); return; }
+      if ((el = t.closest('[data-add-service]')))  { addFilter('service', el.getAttribute('data-add-service')); return; }
+      if ((el = t.closest('[data-add-audience]'))) { addFilter('audience', el.getAttribute('data-add-audience')); return; }
+      if ((el = t.closest('[data-prop]')))         { addFilter('prop', el.getAttribute('data-prop')); return; }
+      if (t.closest('[data-show-archive]')) { canvas.close(); patch({ archived: true }); return; }
+      if ((el = t.closest('[data-open-axis]'))) {
+        const [k, v] = el.getAttribute('data-open-axis').split(':');
+        const next = readURL0();
+        next[k] = [v];
+        rememberFilter();
+        writeURL(next);
+        return;
+      }
+      if (t.closest('[data-toggle-mine]')) { const s = readURL(); s.mine = !s.mine; s.doc = ''; rememberFilter(); writeURL(s); return; }
+      if (t.closest('[data-more]'))        { moreOpen = !moreOpen; renderFilters(readURL()); return; }
+      if (t.closest('[data-resume]')) { location.search = lastFilter; return; }
+      if (t.closest('[data-retry]'))  { location.href = location.pathname; return; }
+
+      /* ── briefing ── */
+      if ((el = t.closest('[data-brief-filter]'))) {
+        const b = sinceLastVisit().find((x) => x.id === el.getAttribute('data-brief-filter'));
+        if (!b || !b.href) return;
+        const next = readURL0();
+        Object.keys(b.href).forEach((k) => { next[k] = b.href[k]; });
+        rememberFilter();
+        writeURL(next);
+        /* Filters AND explains — the finding and its detail in one click. */
+        if (b.ask) patch({ settings: b.ask[0] + ':' + b.ask[1] });
+        return;
+      }
+      if ((el = t.closest('[data-brief-prompt]'))) {
+        canvas.stage(el.getAttribute('data-brief-prompt'),
+          ['Coverage gap', '3 unanswered questions', 'Nothing to filter to']);
+        return;
+      }
+
+      /* ── documents ── */
+      if ((el = t.closest('[data-open-doc]'))) {
+        patch({ doc: el.getAttribute('data-open-doc'), mode: 'view' });
+        return;
+      }
+      if ((el = t.closest('[data-keep]'))) { canvas.close(); docAct('keep', el.getAttribute('data-keep')); return; }
+      if ((el = t.closest('[data-compare-with]'))) { docAct('compare', el.getAttribute('data-compare-with')); return; }
+      if ((el = t.closest('[data-resolve]'))) { canvas.close(); docAct('resolve', el.getAttribute('data-resolve')); return; }
+      if ((el = t.closest('[data-edit-doc]'))) { patch({ doc: el.getAttribute('data-edit-doc'), mode: 'edit' }); return; }
+      if ((el = t.closest('[data-view-doc]'))) { patch({ doc: el.getAttribute('data-view-doc'), mode: 'view' }); return; }
+      if (t.closest('[data-doc-close]')) { previewVer = null; docModal.close(); return; }
+
+      /* ── editor: tabs, versions, properties ── */
+      if ((el = t.closest('[data-etab]'))) { editorTab = el.getAttribute('data-etab'); renderEditor(readURL()); return; }
+      if ((el = t.closest('[data-open-ver]'))) { previewVer = +el.getAttribute('data-open-ver'); renderEditor(readURL()); return; }
+      if (t.closest('[data-close-ver]')) { previewVer = null; renderEditor(readURL()); return; }
+      if ((el = t.closest('[data-tag-drop]'))) {
+        const o = byId(readURL().doc);
+        const key = el.closest('[data-tag-field]').getAttribute('data-tag-field');
+        o[key] = o[key].filter((x) => x !== el.getAttribute('data-tag-drop'));
+        repaintEditor();
+        return;
+      }
+      if ((el = t.closest('[data-prop-del]'))) {
+        const o = byId(readURL().doc);
+        delete o.props[el.getAttribute('data-prop-del')];
+        repaintEditor();
+        return;
+      }
+      if (t.closest('[data-prop-add]')) {
+        const o = byId(readURL().doc);
+        let n = 1;
+        while (o.props['property-' + n] !== undefined) n++;
+        o.props['property-' + n] = '';
+        repaintEditor();
+        return;
+      }
+      if ((el = t.closest('[data-discard]'))) {
+        const o = byId(el.getAttribute('data-discard'));
+        [CORPUS, LIVE, ENTITLED].forEach((arr) => { const i = arr.indexOf(o); if (i > -1) arr.splice(i, 1); });
+        docModal.close();
+        render();
+        markAfter('.rm-main');
+        toast('Discarded', null, 'Nothing was saved');
+        return;
+      }
+      if ((el = t.closest('[data-versions]'))) {
+        /* In the editor the version panel is already beside the body, so the
+           chrome control only has work to do while reading. */
+        const det = $('#docVersions');
+        if (det) { det.open = true; det.scrollIntoView({ block: 'nearest' }); $('.ver-item', det).focus(); }
+        else { const p = $('.ver-list'); if (p) p.scrollIntoView({ block: 'nearest' }); }
+        return;
+      }
+      if ((el = t.closest('[data-card-act]'))) {
+        cardActRun(el.getAttribute('data-card-act'));
+        return;
+      }
+      /* Recording what a document conflicts with is a statement about both, so
+         it is written on both — a one-sided contradiction would leave the other
+         document claiming to be current while this one disagrees with it. */
+      if ((el = t.closest('[data-set-conflict]'))) {
+        const [a, b] = el.getAttribute('data-set-conflict').split(':');
+        const A = byId(a), B = byId(b);
+        if (!A || !B) return;
+        RELATED[a] = Object.assign({ related: [], contradicts: [] }, RELATED[a]);
+        RELATED[b] = Object.assign({ related: [], contradicts: [] }, RELATED[b]);
+        if (RELATED[a].contradicts.indexOf(b) < 0) RELATED[a].contradicts.push(b);
+        if (RELATED[b].contradicts.indexOf(a) < 0) RELATED[b].contradicts.push(a);
+        recompute();
+        render();
+        markCard(a); markCard(b);
+        docAct('compare', a);
+        return;
+      }
+      if ((el = t.closest('[data-set-successor]'))) {
+        const [a, b] = el.getAttribute('data-set-successor').split(':');
+        if (!byId(a) || !byId(b)) return;
+        RELATED[a] = Object.assign({ related: [], contradicts: [] }, RELATED[a], { supersededBy: b });
+        RELATED[b] = Object.assign({ related: [], contradicts: [] }, RELATED[b]);
+        if (RELATED[b].related.indexOf(a) < 0) RELATED[b].related.push(a);
+        recompute();
+        canvas.close();
+        patch({ doc: b, mode: 'view' });
+        markCard(a); markCard(b);
+        toast('Recorded', 'Undo', esc(byId(b).title) + ' replaces ' + esc(byId(a).title));
+        undoStack = () => { delete RELATED[a].supersededBy; recompute(); render(); };
+        return;
+      }
       if ((el = t.closest('[data-act]'))) {
-        const act = ACTS[el.getAttribute('data-act')];
-        if (act) { act.run(); return; }
-      }
-      if ((el = t.closest('[data-undo]'))) {
-        const card = el.closest('.bcard');
-        const row = el.closest('.bcard-ack-row');
-        row.innerHTML = '<span class="work-state ws-detected" data-work-state="detected">' +
-          '<span class="ws-dot"></span>Back to detected</span>' +
-          '<span class="k-action-note" style="flex:1">Reopened — the objects returned to the queue.</span>';
-        const meta = card.querySelector('.bcard-meta [data-work-state]');
-        if (meta) {
-          meta.className = 'work-state ws-detected';
-          meta.setAttribute('data-work-state', 'detected');
-          meta.innerHTML = '<span class="ws-dot"></span>Detected';
-        }
-        card.classList.add('is-undone');
-        toast('Reopened — the objects are back in Requests', null);
+        docAct(el.getAttribute('data-act'), el.getAttribute('data-obj'), el.getAttribute('data-arg'));
         return;
       }
-      if ((el = t.closest('[data-ack]'))) {
-        el.classList.add('is-acked');
-        el.textContent = 'Acknowledged';
+      if ((el = t.closest('[data-new-doc]'))) { newDocument(readURL().type[0]); return; }
+      if ((el = t.closest('[data-apply-ids]'))) {
+        const ids = el.getAttribute('data-apply-ids').split(',');
+        canvas.close();
+        surfaceIds(ids);
         return;
       }
-      /* Dismissal captures a reason and is reversible (doctrine §5.9). The
-         slot is removed so the grid reflows rather than leaving a hole, and
-         the whole slot is held so Undo can put it back where it was — an
-         Undo that only prints "Reverted" is the dead end the doctrine bans. */
-      if ((el = t.closest('[data-dismiss]'))) {
-        const slot = el.closest('[data-slot]');
-        const reason = el.textContent.trim();
-        if (slot) {
-          const grid = slot.parentElement;
-          dismissed = {
-            html: slot.outerHTML,
-            index: Array.prototype.indexOf.call(grid.children, slot),
-            grid: grid
-          };
-          slot.remove();
-        }
-        toast(`Dismissed — “${reason}” recorded`, 'Undo');
-        return;
+
+      /* ── set scope ── */
+      /* ── commit surfaces ── */
+      if (t.closest('[data-commit-close]') || (t.hasAttribute && t.hasAttribute('data-hide-on-backdrop') && t === e.target && t.classList.contains('modal-backdrop'))) {
+        closeCommit(); return;
       }
-      if (t.closest('[data-toast-undo]')) {
-        if (dismissed) {
-          const ref = dismissed.grid.children[dismissed.index] || null;
-          dismissed.grid.insertAdjacentHTML('beforeend', dismissed.html);
-          const restored = dismissed.grid.lastElementChild;
-          if (ref) dismissed.grid.insertBefore(restored, ref);
-          dismissed = null;
-          toast('Restored to the briefing', null);
-        } else {
-          toast('Reverted', null);
-        }
-        return;
-      }
-      if (t.closest('[data-commit-close]')) { $('#commitHost').innerHTML = ''; return; }
       if ((el = t.closest('[data-commit-run]'))) {
         const label = el.getAttribute('data-commit-run');
-        $('#commitHost').innerHTML = '';
-        /* A commit surface that only toasts is theatre — run the write. */
-        if (pendingCommit) { pendingCommit(); pendingCommit = null; toast(label + ' — done', 'Undo'); }
-        else toast(label + ' — sent', 'Undo');
+        const run = pendingCommit;
+        /* Run BEFORE tearing the surface down. Several commits carry a form —
+           the schedule radios, the grounding checkboxes, the retention rule —
+           and closing first left onRun reading a form that no longer existed,
+           so the change silently did nothing. */
+        /* And if it throws, say so. A commit that dies mid-run used to leave
+           this surface open with the button still sitting there, which reads
+           as "it refuses and will not tell me why". */
+        let handled = false, failed = false;
+        try { handled = run ? run() === true : false; }
+        catch (err) { failed = true; console.error('commit failed:', err); }
+        closeCommit();
+        if (failed) { toast("That didn't go through", null, 'Nothing was changed'); return; }
+        /* An onRun that says something specific returns true and keeps its own
+           toast. Without this the generic one lands on top of it, and the user
+           reads a restatement of the button they just pressed. */
+        if (!handled) toast(label, 'Undo', 'Logged to the audit trail');
         return;
       }
-      if (t.closest('[data-overlay-close]')) { canvas.close(); return; }
 
-      /* Workbench */
-      if ((el = t.closest('[data-open-obj]'))) {
-        const id = el.getAttribute('data-open-obj');
-        workingSet.add(id, true);
-        workingSet.open = id;
-        renderWorkbench();
+      /* ── the axis panel: governance and sources, in place ── */
+
+      if (t.closest('[data-stage-drop]')) { stagedSetting = null; render(); return; }
+      if (t.closest('[data-stage-run]')) {
+        const stage = stagedSetting;
+        stagedSetting = null;
+        if (!stage) { render(); return; }
+        /* Drive the control rather than the model, so the staged path and the
+           clicked path cannot drift apart. */
+        const dd = $(`#setSheet .v2-dropdown[data-set-key="${stage.key}"]`);
+        const opt = dd && $$('.v2-dropdown-option', dd).find((o) => o.dataset.slug === stage.value);
+        if (!opt) { render(); return; }
+        $$('.v2-dropdown-option', dd).forEach((o) => o.setAttribute('aria-selected', String(o === opt)));
+        dd.dispatchEvent(new CustomEvent('dd:change', { bubbles: true }));
         return;
       }
-      if ((el = t.closest('[data-promote]'))) {
-        workingSet.add(el.getAttribute('data-promote'));
-        el.disabled = true;
-        el.textContent = 'In working set';
-        renderWorkbench();
+      if (t.closest('[data-set-close]')) { setModal.close(); return; }
+      if ((el = t.closest('[data-settings]'))) { patch({ settings: el.getAttribute('data-settings') }); return; }
+
+
+
+      if ((el = t.closest('[data-reconnect]'))) {
+        const k = el.getAttribute('data-reconnect');
+        const was = { health: SRC[k].health, note: SRC[k].note, code: SRC[k].code };
+        SRC[k].health = 'ok';
+        SRC[k].note = 'Reconnected just now · first sync queued';
+        delete SRC[k].code;
+        SRC[k].history.unshift([0, 'ok', 'Reconnected by ' + USER.owner + ' · sync queued']);
+        SRC[k].queued = true;
+        undoStack = () => { Object.assign(SRC[k], was); SRC[k].history.shift(); render(); };
+        render();
+        markAfter('.rail-set');
+        toast(SRC[k].label + ' reconnected', 'Undo', 'Sync queued · ingestion resumes on the next cycle');
         return;
       }
-      if (t.closest('[data-ws-back]')) { workingSet.open = null; renderWorkbench(); return; }
-      if (t.closest('[data-ws-clear]')) { workingSet.clear(); renderWorkbench(); return; }
-      if ((el = t.closest('[data-seed]'))) {
-        el.getAttribute('data-seed').split(',').forEach((id) => workingSet.add(id, true));
-        renderWorkbench();
+      if ((el = t.closest('[data-sync-source]'))) {
+        const k = el.getAttribute('data-sync-source');
+        SRC[k].history.unshift([0, 'ok', 'Manual sync by ' + USER.owner + ' · no changes found']);
+        SRC[k].last = 0;
+        delete SRC[k].queued;
+        render();
+        toast(SRC[k].label + ' synced', null, 'Triggered by hand — the schedule is unchanged');
         return;
       }
-      if (t.closest('[data-ss-run]')) { const p = $('#ssPreview'); if (p) p.hidden = false; return; }
-      if (t.closest('[data-ss-cancel]')) { const p = $('#ssPreview'); if (p) p.hidden = true; return; }
-      if ((el = t.closest('[data-ss-confirm]'))) {
-        toast(`${el.getAttribute('data-ss-confirm')} verification requests sent`, 'Undo');
-        $$('[data-pick]:checked').forEach((i) => { i.checked = false; });
-        renderSetScope();
+
+      /* ── editor ── */
+      if ((el = t.closest('[data-fmt]'))) {
+        const [cmd, val] = el.getAttribute('data-fmt').split(':');
+        /* formatBlock wants a tag name in angle brackets in several engines and
+           silently does nothing without them. */
+        document.execCommand(cmd, false, cmd === 'formatBlock' ? '<' + val + '>' : (val || null));
+        const body = $('#editBody');
+        if (body) {
+          body.focus();
+          writeBody(body);
+          syncToolbar();
+        }
         return;
       }
-      if (t.closest('[data-ss-clear]')) {
-        $$('[data-pick]:checked').forEach((i) => { i.checked = false; });
-        renderSetScope();
+      if ((el = t.closest('[data-suggest]'))) {
+        const verdict = el.getAttribute('data-suggest');
+        const ins = $('#aiSuggest ins');
+        const o = byId(readURL().doc);
+        if (!aiDraft || !o) return;
+
+        /* Edit means edit THIS — the proposal, in place. It lives in state now,
+           so it survives the repaint that used to wipe it. */
+        if (verdict === 'edit') {
+          aiDraft.editing = true;
+          renderEditor(readURL());
+          const box = $('#aiSuggest ins');
+          if (box) {
+            box.focus();
+            const r = document.createRange();
+            r.selectNodeContents(box);
+            const sel = window.getSelection();
+            sel.removeAllRanges(); sel.addRange(r);
+          }
+          return;
+        }
+
+        /* Accepting applies what is on screen — which, after an edit, is yours
+           rather than what was proposed. */
+        const html = ins ? ins.innerHTML.trim() : aiDraft.proposed;
+        const text = ins ? ins.innerText.trim() : stripTags(aiDraft.proposed);
+        const edited = html !== aiDraft.proposed;
+        const msg = aiDraft.msg;
+
+        if (verdict === 'accept') {
+          /* Same split the writing tools use: o.html is what the document says,
+             o.sum is the plain-text projection everything else reads. */
+          o.sum = text;
+          o.html = html;
+          o.upd = 0;
+          /* Accepting an edit is not publishing. A draft stays a draft until
+             someone presses Publish — otherwise taking AiMY's wording would
+             quietly make a brand-new document live. */
+          /* An AiMY edit is an ordinary version with an AiMY author — not a
+             separate history, so reviewing the human history never hides it. */
+          addVersion(o, aiDraft.label, 'AiMY',
+            edited ? 'edited and accepted by ' + USER.owner : 'accepted by ' + USER.owner, text, true);
+          o.versions[0].html = html;
+          recompute();
+        }
+
+        /* Either verdict ends the proposal. It stopped being a block that
+           lingers with a note inside it: the record of what happened belongs to
+           the canvas message, and the editor goes back to being the document. */
+        aiDraft = null;
+        aiOutcome(msg, verdict);
+        repaintEditor();
+        if (verdict === 'accept') {
+          markAfter('#editBody', $('#docSheet'));
+          markCard(o.id);
+          toast('Applied', 'Undo', 'Filed as a version with AiMY as the author');
+        } else {
+          toast('Rejected', null, 'Kept in the trail, not applied');
+        }
+        return;
+      }
+      if ((el = t.closest('[data-restore]'))) {
+        const o = byId(el.getAttribute('data-restore'));
+        const agents = AGENTS.filter((a) => COLLECTION_META[o.col].grounding[a.id]).length;
+        /* Restoring what you are previewing, not a fixed version — the button
+           lives beside the preview, so it has to mean the one on screen. */
+        const idx = previewVer === null ? 1 : previewVer;
+        const from = VERSIONS(o)[idx] || VERSIONS(o)[VERSIONS(o).length - 1];
+        commit({
+          title: 'Restore ' + from.v,
+          current: (VERSIONS(o)[0] || {}).v + ' · current', proposed: from.v + ' restored as the newest version',
+          rationale: `Restore is additive: it creates a new version rather than deleting the ones it supersedes,
+            so the audit trail does not acquire a hole exactly where someone will later need to look.`,
+          confirm: 'Restore this version',
+          effects: [
+            agents ? ['warn', `Changes what <strong>${agents} consuming agent(s)</strong> answer from.`]
+                   : ['skip', 'No agent grounds on this collection, so no answer changes.'],
+            ['ok', 'History preserved — every superseded version stays readable.']],
+          onRun: () => {
+            o.sum = from.body;
+            o.html = from.html || '';
+            o.upd = 0;
+            addVersion(o, 'Restored ' + from.v, USER.owner, 'restored from ' + fmtShort(from.at), from.body);
+            o.versions[0].html = from.html || '';
+            recompute();
+            repaintEditor();
+            markAfter('#editBody', $('#docSheet'));
+            markCard(o.id);
+            toast('Restored ' + from.v, null, 'Added as the newest version — nothing was deleted');
+            return true;
+          }
+        });
+        return;
+      }
+      /* The toolbar's AiMY button: document scope. */
+      if ((el = t.closest('[data-ai-doc]'))) {
+        const o = byId(readURL().doc);
+        const isBlank = o && !String(o.sum || '').trim();
+        aiMenu(el, isBlank ? DOC_AI.blank : DOC_AI.filled, 'data-ai-doc-run');
+        return;
+      }
+      if ((el = t.closest('[data-ai-doc-run]'))) {
+        const label = el.getAttribute('data-ai-doc-run');
+        const m = el.closest('.ai-menu');
+        if (m) m.remove();
+        const o = byId(readURL().doc);
+        if (!o) return;
+        /* Not every AiMY action is a rewrite. "Find a source for this" asks
+           whether the corpus supports what the document says, which is a
+           question about grounding — proposing it as body text was answering a
+           different question in the wrong place. */
+        if (label === 'Find a source for this') { groundingAnswer(o); return; }
+        aiPropose(label, aiCopy(label, o));
+        return;
+      }
+      if ((el = t.closest('[data-ai-sel]'))) {
+        const m = el.closest('.ai-menu');
+        if (m) m.remove();
+        const o = byId(readURL().doc);
+        const label = el.getAttribute('data-ai-sel');
+        /* The selected words, which the selection actions never received. */
+        const picked = el.closest('.ai-menu').dataset.sel || '';
+        if (!o) return;
+        if (label === 'Find a source') { groundingAnswer(o, picked); return; }
+        aiPropose(label, aiCopy(label, o, picked));
+        return;
+      }
+      if (t.closest('[data-comment-add]')) {
+        const input = $('.comment-compose input');
+        const o = byId(readURL().doc);
+        if (!input || !input.value.trim() || !o) return;
+        addComment(o, input.value.trim());
+        renderEditor(readURL());
+        markAfter('.comment:last-of-type', $('#docSheet'));
+        return;
+      }
+
+      /* ── answers ── */
+      if ((el = t.closest('[data-raise-gap]'))) {
+        /* A gap is the absence of a document, so the only honest destination is
+           the document. Raising it creates the draft and opens it. */
+        const q = el.getAttribute('data-raise-gap');
+        canvas.close();
+        newDocument('article', { title: q.replace(/\?$/, '') });
+        toast('Draft started', null, 'From the question nothing could answer');
         return;
       }
       if ((el = t.closest('[data-flag]'))) {
-        el.classList.add('is-flagged');
-        el.closest('.cite-wrap').querySelector('.cite').classList.add('is-flagged');
-        toast('Citation flagged', 'Undo', 'It goes to the object owner as a correction request. You can see it in Requests.');
-        return;
-      }
-      if ((el = t.closest('[data-edit-obj]'))) { renderEditor(el.getAttribute('data-edit-obj')); return; }
-
-      /* Requests */
-      if ((el = t.closest('[data-rq-filter]'))) { rqFilter = el.getAttribute('data-rq-filter'); rqOpen = null; renderRequests(); return; }
-      if ((el = t.closest('[data-rq]'))) { rqOpen = el.getAttribute('data-rq'); renderRequests(); return; }
-      if ((el = t.closest('[data-decide]'))) {
-        const [id, outcome] = el.getAttribute('data-decide').split('|');
-        decide(id, outcome);
-        return;
-      }
-      if ((el = t.closest('[data-undecide]'))) {
-        delete decisions[el.getAttribute('data-undecide')];
-        renderRequests();
-        toast('Decision reverted — back in the queue', null);
-        return;
-      }
-      if ((el = t.closest('[data-open-in-wb]'))) {
-        location.href = 'workbench.html?open=' + encodeURIComponent(el.getAttribute('data-open-in-wb'));
+        const id = el.getAttribute('data-flag');
+        canvas.close();
+        patch({ doc: id, mode: 'view' });
+        toast('Flagged — opened the source so it can be corrected', null, 'Feedback is captured per citation, not per answer');
         return;
       }
 
-      if ((el = t.closest('[data-filter-chip]'))) { paintScopeStrip(); return; }
-      if ((el = t.closest('[data-clear-filter-chips]'))) { setTimeout(paintScopeStrip, 0); return; }
-      if ((el = t.closest('[data-scope-drop]'))) {
-        const label = el.getAttribute('data-scope-drop');
-        $$('#floatFilterTray .filter-chip').forEach((c) => {
-          if (c.textContent.trim() === label) c.classList.remove('active');
-        });
-        paintScopeStrip();
-        toast(`Scope narrowed — “${label}” removed`, null);
-        return;
-      }
-      if ((el = t.closest('[data-scope-clear]'))) {
-        $$('#floatFilterTray .filter-chip').forEach((c) => c.classList.remove('active'));
-        paintScopeStrip();
-        toast('Scope cleared — answers now span the whole corpus', null);
+      /* ── canvas ── */
+      if (t.closest('[data-overlay-close]')) { canvas.close(); return; }
+      if (t.closest('[data-mem-drop]')) { const m = t.closest('.memory-panel'); if (m) m.remove(); return; }
+      if ((el = t.closest('.overlay-sugg-chip'))) { submit(el.textContent.trim()); return; }
+
+      /* The whole card opens the document. LAST in the delegate on purpose:
+         the title, the action, the tags and everything else interactive inside
+         a card have already claimed the click and returned by here. Placing it
+         any earlier makes the card swallow its own action button. */
+      if ((el = t.closest('[data-card-open]'))) {
+        patch({ doc: el.getAttribute('data-card-open'), mode: 'view' });
         return;
       }
 
-      if ((el = t.closest('[data-mem-drop]'))) {
-        const panel = el.closest('.memory-panel');
-        panel.classList.add('is-dropped');
-        panel.querySelector('.mem-foot').innerHTML =
-          '<span class="k-action-note">Dropped — this answer stands on the current question alone.</span>';
-        toast('Earlier thread dropped from this answer', null);
-        return;
-      }
-
-      /* Clicking the input bar anywhere focuses its field. Without this the
-         padding around a text field is dead, which reads as the field being
-         disabled. */
-      if ((el = t.closest('.aimy-float-bar')) && !t.closest('button')) {
-        const i = $('#floatInput'); if (i) i.focus(); return;
-      }
-      if ((el = t.closest('.overlay-input-bar')) && !t.closest('button')) {
-        const i = $('#overlayInput'); if (i) i.focus(); return;
-      }
-
-      /* Settings actions. Sign-out ends a session, so it confirms in place
-         first — the bottom rung of the ladder, where the confirmation lives in
-         the action surface rather than in a modal. */
-      if ((el = t.closest('[data-set-action]'))) {
-        const kind = el.getAttribute('data-set-action');
-        if (kind === 'profile') {
-          toast('Profile is managed in the AiMY directory', null,
-                'Name, role and avatar come from there so they stay the same across every agent.');
-          return;
-        }
-        if (kind === 'signout') {
-          if (el.dataset.confirming) {
-            toast('Signed out', null, 'The session would end here. Staged work is kept until it expires.');
-            delete el.dataset.confirming;
-            el.textContent = 'Sign out';
-            el.classList.remove('btn-err');
-            return;
-          }
-          el.dataset.confirming = '1';
-          el.textContent = 'Confirm sign out';
-          el.classList.add('btn-err');
-          setTimeout(() => {
-            if (!el.dataset.confirming) return;
-            delete el.dataset.confirming;
-            el.textContent = 'Sign out';
-            el.classList.remove('btn-err');
-          }, 4000);
-          return;
-        }
-        return;
-      }
-
-      /* Copy to clipboard. The library's own copy handler lives in its
-         documentation JS, which this product does not ship, so .copy-field
-         needs a real one. Confirms in place rather than only by toast — the
-         button is where the user is looking. */
-      if ((el = t.closest('[data-copy]'))) {
-        const value = el.getAttribute('data-copy');
-        const done = () => {
-          const label = el.querySelector('span') || el;
-          const original = el.textContent.trim();
-          el.classList.add('copied');
-          if (label === el) el.textContent = 'Copied';
-          toast('Copied to clipboard', null, 'The key is bound by your entitlements — treat it like a password.');
-          setTimeout(() => {
-            el.classList.remove('copied');
-            if (label === el) el.textContent = original;
-          }, 1600);
-        };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(value).then(done, done);
-        } else { done(); }
-        return;
-      }
-
-      /* Tabs — the library's handler runs first via its own listener; this
-         only repairs the ARIA it leaves behind. */
-      if ((el = t.closest('.ds-tab'))) { syncTabAria(el); return; }
-
-      /* ── Loop closers ─────────────────────────────────────────────────
-         Every one of these was a control that looked live and did nothing.
-         A dead control is the dead end §1.2 bans, and it is worse than a
-         missing one because it spends the user's trust before failing. */
-
-      /* Audit reversal — the entry says it is reversible, so it must be. */
-      if ((el = t.closest('.audit-revert'))) {
-        const entry = el.closest('.audit-entry');
-        const what = entry.querySelector('.audit-action').textContent.trim();
-        entry.classList.add('is-reverted');
-        el.replaceWith(Object.assign(document.createElement('span'),
-          { className: 'audit-irreversible', textContent: 'Reverted' }));
-        toast(`Reverted — ${what.slice(0, 44)}`, null);
-        return;
-      }
-
-      /* A related object is a route, not a label. */
-      if ((el = t.closest('.dv-rel-item'))) {
-        const target = el.getAttribute('data-open-obj');
-        if (target) { workingSet.add(target); renderViewer(target); return; }
-        if (el.hasAttribute('data-act')) { /* fall through to the action router */ }
-        const label = el.textContent.trim();
-        const hit = CORPUS.find((o) => o.title.toLowerCase().startsWith(label.toLowerCase().slice(0, 12)));
-        if (hit) { workingSet.add(hit.id); renderViewer(hit.id); }
-        else { toast(`“${label.slice(0, 40)}” is not in the working set yet`, null); }
-        return;
-      }
-
-      /* Credential and cadence are governed writes — they go to a commit
-         surface like every other one, not straight into an input. */
-      if ((el = t.closest('[data-src-setting]'))) {
-        const [id, kind] = el.getAttribute('data-src-setting').split('|');
-        const s = SOURCES.find((x) => x.id === id);
-        govCommit(kind === 'auth'
-          ? { title: `Credential — ${s.name}`, current: s.auth,
-              proposed: 'New token · entered on the connector', confirm: 'Replace credential',
-              rationale: 'The connector re-authenticates on the next scheduled sync. Nothing is re-ingested until ' +
-                'that sync succeeds, so the backlog clears on the following run rather than immediately.',
-              blast: `Affects <span class="blast-val">${s.objects.toLocaleString()} objects</span> · ` +
-                `<span class="blast-val">${s.behind} behind</span> the source` }
-          : { title: `Sync frequency — ${s.name}`, current: s.cadence, proposed: 'Every 5 minutes',
-              confirm: 'Set frequency', rationale: 'More frequent syncing shortens the window in which the corpus ' +
-                'is behind the source. It does not change what is ingested, only how quickly.',
-              blast: `Affects <span class="blast-val">${s.name}</span> only` });
-        return;
-      }
-
-      /* The AI suggestion must resolve — §6.8 forbids leaving a proposed
-         change without an explicit outcome, and Edit is not optional. */
-      if ((el = t.closest('[data-suggest]'))) {
-        const outcome = el.getAttribute('data-suggest');
-        const card = el.closest('.ai-suggestion');
-        const ins = card.querySelector('ins').textContent.trim();
-        const body = $('.dv-body[contenteditable]');
-        if (outcome === 'accept' && body) {
-          const paras = body.querySelectorAll('p');
-          if (paras.length) paras[paras.length - 1].textContent = ins;
-        }
-        if (outcome === 'edit' && body) {
-          const paras = body.querySelectorAll('p');
-          if (paras.length) {
-            paras[paras.length - 1].textContent = ins;
-            paras[paras.length - 1].focus();
-          }
-          body.focus();
-        }
-        card.classList.add('is-resolved');
-        card.querySelector('.ai-suggestion-foot').innerHTML =
-          `<span class="work-state ws-${outcome === 'reject' ? 'failed' : 'completed'}"
-                 data-work-state="${outcome === 'reject' ? 'failed' : 'completed'}"><span class="ws-dot"></span>${
-            outcome === 'accept' ? 'Accepted' : outcome === 'edit' ? 'Accepted, editing' : 'Rejected'}</span>
-           <span class="k-action-note" style="flex:1">Saved as a version by <strong>AiMY</strong>, authored to
-           you — an AI edit is an ordinary version, never a parallel history.</span>`;
-        toast(outcome === 'reject' ? 'Suggestion rejected — document unchanged'
-                                   : 'Suggestion applied — saved as a new version', 'Undo');
-        return;
-      }
-
-      /* Formatting acts on the selection in the editor body. */
-      if ((el = t.closest('[data-fmt]'))) {
-        const body = $('.dv-body[contenteditable]');
-        if (body) { body.focus(); document.execCommand(el.getAttribute('data-fmt')); }
-        return;
-      }
-
-      /* An unanswerable question becomes a queued decision rather than a
-         shrug — the gap is the finding. */
-      if ((el = t.closest('[data-raise-gap]'))) {
-        toast('Raised as a coverage gap — it is in Requests', 'View');
-        return;
-      }
-
-      if ((el = t.closest('[data-goto-tab]'))) {
-        const tab = $(`.ds-tab[data-tab="${el.getAttribute('data-goto-tab')}"]`);
-        if (tab) { canvas.close(); tab.click(); }
-        else location.href = 'governance.html';
-        return;
-      }
-      if ((el = t.closest('[data-goto-src]'))) {
-        location.href = 'governance.html?source=' + encodeURIComponent(el.getAttribute('data-goto-src'));
-        return;
-      }
-
-      /* Ecosystem chrome that this prototype does not contain. Saying so is a
-         closed loop; silently doing nothing is not.
-
-         The QA entry is an <a> to the deployed product, so it is left to
-         navigate. Toasting "not part of this prototype" over a real product
-         switch would be both wrong and a flash of text on the way out. */
-      if ((el = t.closest('.topnav-tab'))) {
-        if (el.hasAttribute('href')) return;
-        if (el.classList.contains('active')) return;
-        toast(`${el.textContent.trim()} is a separate agent — not part of this prototype`, null);
-        return;
-      }
-      if ((el = t.closest('.topnav-bell'))) { toast('Nothing new here', null, 'Anything that needs you appears on the dashboard and in Requests, not as a notification.'); return; }
-      if ((el = t.closest('.topnav-user'))) { location.href = 'settings.html'; return; }
-
-      /* Sources */
-      if ((el = t.closest('[data-src]'))) { srcOpen = el.getAttribute('data-src'); renderSources(); return; }
-      if ((el = t.closest('[data-src-reconnect]'))) {
-        const id = el.getAttribute('data-src-reconnect');
-        const s = SOURCES.find((x) => x.id === id);
-        reconnected[id] = true;
-        s.history.unshift(['ok', 'Sync completed', 'Just now',
-          `Reconnected by ${activeProfile().name} · ${s.behind} object${s.behind === 1 ? '' : 's'} caught up.`]);
-        renderSources();
-        toast(`${s.name} reconnected — ${s.behind} object${s.behind === 1 ? '' : 's'} caught up`, 'Undo');
-        return;
-      }
-
-      /* Governance — nothing commits from the control itself */
-      if ((el = t.closest('[data-gov-cadence]'))) {
-        const ty = GOV_TYPES[+el.getAttribute('data-gov-cadence')];
-        const next = CADENCES[Math.max(0, CADENCES.indexOf(ty.cadence) - 1)];
-        govCommit({
-          title: `Verification cadence — ${ty.type}`,
-          current: `${ty.cadence} · ${ty.count.toLocaleString()} objects`,
-          proposed: `${next} · ${ty.count.toLocaleString()} objects`,
-          rationale: `Every ${ty.type} object is re-scheduled against the new cadence. Objects already past the ` +
-            `new date move to <strong>due</strong> immediately; none are excluded from answers by this change alone.`,
-          blast: `Re-schedules <span class="blast-val">${ty.count.toLocaleString()} objects</span> · ` +
-            `owners notified <span class="blast-val">on the next digest</span>`,
-          confirm: `Set cadence to ${next}`
-        });
-        return;
-      }
-      if ((el = t.closest('[data-gov-owner]'))) {
-        const c = GOV_COLLECTIONS[+el.getAttribute('data-gov-owner')];
-        govCommit({
-          title: `Collection ownership — ${c.name}`,
-          current: `${c.owner} · ${c.objects.toLocaleString()} objects`,
-          proposed: `Knowledge owners group · ${c.objects.toLocaleString()} objects`,
-          rationale: 'Verification requests for every object in this collection route to the new owner from now on. ' +
-            'Requests already open stay with their current assignee rather than being silently reassigned.',
-          blast: `Moves <span class="blast-val">${c.objects.toLocaleString()} objects</span> · ` +
-            `<span class="blast-val">3 open requests</span> keep their assignee`,
-          confirm: 'Reassign collection'
-        });
-        return;
-      }
-      if ((el = t.closest('[data-gov-expose]'))) {
-        const [collection, agent] = el.getAttribute('data-gov-expose').split('|');
-        const turningOn = !GOV_EXPOSURE[collection][agent];
-        /* Rung 4 (type-to-confirm) for ALLOWING — that widens what an agent may
-           say. Rung 3 for BLOCKING: it narrows exposure, is reversible, and is
-           the direction you want to be easy. Charging the same toll both ways
-           trains people to type through the confirmation, which spends its
-           value on the case that did not need it (§3.1). */
-        if (turningOn) { govExposureConfirm(collection, agent, true); return; }
-        govCommit({
-          title: `Block ${GOV_AGENTS.find((a) => a.id === agent).name} on ${collection}`,
-          current: `${collection} is citable by ${GOV_AGENTS.find((a) => a.id === agent).name}`,
-          proposed: `${collection} is not used to ground its answers`,
-          rationale: 'Answers already given are unaffected. Future ones will be thinner, and the agent will say so ' +
-            'rather than failing silently. Re-allowing it later is a typed confirmation again.',
-          blast: `Removes <span class="blast-val">${GOV_COLLECTIONS.find((c) => c.name === collection).objects.toLocaleString()} objects</span> ` +
-            `from one agent's grounding · <span class="blast-val">reversible</span>`,
-          confirm: 'Block grounding',
-          onRun: () => {
-            GOV_EXPOSURE[collection][agent] = false;
-            const a = GOV_AGENTS.find((x) => x.id === agent);
-            GOV_AUDIT.unshift({ tone: 'is-ok', ico: ICO.check,
-              action: `${collection} blocked from ${a.name}`, who: activeProfile().name,
-              detail: 'exposure narrowed · reversible', time: 'just now', revert: 'Revert' });
-            renderGovernance();
-          }
-        });
-        return;
-      }
-      if ((el = t.closest('[data-gov-apply]'))) {
-        if (el.disabled) return;
-        const [collection, agent, on] = el.getAttribute('data-gov-apply').split('|');
-        GOV_EXPOSURE[collection][agent] = on === '1';
-        const a = GOV_AGENTS.find((x) => x.id === agent);
-        GOV_AUDIT.unshift({
-          tone: on === '1' ? (a.external ? 'is-warn' : 'is-ok') : 'is-err',
-          ico: on === '1' ? ICO.check : ICO.x,
-          action: `${collection} ${on === '1' ? 'exposed to' : 'blocked from'} ${a.name}${a.external ? ' (customer-facing)' : ''}`,
-          who: activeProfile().name,
-          detail: 'typed confirmation · grounding permission changed',
-          time: 'just now', revert: 'Revert'
-        });
-        $('#commitHost').innerHTML = '';
-        renderGovernance();
-        toast(`${collection} · ${a.name} grounding ${on === '1' ? 'allowed' : 'blocked'}`, 'Undo');
-        return;
-      }
-      if ((el = t.closest('[data-retry]'))) {
-        const slot = el.closest('[data-slot]');
-        if (slot) {
-          slot.innerHTML = skeletonCard();
-          const b = BLOCKS.find((x) => x.id === slot.getAttribute('data-slot'));
-          setTimeout(() => { if (b) slot.innerHTML = b.render(); }, 600);
-        }
+      if (t.closest('[data-toast-undo]')) {
+        const h = $('#toastHost');
+        if (h) h.innerHTML = '';
+        if (undoStack) { undoStack(); undoStack = null; } else history.back();
         return;
       }
     });
+  }
 
-    /* Type-to-confirm: the destructive button unlocks only on an exact match. */
-    document.addEventListener('input', (e) => {
-      const f = e.target.closest && e.target.closest('[data-gov-typed]');
-      if (!f) return;
-      const btn = $('#govConfirmBtn');
-      if (!btn) return;
-      const ok = f.value.trim() === f.getAttribute('data-gov-typed');
-      btn.disabled = !ok;
-      btn.style.opacity = ok ? '' : '.45';
-      btn.style.cursor = ok ? '' : 'not-allowed';
-    });
+  /* A blank state object with the same shape readURL produces, so callers can
+     build a URL from scratch without hand-writing every key. */
+  function readURL0() {
+    const st = { doc: '', mode: 'view', settings: '', q: '', prop: '' };
+    LIST_KEYS.forEach((k) => { st[k] = []; });
+    DATE_KEYS.forEach((k) => { st[k] = ''; });
+    FLAG_KEYS.forEach((k) => { st[k] = false; });
+    return st;
+  }
 
-    document.addEventListener('change', (e) => {
-      if (e.target.matches('[data-pick]')) {
-        e.target.closest('.ws-item').classList.toggle('is-picked', e.target.checked);
-        renderSetScope();
-      }
-    });
+  function addFilter(key, value) {
+    const st = readURL();
+    if (FLAG_KEYS.indexOf(key) > -1) st[key] = true;
+    else if (LIST_KEYS.indexOf(key) > -1) { st[key] = st[key] || []; if (st[key].indexOf(value) === -1) st[key].push(value); }
+    else st[key] = value;
+    st.doc = ''; st.mode = 'view';
+    rememberFilter();
+    writeURL(st);
+  }
 
-    /* Float bar. Enter or the send button runs the query; the tray is the
-       scope, and scope is set before the query runs (§7.2). */
-    const fb = $('#floatInput');
-    if (fb) {
-      fb.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); submitFloat(); }
+  function dropChip(key, value) {
+    const st = readURL();
+    if (FLAG_KEYS.indexOf(key) > -1) st[key] = false;
+    else if (key === 'q' || key === 'prop') st[key] = '';
+    else if (LIST_KEYS.indexOf(key) > -1) st[key] = st[key].filter((v) => v !== value);
+    else st[key] = '';
+    writeURL(st);
+  }
+
+  /* Actions available on a document, from the card or from inside the modal.
+     One implementation, so a verify request means the same thing wherever it
+     is started from. */
+  function docAct(kind, id, arg) {
+    const o = byId(id);
+    if (!o) return;
+
+    /* Out of date has one honest remedy: pull the source again. There is no
+       "confirm it is still correct" here, because nobody performs that ritual
+       and a button that claims they did is the badge lying in a new place. */
+    if (kind === 'resync') {
+      const src = SRC[o.src];
+      /* Same rule as the card: there is no point confirming a pull from a
+         source that cannot answer. */
+      if (src.health !== 'ok') return docAct('reconnect', o.id);
+      commit({
+        title: 'Re-sync from source',
+        current: 'Our copy — ' + fmtDate(o.upd),
+        proposed: src.label + ' — ' + fmtDate(o.xu),
+        rationale: `<strong>${esc(src.label)}</strong> changed after our copy. Pulling it again replaces the body
+          with what the source says now.`,
+        confirm: 'Pull it now',
+        effects: [
+          ['ok', 'Runs immediately, outside the schedule.'],
+          ['skip', 'Local edits to this document are replaced by the source.']
+        ],
+        onRun: () => {
+          const before = { upd: o.upd, used: o.used, work: o.work, versions: VERSIONS(o).slice() };
+          o.upd = o.xu;
+          if (o.work === 'failed') o.work = 'completed';
+          addVersion(o, 'Re-synced from ' + src.label, src.label, 'pulled from the source');
+          recompute();
+          undoStack = () => { Object.assign(o, before); recompute(); render(); };
+          render();
+          markAfter('.dv-prov', $('#docSheet'));
+          markAfter('.dv-head .trust-state', $('#docSheet'));
+          markCard(o.id);
+          toast('Re-synced from ' + src.label, 'Undo', 'Our copy now matches the source');
+          return true;
+        }
       });
-      /* The "Enter to send" hint has done its job once typing starts, and it
-         competes with the text for the same line. Documented behaviour of
-         .aimy-float-hint in the design system. */
-      const hint = $('.aimy-float-hint');
-      if (hint) {
-        const sync = () => { hint.style.opacity = fb.value.trim() ? '0' : '1'; };
-        fb.addEventListener('input', sync);
-        sync();
-      }
-
-      /* The scope tray. .filter-tray ships at opacity 0 and the design system
-         reveals it only on .visible — a class nothing in the library adds, so
-         without this the scope chips never appear and §7.2's scope-before-query
-         is unreachable. Same handlers as the reference implementation, with the
-         blur delay that lets a click on a chip land before the tray goes. */
-      const tray = $('#floatFilterTray');
-      if (tray) {
-        let hideTimer = null;
-        const showTray = () => { clearTimeout(hideTimer); tray.classList.add('visible'); };
-        const hideTray = () => { hideTimer = setTimeout(() => tray.classList.remove('visible'), 160); };
-        fb.addEventListener('focus', showTray);
-        fb.addEventListener('blur', hideTray);
-        tray.addEventListener('mousedown', (e) => e.preventDefault()); // keep the input focused
-        tray.addEventListener('focusin', showTray);
-        tray.addEventListener('focusout', hideTray);
-      }
+      return;
     }
-    const fs = $('#floatSend');
-    if (fs) fs.addEventListener('click', submitFloat);
 
-    const oi = $('#overlayInput');
-    if (oi) oi.addEventListener('input', () => { if (canvas.stagedNow) canvas.setStaged(false); });
-    if (oi) oi.addEventListener('aimy:submit', () => {
-      const v = oi.value.trim();
-      if (!v) return;
-      oi.value = '';
-      canvas.ask(v, scopeBasis(), answerFor(v, CORPUS.slice(0, 2), 'question'));
-    });
-    const os = $('#overlaySend');
-    if (os) os.addEventListener('click', () => oi && oi.dispatchEvent(new CustomEvent('aimy:submit', { bubbles: true })));
-
-    $$('.overlay-sugg-chip').forEach((c) => {
-      c.addEventListener('click', () => {
-        const q = c.textContent.trim();
-        canvas.ask(q, scopeBasis(), answerFor(q, CORPUS.slice(0, 2), 'question'));
+    if (kind === 'archive') {
+      const agents = AGENTS.filter((a) => COLLECTION_META[o.col].grounding[a.id]).length;
+      commit({
+        title: 'Archive this document', danger: true, typed: 'archive', confirm: 'Archive',
+        current: 'Live in ' + COLLECTIONS[o.col], proposed: 'Archived',
+        rationale: `Archiving takes <strong>${esc(o.title)}</strong> out of the live corpus and out of answers.
+          It is not deletion: the document stays whole, stays addressable at <code>?archived=1</code>, and can be
+          restored.`,
+        effects: [
+          agents ? ['warn', `<strong>${agents} agent(s)</strong> ground on ${esc(COLLECTIONS[o.col])} and will stop citing it.`] : null,
+          ['ok', 'Restorable from the archive with its history intact.']
+        ].filter(Boolean),
+        onRun: () => { o.arch = true; docModal.close(); render(); markAfter('.rm-main'); }
       });
+      return;
+    }
+
+    /* Delete is not archive with a harsher word. It is the only action in the
+       product that cannot be undone, so it is reachable only from the archive
+       — you have to have archived something and then come back for it. */
+    if (kind === 'delete') {
+      const m = COLLECTION_META[o.col];
+      commit({
+        title: 'Delete permanently', danger: true, typed: 'delete', confirm: 'Delete for good',
+        current: 'Archived · recoverable', proposed: 'Gone',
+        rationale: `<strong>${esc(o.title)}</strong> and its ${VERSIONS(o).length} versions are removed. This cannot
+          be undone and there is no restore afterwards.`,
+        reversible: 'Not reversible. The audit trail keeps a record that it existed and who deleted it.',
+        effects: [
+          ['skip', 'Every version goes with it. Citations pointing here will break.'],
+          ['warn', `${esc(COLLECTIONS[o.col])} keeps archived documents for ${Math.round(m.purge / 30)} months —
+            this is ${o.upd < m.purge ? 'inside' : 'past'} that window.`]
+        ],
+        onRun: () => {
+          [CORPUS, LIVE, ENTITLED].forEach((arr) => { const i = arr.indexOf(o); if (i > -1) arr.splice(i, 1); });
+          docModal.close();
+          render();
+          markAfter('.rm-main');
+          toast('Deleted', null, 'Permanent · logged to the audit trail');
+          return true;
+        }
+      });
+      return;
+    }
+
+    if (kind === 'restore') {
+      commit({
+        title: 'Restore from the archive', confirm: 'Restore',
+        current: 'Archived', proposed: 'Live in ' + COLLECTIONS[o.col],
+        rationale: `<strong>${esc(o.title)}</strong> returns to the live corpus with its trust state as it was —
+          ${esc(STATUS[o.status].label.toLowerCase())}. Restoring does not change its condition.`,
+        effects: [
+          STATUS[o.status].excluded
+            ? ['skip', 'It is ' + STATUS[o.status].label.toLowerCase() + ', so it still will not be used in answers.']
+            : ['ok', 'It becomes available to answers again immediately.']
+        ],
+        onRun: () => { o.arch = false; docModal.close(); render(); markCard(o.id); }
+      });
+      return;
+    }
+
+    if (kind === 'successor') {
+      const r = RELATED[o.id];
+      if (r && r.supersededBy) patch({ doc: r.supersededBy, mode: 'view' });
+      else pickRelated(o, 'successor');
+      return;
+    }
+    if (kind === 'findsuccessor') { pickRelated(o, 'successor'); return; }
+
+    /* Reconnecting is a change to a shared source, not to this document, so it
+       is confirmed like one — and the re-sync it was standing in for runs
+       straight after, because that is what you were trying to do. */
+    if (kind === 'reconnect') {
+      const src = SRC[o.src];
+      const behind = LIVE.filter((x) => x.src === o.src && x.status === 'outdated');
+      commit({
+        title: 'Reconnect ' + src.label,
+        current: src.note, proposed: 'Connected · syncing resumes',
+        rationale: `<strong>${esc(src.label)}</strong> is not connected, so re-syncing <strong>${esc(o.title)}</strong>
+          would queue and wait. Reconnecting is the thing that actually moves it.`,
+        confirm: 'Reconnect it',
+        effects: [
+          ['ok', `<strong>${behind.length}</strong> document(s) from this source are behind it.`],
+          ['ok', 'This document is pulled again as soon as the connection is back.'],
+          ['skip', 'Nothing else is re-ingested now — the schedule handles the rest.']
+        ],
+        onRun: () => {
+          const was = { health: src.health, note: src.note, code: src.code };
+          src.health = 'ok';
+          src.note = 'Reconnected just now · first sync queued';
+          delete src.code;
+          src.history.unshift([0, 'ok', 'Reconnected by ' + USER.owner + ' · ' + esc(o.title) + ' pulled']);
+          src.last = 0;
+          delete src.queued;
+          const before = { upd: o.upd, work: o.work, versions: VERSIONS(o).slice() };
+          o.upd = o.xu;
+          if (o.work === 'failed') o.work = 'completed';
+          addVersion(o, 'Re-synced from ' + src.label, src.label, 'pulled once the source reconnected');
+          recompute();
+          undoStack = () => { Object.assign(src, was); src.history.shift(); Object.assign(o, before); recompute(); render(); };
+          render();
+          markCard(o.id);
+          markAfter('.rail-set');
+          toast(src.label + ' reconnected', 'Undo', esc(o.title) + ' is up to date with it');
+          return true;
+        }
+      });
+      return;
+    }
+
+    /* ── The exits. Each one changes the fact the status is computed from, so
+       the badge moves because the world moved, not because someone relabelled
+       it. ── */
+
+    if (kind === 'publish') {
+      const agents = AGENTS.filter((a) => COLLECTION_META[o.col].grounding[a.id]);
+      commit({
+        title: 'Publish', confirm: 'Publish it',
+        current: 'Draft', proposed: 'Live in ' + COLLECTIONS[o.col],
+        rationale: `<strong>${esc(o.title)}</strong> becomes part of the collection and available to whatever is
+          allowed to ground on it.`,
+        effects: [
+          agents.length
+            ? ['warn', `<strong>${agents.map((a) => esc(a.name)).join(', ')}</strong> may start citing it immediately.`]
+            : ['skip', 'No agent grounds on this collection, so nothing starts citing it.'],
+          o.owner === 'Unassigned' ? ['warn', 'It has no owner. Publishing does not give it one.'] : null
+        ].filter(Boolean),
+        onRun: () => {
+          const before = { work: o.work, upd: o.upd, versions: VERSIONS(o).slice() };
+          o.work = 'completed';
+          o.upd = 0;
+          addVersion(o, 'Published', USER.owner, 'made live in ' + COLLECTIONS[o.col]);
+          recompute();
+          undoStack = () => { Object.assign(o, before); recompute(); render(); };
+          /* Publishing leaves the editor. Staying in it meant the only feedback
+             was a toast over an unchanged screen, which reads as nothing having
+             happened — the card on the grid is where the result actually shows. */
+          docModal.close();
+          render();
+          markCard(o.id);
+          toast('Published', 'Undo', 'Live in ' + COLLECTIONS[o.col]);
+          return true;
+        }
+      });
+      return;
+    }
+
+    /* A contradiction is two documents, so resolving it is a choice between
+       them rather than an edit to one. The loser is superseded by the winner —
+       which is exactly what supersession means and why it already exists. */
+    if (kind === 'compare' || kind === 'resolve') {
+      const other = byId((RELATED[o.id] || { contradicts: [] }).contradicts[0]);
+      /* Setting the status by hand says two documents disagree without saying
+         which two. Falling back to opening this one answered a different
+         question — the card said Compare and behaved like Open. Ask instead. */
+      if (!other) { pickRelated(o, 'conflict'); return; }
+      if (kind === 'compare') {
+        canvas.close();
+        canvas.ask('Compare ' + o.title + ' and ' + other.title,
+          [o.title, other.title, 'Conflicting'],
+          () => conflictAnswer(o, byId(RELATED[o.id].contradicts[0]) || other));
+        return;
+      }
+      const winner = byId(o.id), loser = other;
+      commit({
+        title: 'Resolve the conflict', confirm: 'Make this the one',
+        current: 'Both answering', proposed: esc(winner.title) + ' wins',
+        rationale: `<strong>${esc(loser.title)}</strong> becomes superseded by <strong>${esc(winner.title)}</strong>.
+          It stays readable and stops being used in answers.`,
+        effects: [
+          ['ok', 'Anyone following a link to the superseded one is told where the current one is.'],
+          ['skip', esc(loser.title) + ' leaves answers. Nothing else changes.']
+        ],
+        onRun: () => {
+          RELATED[loser.id] = Object.assign({ related: [], contradicts: [] }, RELATED[loser.id], { supersededBy: winner.id });
+          RELATED[winner.id] = Object.assign({ related: [], contradicts: [] }, RELATED[winner.id], { contradicts: [] });
+          recompute();
+          render();
+          markCard(winner.id);
+          markCard(loser.id);
+          toast('Resolved', null, esc(loser.title) + ' is superseded');
+          return true;
+        }
+      });
+      return;
+    }
+
+    return docActRest(kind, o, arg);
+  }
+
+  /* Which document does this one disagree with? The corpus knows what overlaps;
+     it cannot know what contradicts, so this asks rather than guesses. Choosing
+     records the contradiction on both sides and runs the real comparison. */
+  /* Two questions, one shape: what does this disagree with, and what replaced
+     this. Both are a relationship the corpus cannot infer — overlap is not
+     disagreement and newer is not a replacement — so both ask, and choosing
+     writes the relationship on BOTH documents. A one-sided link would leave the
+     other one claiming to be unrelated. */
+  const PICK = {
+    conflict: {
+      ask: (o) => 'What does ' + o.title + ' conflict with?',
+      basis: (o) => [o.title, 'Conflicting', COLLECTIONS[o.col]],
+      lead: 'Its status says it disagrees with something, but nothing records what.',
+      none: 'Nothing else is in this collection, so there is nothing here it could contradict.',
+      caveat: 'Overlap is not disagreement. Picking one records the contradiction on both documents, which is a statement about them — not a guess AiMY made.',
+      verb: 'Compare with ',
+      attr: (o, x) => `data-set-conflict="${o.id}:${x.id}"`,
+      /* Anything in the collection that shares a tag. */
+      pool: (o) => LIVE.filter((x) => x.id !== o.id && x.col === o.col)
+    },
+    successor: {
+      ask: (o) => 'What replaced ' + o.title + '?',
+      basis: (o) => [o.title, 'Superseded', COLLECTIONS[o.col]],
+      lead: 'It is marked as replaced, but nothing records what replaced it.',
+      none: 'Nothing in this collection is newer than it, so the replacement is not here.',
+      caveat: 'Newer is not the same as replacing. Picking one records the supersession on both, so anyone following a link to this one is told where to go.',
+      verb: 'This replaced it: ',
+      attr: (o, x) => `data-set-successor="${o.id}:${x.id}"`,
+      /* Only something newer can have replaced it. */
+      pool: (o) => LIVE.filter((x) => x.id !== o.id && x.col === o.col && x.upd < o.upd)
+    }
+  };
+
+  function pickRelated(o, kind) {
+    const cfg = PICK[kind];
+    const pool = cfg.pool(o);
+    const near = pool.filter((x) => x.tags.some((tg) => o.tags.indexOf(tg) > -1)).slice(0, 4);
+    const list = near.length ? near : pool.slice(0, 4);
+    canvas.close();
+    canvas.ask(cfg.ask(o), cfg.basis(o),
+      `<div class="answer-surface">
+        <div class="answer-body">
+          <p>${cfg.lead}
+          ${list.length
+            ? (near.length
+                ? 'These share its collection and its tags, so they are the ones most likely to cover the same ground:'
+                : 'Nothing shares its tags. These are the rest of its collection:')
+            : cfg.none}</p>
+        </div>
+        ${list.length ? `<div class="rs-list">${list.map((x) => typeCard(x, true)).join('')}</div>` : ''}
+        <div class="trust-disclosure">
+          <div class="td-row is-warn">${ICO.warn}<span class="td-text">${cfg.caveat}</span></div>
+        </div>
+        <div class="answer-apply">
+          ${list.length
+            ? list.map((x) => entryAction('investigate', cfg.verb + x.title, cfg.attr(o, x))).join('')
+            : entryAction('review', 'Set the status back to automatic',
+                `data-act="setstatus" data-obj="${o.id}" data-arg="auto"`)}
+        </div>
+      </div>`);
+  }
+
+  function docActRest(kind, o, arg) {
+    /* Unused is a question, not a defect, so its exit is the two answers to it.
+       "Keep" is a real outcome: it records the decision so the surface stops
+       asking, which is what stops a briefing item becoming wallpaper. */
+    /* "Is this worth keeping" cannot be answered by a yes/no box. It needs what
+       else covers the same ground, who owns it and how it compares to the rest
+       of its collection — so it is a conversation that ends in the choice. */
+    if (kind === 'triage') {
+      const overlap = LIVE.filter((x) => x.id !== o.id && x.col === o.col &&
+        x.tags.some((tg) => o.tags.indexOf(tg) > -1)).slice(0, 3);
+      const colAvg = (() => {
+        const peers = LIVE.filter((x) => x.col === o.col);
+        return Math.round(peers.reduce((n, x) => n + x.uses, 0) / Math.max(1, peers.length));
+      })();
+      canvas.ask('Is ' + o.title + ' still worth keeping?',
+        [o.title, 'Unused', COLLECTIONS[o.col]],
+        `<div class="answer-surface">
+          <div class="answer-body">
+            <p>Nothing has cited it in <strong>${Math.round(o.used / 30)} months</strong>. It was used
+            ${o.uses} times in the last ninety days, against an average of ${colAvg} across
+            ${esc(COLLECTIONS[o.col])}.</p>
+            <p>${overlap.length
+              ? 'These cover some of the same ground, which may be why nobody reaches for it:'
+              : 'Nothing else in the collection covers the same tags, so this is the only thing on the subject.'}</p>
+          </div>
+          ${overlap.length ? `<div class="rs-list">${overlap.map((x) => typeCard(x, true)).join('')}</div>` : ''}
+          <div class="trust-disclosure">
+            <div class="td-row is-warn">${ICO.warn}<span class="td-text">Low usage is not evidence that it is wrong.
+            ${overlap.length ? 'It may just be that the others are found first.' : 'It may be a subject nobody asks about yet.'}</span></div>
+          </div>
+          <div class="answer-apply">
+            ${entryAction('review', 'Archive it', `data-act="archive" data-obj="${o.id}"`)}
+            ${entryAction('direct', 'Keep it', `data-keep="${o.id}"`)}
+            ${entryAction('direct', 'Open it', `data-open-doc="${o.id}"`)}
+          </div>
+        </div>`);
+      return;
+    }
+
+    if (kind === 'keep') {
+      o.statusSet = 'current';
+      o.statusBy = USER.owner;
+      recompute();
+      render();
+      undoStack = () => { delete o.statusSet; delete o.statusBy; recompute(); render(); };
+      markCard(o.id);
+      toast('Kept', 'Undo', 'Marked current by you — the flag is cleared');
+      return;
+    }
+
+    /* Taking someone to the field beats telling them where it is. */
+    if (kind === 'assign') {
+      editorTab = 'props';
+      patch({ doc: o.id, mode: 'edit' });
+      setTimeout(() => {
+        const dd = $('.v2-dropdown[data-prop-key="owner"] .v2-dropdown-btn');
+        if (dd) { dd.scrollIntoView({ block: 'center' }); dd.focus(); }
+      }, 120);
+      return;
+    }
+    if (kind === 'source') { addFilter('source', o.src); return; }
+    if (kind === 'open')   { patch({ doc: o.id, mode: 'view' }); return; }
+
+    /* Set or clear the manual override. Same path from the editor and from
+       chat, so the two cannot drift. */
+    if (kind === 'setstatus') {
+      const to = arg;
+      if (!to || to === 'auto') {
+        delete o.statusSet; delete o.statusBy;
+      } else {
+        o.statusSet = to; o.statusBy = USER.owner;
+      }
+      recompute();
+      render();
+      markCard(o.id);
+      markAfter('.dv-head .trust-state, .dv-meta .trust-state', $('#docSheet'));
+      toast(to && to !== 'auto' ? 'Status set to ' + STATUS[to].label : 'Status back to automatic',
+        'Undo', to && to !== 'auto' ? 'Set by you, and marked as such' : 'Computed from the facts again');
+      return;
+    }
+
+    if (kind === 'report') {
+      /* Reporting is not editing. Switching modes took the document you were
+         reading away from you as the reward for flagging it. The comment lands
+         where comments live, and the record of it is on the document. */
+      addComment(o, 'Reported a problem with this document.');
+      recompute();
+      render();
+      markCard(o.id);
+      toast('Reported', 'Undo', 'Recorded on the document · ' + o.comments.length + ' comment(s)');
+      undoStack = () => { o.comments.pop(); render(); };
+      return;
+    }
+  }
+
+  /* New document — the mind map's manual Add.
+
+     No confirmation. An empty draft commits nothing, changes nothing anyone
+     else can see and is one click to discard, so a gate in front of it was
+     ceremony around an action with no consequence. Every field it needs is in
+     the editor's Properties panel, which is where you were going anyway. */
+  let newSeq = 0;
+  function newDocument(type, seed) {
+    const t = TYPES[type] ? type : 'article';
+    const id = 'new-' + (++newSeq);
+    const doc = Object.assign({
+      id: id, work: 'drafted', owner: USER.owner, t: t,
+      title: 'Untitled ' + TYPES[t].label.toLowerCase(), col: USER.collections[0],
+      src: 'upload', prod: 'copilot', client: '', tags: [], services: [], props: {},
+      aud: ['admins', 'stakeholders'], region: 'global', arch: false,
+      upd: 0, ing: 0, xc: 0, xu: 0, used: 0, uses: 0, sum: '', comments: [], versions: [],
+      x: Object.assign({}, BLANK_X[t] || BLANK_X.article)
+    }, seed || {});
+    CORPUS.push(doc);
+    LIVE.push(doc);
+    ENTITLED.push(doc);
+    recompute();
+    editorTab = 'props';
+    previewVer = null;
+    patch({ doc: id, mode: 'edit' });
+    return doc;
+  }
+
+  /* ── Files ──
+
+     Text arrives as text; anything else records what was dropped and leaves the
+     body for AiMY to draft into. Guessing a type from an extension is a guess,
+     and the Properties panel is one click away to correct it. */
+  const EXT_TYPE = { md: 'article', txt: 'article', doc: 'article', docx: 'article', pdf: 'asset',
+                     ppt: 'asset', pptx: 'asset', png: 'asset', jpg: 'asset', jpeg: 'asset',
+                     csv: 'icp', xlsx: 'icp', html: 'webpage', htm: 'webpage' };
+  const TEXTY = /\.(md|txt|csv|html?|json)$/i;
+
+  function ingestFiles(files) {
+    const list = Array.from(files || []);
+    if (!list.length) return;
+    let first = null;
+    list.forEach((f) => {
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      const doc = newDocument(EXT_TYPE[ext] || 'article', {
+        title: f.name.replace(/\.[^.]+$/, ''),
+        props: { 'source-file': f.name, size: Math.max(1, Math.round(f.size / 1024)) + ' KB' }
+      });
+      first = first || doc;
+      if (TEXTY.test(f.name)) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          doc.sum = String(reader.result).trim().slice(0, 400);
+          recompute();
+          if (readURL().doc === doc.id) renderEditor(readURL());
+        };
+        reader.readAsText(f);
+      }
+    });
+    toast(list.length === 1 ? 'Added “' + list[0].name + '”' : 'Added ' + list.length + ' files',
+      null, 'Draft, owned by you. Nothing is live until you say so.');
+  }
+
+  /* The drop layer covers the whole workbench. dragenter/dragleave fire on every
+     child, so the depth counter is what stops it flickering as the pointer
+     crosses a card. */
+  function wireDrop() {
+    const layer = $('#dropLayer');
+    if (!layer) return;
+    let depth = 0;
+    const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).indexOf('Files') > -1;
+    document.addEventListener('dragenter', (e) => {
+      if (!hasFiles(e)) return;
+      depth++;
+      layer.hidden = false;
+      /* Reflow, not rAF — same as the document sheet. rAF does not run in a
+         throttled tab, and this is the one layer whose whole job is to appear. */
+      void layer.offsetWidth;
+      layer.classList.add('open');
+    });
+    document.addEventListener('dragleave', (e) => {
+      if (!hasFiles(e)) return;
+      if (--depth > 0) return;
+      depth = 0;
+      layer.classList.remove('open');
+      setTimeout(() => { if (!layer.classList.contains('open')) layer.hidden = true; }, 180);
+    });
+    document.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+    document.addEventListener('drop', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      layer.classList.remove('open');
+      setTimeout(() => { layer.hidden = true; }, 180);
+      ingestFiles(e.dataTransfer.files);
     });
   }
 
-  function submitFloat() {
-    const fb = $('#floatInput');
-    if (!fb) return;
-    const v = fb.value.trim();
-    if (!v) return;
-    fb.value = '';
-    if (document.body.dataset.page === 'workbench') runQuery(v);
-    else canvas.ask(v, scopeBasis(), answerFor(v, CORPUS.slice(0, 2), 'question'));
-  }
+  /* Enough of each type's shape for the card and the viewer to render it before
+     anyone has filled anything in. */
+  const BLANK_X = {
+    article:  { applies: '—' },
+    ticket:   { requester: '—', status: 'Open', resolution: '—' },
+    icp:      { segment: '—', fit: [], dis: [] },
+    campaign: { objective: '—', window: '—', assets: '—' },
+    asset:    { format: '—', usage: 'Internal only', approval: 'pending' },
+    story:    { customer: '—', outcome: '—', quote: '', approval: 'pending' },
+    blog:     { pub: 'Draft', canonical: '—', author: USER.owner },
+    webpage:  { url: '—', crawl: '—', change: 'None' }
+  };
 
-  function renderEditor(id) {
-    const o = CORPUS.find((x) => x.id === id);
-    const stage = $('#wbStage');
-    if (!o || !stage) return;
-
-    stage.innerHTML = `
-      <button class="wb-back" data-ws-back>${ICO.left}Back to working set</button>
-      <div class="wb-editor-split">
-        <div>
-          <div class="toolbar" role="toolbar" aria-label="Formatting">
-            <button class="icon-btn" aria-label="Bold" data-fmt="bold"><strong>B</strong></button>
-            <button class="icon-btn" aria-label="Italic" data-fmt="italic"><em>I</em></button>
-            <span class="toolbar-sep"></span>
-            <button class="icon-btn" aria-label="Bulleted list" data-fmt="insertUnorderedList">≡</button>
-          </div>
-          <div class="doc-view" style="margin-top:12px">
-            <div class="dv-head">
-              <div class="dv-meta">
-                <span class="tc-type">${o.ico}${esc(o.type)}</span>
-                ${trustState('unverified')}
-              </div>
-              <div class="dv-title">${esc(o.title)}</div>
-            </div>
-            <div class="inline-note warn" style="align-items:flex-start">
-              <span class="dot" style="margin-top:6px"></span>
-              <span><strong>Editing moves this out of verified.</strong> The previous verification attested to content
-              that no longer exists. You are not the owner, so it lands on <strong>unverified</strong> rather than due.</span>
-            </div>
-            <div class="dv-body" contenteditable="true" style="outline:none">
-              <p>${esc(o.summary || o.title)}</p>
-              <p>Activated products are handled case by case.</p>
-            </div>
-          </div>
-
-          <div class="ai-suggestion" style="margin-top:14px">
-            <div class="ai-suggestion-head">
-              <svg width="12" height="13" viewBox="0 0 18 20"><use href="#aimy-logo-small"/></svg>
-              AiMY proposes a change
-            </div>
-            <div class="ai-suggestion-body">
-              <del>Activated products are handled case by case.</del>
-              <ins>Activated products are outside the 30-day window. Where a fault is demonstrated, the warranty
-              process applies instead — see Warranty process — EU.</ins>
-            </div>
-            <div class="ai-suggestion-foot">
-              <button class="btn btn-brand btn-sm" data-suggest="accept">Accept</button>
-              <button class="btn btn-ghost btn-sm" data-suggest="edit">Edit</button>
-              <button class="btn btn-ghost btn-sm" data-suggest="reject">Reject</button>
-            </div>
-          </div>
-
-          <div class="comment-thread" style="margin-top:16px">
-            <div class="comment">
-              <div class="avatar avatar-sm">AM</div>
-              <div class="comment-body">
-                <div class="comment-head"><span class="comment-author">A. Mahfouz</span><span class="comment-time">2 days ago</span></div>
-                <div class="comment-text">The exception needs to name the warranty article explicitly — support keeps
-                landing here and then having to search again.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <!-- .ver-item is a 3-column grid: .ver-mark · .ver-main · .ver-side.
-               Flat children spill into implicit rows and overflow the column. -->
-          <div class="ver-list">
-            <div class="ver-item is-current">
-              <span class="ver-mark">v7</span>
-              <div class="ver-main">
-                <div class="ver-label">Clarified the activation exception</div>
-                <div class="ver-author"><strong>N. Wael</strong> · edited in the document editor</div>
-              </div>
-              <div class="ver-side"><span class="ver-tag">Current</span><span class="ver-time">14:06</span></div>
-            </div>
-            <div class="ver-item is-ai">
-              <span class="ver-mark"><svg width="10" height="11" viewBox="0 0 18 20"><use href="#aimy-logo-small"/></svg></span>
-              <div class="ver-main">
-                <div class="ver-label">Exception clause rewritten from 12 resolved tickets</div>
-                <div class="ver-author"><strong>AiMY</strong> · accepted by N. Wael</div>
-              </div>
-              <div class="ver-side"><span class="ver-time">2 Jul</span></div>
-            </div>
-            <div class="ver-item">
-              <span class="ver-mark">v5</span>
-              <div class="ver-main">
-                <div class="ver-label">Refund window changed 14 → 30 days</div>
-                <div class="ver-author"><strong>A. Mahfouz</strong> · policy update</div>
-              </div>
-              <div class="ver-side"><span class="ver-time">12 Mar</span></div>
-            </div>
-          </div>
-          <div class="ver-restore">
-            <div class="vr-effect">
-              ${ICO.warn.replace('<svg', '<svg style="width:13px;height:13px;flex-shrink:0"')}
-              <span>Restoring the 12 Mar version changes what <strong>4 consuming agents</strong> answer from.
-              History is preserved — restore adds a new version rather than deleting the ones it supersedes.</span>
-            </div>
-            <button class="btn btn-ghost btn-sm" data-commit-run="Version restored">Restore 12 Mar version</button>
-          </div>
-        </div>
-      </div>`;
+  /* The card's one classified action. Each terminates in a completed action, a
+     staged one, or a structured destination — never in "open". */
+  function cardActRun(id) {
+    const o = byId(id);
+    if (!o) return;
+    docAct(cardAction(o)[2], id);
   }
 
   /* ═══════════════════════════════════════════════
@@ -3216,56 +5047,22 @@
   ═══════════════════════════════════════════════ */
   function init() {
     canvas.init();
+    docModal.init();
+    setModal.init();
     wire();
+    wireDrop();
+    renderAiState();
 
-    const page = document.body.dataset.page;
-    paintNavSignals();
-    if (page === 'dashboard') bootDashboard();
-    /* Governance carries both halves since the Sources page was folded in:
-       what the corpus is allowed to do, and where it actually comes from. */
-    if (page === 'settings') paintIdentity(activeProfile());
-    if (page === 'governance') {
-      paintIdentity(activeProfile());
-      renderGovernance();
+    const u = $('#userName'), r = $('#userRole'), a = $('#userAvatar');
+    if (u) u.textContent = USER.name;
+    if (r) r.textContent = USER.role;
+    if (a) a.textContent = USER.initials;
 
-      const seed = params.get('source');
-      if (seed && SOURCES.some((s) => s.id === seed)) srcOpen = seed;
-      renderSources();
+    render();
 
-      /* A deep link to a source lands on the Sources tab, not on Rules. */
-      if (seed) {
-        const tab = $('.ds-tab[data-tab="govSources"]');
-        if (tab) tab.click();
-      }
-    }
-    if (page === 'requests') {
-      paintIdentity(activeProfile());
-      const seed = params.get('open');
-      if (seed && REQUESTS.some((r) => r.id === seed)) rqOpen = seed;
-      renderRequests();
-    }
-    if (page === 'workbench') {
-      paintIdentity(activeProfile());
-      workingSet.load();
-      const seed = params.get('open');
-      if (seed && CORPUS.some((o) => o.id === seed)) {
-        workingSet.add(seed, true);
-        workingSet.open = seed;
-      }
-      renderWorkbench();
-
-      /* Prototype affordance: pre-fill the input so the two routing paths of
-         §7.1 can be compared side by side. Nothing is sent — the user still
-         presses Enter, because the routing decision is what is on show. */
-      const demo = params.get('q');
-      const fb = $('#floatInput');
-      if (demo && fb) {
-        fb.value = demo === 'object'
-          ? 'Refund eligibility — EU customers'
-          : 'Can EU customers get a refund after activating?';
-        fb.focus();
-      }
-    }
+    /* The loading state resolves into the real surface, so the skeleton is a
+       stage rather than a dead end. */
+    if (forcedState === 'loading') setTimeout(() => { location.href = location.pathname; }, 2200);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

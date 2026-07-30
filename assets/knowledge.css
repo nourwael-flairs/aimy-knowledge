@@ -94,6 +94,15 @@ button {
 /* .entry-action is a different component with its own padding, so pairing it
    with a .btn in one row leaves a 2px step. Matched where they sit together. */
 .dv-actions .entry-action, .dv-actions .btn { min-height: 34px; }
+/* The row used to carry a primary action on the left with these pushed to the
+   right by `margin-left:auto`. With the left side gone, the tint and the gap
+   drew a large empty panel around two buttons. It is a plain end-of-document
+   row now: hairline above, actions where the text is. */
+/* No border-top: with Versions collapsed it landed directly under the summary
+   and read as a line drawn under a closed section. */
+.dv-actions { padding: 14px 0 2px; background: none; border-top: 0; }
+.dv-actions .dv-actions-end { margin-left: 0; }
+:root[data-theme="light"] .dv-actions { background: none; }
 .btn-sm { line-height: 15px; }
 .btn-lg { line-height: 17px; }
 
@@ -290,11 +299,6 @@ button {
   left: 0; right: 0; top: 50%; height: 24px;
   transform: translateY(-50%);
 }
-/* The checkbox draws at 18px; the label is the real target, so it carries the
-   24px area and the input sits inside it. */
-.ws-item-pick { position: relative; display: inline-flex; min-width: 24px; min-height: 24px;
-  align-items: center; justify-content: center; }
-
 /* The small-button variants land a pixel or two under once padding rounds.
    min-height rather than more padding, so the drawn size is unchanged. */
 .btn-sm, .bcard-ack-btn, .wb-back, .ss-clear, .agg-more, .td-action, .cite-action,
@@ -356,14 +360,14 @@ button {
 
 @media (prefers-reduced-motion: no-preference) {
   .btn, .entry-action, .filter-chip, .seg-btn, .bcard-ack-btn, .overlay-sugg-chip,
-  .gov-toggle, .audit-revert, .cite-action, .td-action, .dv-rel-item, .icon-btn,
+  .audit-revert, .cite-action, .td-action, .dv-rel-item, .icon-btn,
   .topnav-bell, .ds-theme-toggle, .aimy-float-send, .overlay-send, .overlay-close,
   .agg-more, .ss-clear, .wb-back, .tab, .nav-item, .bcard-dismiss-reason {
     transition: transform var(--t-press) var(--ease-out),
                 background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
   }
   .btn:active, .entry-action:active, .filter-chip:active, .seg-btn:active,
-  .bcard-ack-btn:active, .overlay-sugg-chip:active, .gov-toggle:active,
+  .bcard-ack-btn:active, .overlay-sugg-chip:active,
   .audit-revert:active, .cite-action:active, .td-action:active, .dv-rel-item:active,
   .icon-btn:active, .topnav-bell:active, .ds-theme-toggle:active,
   .aimy-float-send:active, .overlay-send:active, .overlay-close:active,
@@ -875,15 +879,13 @@ body {
 
 /* Empty working set: the float bar sits centred on the canvas (§5.2).
    Docks to the bottom the moment work exists. */
-.aimy-float-wrap { bottom: 20px; left: 24px; right: 24px; }
-.aimy-float-wrap.is-centred {
-  top: 50%; bottom: auto;
-  transform: translateY(-50%);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .aimy-float-wrap {
-    transition: transform var(--t-slow) var(--ease-out);
-  }
+/* Fixed and centred on the WINDOW, not on the main column. Centring it inside
+   .app-main put it half the rail's width right of the page's true centre —
+   134px, and visible the moment you look for it. */
+.aimy-float-wrap {
+  position: fixed; bottom: 20px; top: auto;
+  left: 50%; right: auto; transform: translateX(-50%);
+  width: min(760px, calc(100vw - 48px));
 }
 
 .wb-blank {
@@ -923,22 +925,6 @@ body {
   align-items: start;
 }
 
-/* Selection affordance for bulk curation. The checkbox is a design-system
-   .ds-choice; this only positions it against the card. */
-.ws-item { position: relative; }
-.ws-item-pick {
-  position: absolute; top: 12px; left: 12px; z-index: 2;
-  opacity: 0;
-  transition: opacity var(--t-fast);
-}
-.ws-item:hover .ws-item-pick,
-.ws-item:focus-within .ws-item-pick,
-.ws-item.is-picked .ws-item-pick { opacity: 1; }
-.ws-item.is-picked .type-card { border-color: rgba(var(--accent-rgb),0.4); }
-.ws-item.is-picked .tc-head { padding-left: 26px; }
-.ws-item:hover .tc-head,
-.ws-item:focus-within .tc-head { padding-left: 26px; }
-
 /* Single-object mode: viewer / editor lay out at full canvas width, since
    no column is reserved for conversation (§5.4). */
 .ws-single { max-width: 920px; }
@@ -964,162 +950,15 @@ body {
   .wb-editor-split { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* ═══════════════════════════════════════════════
-   REQUESTS — the decision queue (§4)
-
-   List beside detail, at the 360px the design system's layout table specifies
-   for this shape. The queue is a browsable inventory; the detail is where a
-   decision is actually made, so it gets the room.
-═══════════════════════════════════════════════ */
-.rq-split {
-  display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px;
-  align-items: start;
+/* Governance has no block of its own any more. It is stated on the axis panel
+   and on the document, and changed through the same commit surface as
+   everything else — so the only thing left from the old page is the
+   customer-facing marker, which the commit form still needs. */
+.gov-ext {
+  display: block; font-size: 8.5px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); color: var(--warn);
+  text-transform: uppercase; margin-top: 2px;
 }
-@media (max-width: 1080px) {
-  .rq-split { grid-template-columns: minmax(0, 1fr); }
-}
-
-.rq-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-.rq-count {
-  margin-left: 6px; font-size: var(--fs-2xs); font-weight: var(--fw-bold);
-  opacity: 0.7;
-}
-
-.rq-queue { max-width: none; }
-/* .list-row is not a button in the library and has no selected state; a queue
-   needs both. Selection is product state, not a component restyle. */
-.rq-row {
-  width: 100%; text-align: left; border: 0; background: none;
-  font-family: inherit; cursor: pointer;
-  border-bottom: 1px solid var(--hairline);
-  align-items: flex-start;
-}
-.rq-row:last-child { border-bottom: none; }
-.rq-row.is-selected { background: var(--accent-dim); }
-.rq-row.is-selected .list-title { color: var(--d50); }
-.rq-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
-/* Type is carried by icon AND label, per §13. An icon alone would leave four
-   request kinds distinguishable only by glyph, in a 360px column. */
-.rq-row-kind {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide); text-transform: uppercase;
-  color: var(--d500); margin-bottom: 3px;
-}
-.rq-row-kind svg { flex-shrink: 0; }
-.rq-row.is-selected .rq-row-kind { color: var(--accent); }
-.rq-row .list-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.rq-row .list-title { white-space: normal; line-height: var(--lh-snug); }
-.rq-row-end {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
-  flex-shrink: 0;
-}
-
-.rq-head { margin-bottom: 20px; }
-.rq-head-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 9px; }
-.rq-title {
-  font-family: var(--font-display);
-  font-size: var(--fs-xl); font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-tight); color: var(--d50);
-  line-height: var(--lh-tight);
-}
-.rq-sub { font-size: var(--fs-sm); color: var(--d400); margin-top: 6px; }
-.rq-sub .link { font-size: inherit; }
-
-.rq-section { margin-bottom: 22px; }
-.rq-section-label {
-  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wider); text-transform: uppercase;
-  color: var(--d500); margin-bottom: 9px;
-}
-/* Released from their specimen widths — see SPECIMEN WIDTHS above. */
-.rq-detail .desc-list,
-.rq-detail .decision-zone,
-.rq-detail .audit-trail { max-width: none; }
-
-/* Governance carries two panels since Sources folded in. */
-.gov-tabs { margin-bottom: 4px; }
-.gov-panel { padding: 20px 0 0; }
-/* A fault count must not read like a neutral total. */
-.tab-count.is-err { background: var(--err-bg); color: var(--err); }
-
-/* ═══════════════════════════════════════════════
-   SOURCES — now a panel of Governance (§4)
-
-   300px list beside detail — the width the design system's layout table
-   specifies for an ingestion split.
-═══════════════════════════════════════════════ */
-.src-split {
-  display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px;
-  align-items: start;
-}
-@media (max-width: 1000px) { .src-split { grid-template-columns: minmax(0, 1fr); } }
-
-.src-list { max-width: none; }
-.src-row {
-  width: 100%; text-align: left; border: 0; background: none;
-  font-family: inherit; cursor: pointer;
-  border-bottom: 1px solid var(--hairline);
-}
-.src-row:last-child { border-bottom: none; }
-.src-row.is-selected { background: var(--accent-dim); }
-.src-row.is-selected .list-title { color: var(--d50); }
-.src-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
-.src-row .list-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-
-.src-head { margin-bottom: 18px; }
-.src-head-meta { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 9px; }
-.src-title {
-  font-family: var(--font-display);
-  font-size: var(--fs-xl); font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-tight); color: var(--d50); line-height: var(--lh-tight);
-}
-.src-sub { font-size: var(--fs-sm); color: var(--d400); margin-top: 5px; }
-
-/* The failure states its consequence and its way out, in that order. */
-.src-error { align-items: flex-start; text-align: left; padding: 20px; margin-bottom: 22px; }
-.src-error .error-state-icon { margin-bottom: 12px; }
-.src-error .error-state-desc { max-width: 64ch; margin-bottom: 14px; }
-.src-code {
-  font-family: var(--font-mono); font-size: var(--fs-xs);
-  color: var(--err); background: var(--err-bg);
-  border: 1px solid rgba(240,68,56,0.22);
-  border-radius: var(--r-sm); padding: 3px 8px; margin-bottom: 14px;
-}
-.src-error-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.src-error-actions .k-action-note { flex: 0 1 auto; min-width: 0; }
-
-.src-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; }
-.src-stats .stat-card { max-width: none; }
-
-.src-section { margin-bottom: 24px; }
-.src-section-label {
-  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wider); text-transform: uppercase;
-  color: var(--d500); margin-bottom: 10px;
-}
-.src-section .progress-bar-wrap { margin-bottom: 12px; max-width: 420px; }
-.src-timeline { max-width: none; }
-
-/* ═══════════════════════════════════════════════
-   GOVERNANCE (§4)
-═══════════════════════════════════════════════ */
-.gov-section { margin-bottom: 32px; }
-.gov-section-head { margin-bottom: 12px; }
-.gov-section-title { display: block; }
-.gov-section-title {
-  font-size: var(--fs-md); font-weight: var(--fw-bold);
-  color: var(--d50); letter-spacing: var(--ls-tight);
-}
-.gov-table-wrap {
-  border: 1px solid var(--card-border); border-radius: var(--r-lg);
-  overflow: hidden; background: var(--card-bg);
-}
-/* Wide tables scroll inside their own box rather than the page. */
-.gov-table-wrap { overflow-x: auto; }
-.gov-num { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--d400); }
-.gov-act { text-align: right; white-space: nowrap; }
-.gov-collections { max-width: none; }
 
 /* .gov-cr-audit-note is styled in the library only as
    `.gov-cr-actions .gov-cr-audit-note`, so outside that one parent it gets
@@ -1131,35 +970,6 @@ body {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 10px; color: var(--d500);
 }
-
-/* Exposure matrix. Human access and agent grounding are separate permissions
-   (§8.1), so the human column is deliberately present and deliberately not a
-   control — it is set by entitlement elsewhere, and showing it here is what
-   makes the distinction legible. */
-.gov-matrix th.gov-agent-col { text-align: center; }
-.gov-matrix td.gov-cell { text-align: center; padding: 8px 10px; }
-.gov-matrix .gov-human { border-right: 1px solid var(--card-border); }
-.gov-ext {
-  display: block; font-size: 8.5px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide); color: var(--warn);
-  text-transform: uppercase; margin-top: 2px;
-}
-.gov-toggle {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 4px 10px; border-radius: var(--r-pill);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  border: 1px solid var(--card-border); color: var(--d500);
-  background: rgba(255,255,255,0.03); cursor: pointer;
-  transition: border-color var(--t-fast), color var(--t-fast), background-color var(--t-fast);
-}
-.gov-toggle svg { flex-shrink: 0; }
-.gov-toggle:hover { border-color: var(--card-border-hover); color: var(--d200); }
-.gov-toggle.is-on { background: var(--ok-bg); border-color: rgba(23,178,106,0.28); color: var(--ok); }
-/* Exposure to a customer-facing agent is the highest-consequence state on the
-   page and is marked as caution, not success. */
-.gov-toggle.is-on.is-external { background: var(--warn-bg); border-color: rgba(247,144,9,0.3); color: var(--warn); }
-.gov-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-:root[data-theme="light"] .gov-toggle { background: rgba(16,24,40,0.03); }
 
 /* ═══════════════════════════════════════════════
    RETRIEVAL — results-first result set (§7.1)
@@ -1202,9 +1012,151 @@ body {
 .chat-msg.aimy:has(.answer-surface),
 .chat-msg.aimy:has(.answer-surface) .msg-bubble { max-width: 100%; }
 .answer-surface { display: flex; flex-direction: column; gap: 12px; }
+/* The surface owns the rhythm, once. Several of these blocks carry their own
+   vertical margins for the places they appear outside an answer, and those
+   margins land on top of the gap here — which is why the spacing between an
+   answer's parts drifted between 12px and 24px. */
+.answer-surface > * { margin-top: 0; margin-bottom: 0; }
 .answer-surface .source-list,
 .answer-surface .trust-disclosure,
 .answer-surface .agent-steps { max-width: none; }
+
+/* ═══════════════════════════════════════════════
+   THE SETTINGS SHEET
+
+   Same overlay as a document — it reuses .doc-overlay, .doc-sheet, .doc-bar and
+   .doc-scroll rather than growing a second set of them. What is new here is the
+   label/control row, which is the whole point: settings are edited in place,
+   not described and then edited in a dialog.
+═══════════════════════════════════════════════ */
+.doc-sheet.is-settings { max-width: 620px; }
+
+.set-panel { display: flex; flex-direction: column; gap: 18px; }
+
+.set-lead { font-size: var(--fs-sm); color: var(--d200); line-height: var(--lh-normal); margin: 0; }
+.set-lead strong { color: var(--d50); }
+
+.set-sub {
+  font-size: var(--fs-2xs); color: var(--d500);
+  text-transform: uppercase; letter-spacing: var(--ls-wide);
+}
+
+.set-group {
+  display: flex; flex-direction: column; gap: 10px;
+  padding-top: 16px; border-top: 1px solid var(--hairline);
+}
+
+/* Label left, control right, explanation under the control it explains — not
+   under the row, where it reads as a footnote to both. */
+.set-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; align-items: start; }
+.set-label {
+  font-size: var(--fs-xs); color: var(--d400); padding-top: 8px;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.set-control { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.set-control .v2-dropdown { width: 100%; max-width: 260px; }
+.set-note { font-size: var(--fs-2xs); color: var(--d500); line-height: var(--lh-snug); }
+.set-note strong { color: var(--d300); }
+
+.set-checks { display: flex; flex-direction: column; gap: 2px; }
+.set-check { padding: 5px 0; }
+
+.set-foot { padding-top: 14px; border-top: 1px solid var(--hairline); }
+
+/* A change the input asked for, sitting above the control it would move. It is
+   a proposal, not a result — the same distinction the AiMY draft makes in the
+   editor, and drawn the same way. */
+.set-staged {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border-radius: var(--r-md);
+  background: var(--accent-dim); border: 1px solid rgba(139,79,244,0.28);
+}
+.set-staged-text { flex: 1; min-width: 180px; font-size: var(--fs-xs); color: var(--d200); }
+.set-staged-text strong { color: var(--d50); }
+.set-staged-end { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* The sheet's own facts row sits tighter than an answer's. */
+.set-panel .conv-facts { padding: 12px 0; }
+
+@media (max-width: 720px) {
+  .set-row { grid-template-columns: 1fr; gap: 4px; }
+  .set-label { padding-top: 0; }
+}
+
+/* ═══════════════════════════════════════════════
+   SOURCES & DATA — the settings, where they can be found
+
+   Not a destination. Each row opens the conversation that already carries the
+   controls; this rail block exists because a setting you cannot find is a
+   setting you do not have.
+═══════════════════════════════════════════════ */
+.rail-set { display: flex; flex-direction: column; gap: 1px; }
+.rail-set-row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 6px 8px; border-radius: var(--r-sm);
+  font-size: var(--fs-xs); color: var(--d300);
+}
+.rail-set-row:hover { background: rgba(255,255,255,0.04); }
+:root[data-theme="light"] .rail-set-row:hover { background: rgba(16,24,40,0.04); }
+/* The name opens the conversation; the row's own control resolves it. */
+.rail-set-name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
+  font-family: var(--font-sans); font-size: var(--fs-xs); color: inherit;
+}
+.rail-set-name:hover { color: var(--d50); }
+.rail-set-name:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+.rail-set-note { font-size: var(--fs-2xs); color: var(--d500); flex-shrink: 0; }
+.rail-set-do {
+  flex-shrink: 0; cursor: pointer;
+  font-family: var(--font-sans); font-size: 10px; font-weight: var(--fw-bold);
+  padding: 3px 8px; border-radius: var(--r-pill);
+  background: var(--err-bg); border: 1px solid rgba(240,68,56,0.28); color: var(--err);
+}
+.rail-set-do:hover { background: rgba(240,68,56,0.2); }
+.rail-set-do:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* A formatting button that never shows what is already applied is telling you
+   nothing about the text your caret is in. */
+.toolbar .icon-btn.is-on {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: rgba(139,79,244,0.35);
+}
+
+/* ═══════════════════════════════════════════════
+   THE CHANGE MARKER
+
+   Every action has to move the screen where you are looking. When a repaint is
+   the whole of the feedback — a status badge quietly becoming a different word,
+   a date catching up to its source — nothing takes the eye to it. This does.
+═══════════════════════════════════════════════ */
+.just-changed {
+  /* Tint only. No transform, no outline: this lands on rows, badges, cards and
+     whole answers, and anything geometric would reflow one of them. */
+  animation: just-changed 1.5s var(--ease-out);
+  border-radius: var(--r-sm);
+}
+@keyframes just-changed {
+  0%   { background-color: var(--accent-dim); }
+  60%  { background-color: var(--accent-dim); }
+  100% { background-color: transparent; }
+}
+/* Held, not animated — the point is to be noticed, and a fade is not the only
+   way to do that. */
+@media (prefers-reduced-motion: reduce) {
+  .just-changed { animation: none; background-color: var(--accent-dim); }
+}
+
+/* `display:flex` on .float-badge outranks the UA's `[hidden] { display:none }`,
+   so the badge has been sitting there reading 0. Same shape of bug as the drop
+   layer. */
+.float-badge[hidden] { display: none; }
+
+/* The mark on the input is the way back into the canvas, so it has to read
+   as pressable. Everything else about it is the design system's. */
+#canvasOpen { cursor: pointer; }
+#canvasOpen:hover { border-color: rgba(139,79,244,0.6); }
 
 /* Working set — the viewer, editor and version panel own their columns. */
 .ws-single .doc-view,
@@ -1234,35 +1186,767 @@ body {
    dashed border, no accent. Direction §11 rejects an explicit role toggle
    in the product, so this must not be mistakable for one.
 ═══════════════════════════════════════════════ */
-/* Sits at the top of the scroll region, not fixed to the viewport: pinned
-   bottom-left it collided with the float bar's lane on wide screens, and a
-   dev tool overlapping the primary input is worse than one that scrolls. */
-.proto-bar {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-bottom: 18px;
-  padding: 6px 10px; border-radius: var(--r-md);
+/* Out of the content flow entirely. It is dev chrome and should not be the
+   first thing on the page it is there to test. Bottom-left, clear of the
+   input's centred lane. */
+/* ═══════════════════════════════════════════════
+   PROTOTYPE CONTROLS — not product UI.
+
+   Collapsed to an icon in the bottom-right corner, expanding upward. Fixed, so
+   it cannot push anything — but "does not push" was never the whole problem:
+   the earlier bar sat ON the input, because the input is centred at
+   `min(760px, 100vw - 48px)` and its right edge reaches `vw/2 + 380`. A 32px
+   icon at `right: 14px` starts at `vw - 46`, so the two clear each other only
+   above ~850px. Below that the control lifts above the input band instead of
+   overlapping it. The bottom-centre band belongs to the input and the toast.
+═══════════════════════════════════════════════ */
+.proto {
+  position: fixed; right: 14px; z-index: 960;
+  /* Above the input band, not in it. The input is centred at
+     min(760px, 100vw - 48px), so its right edge reaches vw/2 + 380 and the
+     236px panel's left edge is vw - 250 — they clear each other only above
+     ~1260px. Sitting the whole control just above the input's top edge is one
+     rule that holds at every width, and it does not move when it opens. */
+  bottom: 92px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+}
+
+.proto-toggle {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
   background: var(--card-bg-raised);
   border: 1px dashed var(--d600);
-  font-family: var(--font-mono); font-size: 10px; color: var(--d400);
+  color: var(--d400); cursor: pointer;
+  opacity: 0.45;
+  transition: opacity var(--t-fast), color var(--t-fast);
 }
-.proto-bar-label {
-  font-weight: 500; color: var(--d500);
+.proto-toggle svg { width: 15px; height: 15px; }
+.proto-toggle:hover { opacity: 1; color: var(--d200); }
+.proto-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; opacity: 1; }
+.proto.is-open .proto-toggle { opacity: 1; color: var(--d100); border-style: solid; }
+
+/* Grows upward from the icon, so it never reaches down into the input. */
+.proto-panel {
+  order: -1;
+  width: 236px; max-height: min(62vh, 460px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 12px; border-radius: var(--r-md);
+  background: var(--card-bg-raised);
+  border: 1px dashed var(--d600);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-mono); font-size: 10px;
+}
+.proto-panel[hidden] { display: none; }
+
+.proto-group { display: flex; flex-direction: column; gap: 5px; }
+.proto-group-label {
+  font-size: 9px; font-weight: 500; color: var(--d500);
   text-transform: uppercase; letter-spacing: 0.08em;
 }
-.proto-bar a {
+.proto-group-note { font-size: 9px; color: var(--d600); line-height: 1.35; }
+.proto-links { display: flex; flex-wrap: wrap; gap: 4px; }
+.proto-link {
+  font-family: var(--font-mono); font-size: 10px; line-height: 14px;
+  padding: 3px 7px; border-radius: var(--r-sm);
+  background: rgba(255,255,255,0.05); border: 0; color: var(--d300); cursor: pointer;
+}
+.proto-link:hover { background: rgba(255,255,255,0.1); color: var(--d50); }
+.proto-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+:root[data-theme="light"] .proto-link { background: rgba(16,24,40,0.05); }
+:root[data-theme="light"] .proto-link:hover { background: rgba(16,24,40,0.1); }
+
+/* ═══════════════════════════════════════════════
+   THE SIDEBAR BRIEFING
+
+   The rail is no longer navigation, so .sidebar-nav's metrics do not apply.
+   What it holds is a composed briefing whose every item is a filter link.
+═══════════════════════════════════════════════ */
+:root { --sidebar-width: 268px; }
+
+.app-sidebar { border-right: 1px solid var(--hairline); }
+.brief {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 18px 14px 8px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.brief::-webkit-scrollbar { width: 4px; }
+.brief::-webkit-scrollbar-track { background: transparent; }
+.brief::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+:root[data-theme="light"] .brief::-webkit-scrollbar-thumb { background: rgba(16,24,40,0.12); }
+
+
+.brief-scope {
+  font-size: var(--fs-2xs); color: var(--d500); line-height: var(--lh-snug);
+  padding-bottom: 10px; border-bottom: 1px solid var(--hairline);
+}
+.brief-scope-more { display: flex; align-items: center; gap: 10px; margin-top: 4px; flex-wrap: wrap; }
+.brief-scope-link {
+  background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
+  font-size: inherit; color: var(--d400); border-bottom: 1px dotted var(--d600);
+}
+.brief-scope-link:hover { color: var(--accent); }
+.brief-withheld { color: var(--warn); font-weight: var(--fw-semibold); }
+
+.brief-section-label {
+  font-size: 10px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider); text-transform: uppercase;
+  color: var(--d500); margin-top: 6px;
+}
+.brief-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* A briefing item states what changed, why it matters, its work state and one
+   classified next step. Tone is carried by the icon's colour, not by a stripe. */
+/* ═══════════════════════════════════════════════
+   THE BRIEFING — what changed since you were last here
+═══════════════════════════════════════════════ */
+.brief-entry {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hairline);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+}
+.brief-entry:last-child { border-bottom: 0; }
+.brief-text {
+  font-size: var(--fs-xs); line-height: var(--lh-base); color: var(--d200);
+  /* Tone lives on one leading dot, not on a stripe or a tinted panel. */
+  padding-left: 13px; position: relative;
+}
+.brief-text::before {
+  content: ""; position: absolute; left: 0; top: 7px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--d500);
+}
+.brief-entry.is-err  .brief-text::before { background: var(--err); }
+.brief-entry.is-warn .brief-text::before { background: var(--warn); }
+.brief-entry.is-ok   .brief-text::before { background: var(--ok); }
+.brief-go {
+  margin-left: 13px;
+  background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold); color: var(--accent);
+  transition: opacity var(--t-fast);
+}
+.brief-go:hover { opacity: 0.75; }
+.brief-go:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+.brief-resume {
+  margin-top: 12px; align-self: flex-start;
+  background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
+  font-size: var(--fs-2xs); color: var(--d500); border-bottom: 1px dotted var(--d600);
+}
+.brief-resume:hover { color: var(--d200); }
+
+/* ═══════════════════════════════════════════════
+   THE PAGE — greeting, filters, chips
+═══════════════════════════════════════════════ */
+
+
+.filter-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.filter-row.is-more { padding-top: 2px; }
+.filter-row-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* The dropdowns are chrome until they carry a value, so they sit quiet by
+   default and the component's own .active-filter does the lighting up. */
+.k-filter .v2-dropdown-btn {
+  height: 30px; padding: 0 10px; border-radius: var(--r-md);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  background: none; border-color: var(--card-border); color: var(--d400);
+}
+.k-filter .v2-dropdown-btn:hover { border-color: var(--card-border-hover); color: var(--d100); }
+.k-filter .v2-dropdown-btn svg { width: 9px; height: 6px; opacity: 0.7; }
+.k-filter .v2-dropdown-panel { min-width: 170px; }
+
+.k-toggle, .k-more, .k-clear {
+  height: 30px; padding: 0 11px; border-radius: var(--r-md);
+  border: 1px solid var(--card-border); background: none; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  color: var(--d400);
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: border-color var(--t-fast), color var(--t-fast), background-color var(--t-fast),
+              transform var(--t-press) var(--ease-out);
+}
+.k-toggle:hover, .k-more:hover, .k-clear:hover { border-color: var(--card-border-hover); color: var(--d50); }
+.k-toggle:active, .k-more:active, .k-clear:active { transform: scale(0.97); }
+.k-toggle:focus-visible, .k-more:focus-visible, .k-clear:focus-visible {
+  outline: 2px solid var(--brand); outline-offset: 2px;
+}
+.k-toggle.is-on {
+  background: var(--accent-dim); border-color: rgba(var(--accent-rgb), 0.4); color: var(--accent);
+}
+.k-more.is-open { color: var(--d50); border-color: var(--card-border-hover); }
+.k-more-n {
+  font-size: 9px; font-weight: var(--fw-bold); font-variant-numeric: tabular-nums;
+  background: var(--accent-dim); color: var(--accent);
+  border-radius: var(--r-pill); padding: 1px 5px;
+}
+.k-clear { border-color: transparent; color: var(--d500); }
+
+/* ═══════════════════════════════════════════════
+   THE CHIP BAR — only what a dropdown cannot say
+═══════════════════════════════════════════════ */
+.chip-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.chip-bar .ctx-chips { flex: 1; min-width: 0; }
+.ctx-chip .ctx-key {
+  font-size: 9px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--d500); margin-right: 1px;
+}
+
+/* ═══════════════════════════════════════════════
+   RESULT META — count, scope, and what is excluded
+═══════════════════════════════════════════════ */
+.rm {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  margin-bottom: 14px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+.rm-main { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; min-width: 0; }
+.rm-count {
+  font-family: var(--font-display); font-size: var(--fs-xl); font-weight: var(--fw-extrabold);
+  color: var(--d50); letter-spacing: var(--ls-tight); font-variant-numeric: tabular-nums;
+}
+.rm-word { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--d200); }
+.rm-note { font-size: var(--fs-xs); color: var(--d500); }
+.rm-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.rm-disclosure {
+  flex-basis: 100%; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.rm-flag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-xs); color: var(--d400); font-variant-numeric: tabular-nums;
+}
+.rm-flag.is-err  { color: var(--err); }
+.rm-flag.is-warn { color: var(--warn); }
+.rm-flag strong { color: inherit; }
+
+/* ═══════════════════════════════════════════════
+   TYPE CARD — product-owned bits only
+═══════════════════════════════════════════════ */
+.tc-title-btn {
+  display: block; width: 100%; text-align: left;
+  background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
+  transition: color var(--t-fast);
+}
+.tc-title-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+/* No hover of its own: the whole card is the target, and a second highlight
+   inside it advertises a second target that does not exist. Focus-visible
+   stays — the keyboard still needs one thing to land on. */
+.tc-tag {
+  border: 0; cursor: pointer; font-family: inherit;
+  transition: color var(--t-fast), background-color var(--t-fast);
+}
+.tc-tag:hover { color: var(--d50); }
+.tc-tag:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.tc-mono { font-family: var(--font-mono); font-size: var(--fs-2xs); }
+.tc-gov { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ws-grid .type-card { max-width: none; }
+
+/* Thinned. Two labelled facts plus the review date, and the rest in the modal.
+
+   ONE footer, not two. The library's card ends with a bordered, tinted .tc-gov
+   strip and then a bordered .tc-action strip holding a full-width button —
+   two rules and a banner, which is most of the height and all of the noise. */
+.type-card { padding-bottom: 0; cursor: pointer; }
+.type-card:hover { border-color: var(--card-border-hover); }
+/* Anything interactive inside the card keeps its own cursor, so the card
+   reading as clickable never claims a control that does something else. */
+.type-card button { cursor: pointer; }
+.tc-head    { padding: 12px 12px 0; }
+.tc-title-btn { padding: 7px 12px 0; }
+.tc-title { padding: 0; line-height: var(--lh-snug); }
+.tc-fields {
+  padding: 9px 12px 0;
+  display: grid; grid-template-columns: 76px minmax(0, 1fr);
+  gap: 4px 10px; align-items: baseline;
+}
+.tc-field-label {
+  font-size: 9.5px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+  white-space: nowrap;
+}
+.tc-field-val {
+  font-size: var(--fs-xs); color: var(--d200); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* margin-top:auto pins the footer to the bottom of a stretched card, so a row
+   of cards ends on one line whatever each of them had to say. */
+.tc-foot {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: auto; padding: 8px 12px;
+  border-top: 1px solid var(--hairline);
+  font-size: var(--fs-2xs); color: var(--d500);
+}
+.tc-fields { padding-bottom: 11px; }
+.tc-foot-who {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: var(--fw-semibold); color: var(--d400);
+}
+.tc-foot-act { margin-left: auto; flex-shrink: 0; }
+/* A text action, not a filled bar — the card is a result, not a form. The
+   entry-mode icon stays: with it hidden, colour alone would be carrying which
+   mode the action is, which §13 forbids. */
+.tc-foot-act .entry-action {
+  background: none; border-color: transparent; padding: 3px 0;
+}
+.tc-foot-act .entry-action:hover { background: none; opacity: 0.75; }
+.ws-grid {
+  grid-template-columns: repeat(auto-fill, minmax(288px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+/* Skeletons resolve in place of cards, at card proportions, so the grid does
+   not reflow when the real content lands. */
+.skeleton-card {
+  border: 1px solid var(--card-border); border-radius: var(--r-lg);
+  background: var(--card-bg); padding: 16px;
+  display: flex; flex-direction: column; gap: 10px; min-height: 190px;
+}
+
+/* ═══════════════════════════════════════════════
+   DOCUMENT VIEWER — provenance and tags
+═══════════════════════════════════════════════ */
+.dv-prov {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px 18px; padding: 14px 0; margin-top: 4px;
+  border-top: 1px solid var(--hairline);
+}
+.dv-prov-item { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.dv-prov-label {
+  font-size: 10px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+}
+.dv-prov-val {
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--d200);
+  font-variant-numeric: tabular-nums;
+}
+.dv-prov-val.is-overdue { color: var(--warn); }
+.dv-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-top: 12px; }
+.dv-tags-label {
+  font-size: 10px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+  margin-right: 2px;
+}
+.dv-body .tc-fields { margin-top: 10px; }
+
+/* ═══════════════════════════════════════════════
+   ANSWER → SURFACE
+═══════════════════════════════════════════════ */
+.answer-apply {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding-top: 10px; border-top: 1px solid var(--hairline);
+}
+.answer-apply-note { font-size: var(--fs-2xs); color: var(--d500); flex: 1; min-width: 180px; }
+.answer-apply-note code {
   font-family: var(--font-mono); font-size: 10px;
-  color: var(--d300); text-decoration: none;
-  padding: 2px 7px; border-radius: var(--r-xs);
-  border: 1px solid transparent;
-  transition: background-color var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+  background: rgba(255,255,255,0.06); border-radius: var(--r-xs); padding: 1px 4px;
 }
-.proto-bar a:hover { background: rgba(255,255,255,0.06); color: var(--d50); }
-.proto-bar a.is-on {
-  background: rgba(255,255,255,0.08); color: var(--d50);
-  border-color: var(--d600);
+:root[data-theme="light"] .answer-apply-note code { background: rgba(16,24,40,0.06); }
+
+/* ═══════════════════════════════════════════════
+   THE INPUT — degraded state
+
+   AI-unavailable does not disable the product. Filters, grid, viewer and
+   editor are state reads and keep working; only the parse and the canvas go.
+═══════════════════════════════════════════════ */
+.aimy-float-bar.is-degraded { opacity: 0.72; }
+.aimy-float-bar.is-degraded .aimy-float-send { pointer-events: none; opacity: 0.4; }
+.filter-tray.is-forced { opacity: 1; visibility: visible; transform: none; pointer-events: auto; }
+
+@media (max-width: 1040px) {
+  .app-sidebar { display: none; }
 }
-:root[data-theme="light"] .proto-bar a:hover,
-:root[data-theme="light"] .proto-bar a.is-on { background: rgba(16,24,40,0.06); }
+
+/* ═══════════════════════════════════════════════
+   THE DOCUMENT OVERLAY
+
+   Same frame as the canvas: absolute inside .app-main, blurred backdrop, the
+   shell stays interactive. One overlay language for the conversation and for
+   the document.
+
+   Stacking. The input sits ABOVE the document, because a bar that stops
+   working when you open something is not the surface's one input. The canvas
+   sits above both, so you can ask about what you are reading.
+═══════════════════════════════════════════════ */
+.doc-overlay  { z-index: 450; }
+.aimy-float-wrap { z-index: 550; }
+.aimy-overlay { z-index: 600; }
+
+.doc-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: stretch; justify-content: center;
+  padding: 18px 20px 96px;
+  background: rgba(20, 27, 34, 0.34);
+  backdrop-filter: blur(22px) saturate(1.3) brightness(0.88);
+  -webkit-backdrop-filter: blur(22px) saturate(1.3) brightness(0.88);
+  opacity: 0; pointer-events: none;
+}
+:root[data-theme="light"] .doc-overlay { background: rgba(238, 242, 246, 0.62); }
+.doc-overlay.open { opacity: 1; pointer-events: auto; }
+@media (prefers-reduced-motion: no-preference) {
+  .doc-overlay { transition: opacity var(--t-base) var(--ease-out); }
+  .doc-overlay .doc-sheet { transform: translateY(8px); transition: transform var(--t-base) var(--ease-out); }
+  .doc-overlay.open .doc-sheet { transform: translateY(0); }
+}
+
+.doc-sheet {
+  width: 100%; max-width: 940px;
+  display: flex; flex-direction: column; min-height: 0;
+  background: var(--card-bg-raised);
+  border: 1px solid var(--card-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg, 0 24px 60px rgba(0,0,0,0.4));
+  overflow-y: auto; position: relative;
+}
+/* The editor needs its version panel beside the body, so it takes the room. */
+.doc-sheet:has(.wb-editor-split) { max-width: 1180px; }
+
+.doc-bar {
+  position: sticky; top: 0; z-index: 3;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  background: var(--card-bg-raised);
+  border-bottom: 1px solid var(--hairline);
+}
+.doc-bar-crumb {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--d400);
+}
+.doc-bar-crumb svg { flex-shrink: 0; }
+.doc-bar-sep { color: var(--d600); }
+.doc-bar-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.doc-close {
+  width: 30px; height: 30px; border-radius: var(--r-md);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.09);
+  color: var(--d400); cursor: pointer;
+  transition: background-color var(--t-fast), color var(--t-fast);
+}
+.doc-close:hover { background: rgba(255,255,255,0.1); color: var(--d50); }
+:root[data-theme="light"] .doc-close { background: rgba(16,24,40,0.04); border-color: rgba(16,24,40,0.10); }
+.doc-scroll { padding: 20px 22px 28px; }
+.doc-scroll .doc-view { max-width: none; border: 0; background: none; padding: 0; }
+.doc-scroll .toolbar,
+.doc-scroll .ver-list,
+.doc-scroll .ai-suggestion,
+.doc-scroll .comment,
+.doc-scroll .comment-thread { max-width: none; }
+.doc-scroll .ver-list { padding: 0 8px; }
+.doc-scroll > .toolbar { position: sticky; top: 54px; z-index: 2; margin-bottom: 14px; }
+.doc-scroll .ai-suggestion { margin-top: 14px; }
+.doc-scroll .comment-thread { margin-top: 16px; }
+
+.dv-title { font-family: var(--font-display); }
+.dv-section { margin-top: 18px; }
+.dv-section-label,
+.ver-panel-label {
+  font-size: 10px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider); text-transform: uppercase;
+  color: var(--d500); margin-bottom: 8px;
+}
+.dv-aud {
+  background: none; border: 0; padding: 0 6px 0 0; cursor: pointer; font-family: inherit;
+  font-size: inherit; font-weight: inherit; color: inherit;
+  border-bottom: 1px dotted var(--d600);
+}
+.dv-aud:hover { color: var(--accent); }
+
+/* Grounding — governance, stated on the document it governs */
+.dv-grounding {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 0; margin-top: 2px;
+  border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+}
+.dv-ground-list { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dv-ground {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: var(--r-pill);
+  font-size: var(--fs-2xs); font-weight: var(--fw-semibold);
+  border: 1px solid var(--card-border); color: var(--d500);
+}
+.dv-ground.is-on { background: var(--ok-bg); border-color: rgba(23,178,106,0.28); color: var(--ok); }
+.dv-ground.is-on.is-external { background: var(--warn-bg); border-color: rgba(247,144,9,0.3); color: var(--warn); }
+.dv-ground-edit {
+  margin-left: auto; background: none; border: 0; cursor: pointer; font-family: inherit;
+  font-size: var(--fs-2xs); font-weight: var(--fw-semibold); color: var(--d400);
+  transition: color var(--t-fast);
+}
+.dv-ground-edit:hover { color: var(--accent); }
+
+.dv-prov-act { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 4px; }
+.dv-prov-note { font-size: var(--fs-2xs); color: var(--warn); }
+.dv-prov-val .status-dot { margin-right: 5px; }
+
+.dv-props { padding: 12px 0; border-top: 1px solid var(--hairline); }
+.dv-prop-list { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.dv-prop {
+  display: inline-flex; align-items: stretch; overflow: hidden;
+  border: 1px solid var(--card-border); border-radius: var(--r-sm);
+  background: none; cursor: pointer; font-family: var(--font-mono);
+  transition: border-color var(--t-fast);
+}
+.dv-prop:hover { border-color: var(--card-border-hover); }
+.dv-prop-k { padding: 3px 7px; font-size: 10px; color: var(--d500); background: rgba(255,255,255,0.04); }
+.dv-prop-v { padding: 3px 7px; font-size: 10px; color: var(--d200); }
+:root[data-theme="light"] .dv-prop-k { background: rgba(16,24,40,0.04); }
+
+.dv-versions { margin-top: 16px; border-top: 1px solid var(--hairline); padding-top: 12px; }
+.dv-versions-head {
+  cursor: pointer; list-style: none;
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider); text-transform: uppercase; color: var(--d500);
+}
+.dv-versions-head::-webkit-details-marker { display: none; }
+.dv-versions-head::before { content: "▸ "; color: var(--d600); }
+.dv-versions[open] .dv-versions-head::before { content: "▾ "; }
+.dv-versions-n {
+  margin-left: 4px; padding: 1px 6px; border-radius: var(--r-pill);
+  background: rgba(255,255,255,0.06); color: var(--d400);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-theme="light"] .dv-versions-n { background: rgba(16,24,40,0.06); }
+.dv-versions .ver-list { margin-top: 10px; }
+
+.comment-compose { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.comment-compose .field-input { flex: 1; }
+.icon-btn.is-ai svg { display: block; }
+
+/* Selection-scope AI menu, positioned against the sheet */
+.doc-sheet .ai-menu { position: absolute; z-index: 5; }
+
+/* ═══════════════════════════════════════════════
+   THE EDITOR — properties, versions, placeholder
+
+   Restored. These rules were destroyed by a bulk deletion that cut a range
+   between two section markers without checking what was inside it. The audit
+   in ../README.md — every class the JS renders must resolve to a rule — is the
+   check that catches this, and it is a script rather than an eyeball.
+═══════════════════════════════════════════════ */
+.editor-side .ds-tabs { margin-bottom: 12px; }
+.editor-side .ds-tabpanel { padding: 0; }
+
+.props { display: flex; flex-direction: column; gap: 10px; }
+.prop-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; align-items: center; }
+.prop-row.is-stack { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.prop-label {
+  font-size: 10px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+}
+/* The control and its explanation stack, so the sentence reads as belonging to
+   the field above it rather than to the row beside it. */
+.prop-status { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.prop-why { font-size: 10px; color: var(--d500); line-height: var(--lh-snug); }
+
+/* Property dropdowns read as fields, not as the filter row's buttons. */
+.k-prop { width: 100%; }
+.k-prop .v2-dropdown-btn {
+  width: 100%; justify-content: space-between;
+  height: 30px; padding: 0 9px; border-radius: var(--r-sm);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  background: var(--card-bg-raised); border-color: var(--card-border); color: var(--d100);
+}
+.k-prop .v2-dropdown-btn:hover { border-color: var(--card-border-hover); }
+.k-prop .v2-dropdown-btn svg { width: 9px; height: 6px; opacity: 0.6; }
+.k-prop .v2-dropdown-panel { min-width: 100%; }
+
+.props .tag-input { max-width: none; padding: 5px 6px; }
+.props .tag-input input { font-size: var(--fs-xs); }
+.prop-checks { display: flex; flex-direction: column; gap: 5px; }
+.prop-checks .ds-choice { display: flex; align-items: center; gap: 7px; }
+.prop-check-label { font-size: var(--fs-xs); color: var(--d200); }
+
+.prop-custom { display: flex; flex-direction: column; gap: 5px; }
+.prop-kv { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 24px; gap: 5px; align-items: center; }
+.prop-kv .field-input { height: 28px; padding: 0 8px; font-size: var(--fs-xs); }
+.prop-kv-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border: 0; border-radius: var(--r-sm);
+  background: none; color: var(--d500); cursor: pointer;
+  transition: color var(--t-fast), background-color var(--t-fast);
+}
+.prop-kv-x:hover { color: var(--err); background: var(--err-bg); }
+.prop-add {
+  align-self: flex-start; background: none; border: 0; padding: 2px 0; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-2xs); font-weight: var(--fw-semibold); color: var(--accent);
+}
+.prop-add:hover { opacity: 0.75; }
+
+/* Versions are pressable in the editor, and the one you opened says so. */
+.ver-item.is-pickable {
+  width: 100%; text-align: left; border: 0; background: none;
+  font-family: inherit; cursor: pointer;
+  transition: background-color var(--t-fast);
+}
+.ver-item.is-pickable:hover { background: rgba(255,255,255,0.05); }
+:root[data-theme="light"] .ver-item.is-pickable:hover { background: rgba(16,24,40,0.05); }
+.ver-item.is-pickable:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.ver-item.is-viewing { background: var(--accent-dim); }
+.ver-hint { font-size: 10px; color: var(--d500); margin-top: 10px; line-height: var(--lh-snug); }
+
+.ver-preview {
+  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+  padding: 9px 12px; margin-bottom: 14px;
+  border-radius: var(--r-md);
+  background: var(--accent-dim); border: 1px solid rgba(var(--accent-rgb), 0.3);
+  font-size: var(--fs-xs); color: var(--d100);
+}
+.ver-preview svg { flex-shrink: 0; color: var(--accent); }
+.ver-preview-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* A placeholder, not content. It was a <p> inside the contenteditable, which
+   made it real text: it looked publishable because it was. */
+.dv-body.is-blank { min-height: 120px; }
+/* Keyed off .is-blank, not :empty — the element carries whitespace text nodes
+   from the template, and :empty counts those as content. */
+.dv-body.is-blank[data-placeholder]::before {
+  content: attr(data-placeholder);
+  color: var(--d500); font-style: italic; pointer-events: none;
+}
+
+/* Overridden status carries a marker wherever it shows. */
+.trust-state.is-pinned { position: relative; }
+.pin-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: currentColor; opacity: 0.75; margin-left: 1px; flex-shrink: 0;
+}
+
+.commit-typed { margin-top: 14px; }
+.cite-action.is-danger { color: var(--err); }
+.cite-action.is-danger:hover { color: var(--err); opacity: 0.8; }
+.skeleton-line { height: 11px; border-radius: var(--r-xs); }
+
+/* ═══════════════════════════════════════════════
+   CONFLICT — two documents, one choice
+═══════════════════════════════════════════════ */
+.conflict-pair {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+}
+.conflict-side {
+  display: flex; flex-direction: column; gap: 7px;
+  padding: 12px; border-radius: var(--r-md);
+  border: 1px solid var(--card-border); background: var(--card-bg);
+}
+.conflict-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.conflict-title {
+  font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--d50);
+  line-height: var(--lh-snug);
+}
+.conflict-body { font-size: var(--fs-xs); color: var(--d300); line-height: var(--lh-base); }
+.conflict-meta { font-size: 10px; color: var(--d500); margin-top: auto; }
+.conflict-side .entry-action { align-self: flex-start; }
+
+/* What you did with a proposal, written into the message it belongs to. */
+.ai-outcome {
+  display: flex; align-items: center; gap: 6px; margin-top: 8px;
+  padding-top: 8px; border-top: 1px solid var(--hairline);
+  font-size: var(--fs-2xs); font-weight: var(--fw-semibold);
+}
+.ai-outcome.is-accept { color: var(--ok); }
+.ai-outcome.is-reject { color: var(--d500); }
+.ai-suggestion ins.is-editing {
+  outline: 2px solid var(--brand); outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* ═══════════════════════════════════════════════
+   DROP LAYER
+═══════════════════════════════════════════════ */
+.drop-layer {
+  position: fixed; inset: 0; z-index: 930;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20, 27, 34, 0.55);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  opacity: 0; pointer-events: none;
+}
+:root[data-theme="light"] .drop-layer { background: rgba(238, 242, 246, 0.7); }
+.drop-layer.open { opacity: 1; }
+/* display:flex above outranks the UA's [hidden] rule, so state it here too. */
+.drop-layer[hidden] { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .drop-layer { transition: opacity var(--t-fast) var(--ease-out); }
+}
+.drop-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 34px 46px; border-radius: var(--r-xl);
+  background: var(--card-bg-raised);
+  border: 2px dashed rgba(var(--accent-rgb), 0.5);
+  color: var(--accent); text-align: center;
+}
+.drop-title { font-size: var(--fs-md); font-weight: var(--fw-bold); color: var(--d50); }
+.drop-sub { font-size: var(--fs-xs); color: var(--d500); max-width: 34ch; }
+.drop-hint { color: var(--d500); font-style: italic; }
+
+/* ═══════════════════════════════════════════════
+   CONVERSATION BLOCKS
+
+   Governance and source health used to be a panel above the grid. They are
+   answers now, so they are built from the answer surface's own parts and only
+   add the shapes an answer did not already have.
+═══════════════════════════════════════════════ */
+.conv-facts {
+  display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap;
+  padding: 10px 0; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+}
+.conv-fact { display: flex; flex-direction: column; gap: 1px; }
+.conv-fact-v {
+  font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--d100);
+  font-variant-numeric: tabular-nums;
+}
+.conv-fact-l { font-size: 10px; color: var(--d500); }
+.conv-code { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--err); }
+
+.conv-label {
+  font-size: 10px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+}
+.conv-ground { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+
+.conv-log { display: flex; flex-direction: column; gap: 5px; }
+.conv-log-row { display: flex; align-items: center; gap: 9px; font-size: var(--fs-xs); }
+.conv-log-when { width: 60px; flex-shrink: 0; color: var(--d500); font-variant-numeric: tabular-nums; }
+.conv-log-note { color: var(--d300); }
+
+.answer-apply { flex-wrap: wrap; }
+
+/* The chip's label opens the conversation about that axis; its × still just
+   removes the filter. Two targets in one chip, so both need to read as one. */
+.ctx-ask {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: inherit; font-weight: inherit; color: inherit;
+  border-bottom: 1px dotted currentColor;
+}
+.ctx-ask:hover { color: var(--accent); }
+.ctx-ask:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* The way into a collection's or a source's conversation, on the one line that
+   is already saying what you filtered to. */
+.rm-ask {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: inherit; font-weight: var(--fw-semibold);
+  color: var(--accent); border-bottom: 1px dotted currentColor;
+}
+.rm-ask:hover { opacity: 0.75; }
+.rm-ask:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* The choice forms inside a commit surface. They were named for the axis panel
+   that used to open them; the panel is gone and the forms are not. */
+.commit-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.commit-choice { display: flex; align-items: center; gap: 9px; }
+.commit-choice-label { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--d100); }
+.commit-choice-label .gov-ext { display: inline; margin-left: 6px; }
+.retain-note { font-size: var(--fs-xs); color: var(--d500); margin-top: 12px; line-height: var(--lh-base); }
+
+/* Nothing to save, so this is a state and not a button. */
+.doc-saved {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-2xs); font-weight: var(--fw-semibold); color: var(--d500);
+  margin-right: 2px;
+}
+.doc-saved svg { color: var(--ok); }
 
 /* ═══════════════════════════════════════════════
    UTILITIES
