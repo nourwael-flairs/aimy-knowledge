@@ -1,0 +1,1262 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   knowledge.css — AiMY Knowledge v2, product chrome only
+   ───────────────────────────────────────────────────────────────────────
+   Everything here is layout and product shell. No component lives in this
+   file. If a rule here starts describing what a component looks like, it
+   belongs in the design system instead — a component built inside Knowledge
+   will not travel correctly into a consuming agent (direction §13).
+
+   The shell is legitimately product-owned: design-system.md §navigation
+   states the shared topnav is "maintained centrally, outside this system",
+   and .app-topnav / .app-sidebar / .app-main exist there only as the
+   #shell-css sample. Ported from AiMY/QA so the two agents are structurally
+   identical, with two corrections applied on the way across:
+     · --transition-fast → --t-fast    (QA used a token that does not exist)
+     · --qa-accent       → --accent    (withdrawn, design-system.md §10.8)
+
+   Knowledge keeps the default --accent (#8b4ff4). No re-theme this round.
+
+   Components used by the shell come from the design system, not from here:
+   .nav-item · .tabs-strip/.tab · .avatar · .user-pill · .aimy-float-bar ·
+   .aimy-overlay. This file positions them; it does not restyle them.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════
+   FORM-CONTROL RESET
+
+   The design system's base has no reset for form controls, and most of its
+   specimens are <div>s, so the omissions never surface on the documentation
+   page. On the correct interactive elements they do:
+
+     · <button> does not inherit font-family — the topnav tabs rendered in
+       Arial instead of Urbanist;
+     · .tab declares no background at all (its specimen is a <div>), so on a
+       <button> the UA's buttonface showed through — light chips on the dark
+       shell, which read as the navbar rendering in light mode.
+
+   Tabs are interactive and must be buttons, so this restores the neutral
+   canvas the components assume. Nothing here sets a colour, size or spacing;
+   it is a reset, not a restyle. Filed in ../GAPS.md.
+═══════════════════════════════════════════════ */
+input, select, textarea { font-family: inherit; }
+
+/* Element-selector specificity (0,0,1), so any component class that sets these
+   still wins — .btn, .entry-action, .filter-chip, .ds-theme-toggle and the
+   rest are untouched. What it removes is only what the UA supplies where no
+   class does:
+     background → .tab showed the buttonface as a light chip on a dark shell
+     border     → .link showed `2px outset`, since it only sets border-bottom
+     font       → every button rendered in Arial, not Urbanist
+     color      → .rq-row computed to black text
+   Buttons only: native checkbox and radio need their appearance and the
+   library relies on them. */
+button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* ═══════════════════════════════════════════════
+   BUTTON HEIGHTS — deterministic, not inherited
+
+   `font: inherit` on the reset above also inherits LINE-HEIGHT, and none of
+   the .btn classes set their own. So a button's height depended on whatever
+   container it landed in: .btn-sm rendered 29px inside Governance's table and
+   settings rows, and 25px everywhere else. Same class, two heights, which is
+   what makes one button look subtly wrong beside another.
+
+   Explicit line-heights reproduce the design system's own measured sizes
+   (32 / 25 / 37) and make them independent of context. The library has the
+   same latent fragility — its 32px is only 32 because of what it inherits on
+   the documentation page. Filed in ../GAPS.md.
+═══════════════════════════════════════════════ */
+.btn    { line-height: 16px; }
+/* .entry-action is a different component with its own padding, so pairing it
+   with a .btn in one row leaves a 2px step. Matched where they sit together. */
+.dv-actions .entry-action, .dv-actions .btn { min-height: 34px; }
+.btn-sm { line-height: 15px; }
+.btn-lg { line-height: 17px; }
+
+/* ═══════════════════════════════════════════════
+   COPY BUTTON — restored
+
+   Dropped during extraction as documentation chrome, because on the library's
+   own page .copy-btn is the "Copy code" control. But .copy-field — a real
+   component this product uses — embeds a .copy-btn in its anatomy, so dropping
+   it left the settings API-key field with an unstyled button whose unsized SVG
+   expanded to 37px. Exactly the failure the extraction header warns about; I
+   applied the judgment to the wrong element.
+═══════════════════════════════════════════════ */
+.copy-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-sans); font-size: 10px; font-weight: var(--fw-bold);
+  line-height: 14px; padding: 4px 9px; border-radius: var(--r-sm);
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  color: var(--d400); cursor: pointer; white-space: nowrap;
+  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.copy-btn:hover { background: rgba(255,255,255,0.1); color: var(--d100); border-color: rgba(255,255,255,0.18); }
+.copy-btn.copied { background: var(--ok-bg); border-color: rgba(23,178,106,0.3); color: var(--ok); }
+.copy-btn svg { width: 11px; height: 11px; flex-shrink: 0; }
+:root[data-theme="light"] .copy-btn {
+  background: rgba(16,24,40,0.05); border-color: rgba(16,24,40,0.12); color: var(--d500);
+}
+:root[data-theme="light"] .copy-btn:hover { background: rgba(16,24,40,0.10); color: var(--d100); }
+
+/* Small uppercase labels use --d500, not --d600. Measured on the real
+   surfaces, --d600 lands at 4.22 / 4.00 / 3.89 against card / raised / body —
+   above the design system's stated >=3:1 bar but under WCAG AA's 4.5:1 for
+   small text. --d500 is 4.94 / 4.69 / 4.56 and passes everywhere, at a
+   difference the eye does not register. See ../GAPS.md. */
+
+/* Numerals in data positions are tabular, so columns of figures line up and a
+   changing count does not reflow the text beside it. Proportional digits in a
+   metric row make every update look like a layout shift. */
+.stat-value, .agg-stat-val, .gov-num, .list-meta, .audit-time, .ver-time,
+.ss-num, .agg-val, .rq-count, .nav-count, .dtable td, .conf-val,
+.progress-bar-value { font-variant-numeric: tabular-nums; }
+
+.memory-panel { max-width: none; }
+
+/* ═══════════════════════════════════════════════
+   AIMY TOAST — corrected to its documented spec
+
+   The library's #canvas-toast anatomy table and the CSS in the same file
+   describe two different components. The table (and the published design
+   system) specify a bottom-CENTRE toast: accent-tinted icon, row layout with
+   a vertical divider, AI-gradient countdown over 5s. The stylesheet still
+   implements an older one: bottom-right, green success chip, column layout,
+   horizontal divider, --ok fill over 4s.
+
+   The table is the spec people read and the one published, so it wins. Every
+   value below is quoted from it, not invented here. Filed in ../GAPS.md — the
+   correction belongs in the library, not in each product.
+═══════════════════════════════════════════════ */
+.aimy-toast {
+  bottom: 90px; left: 50%; right: auto;
+  transform: translateX(-50%) translateY(20px) scale(0.97);
+  flex-direction: row; align-items: center; gap: 12px;
+  padding: 12px 16px;
+  visibility: hidden;
+  position: fixed; overflow: hidden;
+}
+.aimy-toast.visible {
+  transform: translateX(-50%) translateY(0) scale(1);
+  visibility: visible;
+}
+.aimy-toast-icon {
+  width: 30px; height: 30px; border-radius: 9px;
+  background: rgba(var(--accent-rgb), 0.1);
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+}
+.aimy-toast-icon svg { width: 13px; height: 15px; stroke: none; }
+.aimy-toast-body { flex-direction: column; gap: 1px; flex: 1; align-items: flex-start; }
+.aimy-toast-title { letter-spacing: -0.005em; margin-bottom: 0; }
+/* Vertical rule between the message and the undo, not a horizontal one. */
+.aimy-toast-divider { width: 1px; height: 28px; flex-shrink: 0; margin: 0; }
+.aimy-toast-progress {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 2.5px; border-radius: 0; background: none;
+}
+.aimy-toast-progress-fill {
+  background: var(--ai);
+  transform-origin: left center;
+  animation: kToastCountdown 5s linear forwards;
+}
+@keyframes kToastCountdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+/* Spec says #61adf1 — that is --ai-text, which the CSS renders as --brand.
+   Using the token rather than the literal keeps it legible in light mode. */
+.aimy-toast-undo { color: var(--ai-text); }
+.aimy-toast-undo:hover { color: var(--d50); }
+@media (prefers-reduced-motion: reduce) {
+  /* The bar states remaining time, so freeze it filled rather than remove it. */
+  .aimy-toast-progress-fill { animation: none; transform: scaleX(1); }
+}
+
+/* Answer-coverage chart. Bands are labelled in the legend with their current
+   share, so the composition is readable without decoding colour — and the
+   number beside each label is the thing people actually quote. */
+.cov-chart { display: block; border-radius: var(--r-sm); overflow: hidden; }
+.cov-legend {
+  display: flex; flex-wrap: wrap; gap: 6px 16px;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+}
+.cov-key { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); }
+.cov-swatch { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+.cov-key-label { color: var(--d400); }
+.cov-key-val { color: var(--d100); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
+
+/* ═══════════════════════════════════════════════
+   SETTINGS — preferences only
+
+   Deliberately thin. Everything that changes what the corpus DOES is in
+   Governance, because the direction classes those as operational decisions
+   rather than preferences. Uses the library's .settings-list / .settings-row
+   throughout; no settings component is invented here.
+═══════════════════════════════════════════════ */
+.set-section { margin-bottom: 26px; }
+.set-section-title {
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider); text-transform: uppercase;
+  color: var(--d500); margin-bottom: 9px;
+}
+.set-list { max-width: 720px; }
+.set-list .settings-row { gap: 14px; }
+.set-list .avatar { flex-shrink: 0; }
+.set-list .copy-field { max-width: 260px; }
+
+/* ═══════════════════════════════════════════════
+   CANVAS COLUMN — centred on .app-main, matching QA
+
+   The float bar and the overlay both live inside .app-main, so they centre on
+   the content column by default. This block previously compensated by half the
+   sidebar to pull the column onto the window's centre instead.
+
+   Reverted to match QA, which centres on the content column: the bar sits over
+   the content it is asking about, and its centre agrees with the page's own.
+   Nothing to declare — removing the compensation is the whole change.
+═══════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════
+   CANVAS THREAD — soften the scroll edge
+
+   The thread's bottom sits flush against the input bar, so a message caught
+   mid-scroll is cut by a hard horizontal edge. Next to the input pill's own
+   top border that cut reads as a stray rule across the canvas rather than as
+   content continuing below.
+
+   A short mask fades the last 28px, which is the honest signal: there is more
+   under there. The fade is inset from the bottom so the final 16px of padding
+   stays solid — when you ARE at the end, nothing looks faded.
+═══════════════════════════════════════════════ */
+.overlay-thread {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent 100%);
+}
+/* At the end of the thread there is nothing to hint at, so drop the fade —
+   otherwise the last line of the last answer looks perpetually unfinished. */
+.overlay-thread.is-at-end {
+  -webkit-mask-image: none;
+          mask-image: none;
+}
+
+/* ═══════════════════════════════════════════════
+   MODAL FOOTER — an action row, nothing else
+
+   .modal-footer is `display: flex` with align-items defaulting to stretch, so
+   its buttons grew to match the tallest child. With a 44px note panel in the
+   row, .btn-sm rendered 56px instead of its designed 25px — the same class at
+   two sizes in two modals, which reads as a rendering fault on the one surface
+   that has to look trustworthy.
+
+   Centred, and the footer now carries decisions only: the reversibility
+   statement moved into the effect list where it belongs.
+═══════════════════════════════════════════════ */
+.modal-footer { align-items: center; }
+
+/* ═══════════════════════════════════════════════
+   POINTER TARGETS — WCAG 2.2 SC 2.5.8 (24×24 minimum)
+
+   Three controls draw smaller than the minimum: .audit-revert at 52×16,
+   .filter-chip at 22px tall, and the working-set checkbox at 18×18. The hit
+   area is extended without changing how any of them looks — growing the
+   visible control would break the density these surfaces depend on, and the
+   success criterion is about the target, not the ink.
+═══════════════════════════════════════════════ */
+.audit-revert, .filter-chip { position: relative; }
+.audit-revert::after, .filter-chip::after {
+  content: ""; position: absolute;
+  left: 0; right: 0; top: 50%; height: 24px;
+  transform: translateY(-50%);
+}
+/* The checkbox draws at 18px; the label is the real target, so it carries the
+   24px area and the input sits inside it. */
+.ws-item-pick { position: relative; display: inline-flex; min-width: 24px; min-height: 24px;
+  align-items: center; justify-content: center; }
+
+/* The small-button variants land a pixel or two under once padding rounds.
+   min-height rather than more padding, so the drawn size is unchanged. */
+.btn-sm, .bcard-ack-btn, .wb-back, .ss-clear, .agg-more, .td-action, .cite-action,
+.dv-notice-link, .mem-foot .btn, .aimy-toast-undo,
+.v2-dropdown-btn, .dv-rel-item { min-height: 24px; }
+
+/* The text inputs draw 19-20px inside a 54px bar, so most of the pill was dead
+   to the pointer — you could click the thing that looks like a text field and
+   have nothing happen. The input now fills its bar's height, and the bar
+   forwards clicks to it. */
+/* min-height only. align-self:stretch made a one-line field 36px tall against
+   a 20px line-height — two lines' worth of box holding one line of text, which
+   reads as a textarea waiting for a second line. The 24px minimum meets the
+   pointer target on its own, and the bar forwards clicks for the rest. */
+.aimy-float-input, .overlay-input { min-height: 24px; }
+.aimy-float-bar, .overlay-input-bar { cursor: text; }
+
+/* A staged prompt is AiMY-composed and waiting on you, so the bar says so
+   rather than looking like text you typed and abandoned. Accent, because the
+   send is the next step — matching the float bar’s own focus treatment. */
+.overlay-input-bar.is-staged {
+  border-color: rgba(var(--accent-rgb), 0.45);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
+}
+.aimy-float-bar > *:not(.aimy-float-input),
+.overlay-input-bar > *:not(.overlay-input) { cursor: default; }
+
+/* ═══════════════════════════════════════════════
+   ACTIVE SCOPE — always visible once set
+
+   .filter-tray sits at opacity 0 until the input takes focus, so scope-before-
+   query (§7.2) was a core capability nobody could discover, and — worse — once
+   set, scope was invisible while it silently narrowed every answer.
+
+   An answer read without knowing its scope cannot be judged. So the moment
+   scope exists it becomes permanent chrome via .afs, the library's own active-
+   filter strip, and stays until cleared.
+═══════════════════════════════════════════════ */
+.k-scope-strip { margin-bottom: 14px; }
+.k-scope-strip .afs { width: 100%; }
+.k-scope-strip .afs-chip { cursor: pointer; }
+
+/* ═══════════════════════════════════════════════
+   PRESS FEEDBACK
+
+   Nothing in this product acknowledged being pressed. Every control changed
+   state only after its work completed, which on a surface where actions carry
+   consequence reads as the click not landing — so people press again.
+
+   90ms is deliberately below the motion scale's smallest step (--t-fast,
+   150ms). Press-release is the one interaction where 150ms is perceptible as
+   lag: the finger is already up before the surface finishes answering. The
+   scale has no press step; noted in ../GAPS.md.
+
+   Scale is proportional to the surface. A 570px briefing card moving 3% is a
+   lurch; a 32px button moving 3% is a press.
+═══════════════════════════════════════════════ */
+:root { --t-press: 90ms; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .btn, .entry-action, .filter-chip, .seg-btn, .bcard-ack-btn, .overlay-sugg-chip,
+  .gov-toggle, .audit-revert, .cite-action, .td-action, .dv-rel-item, .icon-btn,
+  .topnav-bell, .ds-theme-toggle, .aimy-float-send, .overlay-send, .overlay-close,
+  .agg-more, .ss-clear, .wb-back, .tab, .nav-item, .bcard-dismiss-reason {
+    transition: transform var(--t-press) var(--ease-out),
+                background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+  }
+  .btn:active, .entry-action:active, .filter-chip:active, .seg-btn:active,
+  .bcard-ack-btn:active, .overlay-sugg-chip:active, .gov-toggle:active,
+  .audit-revert:active, .cite-action:active, .td-action:active, .dv-rel-item:active,
+  .icon-btn:active, .topnav-bell:active, .ds-theme-toggle:active,
+  .aimy-float-send:active, .overlay-send:active, .overlay-close:active,
+  .agg-more:active, .ss-clear:active, .wb-back:active, .tab:active,
+  .nav-item:active, .bcard-dismiss-reason:active { transform: scale(0.97); }
+
+  /* Large surfaces move less — the same 3% reads as a lurch at card scale. */
+  .rq-row, .src-row, .type-card, .list-row {
+    transition: transform var(--t-press) var(--ease-out), background-color var(--t-fast);
+  }
+  .rq-row:active, .src-row:active, .type-card:active, .list-row:active { transform: scale(0.995); }
+}
+
+/* ═══════════════════════════════════════════════
+   ENTRY STAGGER
+
+   The briefing arrives as one block of nine, which reads as a page repaint
+   rather than a set of findings. A short cascade gives the eye an order to
+   follow — and the order is the priority order composition already computed,
+   so the motion carries the same information the ranking does.
+
+   40ms per item, capped: past ~8 the delay would outlast the reading.
+   Decorative, so it never gates interaction and vanishes under reduced motion.
+═══════════════════════════════════════════════ */
+@media (prefers-reduced-motion: no-preference) {
+  /* Batch entry — a list that renders all at once. Index set in JS. */
+  .k-stagger > * {
+    opacity: 0;
+    transform: translateY(6px);
+    animation: kEnter 240ms var(--ease-out) forwards;
+    animation-delay: calc(min(var(--i, 0), 8) * 40ms);
+  }
+  /* Single entry — a block replacing its own skeleton. No delay: the
+     resolution order already supplies the cascade, and adding a second one on
+     top would double-count it. */
+  .k-enter {
+    opacity: 0; transform: translateY(6px);
+    animation: kEnter 240ms var(--ease-out) forwards;
+  }
+  @keyframes kEnter { to { opacity: 1; transform: translateY(0); } }
+}
+
+/* ═══════════════════════════════════════════════
+   SHELL — topnav → sidebar → scrollable main
+═══════════════════════════════════════════════ */
+body {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Ambient background layer. Sits on the body bg, below every surface.
+   Not decoration hung on a component — no component may depend on it. */
+#appEllipse {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 0; overflow: hidden;
+}
+/* Matched to AiMY/QA/my-profile.html. The design system's --grad-ellipse-*
+   carry these exact colour stops but centre them at 30% 50% / 75% 70%, which
+   is tuned for the documentation page's narrow column. QA re-centres both to
+   `at center` and positions the pseudo-element instead. Same override here,
+   so the two products sit on one ambient wash. */
+:root {
+  /* QA's dark body is #171a1c; the design system's token is #0f1215. Matching
+     QA here, since the ellipse alphas above are calibrated against it — the
+     darker DS body makes the same wash read as a visible blue bloom. */
+  --body-bg: #171a1c;
+  --grad-ellipse-1: radial-gradient(ellipse at center,
+    rgba(0, 102, 255, 0.18) 0%, rgba(97, 173, 241, 0.1) 28%, transparent 60%);
+  --grad-ellipse-2: radial-gradient(ellipse at center,
+    rgba(111, 223, 226, 0.1) 0%, rgba(139, 79, 244, 0.07) 38%, transparent 60%);
+}
+/* Light gets its own alphas rather than an opacity multiplier on the layer —
+   at dark alphas these read as haze on a white body. QA's values. */
+:root[data-theme="light"] {
+  --grad-ellipse-1: radial-gradient(ellipse at center,
+    rgba(0, 102, 255, 0.07) 0%, rgba(97, 173, 241, 0.04) 28%, transparent 60%);
+  --grad-ellipse-2: radial-gradient(ellipse at center,
+    rgba(111, 223, 226, 0.05) 0%, rgba(139, 79, 244, 0.035) 38%, transparent 60%);
+}
+#appEllipse::before {
+  content: ""; position: absolute;
+  top: 42%; left: 50%; transform: translate(-50%, -50%);
+  width: 1300px; height: 1050px;
+  background: var(--grad-ellipse-1);
+}
+#appEllipse::after {
+  content: ""; position: absolute;
+  bottom: -8%; right: -4%;
+  width: 750px; height: 650px;
+  background: var(--grad-ellipse-2);
+}
+
+/* ═══════════════════════════════════════════════
+   TOPNAV — ported verbatim from AiMY/QA
+
+   Values copied exactly from QA/data-ingestion.html so the two agents share
+   one masthead. QA's own local classes are used (.topnav-tabs-inner,
+   .topnav-tab, .topnav-user) rather than the design system's .tabs-strip /
+   .tab / .user-pill, because the library states the shared topnav is
+   "maintained centrally, outside this system" — matching QA is the point.
+
+   Three deliberate departures, each stated rather than smuggled:
+
+     · The calls button is removed, as asked.
+     · Tabs stay <button>, not QA's <div>. A div is not focusable and
+       announces as nothing, so QA's product tabs cannot be reached from the
+       keyboard. The visual is identical.
+     · The strip is centred on the window, not on the space left between the
+       logo and the user pill — carried over from the earlier centring fix.
+═══════════════════════════════════════════════ */
+.app-topnav {
+  height: var(--topbar-height);
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  display: flex;
+  align-items: center;
+  padding: 0 20px 0 24px;
+  gap: 0;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 100;
+}
+:root[data-theme="light"] .app-topnav { border-bottom-color: var(--card-border); }
+
+.topnav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-right: 20px;
+  margin-right: 4px;
+}
+.topnav-logo-mark { display: flex; align-items: center; flex-shrink: 0; }
+.topnav-logo svg { display: block; height: 32px; width: auto; }
+
+.topnav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 1;
+  justify-content: center;
+}
+.topnav-tabs-inner {
+  display: flex;
+  align-items: center;
+  border: 0.75px solid #5b6771;
+  border-radius: 24px;
+  padding: 3px;
+  gap: 2px;
+}
+/* Some entries are <button> (agents this prototype does not contain) and the
+   QA entry is a real <a> to the deployed product, so the class has to render
+   identically on both. */
+.topnav-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+  padding: 5px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--d400);
+  cursor: pointer;
+  transition: background-color var(--t-fast), color var(--t-fast), border-color var(--t-fast),
+              transform var(--t-press) var(--ease-out);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  background: none;
+  font-family: inherit;
+}
+.topnav-tab:hover { background: rgba(255, 255, 255, 0.05); color: var(--d200); }
+.topnav-tab.active { color: var(--accent); }
+.topnav-tab svg { width: 13px; height: 14px; flex-shrink: 0; }
+.topnav-tab:active { transform: scale(0.97); }
+.topnav-tab:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+:root[data-theme="light"] .topnav-tabs-inner { border-color: rgba(16, 24, 40, 0.22); }
+:root[data-theme="light"] .topnav-tab:hover { background: rgba(16, 24, 40, 0.05); color: var(--d100); }
+
+.topnav-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.topnav-bell {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--t-fast), color var(--t-fast), transform var(--t-press) var(--ease-out);
+  color: var(--d400);
+  position: relative;
+}
+.topnav-bell:hover { background: rgba(255, 255, 255, 0.08); color: var(--d200); }
+.topnav-bell svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; }
+.bell-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--err);
+  border: 1.5px solid var(--body-bg);
+}
+
+.topnav-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: border-color var(--t-fast), background-color var(--t-fast), transform var(--t-press) var(--ease-out);
+}
+.topnav-user:hover { border-color: rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.07); }
+.topnav-user:active { transform: scale(0.97); }
+.topnav-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #3369ff);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.topnav-user-info { display: flex; flex-direction: column; gap: 1px; }
+.topnav-user-name { font-size: 12px; font-weight: 700; color: var(--d50); line-height: 1; }
+.topnav-user-role { font-size: 10px; color: var(--d400); line-height: 1; }
+.topnav-user svg { width: 12px; height: 12px; color: var(--d400); }
+:root[data-theme="light"] .topnav-bell,
+:root[data-theme="light"] .topnav-user {
+  background: rgba(16, 24, 40, 0.04); border-color: rgba(16, 24, 40, 0.10);
+}
+
+/* Equal flanks so the strip centres on the WINDOW, not on the space left
+   between the logo and the user pill. Overrides QA's `flex: 1` on .topnav-tabs
+   for the same reason as before: QA's version leans right by half the sidebar.
+
+   The logo's padding-right: 20px and margin-right: 4px exist in QA to separate
+   it from the CALLS BUTTON. With that button removed they are vestigial, and
+   they unbalance the flanks by 28px — pushing the strip 14px right. Dropping
+   them follows from removing the button rather than departing from QA. */
+.topnav-logo { padding-right: 0; margin-right: 0; }
+.topnav-logo, .topnav-right { flex: 1 1 0; min-width: 0; }
+.topnav-tabs { flex: 0 1 auto; min-width: 0; }
+.topnav-right { justify-content: flex-end; }
+.topnav-right > * { flex-shrink: 0; }
+
+/* Below this the six ecosystem tabs and a full user pill cannot both fit.
+   The avatar survives; the name is the thing that can be dropped. */
+@media (max-width: 1120px) {
+  .topnav-user-info { display: none; }
+  .topnav-user { padding: 4px; }
+}
+
+.topnav-bell {
+  width: 34px; height: 34px; border-radius: var(--r-md);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--d400); cursor: pointer; position: relative;
+  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.topnav-bell:hover { background: rgba(255,255,255,0.08); color: var(--d200); }
+.topnav-bell svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+.bell-dot {
+  position: absolute; top: 6px; right: 6px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--err); border: 1.5px solid var(--body-bg);
+}
+:root[data-theme="light"] .topnav-bell {
+  background: rgba(16,24,40,0.04); border-color: rgba(16,24,40,0.10);
+}
+:root[data-theme="light"] .topnav-bell:hover { background: rgba(16,24,40,0.07); }
+:root[data-theme="light"] .user-pill {
+  background: rgba(16,24,40,0.04); border-color: rgba(16,24,40,0.10);
+}
+
+/* Theme toggle — moved here from the design system's documentation chrome */
+.ds-theme-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: var(--r-md);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--d400); cursor: pointer;
+  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.ds-theme-toggle:hover { border-color: var(--card-border-hover); color: var(--d50); }
+.ds-theme-toggle svg { width: 16px; height: 16px; display: block; }
+.ds-theme-toggle .icon-moon { display: none; }
+.ds-theme-toggle .icon-sun  { display: block; }
+:root[data-theme="light"] .ds-theme-toggle {
+  background: rgba(16,24,40,0.04); border-color: rgba(16,24,40,0.10);
+}
+:root[data-theme="light"] .ds-theme-toggle .icon-sun  { display: none; }
+:root[data-theme="light"] .ds-theme-toggle .icon-moon { display: block; }
+
+.app-body { display: flex; flex: 1; min-height: 0; position: relative; z-index: 1; background: transparent; }
+
+/* SIDEBAR METRICS — QA's, not the design system's.
+
+   The DS ships --sidebar-width: 240px and .nav-item { padding: 10px 14px;
+   gap: 11px }. QA overrides all three, and QA's proportions are the ones we
+   want: a 220px rail with roomier nav items reads as better-managed space
+   than a wider rail holding tighter rows. Overridden here rather than in
+   aimy-ds.css so the extracted stylesheet stays a faithful copy of the
+   library and this divergence stays visible.
+
+   --sidebar-width also drives the canvas column and float bar
+   (see the CANVAS COLUMN block), so both follow automatically. */
+:root { --sidebar-width: 220px; }
+.sidebar-nav .nav-item { padding: 11px 16px; gap: 12px; }
+
+/* No border and no background. The sidebar sits directly on the ambient
+   layer, exactly as in QA — a rule here drew a hard seam down the page and
+   made the sidebar read as a separate surface from the canvas it belongs to. */
+.app-sidebar {
+  width: var(--sidebar-width); flex-shrink: 0;
+  display: flex; flex-direction: column;
+  background: transparent;
+}
+.sidebar-nav {
+  padding: 24px 16px; flex: 1; min-height: 0;
+  display: flex; flex-direction: column; gap: 4px;
+  overflow-y: auto;
+}
+.sidebar-nav::-webkit-scrollbar { width: 4px; }
+.sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+:root[data-theme="light"] .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(16,24,40,0.12); }
+.sidebar-nav .nav-item { max-width: none; }
+.sidebar-section-label {
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;   /* QA's tracking */
+  color: var(--d500);
+  /* 16px matches .nav-item's padding above, so "PRIMARY" and "CONFIGURE"
+     line up with the nav icons beneath them. Moves with nav-item. */
+  padding: 4px 16px 6px; margin-top: 16px;
+}
+.sidebar-section-label:first-child { margin-top: 0; }
+.sidebar-nav .nav-item.is-last-primary { margin-bottom: 0; }
+
+.app-main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; background: transparent; }
+
+/* The scroll container. The float bar is absolutely positioned against
+   .app-main, so it must not live inside this element or it scrolls away. */
+.page-scroll {
+  flex: 1; overflow-y: auto;
+  padding: 24px 32px 100px;   /* QA's .dashboard-scroll */
+}
+
+/* Measure cap. Without it a 1920px viewport gives two 800px columns, which
+   is ~120 characters of 13px text per line — past the point where the eye
+   reliably finds the start of the next line. Capped, columns land near 620px
+   and the briefing stays readable on a large monitor. */
+.page-inner { max-width: 1160px; }
+
+/* ═══════════════════════════════════════════════
+   PAGE HEADER
+═══════════════════════════════════════════════ */
+.page-head { margin-bottom: 20px; }
+.page-head-row { display: flex; align-items: flex-start; gap: 16px; }
+.page-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl); font-weight: var(--fw-extrabold);
+  letter-spacing: var(--ls-tight); color: var(--d50);
+  line-height: var(--lh-tight);
+}
+.page-head-end { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.page-stamp {
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  color: var(--d500);
+}
+
+/* ═══════════════════════════════════════════════
+   BRIEFING REGION — layout only, cards are .bcard
+═══════════════════════════════════════════════ */
+/* The design system's #bcard-extended anatomy names .bcard-body,
+   .bcard-conclusion, .evidence-row, .bcard-action, .severity-dot and
+   .priority-badge — none of which have any CSS (see ../GAPS.md; its
+   specimens are inline-styled). Rather than shim six component classes
+   locally and fork the system, briefing cards here compose from the
+   primitives that ARE implemented: .bcard / .bcard-meta / .bcard-type /
+   .bcard-title / .bcard-evidence / .evidence-pill / .status-dot / .tag /
+   .work-state / .conf-badge / .entry-action / .bcard-ack-row.
+   What remains below is layout, which the product legitimately owns. */
+.briefing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+/* .bcard ships max-width:300px for its documentation specimen; every
+   specimen in the design system overrides it inline. Grid owns width here. */
+.briefing-grid .bcard { max-width: none; padding: 16px; }
+.briefing-grid .bcard-meta { flex-wrap: wrap; }
+.briefing-grid .bcard-title { font-size: var(--fs-base); line-height: var(--lh-base); }
+
+/* Full-bleed rule above the action zone */
+.k-rule { height: 1px; background: var(--hairline); margin: 12px -16px; }
+
+/* Action zone — exactly one primary .entry-action, per §10.3.
+   The action keeps its natural pill width. Stretching it edge to edge turned
+   a button into a banner at card widths above ~500px, and a banner reads as
+   a state rather than as something you press. */
+.k-action-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.k-action-note {
+  flex: 1; min-width: 200px;
+  font-size: var(--fs-xs); color: var(--d500);
+  line-height: var(--lh-snug);
+}
+.briefing-grid > .is-wide { grid-column: 1 / -1; }
+@media (max-width: 1180px) {
+  .briefing-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Section rule between the ranked briefing and the trailing trend/confirmation
+   blocks. §10.3 ranks 8 and 9 last: valuable, never urgent. */
+.briefing-tail-label {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 10px;
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider); text-transform: uppercase;
+  color: var(--d500); margin-top: 6px;
+}
+.briefing-tail-label::after {
+  content: ""; flex: 1; height: 1px; background: var(--hairline);
+}
+
+/* ═══════════════════════════════════════════════
+   WORKBENCH — working set layout
+═══════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════
+   CANVAS STACKING
+
+   The design system ships .aimy-float-wrap and .aimy-overlay BOTH at
+   z-index 10, so which one wins is decided by DOM order alone. That is not
+   a stacking order, it is a coincidence — and it broke here the moment the
+   float bar was raised. AiMY QA resolves it at 200 / 500; Knowledge adopts
+   the same numbers so the two agents stack identically. Filed in ../GAPS.md.
+═══════════════════════════════════════════════ */
+.aimy-float-wrap { z-index: 200; }
+.aimy-overlay    { z-index: 500; }
+
+/* The canvas basis — "Based on …". Absolutely positioned below the badge so
+   it cannot disturb the thread's flex layout. Not in the design system;
+   QA had to build it locally too, which is the argument for the system
+   owning it (../GAPS.md). */
+.overlay-context-bar {
+  position: absolute; top: 66px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px;
+  white-space: nowrap; max-width: calc(100% - 140px);
+  overflow: hidden; pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--t-base) 150ms ease;
+}
+.aimy-overlay.open .overlay-context-bar { opacity: 1; }
+/* .overlay-thread's 80px top padding clears the badge alone. With the basis
+   bar below it the first message lands underneath — so make room, but only
+   when there is a basis to show. */
+.aimy-overlay:has(.overlay-context-tag) .overlay-thread { padding-top: 104px; }
+.overlay-context-label {
+  font-size: var(--fs-2xs); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--d500); flex-shrink: 0;
+}
+.overlay-context-tags { display: flex; align-items: center; gap: 4px; overflow: hidden; }
+.overlay-context-tag {
+  font-size: var(--fs-2xs); font-weight: var(--fw-semibold);
+  color: var(--d400);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-pill);
+  padding: 2px 8px; white-space: nowrap; flex-shrink: 0;
+}
+:root[data-theme="light"] .overlay-context-tag {
+  background: rgba(16,24,40,0.05); border-color: rgba(16,24,40,0.10);
+}
+
+/* The scope tray belongs TO the float bar — it is the bar's scope, not a
+   floating pill above it. The design system's .filter-tray-inner has no width
+   contract, so it shrink-wraps and its centring wrapper drops it in the middle
+   of the canvas, detached from the input it modifies. QA gives the inner the
+   same contract as the bar (width 100%, max-width 760px) so their edges line
+   up and the chips start where the input starts. */
+.filter-tray-inner { width: 100%; max-width: 760px; }
+
+/* Anchored to the bar, not to a fixed 70px offset that assumes a bar height. */
+.filter-tray { bottom: calc(100% + 6px); }
+
+/* Empty working set: the float bar sits centred on the canvas (§5.2).
+   Docks to the bottom the moment work exists. */
+.aimy-float-wrap { bottom: 20px; left: 24px; right: 24px; }
+.aimy-float-wrap.is-centred {
+  top: 50%; bottom: auto;
+  transform: translateY(-50%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .aimy-float-wrap {
+    transition: transform var(--t-slow) var(--ease-out);
+  }
+}
+
+.wb-blank {
+  height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding-bottom: 120px;
+}
+.wb-blank-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl); font-weight: var(--fw-bold);
+  color: var(--d200); letter-spacing: var(--ls-tight);
+}
+.wb-blank-body {
+  font-size: var(--fs-base); color: var(--d500);
+  margin-top: 8px; max-width: 46ch; line-height: var(--lh-base);
+}
+
+/* Working-set header — count, scope, and the set-scope entry point */
+.ws-head {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 14px; flex-wrap: wrap;
+}
+.ws-head-title {
+  font-size: var(--fs-md); font-weight: var(--fw-bold);
+  color: var(--d50); letter-spacing: var(--ls-tight);
+}
+.ws-head-count {
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--d500);
+}
+.ws-head-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.ws-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+/* Selection affordance for bulk curation. The checkbox is a design-system
+   .ds-choice; this only positions it against the card. */
+.ws-item { position: relative; }
+.ws-item-pick {
+  position: absolute; top: 12px; left: 12px; z-index: 2;
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+.ws-item:hover .ws-item-pick,
+.ws-item:focus-within .ws-item-pick,
+.ws-item.is-picked .ws-item-pick { opacity: 1; }
+.ws-item.is-picked .type-card { border-color: rgba(var(--accent-rgb),0.4); }
+.ws-item.is-picked .tc-head { padding-left: 26px; }
+.ws-item:hover .tc-head,
+.ws-item:focus-within .tc-head { padding-left: 26px; }
+
+/* Single-object mode: viewer / editor lay out at full canvas width, since
+   no column is reserved for conversation (§5.4). */
+.ws-single { max-width: 920px; }
+
+.wb-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold);
+  color: var(--d400); background: none; border: 0; cursor: pointer;
+  padding: 4px 0; margin-bottom: 12px;
+  transition: color var(--t-fast);
+}
+.wb-back:hover { color: var(--d50); }
+.wb-back svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+
+/* Editor column + version panel. 360px, not 320: .ver-item's row needs 336px
+   before it starts overflowing, and 360 is the split width the design system's
+   own layout table already specifies for a list-beside-detail pane. */
+.wb-editor-split {
+  display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px;
+  align-items: start;
+}
+@media (max-width: 1240px) {
+  .wb-editor-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ═══════════════════════════════════════════════
+   REQUESTS — the decision queue (§4)
+
+   List beside detail, at the 360px the design system's layout table specifies
+   for this shape. The queue is a browsable inventory; the detail is where a
+   decision is actually made, so it gets the room.
+═══════════════════════════════════════════════ */
+.rq-split {
+  display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1080px) {
+  .rq-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+.rq-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.rq-count {
+  margin-left: 6px; font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  opacity: 0.7;
+}
+
+.rq-queue { max-width: none; }
+/* .list-row is not a button in the library and has no selected state; a queue
+   needs both. Selection is product state, not a component restyle. */
+.rq-row {
+  width: 100%; text-align: left; border: 0; background: none;
+  font-family: inherit; cursor: pointer;
+  border-bottom: 1px solid var(--hairline);
+  align-items: flex-start;
+}
+.rq-row:last-child { border-bottom: none; }
+.rq-row.is-selected { background: var(--accent-dim); }
+.rq-row.is-selected .list-title { color: var(--d50); }
+.rq-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+/* Type is carried by icon AND label, per §13. An icon alone would leave four
+   request kinds distinguishable only by glyph, in a 360px column. */
+.rq-row-kind {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--d500); margin-bottom: 3px;
+}
+.rq-row-kind svg { flex-shrink: 0; }
+.rq-row.is-selected .rq-row-kind { color: var(--accent); }
+.rq-row .list-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rq-row .list-title { white-space: normal; line-height: var(--lh-snug); }
+.rq-row-end {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 5px;
+  flex-shrink: 0;
+}
+
+.rq-head { margin-bottom: 20px; }
+.rq-head-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 9px; }
+.rq-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-tight); color: var(--d50);
+  line-height: var(--lh-tight);
+}
+.rq-sub { font-size: var(--fs-sm); color: var(--d400); margin-top: 6px; }
+.rq-sub .link { font-size: inherit; }
+
+.rq-section { margin-bottom: 22px; }
+.rq-section-label {
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider); text-transform: uppercase;
+  color: var(--d500); margin-bottom: 9px;
+}
+/* Released from their specimen widths — see SPECIMEN WIDTHS above. */
+.rq-detail .desc-list,
+.rq-detail .decision-zone,
+.rq-detail .audit-trail { max-width: none; }
+
+/* Governance carries two panels since Sources folded in. */
+.gov-tabs { margin-bottom: 4px; }
+.gov-panel { padding: 20px 0 0; }
+/* A fault count must not read like a neutral total. */
+.tab-count.is-err { background: var(--err-bg); color: var(--err); }
+
+/* ═══════════════════════════════════════════════
+   SOURCES — now a panel of Governance (§4)
+
+   300px list beside detail — the width the design system's layout table
+   specifies for an ingestion split.
+═══════════════════════════════════════════════ */
+.src-split {
+  display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1000px) { .src-split { grid-template-columns: minmax(0, 1fr); } }
+
+.src-list { max-width: none; }
+.src-row {
+  width: 100%; text-align: left; border: 0; background: none;
+  font-family: inherit; cursor: pointer;
+  border-bottom: 1px solid var(--hairline);
+}
+.src-row:last-child { border-bottom: none; }
+.src-row.is-selected { background: var(--accent-dim); }
+.src-row.is-selected .list-title { color: var(--d50); }
+.src-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.src-row .list-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+
+.src-head { margin-bottom: 18px; }
+.src-head-meta { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 9px; }
+.src-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-tight); color: var(--d50); line-height: var(--lh-tight);
+}
+.src-sub { font-size: var(--fs-sm); color: var(--d400); margin-top: 5px; }
+
+/* The failure states its consequence and its way out, in that order. */
+.src-error { align-items: flex-start; text-align: left; padding: 20px; margin-bottom: 22px; }
+.src-error .error-state-icon { margin-bottom: 12px; }
+.src-error .error-state-desc { max-width: 64ch; margin-bottom: 14px; }
+.src-code {
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--err); background: var(--err-bg);
+  border: 1px solid rgba(240,68,56,0.22);
+  border-radius: var(--r-sm); padding: 3px 8px; margin-bottom: 14px;
+}
+.src-error-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.src-error-actions .k-action-note { flex: 0 1 auto; min-width: 0; }
+
+.src-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; }
+.src-stats .stat-card { max-width: none; }
+
+.src-section { margin-bottom: 24px; }
+.src-section-label {
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider); text-transform: uppercase;
+  color: var(--d500); margin-bottom: 10px;
+}
+.src-section .progress-bar-wrap { margin-bottom: 12px; max-width: 420px; }
+.src-timeline { max-width: none; }
+
+/* ═══════════════════════════════════════════════
+   GOVERNANCE (§4)
+═══════════════════════════════════════════════ */
+.gov-section { margin-bottom: 32px; }
+.gov-section-head { margin-bottom: 12px; }
+.gov-section-title { display: block; }
+.gov-section-title {
+  font-size: var(--fs-md); font-weight: var(--fw-bold);
+  color: var(--d50); letter-spacing: var(--ls-tight);
+}
+.gov-table-wrap {
+  border: 1px solid var(--card-border); border-radius: var(--r-lg);
+  overflow: hidden; background: var(--card-bg);
+}
+/* Wide tables scroll inside their own box rather than the page. */
+.gov-table-wrap { overflow-x: auto; }
+.gov-num { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--d400); }
+.gov-act { text-align: right; white-space: nowrap; }
+.gov-collections { max-width: none; }
+
+/* .gov-cr-audit-note is styled in the library only as
+   `.gov-cr-actions .gov-cr-audit-note`, so outside that one parent it gets
+   nothing — in a modal footer the icon jammed against the text at the wrong
+   size. Same values, re-declared for the footer, and pushed left so it does
+   not crowd the buttons. (../GAPS.md) */
+.modal-footer .gov-cr-audit-note {
+  margin-right: auto;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; color: var(--d500);
+}
+
+/* Exposure matrix. Human access and agent grounding are separate permissions
+   (§8.1), so the human column is deliberately present and deliberately not a
+   control — it is set by entitlement elsewhere, and showing it here is what
+   makes the distinction legible. */
+.gov-matrix th.gov-agent-col { text-align: center; }
+.gov-matrix td.gov-cell { text-align: center; padding: 8px 10px; }
+.gov-matrix .gov-human { border-right: 1px solid var(--card-border); }
+.gov-ext {
+  display: block; font-size: 8.5px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); color: var(--warn);
+  text-transform: uppercase; margin-top: 2px;
+}
+.gov-toggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  border: 1px solid var(--card-border); color: var(--d500);
+  background: rgba(255,255,255,0.03); cursor: pointer;
+  transition: border-color var(--t-fast), color var(--t-fast), background-color var(--t-fast);
+}
+.gov-toggle svg { flex-shrink: 0; }
+.gov-toggle:hover { border-color: var(--card-border-hover); color: var(--d200); }
+.gov-toggle.is-on { background: var(--ok-bg); border-color: rgba(23,178,106,0.28); color: var(--ok); }
+/* Exposure to a customer-facing agent is the highest-consequence state on the
+   page and is marked as caution, not success. */
+.gov-toggle.is-on.is-external { background: var(--warn-bg); border-color: rgba(247,144,9,0.3); color: var(--warn); }
+.gov-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+:root[data-theme="light"] .gov-toggle { background: rgba(16,24,40,0.03); }
+
+/* ═══════════════════════════════════════════════
+   RETRIEVAL — results-first result set (§7.1)
+═══════════════════════════════════════════════ */
+.rs-head {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-bottom: 10px;
+}
+.rs-label {
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider); text-transform: uppercase;
+  color: var(--d500);
+}
+.rs-note { font-size: var(--fs-xs); color: var(--d500); }
+.rs-list { display: flex; flex-direction: column; gap: 10px; }
+
+/* ═══════════════════════════════════════════════
+   ANSWER SURFACE — must survive with no shell (§8.1)
+   Layout only; every component inside comes from the design system and
+   none of them may reference --accent, or the embedded case breaks.
+═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   SPECIMEN WIDTHS — released
+
+   Nearly every component in the library carries a hard max-width tuned for
+   the documentation page's narrow specimen column: .bcard 300 · .type-card
+   420 · .agent-steps 420 · .source-list 460 · .trust-disclosure 460 ·
+   .ai-suggestion 480 · .comment 480 · .ver-list 560 · .doc-view 620 ·
+   .msg-bubble 480. Inside a real product shell they stop filling their
+   containers and every panel ends up with a ragged right edge.
+
+   Width is layout, and layout is the product's. Released per container below
+   rather than globally, so a component dropped somewhere unplanned still gets
+   its conservative default. Filed in ../GAPS.md — the constraint belongs on
+   the documentation page, not on the component.
+═══════════════════════════════════════════════ */
+
+/* An answer is not a prose bubble: it carries inline citations, a source list
+   and a trust disclosure, and .msg-bubble's 480px was squeezing all three. */
+.chat-msg.aimy:has(.answer-surface),
+.chat-msg.aimy:has(.answer-surface) .msg-bubble { max-width: 100%; }
+.answer-surface { display: flex; flex-direction: column; gap: 12px; }
+.answer-surface .source-list,
+.answer-surface .trust-disclosure,
+.answer-surface .agent-steps { max-width: none; }
+
+/* Working set — the viewer, editor and version panel own their columns. */
+.ws-single .doc-view,
+.wb-editor-split .doc-view,
+.wb-editor-split .ai-suggestion,
+.wb-editor-split .comment,
+.wb-editor-split .comment-thread,
+.wb-editor-split .ver-list,
+.wb-editor-split .toolbar { max-width: none; }
+/* .ver-item.is-current bleeds 8px each side (margin: 0 -8px) for its
+   highlight, so the list needs that much room or it scrolls sideways. */
+.wb-editor-split .ver-list { padding: 0 8px; }
+.ws-grid .type-card { max-width: none; }
+.answer-body {
+  font-size: var(--fs-md); color: var(--d100);
+  line-height: var(--lh-base);
+}
+.answer-body p + p { margin-top: 10px; }
+.answer-scope {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  font-size: var(--fs-xs); color: var(--d500);
+}
+
+/* ═══════════════════════════════════════════════
+   PROTOTYPE-ONLY CONTROLS
+   Deliberately styled as a dev tool, never as product chrome: mono type,
+   dashed border, no accent. Direction §11 rejects an explicit role toggle
+   in the product, so this must not be mistakable for one.
+═══════════════════════════════════════════════ */
+/* Sits at the top of the scroll region, not fixed to the viewport: pinned
+   bottom-left it collided with the float bar's lane on wide screens, and a
+   dev tool overlapping the primary input is worse than one that scrolls. */
+.proto-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 18px;
+  padding: 6px 10px; border-radius: var(--r-md);
+  background: var(--card-bg-raised);
+  border: 1px dashed var(--d600);
+  font-family: var(--font-mono); font-size: 10px; color: var(--d400);
+}
+.proto-bar-label {
+  font-weight: 500; color: var(--d500);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.proto-bar a {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--d300); text-decoration: none;
+  padding: 2px 7px; border-radius: var(--r-xs);
+  border: 1px solid transparent;
+  transition: background-color var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.proto-bar a:hover { background: rgba(255,255,255,0.06); color: var(--d50); }
+.proto-bar a.is-on {
+  background: rgba(255,255,255,0.08); color: var(--d50);
+  border-color: var(--d600);
+}
+:root[data-theme="light"] .proto-bar a:hover,
+:root[data-theme="light"] .proto-bar a.is-on { background: rgba(16,24,40,0.06); }
+
+/* ═══════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════ */
+.k-stack { display: flex; flex-direction: column; }
+.k-gap-2 { gap: 8px; }  .k-gap-3 { gap: 12px; }  .k-gap-4 { gap: 16px; }
+.k-row { display: flex; align-items: center; }
+.k-hidden { display: none !important; }
+.k-sr {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
