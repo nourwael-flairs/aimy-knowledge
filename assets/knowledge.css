@@ -1190,6 +1190,623 @@ body {
    first thing on the page it is there to test. Bottom-left, clear of the
    input's centred lane. */
 /* ═══════════════════════════════════════════════
+   THE DOCUMENT PAGE
+
+   A page, not a panel. The paper is a surface distinct from the application
+   behind it, the writing is the only thing on it, and everything ABOUT the
+   document — its facts, its connections, its history, its comments — is in a
+   rail beside it that can be folded away.
+
+   The measure is the point: 66-ish characters, which is where the eye keeps
+   the line it is on. Everything else here is in service of that column.
+═══════════════════════════════════════════════ */
+/* Reading one document is not the moment for a rail about everything else —
+   nor for the controls that narrow a grid you cannot see. The URL keeps every
+   value, so closing the document brings the row back exactly as it was.
+
+   `.filter-row`, not `.filter-tray`. The tray is the floating bar at the foot
+   of the window; the row is the thing on screen, and hiding the wrong one and
+   then verifying against that same wrong name meant the check agreed with the
+   fix while five live dropdowns went on standing over every document. */
+body.is-doc .app-sidebar,
+body.is-doc .filter-row { display: none; }
+body.is-doc .page-inner { max-width: none; }
+
+.doc-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0 24px;
+  height: 100%;
+  min-height: 0;
+}
+.doc-page.rail-closed { grid-template-columns: minmax(0, 1fr) 0; gap: 0; }
+.doc-page.rail-closed .doc-rail { display: none; }
+
+/* No rule under it. The row holds the way back and the save state — chrome
+   about the page, not a section of it — and a line across the full width read
+   as the top of a card the document was inside. */
+.doc-topbar {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 8px;
+  padding-bottom: 12px; margin-bottom: 16px;
+}
+.doc-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: 0; cursor: pointer;
+  font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  color: var(--d400); padding: 4px 0;
+}
+.doc-back:hover { color: var(--d50); }
+.doc-back:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+.doc-top-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.doc-rail-toggle {
+  width: 28px; height: 28px; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid var(--card-border); color: var(--d400); cursor: pointer;
+}
+.doc-rail-toggle:hover { border-color: var(--card-border-hover); color: var(--d100); }
+.doc-rail-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ── The page ──
+
+   There is no paper. A 760px column centred in an 867px region left 54px of
+   dead space on each side and floated a bordered, shadowed card on the
+   application background — a rectangle in the middle of a window, not a
+   document. The region IS the document now: content starts at the left edge,
+   the rail sits to its right, and nothing is drawn around it. */
+.doc-canvas { overflow-y: auto; min-height: 0; padding-bottom: 40px; }
+.doc-paper { padding: 8px 0 64px; }
+
+/* ── The writing tools, on the block being written ──
+
+   They used to be a sticky row at the top of the paper that kept its 46px box
+   even while hidden, so every document carried a strip of dead space and the
+   tools were nowhere near the words they act on. Now they arrive above the
+   active block and leave with it, which is the same rule the caret already
+   follows — and above the block there is the full 762px measure, so the AiMY
+   menu opens without clipping. */
+.blk-tools {
+  position: absolute; z-index: 6;
+  flex-wrap: wrap;
+  box-shadow: var(--shadow-lg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .blk-tools { animation: blkIn var(--t-fast) var(--ease-out); }
+  @keyframes blkIn { from { opacity: 0; transform: translateY(2px); } }
+}
+/* The assistant is the one control in here that writes rather than formats, so
+   it is the only one carrying the mark and the accent. */
+.blk-tools .blk-ai {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 8px; border-radius: var(--r-sm);
+  background: none; border: 0; color: var(--accent); cursor: pointer;
+  font-family: var(--font-sans); font-size: var(--fs-2xs); font-weight: var(--fw-semibold);
+}
+.blk-tools .blk-ai:hover { background: rgba(var(--accent-rgb), 0.14); }
+.blk-tools .blk-ai:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.blk-tools .blk-ai svg { flex-shrink: 0; }
+.blk-add { font-size: 16px; line-height: 1; }
+
+/* ── The block list ──
+
+   Reached from the + for the first time and from `/` for every time after.
+   One list either way, so there is nothing to learn twice. */
+.blk-menu {
+  position: absolute; z-index: 7;
+  min-width: 200px; max-height: 320px; overflow-y: auto;
+  padding: 4px;
+  background: var(--panel-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-xl);
+  backdrop-filter: blur(12px);
+}
+.blk-menu-item {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 6px 8px; border-radius: var(--r-sm);
+  background: none; border: 0; cursor: pointer; text-align: left;
+  font-family: var(--font-sans); font-size: 12.5px; color: var(--d100);
+}
+.blk-menu-item:hover { background: rgba(255,255,255,0.06); }
+:root[data-theme="light"] .blk-menu-item:hover { background: rgba(16,24,40,0.05); }
+.blk-menu-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.blk-menu-ico {
+  flex-shrink: 0; width: 24px; height: 24px; border-radius: var(--r-xs);
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.05); color: var(--d400);
+  font-size: 11px; font-weight: var(--fw-bold);
+}
+:root[data-theme="light"] .blk-menu-ico { background: rgba(16,24,40,0.05); }
+
+/* ── The blocks themselves ── */
+.doc-page #editBody > .doc-code {
+  margin: 0 0 16px; padding: 12px 16px; max-width: 80ch;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.6; color: var(--d150, var(--d200));
+  overflow-x: auto; white-space: pre;
+}
+:root[data-theme="light"] .doc-page #editBody > .doc-code { background: rgba(16,24,40,0.04); }
+.doc-code code:empty::before { content: "Type or paste code"; color: var(--d500); }
+.doc-page #editBody > .doc-figure { margin: 0 0 16px; }
+/* A button, not a hint. It used to read "Drop an image on the document to fill
+   this", which asked for the gesture the workbench had already claimed — the
+   drop layer turns any dropped file into a new document, so aiming at the
+   figure made a document instead of an image. */
+.doc-figure-ph {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; min-height: 120px; padding: 24px;
+  background: rgba(255,255,255,0.03); border: 1px dashed var(--card-border);
+  border-radius: var(--r-md); cursor: pointer;
+  font-family: var(--font-sans); font-size: 12.5px; color: var(--d400); text-align: center;
+}
+.doc-figure-ph:hover { border-color: var(--card-border-hover); color: var(--d100); }
+.doc-figure-ph:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.doc-figure-img { display: block; max-width: 100%; border-radius: var(--r-md); }
+:root[data-theme="light"] .doc-figure-ph { background: rgba(16,24,40,0.03); }
+.doc-page #editBody > .doc-figure figcaption {
+  margin-top: 8px; font-size: 12px; color: var(--d500);
+}
+.doc-figure figcaption:empty::before { content: "Describe it"; opacity: 0.6; }
+.doc-page #editBody > .doc-hr {
+  margin: 24px 0; border: 0; border-top: 1px solid var(--hairline);
+}
+
+.doc-title {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 3vw, 32px); font-weight: var(--fw-extrabold);
+  line-height: 1.14; letter-spacing: -0.022em; color: var(--d50);
+  margin: 0 0 12px; text-wrap: balance;
+  border-radius: var(--r-sm); padding: 2px 6px; margin-left: -6px;
+  outline: none; border: 1px solid transparent;
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+/* Nothing is armed. The affordance arrives under the pointer and leaves with
+   it, so the thing reads as a document rather than as a form. The text cursor
+   is the whole invitation. */
+.doc-title, .doc-page #editBody { cursor: text; }
+.doc-title:hover, #editBody:hover { border-color: var(--hairline); }
+.doc-title:focus, #editBody:focus {
+  border-color: var(--card-border-hover);
+  background: rgba(255,255,255,0.02);
+}
+/* Focused but not yet armed — the keyboard's own state, and it has to be
+   visible or Tab lands somewhere invisible. */
+.doc-title:focus-visible:not([contenteditable]),
+.doc-page #editBody:focus-visible:not([contenteditable]) {
+  outline: 2px solid var(--brand); outline-offset: 2px;
+}
+:root[data-theme="light"] .doc-title:focus,
+:root[data-theme="light"] #editBody:focus { background: rgba(16,24,40,0.02); }
+
+/* ── The head, one rhythm ──
+
+   Notice, byline and note each had their own margin — 20px, 24px, 16px — and
+   they were interleaved with the title. As one block above the title they need
+   one internal gap and one gap to the title beneath. */
+.doc-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.doc-head .dv-notice { margin-bottom: 0; }
+.doc-head .doc-note { margin: 0; }
+.doc-byline {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: var(--fs-xs); color: var(--d400);
+  margin: 0;
+}
+.doc-by-sep { color: var(--d600); }
+.doc-by-ent {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--d400);
+  border-bottom: 1px dotted var(--d600);
+}
+.doc-by-ent:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.doc-by-ent:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+.doc-note { font-size: var(--fs-xs); color: var(--warn); margin: 0 0 16px; }
+
+/* The measure sits on the TEXT, not on the container. Capping the block would
+   cage everything inside it; capping the paragraphs keeps the line at the
+   length an eye can track back while a table, a quote or a drafted suggestion
+   uses the width the page actually has. */
+.doc-page #editBody {
+  font-size: 16px; line-height: 1.72; color: var(--d150, var(--d200));
+  padding: 8px; margin: 0 0 0 -8px;
+  border-radius: var(--r-sm); border: 1px solid transparent;
+  min-height: 160px;
+}
+.doc-page #editBody > p,
+.doc-page #editBody > ul,
+.doc-page #editBody > ol,
+.doc-page #editBody > h3,
+.doc-page #editBody > h4 { max-width: 80ch; }
+.doc-page #editBody p { margin: 0 0 16px; }
+.doc-page #editBody h3 {
+  font-family: var(--font-display); font-size: 18px; font-weight: var(--fw-bold);
+  color: var(--d50); margin: 24px 0 8px; letter-spacing: -0.01em;
+}
+.doc-page #editBody h4 { font-size: 15px; margin: 20px 0 6px; }
+.doc-page #editBody ul, .doc-page #editBody ol { margin: 0 0 16px; padding-left: 24px; }
+.doc-page #editBody li { margin-bottom: 6px; }
+.doc-page #editBody blockquote {
+  margin: 0 0 16px; padding-left: 16px;
+  border-left: 2px solid var(--accent); color: var(--d300); font-style: italic;
+}
+.doc-page .dv-notice { margin-bottom: 20px; }
+.doc-page .ai-suggestion { margin-top: 24px; }
+
+/* ══ THE RAIL ══════════════════════════════════════
+
+   Measured before this pass: 1612px in an 800px window — twice the viewport,
+   with two of five blocks already collapsed — and **22 distinct type styles**
+   in a 320px column, every one between 8.5px and 13px, in three purples.
+   Nothing led, because nothing was meaningfully bigger than anything else.
+   That is what "no hierarchy" is when you measure it.
+
+   Five roles now, and nothing below 11px — an 8.5px caption in a column this
+   narrow is decoration, not information:
+
+     block title   12px   / 700 / --d100
+     value         12.5px / 600 / --d100    what you are reading for
+     lead-in       12.5px / 400 / --d400
+     phrase        11px   / 600 / --d500    the relationship
+     supporting    11px   / 400 / --d500    why, author, date, count
+
+   One accent, spent only on actions. Spacing runs 4 / 8 / 12 / 16 / 24 and
+   nothing else.
+══════════════════════════════════════════════════ */
+.doc-rail {
+  overflow-y: auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 2px;
+  padding-bottom: 40px;
+}
+.rail-block { border-bottom: 1px solid var(--hairline); }
+.rail-block > summary {
+  list-style: none; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 4px;
+}
+.rail-block > summary::-webkit-details-marker { display: none; }
+.rail-block > summary:hover .rail-block-title { color: var(--d50); }
+.rail-block > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.rail-block[open] > summary .tree-chev { transform: rotate(90deg); }
+.rail-block .tree-chev { color: var(--d500); transition: transform var(--t-base) var(--ease-out); }
+.rail-block-title { flex: 1; font-size: 12px; font-weight: var(--fw-bold); color: var(--d100); }
+.rail-block-n {
+  font-size: 11px; font-weight: var(--fw-semibold); color: var(--d500);
+  font-variant-numeric: tabular-nums;
+}
+.rail-block-body { padding: 0 4px 16px; }
+
+.rail-facts { display: flex; flex-direction: column; gap: 4px; }
+.rail-facts p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--d400); }
+.rail-facts p.is-overdue { color: var(--err); }
+/* ── The rail has no primary action ──
+
+   `em-direct` renders filled in brand blue, so *Re-sync from Confluence* sat in
+   a 320px column as a solid button beside *Find another source* outlined — two
+   weights for two peers, and the loudest thing in the rail was a maintenance
+   job. Everything here is quiet and equal; the page's one filled control is
+   still New document, on the surface. */
+.rail-act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.rail-act .entry-action {
+  height: 28px; padding: 0 12px; border-radius: var(--r-md);
+  background: none; border: 1px solid var(--card-border); color: var(--d300);
+  font-size: var(--fs-2xs);
+}
+.rail-act .entry-action:hover { background: none; border-color: var(--card-border-hover); color: var(--d50); }
+.rail-empty { margin: 0; font-size: 12.5px; color: var(--d400); line-height: 1.5; }
+/* One row. Two short buttons stacked wasted a line each and read as a list of
+   two unrelated things; side by side they read as what they are — the actions
+   that belong to the whole document. Delete joins them when it exists. */
+.rail-foot {
+  display: flex; flex-direction: row; flex-wrap: wrap;
+  align-items: center; gap: 4px 8px; padding: 16px 4px 0;
+}
+
+/* Connections read as sentences: the relationship, the thing, and who said so. */
+.rail-conn { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
+.rail-conn:last-child { margin-bottom: 0; }
+.rail-conn-phrase { font-size: 11px; font-weight: var(--fw-semibold); color: var(--d500); }
+.rail-conn-item {
+  display: flex; align-items: baseline; gap: 8px; width: 100%;
+  padding: 4px 8px; margin-left: -8px; border-radius: var(--r-sm);
+  background: none; border: 0; cursor: pointer; text-align: left;
+  font-family: var(--font-sans); font-size: 12.5px; font-weight: var(--fw-semibold); color: var(--d100);
+}
+.rail-conn-item:hover { background: rgba(255,255,255,0.05); }
+:root[data-theme="light"] .rail-conn-item:hover { background: rgba(16,24,40,0.04); }
+.rail-conn-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.rail-conn-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Who asserted it, and when. An implicit edge has no author, so it shows none. */
+.rail-conn-by { font-size: 11px; font-weight: 400; color: var(--d500); flex-shrink: 0; }
+
+/* ── Version history, in the line that states the date ──
+
+   It was in the topbar, at the far end of a row you read past on the way into
+   the document, saying "3 versions" beside the save indicator. Nothing there
+   said what it was for. The byline already claims *Updated 12 Jun* — which is
+   the assertion a version history exists to qualify — so the two are one
+   control, first line of the document, where the question gets asked.
+
+   Still native <details>, so an open panel survives a repaint with no state of
+   ours. */
+.doc-versions { position: relative; }
+.doc-versions > summary {
+  list-style: none; cursor: pointer;
+  padding: 4px 8px; border-radius: var(--r-sm);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--d400);
+  white-space: nowrap;
+}
+/* In the byline it is one phrase among peers, so it carries their weight and
+   colour, and the count is the part that is new. */
+.doc-by-ver { margin: 0 -8px; }
+.doc-by-ver > summary { font-weight: var(--fw-regular); }
+.doc-by-vn {
+  margin-left: 4px; padding: 0 6px; border-radius: 20px;
+  background: rgba(255,255,255,0.07); color: var(--d300);
+  font-size: 10px; font-weight: var(--fw-semibold);
+}
+:root[data-theme="light"] .doc-by-vn { background: rgba(16,24,40,0.07); }
+.doc-by-ver > summary:hover .doc-by-vn { color: var(--accent); }
+.doc-by-ver .doc-versions-panel { right: auto; left: 0; }
+.doc-versions > summary::-webkit-details-marker { display: none; }
+.doc-versions > summary::after { content: " ▾"; opacity: 0.5; }
+.doc-versions > summary:hover { background: rgba(255,255,255,0.05); color: var(--d100); }
+:root[data-theme="light"] .doc-versions > summary:hover { background: rgba(16,24,40,0.05); }
+.doc-versions > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.doc-versions-panel {
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 30;
+  width: 300px; max-height: 60vh; overflow-y: auto;
+  padding: 12px;
+  background: var(--panel-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-xl);
+  backdrop-filter: blur(12px);
+}
+
+/* ── Comments, under the writing ──
+
+   You comment on a document while reading it, so the thread lives at the end of
+   the document rather than in 141px of the rail's column. Full width, its own
+   rule, and the count as its heading. */
+/* ── The starting moves, in the writing ──
+
+   Above the body and aligned to the text, so position says what they do: these
+   write INTO the document. In the topbar they read as chrome about it, and the
+   menu — which positions against #docCanvas — opened 426px away from its own
+   button because the anchor had left that host. */
+.doc-start {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 16px;
+}
+.doc-ai, .doc-start-act {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px; border-radius: var(--r-md);
+  cursor: pointer; white-space: nowrap;
+  font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+/* The assistant is the one thing here that is neither reading nor writing by
+   hand, so it is the only one that takes the accent. */
+.doc-ai {
+  background: rgba(var(--accent-rgb), 0.12); border: 1px solid rgba(var(--accent-rgb), 0.35);
+  color: var(--accent);
+}
+.doc-ai:hover { background: rgba(var(--accent-rgb), 0.2); border-color: var(--accent); }
+.doc-start-act {
+  background: none; border: 1px solid var(--card-border); color: var(--d400);
+}
+.doc-start-act:hover { border-color: var(--card-border-hover); color: var(--d100); }
+.doc-ai:focus-visible, .doc-start-act:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.doc-ai svg, .doc-start-act svg { flex-shrink: 0; }
+/* Naming the gesture and what it takes. The drop layer only ever appears once
+   you are already dragging, which is no use to somebody wondering whether they
+   can. */
+.doc-start-fine { margin: -8px 0 16px; font-size: 11px; color: var(--d500); }
+
+.doc-comments { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--hairline); }
+.doc-comments-head {
+  margin: 0 0 12px;
+  font-family: var(--font-display); font-size: 14px; font-weight: var(--fw-bold);
+  color: var(--d200);
+}
+.doc-page .comment-thread { margin: 0; padding: 0; border: 0; background: none; }
+.doc-page .comment-thread-head { display: none; }
+.doc-page .comment { max-width: 80ch; }
+.doc-page .comment-text { font-size: 13px; }
+.doc-page .comment-compose { max-width: 80ch; }
+.doc-page .props { gap: 12px; }
+.prop-facts { display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--hairline); }
+/* The type facts take the lead-in role rather than a sixth style of their own —
+   they are what the document says about itself, in the same voice as the rows
+   below them. */
+.prop-facts p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--d400); }
+
+@media (max-width: 1100px) {
+  .doc-page { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
+  .doc-rail { border-top: 1px solid var(--hairline); padding-top: 8px; }
+}
+
+/* ── A modal you can finish ──
+
+   The library's `.modal` has no height contract: `max-height: none`,
+   `overflow: visible`, and a backdrop that does not scroll. That is fine while
+   the body is a sentence and fatal once it holds a list. Measured: the connect
+   picker renders at 717px, so at a 640px window it was cut by 38px and **the
+   confirm button could not be reached at all** — you could open the picker and
+   never finish it. It only looked safe at 800px, where 42px happened to be
+   spare.
+
+   Same fix and same reason as the peek (GAPS §15): a surface whose content is
+   data-dependent pins its actions and scrolls only its middle. */
+.modal-backdrop { padding: 40px 20px; }
+.modal {
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - 80px); min-height: 0;
+}
+.modal-header, .modal-footer { flex-shrink: 0; }
+.modal-body { min-height: 0; overflow-y: auto; }
+
+/* ── The sheet ──
+
+   Capping the box's height made it finishable but not comfortable: a list as
+   long as the library inside 280px of scroll, inside a body that also scrolls.
+   A surface where the list IS the decision wants the window's full height, so
+   picking takes one scroll and the foot never moves off screen. The centred box
+   stays for the case it was built for — a decision already made, arriving for
+   confirmation. */
+.modal-backdrop.is-sheet { padding: 0; justify-content: flex-end; align-items: stretch; }
+.modal-sheet {
+  height: 100%; max-height: 100%;
+  border-radius: 0; border-top: 0; border-right: 0; border-bottom: 0;
+}
+/* Same shape as .k-enter: the start state lives inside the motion query and the
+   keyframe only names the end, so a surface that never animates is a surface
+   that is simply there. An opacity of 0 in a `from` would leave it invisible. */
+@media (prefers-reduced-motion: no-preference) {
+  .modal-sheet { transform: translateX(24px); animation: sheetIn 160ms var(--ease-out) forwards; }
+  @keyframes sheetIn { to { transform: none; } }
+}
+/* One scroll, not two: in a full-height sheet the list is the body. */
+.modal-sheet .cx-list { max-height: none; overflow: visible; }
+
+/* ═══════════════════════════════════════════════
+   CONNECTING, AS ONE CHOICE
+
+   This was a canvas answer: neighbour groups over a search, with a `+` per row
+   opening its own confirmation. Three faults — the suggestions are noise on a
+   new document, the rows navigated away from the document you were connecting,
+   and one commit per connection is the wrong unit.
+
+   One list inside the commit surface: the relationship chosen once, search over
+   all of it, checkboxes rather than links, and the suggestion surviving as a
+   reason on a row rather than as a section of its own.
+═══════════════════════════════════════════════ */
+.cx-pick { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+/* The lead-in sits above the control rather than jammed against its left edge,
+   so the three rows of this form share one left margin instead of three. */
+.cx-as { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.cx-as-lead { font-size: var(--fs-2xs); font-weight: var(--fw-semibold); color: var(--d500); }
+.cx-seg { padding: 2px; }
+.cx-seg .seg-btn { height: 28px; padding: 0 12px; font-size: var(--fs-2xs); }
+.cx-q { height: 32px; padding: 0 12px; font-size: var(--fs-xs); }
+.cx-list {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 280px; overflow-y: auto;
+  padding: 4px; margin: 0 -4px;
+}
+.cx-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 6px 8px; margin: 0 -8px; border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.cx-row:hover { background: rgba(255,255,255,0.05); }
+:root[data-theme="light"] .cx-row:hover { background: rgba(16,24,40,0.04); }
+.cx-row[hidden] { display: none; }
+.cx-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cx-row-title { font-size: 12.5px; color: var(--d100); }
+/* Why AiMY would have suggested it — a caption, not a section. A guess and a
+   claim still never render alike; the guess is just no longer given its own
+   real estate. */
+.cx-row-why { font-size: 11px; color: var(--d500); }
+.cx-none { margin: 8px 0 0; font-size: 11px; color: var(--d500); }
+.cx-none[hidden] { display: none; }
+
+
+/* ═══════════════════════════════════════════════
+   THE PEEK
+
+   Takes `.cite-preview`'s look — glass panel, 320px, head over body over foot —
+   and none of its mechanism. The library's version is `position: absolute`
+   against a `.cite-wrap` parent and opens on `:hover` of that parent, so it can
+   only ever describe the thing it is nested inside. This one is anchored by
+   script to whatever was clicked, anywhere on the page, including a row inside
+   itself. See GAPS.md.
+═══════════════════════════════════════════════ */
+/* One box that scrolled put the actions under 978px of list, so the panel
+   opened showing a list and no way out of it. Head, facts and actions are
+   fixed; the body is the only thing that scrolls, and it never pushes anything
+   off. What it is, what you can do, then what is connected. */
+.peek {
+  position: fixed; z-index: 940;
+  width: 320px; max-width: calc(100vw - 20px);
+  max-height: min(70vh, 520px);
+  display: flex; flex-direction: column;
+  background: var(--panel-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-xl);
+  backdrop-filter: blur(12px);
+  padding: 12px;
+  opacity: 0; transform: translateY(4px);
+}
+.peek.is-open { opacity: 1; transform: translateY(0); }
+.peek[hidden] { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .peek { transition: opacity var(--t-fast), transform var(--t-fast); }
+}
+
+.peek-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.peek-back, .peek-close {
+  width: 22px; height: 22px; flex-shrink: 0; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 0; color: var(--d400); cursor: pointer;
+}
+.peek-close { margin-left: auto; }
+.peek-back:hover, .peek-close:hover { background: rgba(255,255,255,0.08); color: var(--d50); }
+:root[data-theme="light"] .peek-back:hover,
+:root[data-theme="light"] .peek-close:hover { background: rgba(16,24,40,0.06); }
+.peek-back:focus-visible, .peek-close:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.peek-title {
+  font-family: var(--font-display); font-size: 14px; font-weight: var(--fw-bold);
+  color: var(--d50); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* What kind of thing this is — the one place a bare noun earns its keep,
+   because "Client" is the answer to a question the title cannot answer. */
+.peek-kind {
+  font-size: 9px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+  flex-shrink: 0;
+}
+.peek-facts {
+  margin: 0 0 12px; font-size: 12px; line-height: 1.55; color: var(--d300);
+}
+
+.peek-head, .peek-facts, .peek-foot { flex-shrink: 0; }
+/* The only scrolling part, and it is last, so nothing it holds can push an
+   action out of reach. An entity has no body at all now, and an empty box
+   must not leave its rule behind. */
+.peek-body {
+  display: flex; flex-direction: column; gap: 12px;
+  min-height: 0; overflow-y: auto;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hairline);
+}
+.peek-body:empty { display: none; }
+.peek-group { display: flex; flex-direction: column; gap: 2px; }
+.peek-phrase { font-size: 11px; color: var(--d500); }
+.peek-items { display: flex; flex-direction: column; gap: 2px; }
+.peek-item {
+  display: flex; align-items: baseline; gap: 8px; width: 100%;
+  padding: 4px 6px; margin-left: -6px; border-radius: var(--r-sm);
+  background: none; border: 0; cursor: pointer; text-align: left;
+  font-family: var(--font-sans); font-size: 12.5px; color: var(--d100);
+}
+.peek-item svg { color: var(--d500); flex-shrink: 0; align-self: center; }
+.peek-item:hover { background: rgba(255,255,255,0.06); }
+:root[data-theme="light"] .peek-item:hover { background: rgba(16,24,40,0.05); }
+.peek-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.peek-item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.peek-by { font-size: 10px; color: var(--d600); flex-shrink: 0; }
+
+/* Above the body, not below it — this is the "what you can do" zone and it is
+   the one thing that must never need scrolling to find. */
+.peek-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.peek-foot:empty { display: none; }
+
+.peek-act {
+  cursor: pointer; font-family: var(--font-sans);
+  font-size: 11px; font-weight: var(--fw-semibold);
+  padding: 4px 12px; border-radius: var(--r-pill);
+  background: none; border: 1px solid var(--card-border); color: var(--d200);
+}
+.peek-act:hover { border-color: var(--accent); color: var(--accent); }
+.peek-act:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ═══════════════════════════════════════════════
    THE FOLDER VIEW
 
    Built on the library's `.tree` — native <details>, so open branches survive a
@@ -1263,13 +1880,123 @@ body {
 }
 .ws-tree-doc .trust-state { flex-shrink: 0; }
 
-/* The view switch sits with the count, not with the actions. */
-.rm-views { padding: 2px; }
-.rm-views .seg-btn {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11px; padding: 4px 12px;
+/* ── The graph, inside the folders ──
+
+   A document's claims on the line beneath it, so the connections are part of
+   the structure rather than one click away inside each document. Only the
+   asserted ones: the implicit edges ARE the tree's hierarchy, and printing
+   "Filed in Policies" inside the Policies folder says nothing. */
+.ws-tree-leaf { display: flex; flex-direction: column; }
+.ws-tree-edges {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px;
+  margin: 0 0 4px; padding: 0 12px 0 32px;
 }
-.rm-views .seg-btn svg { opacity: 0.8; }
+.ws-tree-edge {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: var(--font-sans); font-size: 11px; color: var(--d500);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The relationship word IS the row's content — "Answers", "Replaces". `--d600`
+   is the separator grey, and at 2.49:1 the naming half of the phrase was
+   quieter than the line it sat on. */
+.ws-tree-edge em { font-style: normal; color: var(--d500); }
+.ws-tree-edge:hover, .ws-tree-edge:hover em { color: var(--accent); }
+.ws-tree-edge:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+
+/* A group header is a thing, not a heading — its name opens what else touches
+   it. Where the axis has no entity behind it (a type), it stays plain text. */
+.ws-tree-name.is-ent {
+  background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
+  font-family: inherit; font-size: inherit; font-weight: inherit; color: inherit;
+  border-bottom: 1px dotted transparent;
+}
+.ws-tree-name.is-ent:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.ws-tree-name.is-ent:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+/* The documents an axis says nothing about are a finding, so they read as one. */
+.ws-tree-name.is-none { color: var(--d500); font-style: italic; }
+
+.k-group .v2-dropdown-panel { min-width: 150px; }
+
+/* ── The utilities recede; one thing is an action ──
+
+   Two passes were spent on this row. The first left heights 26/27/32, radii
+   9999/8/8 and type 10/16/12 — dimensional chaos. Equalising all three fixed
+   that and exposed what was actually wrong: three bordered boxes and three
+   saturated elements in 418px, with the accent purple appearing TWICE meaning
+   two different things — a sort state and a selected view — beside a solid blue
+   button. And equal weight made three peers out of two utilities and one
+   action.
+
+   Needs attention, Cards/Folders and the grouping picker are all ways of
+   LOOKING. They lose their boxes entirely: muted ink, nothing drawn at rest, a
+   plain neutral fill when active — state by value, not by hue. New document is
+   the only control that creates something, so it is the only filled control and
+   the only saturated thing left in the row. */
+/* ── Two utilities, two species ──
+
+   They were made identical, which fixed the dimensional chaos and created a
+   different error: a binary modifier and a mutually-exclusive view selection
+   are not the same kind of control, and reading alike they invited you to
+   expect one to behave like the other.
+
+   Needs attention is a filter chip — a pill, outlined at rest, filled when on.
+   Cards / Folders is a segmented switch — borderless text, one of two lit. The
+   shape carries the difference; neither takes a hue, so New document is still
+   the only saturated thing in the row. */
+.rm-sort {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 12px; border-radius: var(--r-pill);
+  background: none; border: 1px solid var(--card-border); color: var(--d400);
+  font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  cursor: pointer; white-space: nowrap;
+  transition: color var(--t-fast), background-color var(--t-fast), border-color var(--t-fast);
+}
+.rm-sort svg { flex-shrink: 0; opacity: 0.6; }
+
+/* The view switch loses the library's inset track with it — a track is a box,
+   and this row has no boxes left. */
+/* `border: 0`, not a transparent colour — a transparent 1px border is still
+   1px, and it made the track 34px in a 32px row. */
+.rm-views { background: none; border: 0; padding: 0; gap: 2px; }
+.rm-views .seg-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 8px; border-radius: var(--r-md);
+  background: none; box-shadow: none; color: var(--d400);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+}
+.rm-views .seg-btn svg { opacity: 0.6; }
+
+/* `.k-filter .v2-dropdown-btn` sets 30px at equal specificity and later in the
+   file, so this has to out-weigh it rather than tie with it. */
+.rm-end .k-filter .v2-dropdown-btn {
+  height: 32px; padding: 0 8px; border-radius: var(--r-md);
+  background: none; border: 0; color: var(--d400);
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+}
+
+/* One resting state, one hover, one active — shared by every utility here, so
+   they cannot drift apart again. */
+.rm-sort:hover,
+.rm-views .seg-btn:hover,
+.rm-end .k-filter .v2-dropdown-btn:hover { background: rgba(255,255,255,0.05); color: var(--d100); }
+.rm-sort:hover { border-color: var(--card-border-hover); }
+/* The chip fills and its outline goes with it; the segment only lights up. */
+.rm-sort.is-on {
+  background: rgba(255,255,255,0.1); border-color: transparent; color: var(--d50);
+}
+.rm-views .seg-btn.active { background: rgba(255,255,255,0.08); color: var(--d50); }
+.rm-sort.is-on svg,
+.rm-views .seg-btn.active svg { opacity: 1; }
+:root[data-theme="light"] .rm-sort:hover,
+:root[data-theme="light"] .rm-views .seg-btn:hover,
+:root[data-theme="light"] .rm-end .k-filter .v2-dropdown-btn:hover { background: rgba(16,24,40,0.05); }
+:root[data-theme="light"] .rm-sort.is-on { background: rgba(16,24,40,0.1); }
+:root[data-theme="light"] .rm-views .seg-btn.active { background: rgba(16,24,40,0.07); }
+.rm-sort:focus-visible,
+.rm-views .seg-btn:focus-visible,
+.rm-end .v2-dropdown-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+
+.rm-end .entry-action { height: 32px; padding: 0 16px; border-radius: var(--r-md); font-size: var(--fs-xs); }
 
 @media (max-width: 720px) {
   .ws-tree-doc-who { display: none; }
@@ -1366,6 +2093,41 @@ body {
   margin: 0; font-size: 12px; line-height: 1.6; color: var(--d500);
   max-width: 52ch;
 }
+
+/* ── A reported problem is not a remark ──
+
+   Both live in this thread because both are things said ABOUT the document
+   without changing it. They read differently because they ask different things
+   of the owner: one is a conversation, the other is a job with a finish. */
+.comment.is-problem {
+  padding: 12px; border-radius: var(--r-md);
+  background: rgba(240,68,56,0.05); border: 1px solid rgba(240,68,56,0.2);
+}
+.comment-flag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--err);
+}
+.comment-flag svg { flex-shrink: 0; }
+.comment-resolve {
+  margin-top: 8px; padding: 4px 12px; border-radius: var(--r-md);
+  background: none; border: 1px solid var(--card-border); color: var(--d300);
+  font-family: var(--font-sans); font-size: var(--fs-2xs); cursor: pointer;
+}
+.comment-resolve:hover { border-color: var(--card-border-hover); color: var(--d50); }
+.comment-resolve:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+/* Closed, not gone. The document keeps the record of what was raised and that
+   somebody dealt with it — deleting it would lose the half that matters. */
+.comment.is-problem.is-done {
+  background: none; border-color: var(--hairline);
+}
+.comment.is-done .comment-flag { color: var(--d500); }
+.comment.is-done .comment-text { text-decoration: line-through; opacity: 0.7; }
+
+/* The report's own form, in the commit surface. */
+.rp-form { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+.rp-what { min-height: 72px; padding: 8px 12px; resize: vertical; line-height: var(--lh-normal); }
+.rp-hint { margin: 0; font-size: 11px; color: var(--d500); }
 .doc-scroll .comment-text { font-size: 13px; line-height: 1.6; color: var(--d300); }
 .doc-scroll .comment-author { font-size: 12px; }
 .doc-scroll .comment { max-width: none; }
@@ -1649,7 +2411,20 @@ body {
   letter-spacing: var(--ls-wider); text-transform: uppercase;
   color: var(--d500); margin-top: 6px;
 }
+/* A bare shelf takes two ways in, and the second one needs naming: the file
+   route existed as a drag gesture and nothing else, which is invisible until
+   you are already doing it. */
+.empty-state-fine {
+  margin: 12px 0 0; font-size: 11px; color: var(--d500);
+  max-width: 320px; line-height: var(--lh-snug);
+}
 .brief-list { display: flex; flex-direction: column; gap: 8px; }
+/* The best news this panel can carry, and the one state it could not report.
+   Quiet, because nothing needing you is not an event. */
+.brief-quiet {
+  margin: 0; padding: 12px 0;
+  font-size: 12.5px; line-height: 1.5; color: var(--d400);
+}
 
 /* A briefing item states what changed, why it matters, its work state and one
    classified next step. Tone is carried by the icon's colour, not by a stripe. */
@@ -1759,14 +2534,24 @@ body {
   margin-bottom: 12px; padding-bottom: 12px;
   border-bottom: 1px solid var(--hairline);
 }
-.rm-main { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
+/* The count owns its own line, and the controls own the next one. Crowding all
+   of it onto one row put the utilities hard against the action and made the
+   right edge a cluster; separated, the row below reads as "how you are looking"
+   on the left and "what you can do" on the right. */
+.rm-main { flex-basis: 100%; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .rm-count {
   font-family: var(--font-display); font-size: var(--fs-xl); font-weight: var(--fw-extrabold);
   color: var(--d50); letter-spacing: var(--ls-tight); font-variant-numeric: tabular-nums;
 }
 .rm-word { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--d200); }
 .rm-note { font-size: var(--fs-xs); color: var(--d500); }
-.rm-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+/* -8px pulls the borderless utilities back to the count's left edge: their
+   padding is now the only thing between the text and the margin. */
+.rm-end {
+  flex-basis: 100%; display: flex; align-items: center; flex-wrap: wrap;
+  gap: 4px; margin-left: -8px;
+}
+.rm-end .entry-action { margin-left: auto; }
 .rm-disclosure {
   flex-basis: 100%; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
 }
@@ -1805,25 +2590,51 @@ body {
    ONE footer, not two. The library's card ends with a bordered, tinted .tc-gov
    strip and then a bordered .tc-action strip holding a full-width button —
    two rules and a banner, which is most of the height and all of the noise. */
-.type-card { padding-bottom: 0; cursor: pointer; }
-.type-card:hover { border-color: var(--card-border-hover); }
+/* ── The card's status, on its own border ──
+
+   This was a 3px tinted LEFT edge, which was wrong twice. The library has no
+   status edge on `.type-card` at all — the spec is eight templates over one
+   fixed governance row, and status lives in `.trust-state` — and the left-border
+   idiom I borrowed it from, `.finding.f-err`, sets `border-left-color` on a
+   border the base rule has commented out. A dead pattern, copied.
+
+   The live pattern for "a card whose severity tints its edge" is `.bcard.p1/
+   .p2/.p3`: the WHOLE border, at low alpha, on the card's own 1px. Same
+   information, no invented mechanism, no 2px content shift, and hover keeps
+   its meaning because — exactly as `.bcard` does it — hover wins.
+
+   Nothing wrong with the document means the default border. A screenful still
+   shows you where the problems are before you have read a single title, and the
+   word beside the dot carries the same fact in text, which is the rule: status
+   is colour AND text, never colour alone. */
+.type-card {
+  --st: var(--d400);
+  padding-bottom: 0; cursor: pointer;
+}
+.type-card[data-status="current"]     { --st: var(--ok); }
+.type-card[data-status="unowned"]     { --st: var(--d300); }
+.type-card[data-status="unused"],
+.type-card[data-status="draft"]       { --st: var(--warn); border-color: rgba(247,144,9,0.2); }
+.type-card[data-status="outdated"],
+.type-card[data-status="conflicting"] { --st: var(--err);  border-color: rgba(240,68,56,0.2); }
+.type-card[data-status="superseded"]  { --st: var(--info); border-color: rgba(14,165,233,0.2); }
+/* The saturated tokens go dim on white; the badge already carries these. */
+:root[data-theme="light"] .type-card[data-status="current"]     { --st: #0a7a45; }
+:root[data-theme="light"] .type-card[data-status="unused"],
+:root[data-theme="light"] .type-card[data-status="draft"]       { --st: #8a5200; }
+:root[data-theme="light"] .type-card[data-status="outdated"],
+:root[data-theme="light"] .type-card[data-status="conflicting"] { --st: #bf2f26; }
+:root[data-theme="light"] .type-card[data-status="superseded"]  { --st: #036aa3; }
 /* Anything interactive inside the card keeps its own cursor, so the card
    reading as clickable never claims a control that does something else. */
 .type-card button { cursor: pointer; }
-/* ── The card's type scale ──
+/* ── Three tiers ──
 
-   Everything used to sit within 3.5px of everything else — title 13, value 11,
-   label 9.5 — so nothing led and the whole card read as one grey block. You
-   scan a dozen of these at once, and what has to arrive first is WHICH
-   DOCUMENT, then WHAT IS WRONG WITH IT. The facts are support; they should be
-   legible on purpose, not competing.
-
-   Title 15 against a 12 value is a 1.25 step where there was 1.18, and the
-   title carries the display face and the page's brightest ink. The type row
-   above it drops to a quiet 9.5 uppercase so the badge beside it — which is
-   the only coloured thing on the card — reads as the alert it is. */
-.tc-head    { padding: 12px 16px 0; }
-.tc-title-btn { padding: 8px 16px 0; }
+   Title, then the document's own words, then everything else on one dim line.
+   The steps are 15 → 13 → 11 with colour moving --d50 → --d300 → --d500 in
+   step, so no two adjacent runs share both size and colour and the order they
+   arrive in is the order they matter in. Nothing above the title. */
+.tc-title-btn { padding: 12px 16px 0; }
 .tc-title {
   padding: 0;
   font-family: var(--font-display);
@@ -1835,59 +2646,65 @@ body {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden; text-wrap: pretty;
 }
-.tc-head .tc-type {
-  font-size: 9.5px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
-}
-.tc-head .tc-type svg { opacity: 0.75; }
-
-/* Label above value, not beside it. A 76px label column cost a quarter of the
-   card's width to words nobody reads twice, and forced every value to ellipsis
-   at 194px. Stacked, the value gets the whole card.
-
-   The pair is one element. It used to be two flat siblings in one grid, which
-   gave the gap between a label and its value and the gap between two groups the
-   same number — measured at −1px and 5px once a negative margin was fighting
-   it, so a label sat closer to the wrong thing than the right one. Two nested
-   gaps say the relationship instead of faking it. */
-.tc-fields {
-  padding: 12px 16px 0;
-  display: flex; flex-direction: column;
-  gap: 12px;
-}
-.tc-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-/* A card is denser than a document, so the step between its pairs is one rung
-   down the scale. The ratio to the 2px inside a pair is still 4:1, which is
-   what makes the grouping legible; the absolute number is a density choice. */
-.type-card .tc-fields { gap: 8px; }
-.tc-field-label {
-  font-size: 9px; font-weight: var(--fw-bold);
-  letter-spacing: 0.09em; text-transform: uppercase; color: var(--d600);
-  white-space: nowrap;
-}
-.tc-field-val {
-  font-size: 12px; line-height: 1.4; color: var(--d200); min-width: 0;
+.tc-snip {
+  margin: 6px 0 0; padding: 0 16px;
+  font-size: 13px; line-height: 1.45; color: var(--d300);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.tc-meta {
+  margin: 8px 0 12px; padding: 0 16px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px;
+  font-size: 11px; font-weight: var(--fw-medium); line-height: 1.4; color: var(--d500);
+}
+.tc-sep { font-style: normal; color: var(--d600); }
+.tc-kind { display: inline-flex; align-items: center; gap: 4px; }
+.tc-kind svg { width: 11px; height: 11px; opacity: 0.7; }
+/* The one coloured thing on the card, and it is four characters wide. */
+.tc-st {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-weight: var(--fw-semibold); color: var(--st);
+}
+.tc-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.tc-who {
+  max-width: 12ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: var(--font-sans); font-size: inherit; font-weight: inherit; color: inherit;
+}
+/* `--d600` is the separator grey. *no owner* is not punctuation — it is the
+   reason the card is in a needs-a-person set — and at 2.49:1 on a dark card it
+   was quieter than the dot between the facts beside it. The italic already
+   carries "this is an absence"; the colour does not have to as well. */
+.tc-who.is-none { max-width: none; font-style: italic; color: var(--d500); }
+.tc-who:hover { color: var(--accent); }
+.tc-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+/* Compact cards live inside answers and connection groups, where the row is
+   the point and the action belongs to the panel around it. */
+.type-card.is-compact .tc-title-btn { padding-top: 8px; }
+.type-card.is-compact .tc-meta { margin-bottom: 8px; }
+
 /* margin-top:auto pins the footer to the bottom of a stretched card, so a row
    of cards ends on one line whatever each of them had to say. */
 .tc-foot {
   display: flex; align-items: center; gap: 8px;
-  margin-top: auto; padding: 8px 16px;
-  border-top: 1px solid var(--hairline);
+  margin-top: auto; padding: 4px 16px 8px;
   font-size: 11px; color: var(--d500);
-}
-.tc-fields { padding-bottom: 12px; }
-.tc-foot-who {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-weight: var(--fw-semibold); color: var(--d400);
 }
 .tc-foot-act { margin-left: auto; flex-shrink: 0; }
 /* A text action, not a filled bar — the card is a result, not a form. The
    entry-mode icon stays: with it hidden, colour alone would be carrying which
    mode the action is, which §13 forbids. */
+/* ── Take a variant apart and you take its colour with it ──
+
+   `em-direct` is white text ON a brand fill. Removing the fill here left the
+   white text sitting on the card, which reads fine on a dark card and is
+   **invisible on a white one** — measured at a contrast ratio of 1.00 in light
+   mode, the Open button on every card. Dark mode made a missing declaration
+   look like a design. Same defect as borrowing `.finding.f-err`'s left border
+   from a rule whose border is commented out: a variant's parts are not
+   separable, so a rule that drops one of them owns the rest. */
 .tc-foot-act .entry-action {
   background: none; border-color: transparent; padding: 4px 0;
+  color: var(--accent);
 }
 .tc-foot-act .entry-action:hover { background: none; opacity: 0.75; }
 .ws-grid {
@@ -2108,12 +2925,43 @@ body {
 :root[data-theme="light"] .dv-versions-n { background: rgba(16,24,40,0.06); }
 .dv-versions .ver-list { margin-top: 8px; }
 
-.comment-compose { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-.comment-compose .field-input { flex: 1; }
+/* The send glyph sits inside the field, which is what every message box does
+   and what Enter already did. A word-button beside it was a second control for
+   one action. */
+.comment-compose { position: relative; display: flex; align-items: center; margin-top: 12px; }
+.comment-compose .field-input { flex: 1; padding-right: 40px; }
+.comment-send {
+  position: absolute; right: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: var(--r-sm);
+  background: none; border: 0; color: var(--d500); cursor: pointer;
+  transition: color var(--t-fast), background-color var(--t-fast);
+}
+.comment-send:hover { color: var(--accent); background: rgba(255,255,255,0.06); }
+:root[data-theme="light"] .comment-send:hover { background: rgba(16,24,40,0.05); }
+.comment-send:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .icon-btn.is-ai svg { display: block; }
 
-/* Selection-scope AI menu, positioned against the sheet */
-.doc-sheet .ai-menu { position: absolute; z-index: 5; }
+/* ── The AiMY menu, anchored to whatever opened it ──
+
+   `aiMenu` and `wireSelectionMenu` both append to #docCanvas and set inline
+   top/left from the anchor's rect. Those styles were dead: the only rule making
+   the menu absolute was scoped to `.doc-sheet`, which was deleted when the
+   document stopped being a modal, so the menu computed `position: static` and
+   simply flowed to the end of the canvas — 246px below its own button, and the
+   same for every selection menu. A positioned menu also needs a positioned
+   host, or it resolves against `.app-main` instead. */
+.doc-canvas { position: relative; }
+.doc-page .ai-menu { position: absolute; z-index: 5; }
+/* Formatting, in the menu a selection opens. The library's `.ai-menu button` is
+   a labelled action — 10px of side padding for a word — and these are single
+   glyphs, so they take the square the icon wants and keep everything else. */
+.ai-menu .ai-menu-fmt {
+  justify-content: center;
+  min-width: 24px; padding-left: 0; padding-right: 0;
+  font-size: 12px; font-weight: var(--fw-semibold);
+}
+.ai-menu .ai-menu-fmt.is-on { background: var(--card-bg-raised); color: var(--accent); }
 
 /* ═══════════════════════════════════════════════
    THE EDITOR — properties, versions, placeholder
@@ -2126,17 +2974,32 @@ body {
 .editor-side .ds-tabs { margin-bottom: 12px; }
 .editor-side .ds-tabpanel { padding: 0; }
 
-.props { display: flex; flex-direction: column; gap: 8px; }
-.prop-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px; align-items: center; }
-.prop-row.is-stack { grid-template-columns: minmax(0, 1fr); gap: 6px; }
-.prop-label {
-  font-size: 10px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+.props { display: flex; flex-direction: column; gap: 12px; }
+/* ── The details, one fact per row ──
+
+   No label column, and no flowing sentence either. Prose around six inline
+   controls cannot wrap without orphaning its punctuation, and the open panel
+   landed on the words that followed it. A row holds the phrase and its value
+   together, and the whole row is the target. */
+.prop-rows { display: flex; flex-direction: column; gap: 2px; }
+.prop-row {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px;
+  padding: 6px 8px; margin-left: -8px;
+  font-size: 12.5px; line-height: 1.5; color: var(--d400);
 }
+/* The half of the fact the control cannot say for itself. Quiet, because the
+   value is what you are reading for. */
+.prop-lead { color: var(--d400); flex-shrink: 0; }
+.prop-also { margin: 0 0 4px; font-size: 12.5px; color: var(--d400); }
 /* The control and its explanation stack, so the sentence reads as belonging to
    the field above it rather than to the row beside it. */
 .prop-status { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.prop-why { font-size: 10px; color: var(--d500); line-height: var(--lh-snug); }
+.prop-why { font-size: 11px; color: var(--d500); line-height: 1.45; }
+/* A remove control should not be the brightest ink in the column. The library's
+   token inherits the accent at 13px, which made every × louder than the value
+   it removes. */
+.props .tag-token button { font-size: 11px; color: var(--d500); }
+.props .tag-token button:hover { color: var(--err); }
 
 /* Property dropdowns read as fields, not as the filter row's buttons. */
 .k-prop { width: 100%; }
@@ -2150,15 +3013,80 @@ body {
 .k-prop .v2-dropdown-btn svg { width: 9px; height: 6px; opacity: 0.6; }
 .k-prop .v2-dropdown-panel { min-width: 100%; }
 
-.props .tag-input { max-width: none; padding: 6px 6px; }
-.props .tag-input input { font-size: var(--fs-xs); }
-.prop-checks { display: flex; flex-direction: column; gap: 4px; }
-.prop-checks .ds-choice { display: flex; align-items: center; gap: 6px; }
-.prop-check-label { font-size: var(--fs-xs); color: var(--d200); }
+/* ── A control that is a row ──
 
-.prop-custom { display: flex; flex-direction: column; gap: 4px; }
+   The lead lives inside the trigger, so the phrase and its value are one hit
+   target and the panel opens under its own row. At rest there is no box: the
+   value's weight is the only thing separating it from the words around it, and
+   the chevron and the background arrive under the pointer. */
+.k-prop.k-row .v2-dropdown-btn {
+  width: 100%; height: auto; justify-content: flex-start; gap: 6px;
+  padding: 6px 8px; margin-left: -8px; border-radius: var(--r-sm);
+  background: none; border: 1px solid transparent;
+  font-size: 12.5px; font-weight: 400; line-height: 1.5; text-align: left;
+  color: var(--d400);
+}
+.k-prop.k-row .v2-dropdown-btn .dd-label-text {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: var(--fw-semibold); color: var(--d100);
+}
+.k-prop.k-row .v2-dropdown-btn:hover { background: rgba(255,255,255,0.05); }
+:root[data-theme="light"] .k-prop.k-row .v2-dropdown-btn:hover { background: rgba(16,24,40,0.04); }
+.k-prop.k-row .v2-dropdown-btn:hover .dd-label-text { color: var(--accent); }
+.k-prop.k-row .v2-dropdown-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.k-prop.k-row .v2-dropdown-btn svg {
+  width: 9px; height: 6px; flex-shrink: 0; opacity: 0; transition: opacity var(--t-fast);
+}
+.k-prop.k-row .v2-dropdown-btn:hover svg,
+.k-prop.k-row .v2-dropdown-btn:focus-visible svg,
+.k-prop.k-row.is-open .v2-dropdown-btn svg { opacity: 0.6; }
+.k-prop.k-row .v2-dropdown-panel { min-width: 100%; }
+
+/* Tags stay inline after their lead — the tokens ARE the words after "Tagged". */
+.props .tag-input {
+  display: inline-flex; flex-wrap: wrap; max-width: none; width: auto;
+  vertical-align: baseline; padding: 0; gap: 4px;
+  background: none; border: 0;
+}
+.props .tag-input input { font-size: var(--fs-xs); width: 6ch; min-width: 6ch; }
+/* Empty, the placeholder is the answer to the sentence, so it needs the room
+   to say it: "It touches nothing yet". */
+.props .tag-input.is-empty input { width: 12ch; min-width: 12ch; }
+.prop-checks { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; }
+/* The checkbox carries the state, so its word is a lead-in, not a value. The
+   weight has to be stated too — `.ds-choice` sets 500 on its label, which is a
+   sixth style differing from the fifth by nothing a reader can name. */
+.prop-check-label { font-size: 12.5px; font-weight: 400; color: var(--d400); }
+.prop-row .ds-choice { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; }
+
+/* ── Anything the fixed fields cannot hold ──
+
+   Two permanent text boxes named only by `aria-label` were the least legible
+   thing in the rail. Closed, a property is a fact in the same shape as every
+   row above it — "tier is enterprise". Open, it is the two inputs, and the
+   placeholders do the naming the invisible labels never did. */
+.prop-custom { display: flex; flex-direction: column; gap: 2px; }
+.prop-also { margin: 0 0 2px; }
 .prop-kv { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 24px; gap: 4px; align-items: center; }
 .prop-kv .field-input { height: 28px; padding: 0 8px; font-size: var(--fs-xs); }
+/* Closed: the read row spans the whole grid and the inputs are not rendered. */
+.prop-kv:not(.is-open) { grid-template-columns: minmax(0, 1fr) 24px; }
+.prop-kv:not(.is-open) .field-input { display: none; }
+.prop-kv.is-open .prop-kv-read { display: none; }
+.prop-kv-read {
+  display: flex; align-items: baseline; gap: 6px; min-width: 0;
+  padding: 6px 8px; margin-left: -8px; border-radius: var(--r-sm);
+  background: none; border: 0; cursor: pointer; text-align: left;
+  font-family: var(--font-sans); font-size: 12.5px; line-height: 1.5; color: var(--d400);
+}
+.prop-kv-read:hover { background: rgba(255,255,255,0.05); }
+:root[data-theme="light"] .prop-kv-read:hover { background: rgba(16,24,40,0.04); }
+.prop-kv-read:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.prop-kv-val {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: var(--fw-semibold); color: var(--d100);
+}
+.prop-kv-read:hover .prop-kv-val { color: var(--accent); }
 .prop-kv-x {
   display: inline-flex; align-items: center; justify-content: center;
   width: 24px; height: 24px; border: 0; border-radius: var(--r-sm);
@@ -2167,10 +3095,11 @@ body {
 }
 .prop-kv-x:hover { color: var(--err); background: var(--err-bg); }
 .prop-add {
-  align-self: flex-start; background: none; border: 0; padding: 2px 0; cursor: pointer;
-  font-family: inherit; font-size: var(--fs-2xs); font-weight: var(--fw-semibold); color: var(--accent);
+  align-self: flex-start; background: none; border: 0; padding: 4px 0; cursor: pointer;
+  font-family: inherit; font-size: 11px; font-weight: var(--fw-semibold); color: var(--accent);
 }
 .prop-add:hover { opacity: 0.75; }
+.prop-add:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
 
 /* Versions are pressable in the editor, and the one you opened says so. */
 .ver-item.is-pickable {
@@ -2289,7 +3218,8 @@ body {
   display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap;
   padding: 12px 0; border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
 }
-.conv-fact { display: flex; flex-direction: column; gap: 2px; }
+.conv-fact { font-size: var(--fs-xs); color: var(--d400); }
+.conv-fact strong { color: var(--d50); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
 .conv-fact-v {
   font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--d100);
   font-variant-numeric: tabular-nums;

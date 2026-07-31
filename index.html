@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Poppins:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="assets/aimy-ds.css" />
-  <link rel="stylesheet" href="assets/knowledge.css?v=25" />
+  <link rel="stylesheet" href="assets/knowledge.css?v=64" />
 
   <script>
     /* Apply saved theme before paint to avoid flash. Default = dark. */
@@ -154,13 +154,7 @@
       <div class="doc-sheet is-settings" id="setSheet"></div>
     </div>
 
-    <!-- ══ The document overlay — viewer and editor.
-         Same frame as the canvas: absolute inside .app-main, blurred backdrop,
-         the shell stays interactive, Escape closes, focus returns to the card.
-         `?doc=` and `&mode=` still drive it — the modal is how it renders, not
-         what it is. ══ -->
-    <div class="doc-overlay" id="docOverlay" role="dialog" aria-modal="true" aria-label="Document" hidden>
-      <div class="doc-sheet" id="docSheet"></div>
+    
     </div>
 
     <!-- ══ The input. Not a chat box — it drives the page. Four routes.
@@ -258,6 +252,10 @@
 </div>
 
 <!-- Commit surfaces and toasts mount here -->
+<!-- The peek: one panel, anchored by script to whatever entity was
+     clicked. Lives at the body so it can be anchored to anything. -->
+<div class="peek" id="peek" role="dialog" aria-label="About this" hidden></div>
+
 <div id="commitHost"></div>
 <div id="toastHost"></div>
 
@@ -288,6 +286,6 @@
 
 
 <script src="assets/aimy-ds.js"></script>
-<script src="assets/knowledge.js?v=25"></script>
+<script src="assets/knowledge.js?v=64"></script>
 </body>
 </html>

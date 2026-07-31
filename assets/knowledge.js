@@ -66,7 +66,11 @@
     plus:     svg('<path d="M12 5v14M5 12h14"/>', 2.4),
     tag:      svg('<path d="M20.6 13.4L12 22l-9-9V3h10l7.6 7.6a2 2 0 010 2.8z"/><path d="M7.5 7.5h.01"/>'),
     plug:     svg('<path d="M9 2v6M15 2v6"/><path d="M6 8h12v3a6 6 0 01-12 0z"/><path d="M12 17v5"/>'),
-    box:      svg('<path d="M21 8v13H3V8"/><rect x="1" y="3" width="22" height="5" rx="1"/><path d="M10 12h4"/>')
+    box:      svg('<path d="M21 8v13H3V8"/><rect x="1" y="3" width="22" height="5" rx="1"/><path d="M10 12h4"/>'),
+    send:     svg('<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>'),
+    /* The same picture the drop layer draws, so choosing a file and dropping
+       one read as the same capability rather than two. */
+    upload:   svg('<path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>')
   };
 
   const AIMY_MARK = (w, h) =>
@@ -340,7 +344,11 @@
       title:'Churn signals — 2025 model', col:'sales', src:'confluence', prod:'sales', client:'',
       tags:['churn','sales'], upd:240, ing:600, xc:700, xu:240,
       sum:'Replaced by the 2026 churn model. Kept for reference and excluded from answers.',
-      x:{ applies:'Superseded 12 Mar 2026' } },
+      /* Not "Superseded 12 Mar 2026". That was the supersession written into a
+         scope field, and once the card started reading the scope aloud it came
+         out as "Applies to superseded 12 mar 2026". The status and the Replaced
+         by edge already say it; this field says what it is for. */
+      x:{ applies:'Sales teams — reference only' } },
 
     { id:'article-voice-handoff', t:'article', work:'completed', owner:'Unassigned',
       title:'Voice-to-agent handoff rules', col:'support', src:'upload', prod:'voice', client:'',
@@ -618,7 +626,14 @@
      it — an edit, an archive, a restore, a re-sync. One call, everywhere. */
   function recompute() { CORPUS.forEach((o) => { o.status = statusOf(o); }); }
 
+  /* `used` counts days since the last citation, so 0 means "today" — except
+     when nothing has ever cited it, where 0 is the absence of a date rather
+     than a date. A document created a minute ago read "used today"; so did one
+     nobody has ever opened. A zero is not a date. */
+  const neverCited = (o) => !o.uses;
+
   const usedLabel = (o) => {
+    if (neverCited(o)) return 'Never';
     if (o.used === 0) return 'Today';
     if (o.used === 1) return 'Yesterday';
     if (o.used < 30) return o.used + ' days ago';
@@ -626,17 +641,231 @@
     return m + (m === 1 ? ' month ago' : ' months ago');
   };
 
+  /* One phrase for "how much has anything used this", so the four places that
+     say it cannot disagree — and so none of them has to special-case the zero. */
+  const citedPhrase = (o) => neverCited(o)
+    ? 'Never cited'
+    : 'Cited ' + o.uses + ' times in 90 days — last ' + usedLabel(o).toLowerCase();
+
   /* Relationships. Kept out of the object bodies because they are a graph, and
      a graph half-stored on each node goes out of sync the first time one side
      is edited. */
-  const RELATED = {
-    'article-refund':     { related: ['article-warranty'], contradicts: ['article-returns-faq'] },
-    'article-returns-faq':{ related: ['article-warranty'], contradicts: ['article-refund'] },
-    'article-residency':  { related: ['blog-residency', 'article-gdpr-dsr'], contradicts: [] },
-    'article-churn-signals': { supersededBy: 'icp-bpo', related: [], contradicts: [] },
-    'page-pricing':       { related: ['asset-pricing-sheet'], contradicts: [] },
-    'story-nordwind':     { related: ['ticket-48120'], contradicts: [] }
+  /* ═══════════════════════════════════════════════
+     THE GRAPH
+
+     This corpus has always been one. Every document carries typed edges — to a
+     collection, a source, an owner, a client, a product, a region, its tags —
+     and the product has only ever rendered them as filter dropdowns. That is
+     the string reading of the data: `client` is a column and `nordwind` is a
+     value in it. The other reading is Google's — things, not strings — where
+     Nordwind is a thing with four documents, a success story, two tickets and
+     an owner hanging off it.
+
+     Nothing new is stored to get that. What changes is that the edges become
+     addressable in both directions, and that an edge can say where it came
+     from.
+
+     TWO KINDS, and the distinction is the whole design.
+
+     IMPLICIT edges are the fields themselves. They are derived, always true,
+     cost nothing, and nobody asserted them — so nothing claims anybody did.
+
+     ASSERTED edges are claims: this contradicts that, this replaced that.
+     Somebody or something said so, and the edge carries who and when. That is
+     Glean's point about edge properties, and it is the rule this product
+     already holds for status — a computed fact and a claimed one must never
+     look identical — finally applied to relationships too.
+  ═══════════════════════════════════════════════ */
+  const ENTITY = {
+    doc:        { kind: 'Document',      filter: 'ids',        label: (id) => (byId(id) || {}).title || id },
+    owner:      { kind: 'Person or team', filter: 'ids',       label: (id) => id },
+    collection: { kind: 'Collection',    filter: 'collection', label: (id) => COLLECTIONS[id] || id },
+    source:     { kind: 'Source',        filter: 'source',     label: (id) => (SRC[id] || {}).label || id },
+    client:     { kind: 'Client',        filter: 'client',     label: (id) => CLIENTS[id] || id },
+    product:    { kind: 'Product',       filter: 'product',    label: (id) => PRODUCTS[id] || id },
+    region:     { kind: 'Region',        filter: 'region',     label: (id) => REGIONS[id] || id },
+    service:    { kind: 'Service',       filter: 'service',    label: (id) => SERVICES[id] || id },
+    tag:        { kind: 'Tag',           filter: 'tag',        label: (id) => id }
   };
+
+  const entityLabel = (kind, id) => (ENTITY[kind] ? ENTITY[kind].label(id) : id) || id;
+
+  /* Read straight off the document. The phrase is what gets rendered — the
+     relationship is the sentence, not a label above a value. */
+  const IMPLICIT = [
+    { type: 'ownedBy',   to: 'owner',      phrase: 'Owned by',      get: (o) => o.owner ? [o.owner] : [] },
+    { type: 'in',        to: 'collection', phrase: 'Filed in',      get: (o) => [o.col] },
+    { type: 'from',      to: 'source',     phrase: 'Came from',     get: (o) => [o.src] },
+    { type: 'about',     to: 'client',     phrase: 'About',         get: (o) => o.client ? [o.client] : [] },
+    { type: 'serves',    to: 'product',    phrase: 'Answers for',   get: (o) => o.prod ? [o.prod] : [] },
+    { type: 'covers',    to: 'region',     phrase: 'Covers',        get: (o) => o.region ? [o.region] : [] },
+    { type: 'uses',      to: 'service',    phrase: 'Part of',       get: (o) => o.services || [] },
+    { type: 'tagged',    to: 'tag',        phrase: 'Tagged',        get: (o) => o.tags || [] }
+  ];
+
+  /* Somebody claimed these. `by` and `at` are not decoration: an edge with no
+     author is a fact, and an edge with one is an opinion, and the reader is
+     owed the difference. */
+  const ASSERTED = {
+    contradicts:  { phrase: 'Disagrees with', inverse: 'contradicts',  tone: 'err' },
+    supersededBy: { phrase: 'Replaced by',    inverse: 'supersedes' },
+    supersedes:   { phrase: 'Replaces',       inverse: 'supersededBy' },
+    related:      { phrase: 'Related to',     inverse: 'related' },
+    /* Both halves of a one-way claim have to be entries, or looking at the far
+       end falls through to the generic phrase. `references` used to name its
+       inverse as prose — 'referenced by' — which is not a key, so a document
+       that something else referenced said only "Related to" and lost the
+       direction the claim was made in. */
+    references:   { phrase: 'References',     inverse: 'referencedBy' },
+    referencedBy: { phrase: 'Referenced by',  inverse: 'references' },
+    /* The commonest real link in this corpus and the model could not hold it:
+       a ticket that an article resolves. */
+    answers:      { phrase: 'Answers',        inverse: 'answeredBy' },
+    answeredBy:   { phrase: 'Answered by',    inverse: 'answers' }
+  };
+
+  /* Every live document has at least one of these. Eight edges across
+     forty-two documents left thirty-four rails restating their own fields and
+     calling it a graph. */
+  const EDGES = [
+    /* Refunds, returns and warranty — the conflict the product is built around. */
+    { from: 'article-refund',        to: 'article-returns-faq', type: 'contradicts',  by: 'AiMY',       at: 12 },
+    { from: 'article-refund',        to: 'article-warranty',    type: 'related',      by: 'A. Mahfouz', at: 40 },
+    { from: 'article-returns-faq',   to: 'article-warranty',    type: 'related',      by: 'A. Mahfouz', at: 40 },
+    { from: 'article-refund',        to: 'ticket-48120',        type: 'answers',      by: 'A. Mahfouz', at: 11 },
+    { from: 'article-refund-2024',   to: 'article-refund',      type: 'supersededBy', by: 'A. Mahfouz', at: 120 },
+    /* Residency, GDPR and the DPA. */
+    { from: 'article-residency',     to: 'blog-residency',      type: 'related',      by: 'N. Wael',    at: 26 },
+    { from: 'article-residency',     to: 'article-gdpr-dsr',    type: 'related',      by: 'N. Wael',    at: 26 },
+    { from: 'article-residency',     to: 'ticket-51877',        type: 'answers',      by: 'N. Wael',    at: 20 },
+    { from: 'article-retention',     to: 'ticket-49002',        type: 'answers',      by: 'Legal',      at: 33 },
+    { from: 'article-dpa',           to: 'article-retention',   type: 'contradicts',  by: 'AiMY',      at: 7 },
+    { from: 'page-security',         to: 'article-dpa',         type: 'references',   by: 'Marketing',  at: 44 },
+    { from: 'asset-deck-security',   to: 'article-residency',   type: 'references',   by: 'Brand',      at: 30 },
+    { from: 'asset-deck-security',   to: 'page-security',       type: 'references',   by: 'Brand',      at: 30 },
+    { from: 'campaign-residency',    to: 'blog-residency',      type: 'references',   by: 'Marketing',  at: 22 },
+    /* Onboarding, SSO and the SLA. */
+    { from: 'article-sso',           to: 'ticket-51004',        type: 'answers',      by: 'O. Said',    at: 16 },
+    { from: 'article-onboarding',    to: 'article-sso',         type: 'related',      by: 'O. Said',    at: 48 },
+    { from: 'article-sla',           to: 'article-onboarding',  type: 'related',      by: 'O. Said',    at: 48 },
+    { from: 'article-sla',           to: 'page-status',         type: 'contradicts',  by: 'AiMY',      at: 5 },
+    /* Billing. */
+    { from: 'article-billing',       to: 'ticket-52310',        type: 'answers',      by: 'N. Wael',    at: 14 },
+    { from: 'page-pricing',          to: 'asset-pricing-sheet', type: 'references',   by: 'Marketing',  at: 18 },
+    /* Voice. */
+    { from: 'article-voice-handoff', to: 'ticket-52488',        type: 'answers',      by: 'O. Said',    at: 8 },
+    { from: 'asset-voice-demo',      to: 'article-voice-handoff', type: 'references', by: 'Brand',      at: 24 },
+    { from: 'blog-voice-draft',      to: 'article-voice-handoff', type: 'references', by: 'Marketing',  at: 6 },
+    { from: 'campaign-q4-voice',     to: 'asset-voice-demo',    type: 'references',   by: 'Marketing',  at: 21 },
+    /* Segments and the stories that prove them. */
+    { from: 'article-churn-signals', to: 'icp-bpo',             type: 'supersededBy', by: 'O. Said',    at: 55 },
+    { from: 'icp-bpo',               to: 'icp-bpo-apac',        type: 'related',      by: 'Sales Ops',  at: 60 },
+    { from: 'story-nordwind',        to: 'ticket-48120',        type: 'references',   by: 'N. Wael',    at: 9 },
+    { from: 'story-orbit',           to: 'icp-bpo',             type: 'references',   by: 'Sales Ops',  at: 35 },
+    { from: 'story-meridian',        to: 'icp-healthcare',      type: 'references',   by: 'Sales Ops',  at: 28 },
+    { from: 'story-tavola',          to: 'icp-retail-voice',    type: 'references',   by: 'Sales Ops',  at: 19 },
+    /* Campaigns. */
+    { from: 'campaign-q3',           to: 'asset-onepager',      type: 'references',   by: 'Marketing',  at: 50 },
+    { from: 'campaign-q1-launch',    to: 'campaign-q3',         type: 'supersededBy', by: 'Marketing',  at: 90 },
+    { from: 'blog-quality-scale',    to: 'story-nordwind',      type: 'references',   by: 'Marketing',  at: 38 }
+  ];
+
+  /* RELATED is now a PROJECTION of the edge list, not a second copy of it.
+     Twenty call sites read it and every one of them still works; the four that
+     used to mutate it go through assertEdge instead, so provenance cannot be
+     forgotten by accident. */
+  let RELATED = {};
+
+  function rebuildRelated() {
+    RELATED = {};
+    const slot = (id) => (RELATED[id] = RELATED[id] || { related: [], contradicts: [] });
+    EDGES.forEach((e) => {
+      const a = slot(e.from), b = slot(e.to);
+      if (e.type === 'contradicts') {
+        if (a.contradicts.indexOf(e.to) < 0) a.contradicts.push(e.to);
+        if (b.contradicts.indexOf(e.from) < 0) b.contradicts.push(e.from);
+      } else if (e.type === 'supersededBy') {
+        a.supersededBy = e.to;
+        if (b.related.indexOf(e.from) < 0) b.related.push(e.from);
+      } else if (e.type === 'supersedes') {
+        b.supersededBy = e.from;
+        if (a.related.indexOf(e.to) < 0) a.related.push(e.to);
+      } else {
+        if (a.related.indexOf(e.to) < 0) a.related.push(e.to);
+        if (b.related.indexOf(e.from) < 0) b.related.push(e.from);
+      }
+    });
+  }
+  rebuildRelated();
+
+  /* Claims go in and out through here, so every one of them carries an author
+     and a date, and undoing one is exact. */
+  function assertEdge(from, to, type, by) {
+    dropEdge(from, to);
+    EDGES.push({ from: from, to: to, type: type, by: by || USER.owner, at: 0 });
+    rebuildRelated();
+  }
+  function dropEdge(from, to) {
+    for (let i = EDGES.length - 1; i >= 0; i--) {
+      const e = EDGES[i];
+      if ((e.from === from && e.to === to) || (e.from === to && e.to === from)) EDGES.splice(i, 1);
+    }
+    rebuildRelated();
+  }
+
+  /* Everything connected to one thing, in both directions, as phrases.
+     Returns [{ phrase, kind, id, label, by, at }] — the peek renders it
+     straight, because the sentence IS the relationship. */
+  function edgesOf(kind, id) {
+    const out = [];
+    const push = (phrase, k, target, e) => {
+      if (!target) return;
+      out.push({ phrase: phrase, kind: k, id: target, label: entityLabel(k, target),
+                 by: e && e.by, at: e && e.at });
+    };
+
+    if (kind === 'doc') {
+      const o = byId(id);
+      if (!o) return out;
+      EDGES.forEach((e) => {
+        if (e.from === id) push((ASSERTED[e.type] || {}).phrase || e.type, 'doc', e.to, e);
+        else if (e.to === id) {
+          const inv = (ASSERTED[e.type] || {}).inverse;
+          const ph = (ASSERTED[inv] || {}).phrase || 'Related to';
+          push(ph, 'doc', e.from, e);
+        }
+      });
+      IMPLICIT.forEach((r) => r.get(o).forEach((v) => push(r.phrase, r.to, v, null)));
+      return out;
+    }
+
+    /* Any other entity: the documents that point at it, then what those
+       documents have in common — which is how you get from a client to the
+       person who owns everything about them without ever leaving the panel. */
+    const rel = IMPLICIT.find((r) => r.to === kind);
+    if (!rel) return out;
+    const docs = ENTITLED.filter((o) => !o.arch && rel.get(o).indexOf(id) > -1);
+    docs.forEach((o) => push('Includes', 'doc', o.id, null));
+    const seen = {};
+    IMPLICIT.forEach((r) => {
+      if (r.to === kind) return;
+      docs.forEach((o) => r.get(o).forEach((v) => {
+        const key = r.to + ':' + v;
+        if (seen[key]) return;
+        seen[key] = 1;
+        push(r.phrase === 'Owned by' ? 'Owned by' : r.phrase, r.to, v, null);
+      }));
+    });
+    return out;
+  }
+
+  /* The documents an entity gathers — used for its count and for the URL that
+     puts them on the surface. */
+  function docsOf(kind, id) {
+    if (kind === 'doc') return [byId(id)].filter(Boolean);
+    const rel = IMPLICIT.find((r) => r.to === kind);
+    return rel ? ENTITLED.filter((o) => !o.arch && rel.get(o).indexOf(id) > -1) : [];
+  }
 
   /* Status reads the relationship graph, so the first derivation waits for it. */
   recompute();
@@ -657,11 +886,16 @@
       text: 'APAC is the half nobody has written. A ticket came in on it again yesterday.' }
   ];
 
-  function addComment(o, text) {
+  /* `problem` marks a reported fault rather than a remark. The two read
+     differently because they ask different things of the owner: one is a
+     conversation, the other is a job. */
+  function addComment(o, text, problem) {
     o.comments = (o.comments || []).concat([
-      { who: USER.name, initials: USER.initials, when: 'just now', text: text }
+      { who: USER.name, initials: USER.initials, when: 'just now', text: text, problem: !!problem }
     ]);
   }
+
+  const openProblems = (o) => (o.comments || []).filter((c) => c.problem && !c.done).length;
 
   /* ═══════════════════════════════════════════════
      STATE — the URL, and nothing else
@@ -679,9 +913,26 @@
 
   function readURL() {
     const p = new URLSearchParams(location.search);
-    const st = { doc: p.get('doc') || '', mode: p.get('mode') || 'view',
+    /* No mode. A document is one surface — reading and writing are the same
+       act — so there is nothing for the URL to say about which one you are in.
+       `?mode=edit` in an old link is simply ignored. */
+    const st = { doc: p.get('doc') || '',
                  settings: p.get('settings') || '',
-                 view: p.get('view') === 'tree' ? 'tree' : 'grid' };
+                 view: p.get('view') === 'tree' ? 'tree' : 'grid',
+                 /* Which edge the tree walks. Every axis in the folder view is
+                    an implicit edge type, so grouping by client IS traversing
+                    the `about` edge — and like everything else, it is a link. */
+                 group: GROUPS[p.get('group')] ? p.get('group') : 'col',
+                 /* One named ordering, not a sort menu. It answers "what needs
+                    a person first", which is the only ordering question this
+                    surface has ever been asked.
+
+                    Three values, two states. Absent means "whatever this
+                    surface's default is" — attention for the composed landing
+                    set, recency for a filtered one — so `recent` has to be
+                    writable or the toggle would be dead in the one place the
+                    default is already on. */
+                 sort: /^(attention|recent)$/.test(p.get('sort') || '') ? p.get('sort') : '' };
     LIST_KEYS.forEach((k) => { st[k] = (p.get(k) || '').split(',').filter(Boolean); });
     DATE_KEYS.forEach((k) => { st[k] = p.get(k) || ''; });
     FLAG_KEYS.forEach((k) => { st[k] = p.get(k) === '1'; });
@@ -701,15 +952,28 @@
   }
 
   function writeURL(st, opt) {
+    /* ── The canvas gets out of the way of its own results ──
+
+       Anything that changes the page while the canvas is open was clicked IN
+       the canvas — it is a full overlay, so nothing behind it is reachable —
+       and the point of clicking it was to see what it did. This used to be ten
+       scattered `canvas.close()` calls at ten call sites, which meant every new
+       action arrived not closing it until somebody noticed.
+
+       One rule at the funnel every URL change already goes through. `ask()`
+       does not write the URL, so a follow-up answer still opens normally. */
+    if (canvas && canvas.open) canvas.close();
     const p = new URLSearchParams();
     if (st.q) p.set('q', st.q);
     LIST_KEYS.forEach((k) => { if (st[k] && st[k].length) p.set(k, st[k].join(',')); });
     DATE_KEYS.forEach((k) => { if (st[k]) p.set(k, st[k]); });
     FLAG_KEYS.forEach((k) => { if (st[k]) p.set(k, '1'); });
     if (st.prop) p.set('prop', st.prop);
-    if (st.doc) { p.set('doc', st.doc); if (st.mode === 'edit') p.set('mode', 'edit'); }
+    if (st.doc) p.set('doc', st.doc);
     if (st.settings) p.set('settings', st.settings);
     if (st.view === 'tree') p.set('view', 'tree');
+    if (st.group && st.group !== 'col') p.set('group', st.group);
+    if (st.sort) p.set('sort', st.sort);
     /* Prototype affordance, carried so a forced state survives a filter change
        and the degraded case can actually be driven rather than just looked at. */
     if (forcedState) p.set('state', forcedState);
@@ -731,7 +995,7 @@
     /* Changing a filter drops the open document: you asked to look at the set
        again, and leaving one document open on top of a set you can no longer
        see is the classic lost-place bug. */
-    if (Object.keys(changes).some((k) => ALL_KEYS.indexOf(k) > -1)) { st.doc = ''; st.mode = 'view'; }
+    if (Object.keys(changes).some((k) => ALL_KEYS.indexOf(k) > -1)) st.doc = '';
     writeURL(st, opt);
   }
 
@@ -803,19 +1067,34 @@
 
   function sortSet(list, sort) {
     const s = list.slice();
-    if (sort === 'attention') return s.sort((a, b) => needScore(b) - needScore(a) || a.upd - b.upd);
+    /* Status leads, and then needScore breaks the tie. Ranking on needScore
+       alone let the "+2 because it is yours" and the work state outweigh the
+       status: an unowned document sat below four documents with nothing wrong,
+       which is not what a control called Needs attention can mean. Severity
+       first, then whose it is. */
+    if (sort === 'attention') return s.sort((a, b) =>
+      (NEED_SCORE[b.status] || 0) - (NEED_SCORE[a.status] || 0)
+      || needScore(b) - needScore(a)
+      || a.upd - b.upd);
     if (sort === 'title') return s.sort((a, b) => a.title.localeCompare(b.title));
     return s.sort((a, b) => a.upd - b.upd);           // most recently updated first
   }
 
   /* The landing set: what you own or touched, ranked by what needs you. The
      cap is stated on the surface rather than applied quietly — a list that
-     hides its tail overstates how contained the problem is. */
-  function composedSet() {
+     hides its tail overstates how contained the problem is.
+
+     The order is passed in rather than hard-coded, so one function decides it
+     for every surface and the toggle is a live control here too. */
+  function composedSet(sort) {
     const mine = LIVE.filter((o) => o.owner === USER.owner || USER.recent.indexOf(o.id) > -1);
     const rest = LIVE.filter((o) => mine.indexOf(o) === -1);
-    return sortSet(mine, 'attention').concat(sortSet(rest, 'attention')).slice(0, COMPOSED_CAP);
+    return sortSet(mine, sort).concat(sortSet(rest, sort)).slice(0, COMPOSED_CAP);
   }
+
+  /* Absent means "this surface's default": the composed set leads with what
+     needs a person, a filtered set with what changed last. */
+  const orderOf = (st, composed) => st.sort || (composed ? 'attention' : 'updated');
 
   /* ═══════════════════════════════════════════════
      THE INPUT — one field, four routes
@@ -1391,17 +1670,51 @@
   const LAST_VISIT = 4;                     // days ago; a session fixture
   const VISIT_LABEL = dateOf(LAST_VISIT).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
 
+  /* Questions that arrived and found nothing. Rows rather than a sentence, so
+     the briefing can report that there are none — which is a real condition and
+     was an unreachable one while the count was written into the copy. */
+  const ASKED = [
+    { topic: 'Data residency in APAC', n: 3,
+      prompt: 'Draft an article covering data residency for APAC enterprise contracts' },
+    { topic: 'Refunds on annual plans', n: 1,
+      prompt: 'Draft an article covering refunds on annual plans' }
+  ];
+
   function sinceLastVisit() {
     const out = [];
     const since = (o) => o.upd <= LAST_VISIT;
 
     const failing = Object.keys(SRC).filter((k) => SRC[k].health === 'failed');
-    if (failing.length) {
-      const stale = LIVE.filter((o) => failing.indexOf(o.src) > -1).length;
+    const stale = failing.length ? LIVE.filter((o) => failing.indexOf(o.src) > -1).length : 0;
+    /* Only when it has cost something. With nothing drawn from a dead source
+       this read "Zendesk stopped syncing. 0 documents have not updated since.
+       Show them" over a filter that matches nothing — a briefing entry whose
+       action is a dead end. The Sources block below states every source's
+       health and carries Reconnect; the briefing is for consequences. */
+    if (stale) {
       out.push({
         id: 'source', tone: 'err',
-        text: `${failing.map((k) => SRC[k].label).join(' and ')} stopped syncing. ${stale} documents have not updated since.`,
+        text: `${failing.map((k) => SRC[k].label).join(' and ')} stopped syncing. ${stale} document${stale === 1 ? ' has' : 's have'} not updated since.`,
         action: 'Show them', mode: 'direct', href: { source: failing }, ask: ['source', failing[0]]
+      });
+    }
+
+    /* Somebody said a document is wrong — the only entry here a PERSON put
+       there rather than the system deriving it. It sits with the rest in
+       severity order, below a source that has stopped feeding eleven documents
+       and above what is merely stale. Without it a report went into a comment
+       thread nobody had a reason to open, which is the same as nowhere. */
+    const reported = LIVE.filter((o) => openProblems(o));
+    if (reported.length) {
+      const n = reported.reduce((s, o) => s + openProblems(o), 0);
+      out.push({
+        id: 'reported', tone: 'err',
+        text: n === 1
+          ? `Somebody reported a problem with ${reported[0].title}.`
+          : `${n} reported problems across ${reported.length} document${reported.length === 1 ? '' : 's'}.`,
+        action: reported.length === 1 ? 'Open it' : 'Show them', mode: 'review',
+        doc: reported.length === 1 ? reported[0].id : null,
+        href: reported.length === 1 ? null : { ids: reported.map((o) => o.id) }
       });
     }
 
@@ -1435,13 +1748,19 @@
       });
     }
 
-    out.push({
-      id: 'gap', tone: 'warn',
-      text: 'Three questions came in that nothing here answers. Data residency in APAC leads.',
-      /* No filter target: a gap is the absence of a document. */
-      action: 'Draft one', mode: 'prompt',
-      prompt: 'Draft an article covering data residency for APAC enterprise contracts'
-    });
+    /* This was one hard-coded sentence, pushed unconditionally — which made a
+       briefing with nothing in it impossible, and the empty state below it
+       unreachable. A count that is always three is not a count. */
+    if (ASKED.length && LIVE.length) {
+      const asked = ASKED.reduce((s, a) => s + a.n, 0);
+      const lead = ASKED.slice().sort((a, b) => b.n - a.n)[0];
+      out.push({
+        id: 'gap', tone: 'warn',
+        text: `${asked} question${asked === 1 ? '' : 's'} came in that nothing here answers. ${lead.topic} leads.`,
+        /* No filter target: a gap is the absence of a document. */
+        action: 'Draft one', mode: 'prompt', prompt: lead.prompt
+      });
+    }
 
     const last = byId(USER.recent[0]);
     if (last) {
@@ -1464,14 +1783,26 @@
            were last here, and nothing else. -->
       <div class="brief-section-label">Since ${esc(VISIT_LABEL)}</div>
       <!-- Capped. A briefing that lists everything is a log, and a log is work
-           to read — which is the thing a briefing exists to have done for you. -->
-      <div class="brief-list">${sinceLastVisit().slice(0, 5).map((b) => `
+           to read — which is the thing a briefing exists to have done for you.
+
+           And a briefing with nothing in it still has something to say. The
+           heading over an empty list read as a rail that had failed to load;
+           "nothing needs you" is the best news this panel can carry and it was
+           the one state it could not report. -->
+      ${(() => {
+        const news = sinceLastVisit();
+        if (!news.length) {
+          return `<p class="brief-quiet">Nothing changed and nothing needs a person.
+            The library is as you left it.</p>`;
+        }
+        return `<div class="brief-list">${news.slice(0, 5).map((b) => `
         <div class="brief-entry is-${b.tone}">
           <p class="brief-text">${esc(b.text)}</p>
           <button class="brief-go" data-entry-mode="${b.mode}" ${b.doc
             ? `data-open-doc="${esc(b.doc)}"`
             : b.href ? `data-brief-filter="${esc(b.id)}"` : `data-brief-prompt="${esc(b.prompt)}"`}>${esc(b.action)}</button>
-        </div>`).join('')}</div>
+        </div>`).join('')}</div>`;
+      })()}
 
       ${lastFilter && isComposed(st)
         ? `<button class="brief-resume" data-resume>Resume your last filter</button>` : ''}
@@ -1534,29 +1865,7 @@
     ? `<span class="tc-approval is-approved">${ICO.check.replace('<svg', '<svg width="11" height="11"')}Approved</span>`
     : `<span class="tc-approval is-pending">${ICO.clock.replace('<svg', '<svg width="11" height="11"')}Awaiting approval</span>`;
 
-  const fieldRows = (pairs) => `<div class="tc-fields">${pairs
-    .map(([l, v]) => `<div class="tc-field"><span class="tc-field-label">${esc(l)}</span><span class="tc-field-val">${v}</span></div>`).join('')}</div>`;
 
-  const TEMPLATE = {
-    article:  (o) => fieldRows([['Applies to', esc(o.x.applies)], ['Collection', esc(COLLECTIONS[o.col])]]),
-    ticket:   (o) => fieldRows([['Requester', esc(o.x.requester)],
-                                ['Status', `<span class="tag ${o.x.status === 'Resolved' ? 'tag-ok' : 'tag-warn'}">${esc(o.x.status)}</span>`],
-                                ['Resolution', esc(o.x.resolution)]]),
-    icp:      (o) => fieldRows([['Segment', esc(o.x.segment)]]) +
-                     `<ul class="tc-list">${o.x.fit.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>` +
-                     `<ul class="tc-list is-negative">${o.x.dis.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`,
-    campaign: (o) => fieldRows([['Objective', esc(o.x.objective)], ['Window', `<strong>${esc(o.x.window)}</strong>`],
-                                ['Assets', esc(o.x.assets)]]),
-    asset:    (o) => fieldRows([['Format', esc(o.x.format)], ['Usage', esc(o.x.usage)],
-                                ['Approval', approvalPill(o.x.approval)]]),
-    story:    (o) => fieldRows([['Customer', esc(o.x.customer)], ['Outcome', `<strong>${esc(o.x.outcome)}</strong>`],
-                                ['Approval', approvalPill(o.x.approval)]]) +
-                     `<div class="tc-quote">“${esc(o.x.quote)}”</div>`,
-    blog:     (o) => fieldRows([['State', esc(o.x.pub)], ['Canonical', `<span class="tc-mono">${esc(o.x.canonical)}</span>`],
-                                ['Author', esc(o.x.author)]]),
-    webpage:  (o) => fieldRows([['Source URL', `<span class="tc-mono">${esc(o.x.url)}</span>`], ['Last crawl', esc(o.x.crawl)],
-                                ['Changes', `<span class="tag ${/^None/.test(o.x.change) ? 'tag-ok' : 'tag-warn'}">${esc(o.x.change)}</span>`]])
-  };
 
   /* ── The card ──
 
@@ -1565,21 +1874,61 @@
      ICP without its region and services is not an ICP; a Success Story without
      its client is an anecdote. The full record is one click away in the modal,
      so the card's job is to be scannable, not complete. */
-  const CARD_FACTS = {
-    article:  (o) => [['Applies to', esc(o.x.applies)]],
-    ticket:   (o) => [['Requester', esc(o.x.requester)],
-                      ['Status', `<span class="tag ${o.x.status === 'Resolved' ? 'tag-ok' : 'tag-warn'}">${esc(o.x.status)}</span>`]],
-    icp:      (o) => [['Region', esc(REGIONS[o.region])],
-                      ['Services', esc(o.services.map((s) => SERVICES[s]).join(' · ')) || '—']],
-    campaign: (o) => [['Window', esc(o.x.window)], ['Objective', esc(o.x.objective)]],
-    asset:    (o) => [['Usage', esc(o.x.usage)], ['Approval', approvalPill(o.x.approval)]],
-    story:    (o) => [['Client', esc(CLIENTS[o.client] || '—')], ['Outcome', `<strong>${esc(o.x.outcome)}</strong>`]],
-    blog:     (o) => [['State', esc(o.x.pub)], ['Author', esc(o.x.author)]],
-    webpage:  (o) => [['Last crawl', esc(o.x.crawl)],
-                      ['Changes', `<span class="tag ${/^None/.test(o.x.change) ? 'tag-ok' : 'tag-warn'}">${esc(o.x.change)}</span>`]]
-  };
 
   /* One classified action per card, chosen by what the object actually needs. */
+  /* ═══════════════════════════════════════════════
+     FACTS ARE PHRASES
+
+     `REQUESTER` over `Nordwind GmbH` is two things to read where one would do,
+     and the shouting 9px uppercase run was carrying a hierarchy that size,
+     weight and position are for. A fact says itself now: *Raised by Nordwind
+     GmbH*. Fewer words on screen, not more.
+
+     Where the value is already a badge — a status, an approval — the badge
+     stands alone. A coloured pill reading *Resolved* does not need the word
+     STATUS above it.
+
+     One table, used by the card (first two) and by the document's rail (all).
+     They cannot drift apart because there is nothing to keep in step.
+  ═══════════════════════════════════════════════ */
+  const TYPE_FACTS = {
+    article:  (o) => ['Applies to ' + esc(o.x.applies).toLowerCase(),
+                      neverCited(o) ? 'Never cited' : 'Last cited ' + esc(usedLabel(o).toLowerCase())],
+    ticket:   (o) => ['Raised by ' + esc(o.x.requester),
+                      o.x.status === 'Resolved' ? 'Resolved' : 'Still open',
+                      o.x.resolution && o.x.resolution !== '—' ? 'Closed with ' + esc(o.x.resolution).replace(/\.$/, '') : ''],
+    icp:      (o) => ['Covers ' + esc(REGIONS[o.region]),
+                      o.services.length ? 'Part of ' + esc(o.services.map((s) => SERVICES[s].toLowerCase()).join(' and ')) : '',
+                      o.x.segment && o.x.segment !== '—' ? 'Segment: ' + esc(o.x.segment) : ''],
+    campaign: (o) => ['Ran ' + esc(o.x.window),
+                      'Aimed at ' + esc(o.x.objective).toLowerCase(),
+                      o.x.assets && o.x.assets !== '—' ? esc(o.x.assets) : ''],
+    asset:    (o) => [esc(o.x.format) + ' — ' + esc(o.x.usage).toLowerCase(),
+                      o.x.approval === 'approved' ? 'Cleared for use' : 'Approval still pending'],
+    story:    (o) => ['About ' + esc(CLIENTS[o.client] || 'no named client'),
+                      'Outcome: ' + esc(o.x.outcome),
+                      o.x.approval === 'approved' ? 'Cleared to quote' : 'Not cleared to quote'],
+    blog:     (o) => [o.x.pub === 'Published' ? 'Published' : esc(o.x.pub),
+                      'Written by ' + esc(o.x.author),
+                      o.x.canonical && o.x.canonical !== '—' ? 'Canonical at ' + esc(o.x.canonical) : ''],
+    webpage:  (o) => ['Crawled ' + esc(o.x.crawl),
+                      o.x.change === 'None' ? 'Unchanged since the last crawl' : esc(o.x.change) + ' since the last crawl',
+                      o.x.url && o.x.url !== '—' ? esc(o.x.url) : '']
+  };
+
+  const typeFacts = (o) => (TYPE_FACTS[o.t] || (() => []))(o).filter(Boolean);
+
+  /* What the document says about itself, beyond its type. Phrases, in the
+     order somebody would ask them. */
+  const docFacts = (o) => [
+    ownerPhrase(o),
+    'Updated ' + esc(fmtDate(o.upd)),
+    o.client ? 'About ' + esc(CLIENTS[o.client]) : '',
+    o.prod ? 'Answers for ' + esc(PRODUCTS[o.prod]) : '',
+    'Visible to ' + esc(o.aud.map((a) => AUDIENCE[a].toLowerCase()).join(' and ')),
+    o.tags.length ? 'Tagged ' + esc(o.tags.join(', ')) : ''
+  ].filter(Boolean);
+
   /* One action per card, and it is the status's exit — so the card offers the
      thing the badge implies rather than a second vocabulary of its own. */
   function cardAction(o) {
@@ -1597,30 +1946,74 @@
     return STATUS_EXIT[o.status] || ['direct', 'Open', 'open'];
   }
 
-  /* One footer, not two. The library's card ends with a bordered, tinted
+  /* Status as ink, not as a pill above the title. The dot and the word take the
+     status tone and sit INSIDE the meta line, where colour and weight carry
+     them without outranking the document's name — the same move GitHub makes
+     for open and closed. The card's left edge takes the tone too, so a
+     screenful reads at a glance and a document with nothing wrong stays quiet. */
+  function statusInk(o) {
+    const s = STATUS[o.status];
+    return `<span class="tc-st" title="${esc(o.statusSet
+      ? 'Set by ' + (o.statusBy || USER.owner) + '. ' + s.why : s.why)}"><i class="tc-dot"></i>${esc(s.label)}` +
+      `${o.statusSet ? '<span class="pin-dot" aria-label="set by hand"></span>' : ''}</span>`;
+  }
+
+  /* ── Three tiers, not five rows ──
+
+     The card used to stack a type row, a status pill, a title, two identically
+     styled facts and an owner: six runs, four of them within 3px and two of
+     them byte-identical, so it read as a grey ladder with a bigger rung in the
+     middle. What every list of this kind settles on — GitHub's issue rows,
+     Linear, Gmail, Notion's database cards — is the opposite rule: metadata
+     collapses onto ONE dim line and never becomes rows that compete.
+
+     So: the title first and alone, one line of the document's own words under
+     it, and everything else — status, type, owner, last use — on a single
+     middot line at 11px. Each tier differs from its neighbour in at least two
+     of size, weight, colour and position, which is what makes the hierarchy
+     legible without a single label.
+
+     One footer, not two. The library's card ends with a bordered, tinted
      `.tc-gov` strip followed by a bordered `.tc-action` strip holding a
      full-width button — two rules and a banner where one row does the job. */
   function typeCard(o, compact) {
     const t = TYPES[o.t];
     const act = cardAction(o);
-    const facts = CARD_FACTS[o.t](o).concat(compact ? [] : [['Last used', esc(usedLabel(o))]]);
+    const snip = compact ? '' : (typeFacts(o)[0] || '');
+    const meta = [
+      statusInk(o),
+      `<span class="tc-kind">${t.ico}${esc(t.label)}</span>`,
+      /* Some documents carry an ingestion marker in the owner field rather than
+         a person — "Ingested · Zendesk" — which on a middot-separated line reads
+         as two more items and pointed the peek at an owner that does not exist.
+         Same test the document's byline uses. */
+      hasOwner(o)
+        ? `<button class="tc-who" data-peek="owner:${esc(o.owner)}">${esc(o.owner)}</button>`
+        /* When the STATUS is already Unowned the phrase would say it twice on
+           one line. It still earns its place on a draft or an out-of-date
+           document, where nobody being accountable is the second finding. */
+        : o.status === 'unowned' ? ''
+        : `<span class="tc-who is-none">${o.owner === 'Unassigned' ? 'nobody owns it' : 'no owner'}</span>`,
+      /* Both dates, because they answer different questions and one is not the
+         other: a document edited last week can still be one nobody has cited in
+         four months, and that gap IS the finding. Edited takes a date because
+         it is a point in time; used takes a distance because the question is
+         how long it has been. */
+      compact ? '' : `<span>edited ${esc(fmtDate(o.upd))}</span>`,
+      compact ? '' : `<span>${neverCited(o) ? 'never used' : 'used ' + esc(usedLabel(o).toLowerCase())}</span>`
+    ].filter(Boolean);
     /* The whole card opens the document. The title stays a real button so the
        keyboard has one focusable target that announces which document it is —
        wrapping the card itself in a button would swallow the action inside it,
        and nested buttons are invalid besides. */
     return `<div class="type-card${compact ? ' is-compact' : ''}" data-obj="${o.id}" data-status="${o.status}"
          data-work-state="${o.work}" data-card-open="${o.id}">
-      <div class="tc-head">
-        <span class="tc-type">${t.ico}${esc(t.label)}</span>
-        ${statusBadge(o.status, o.statusSet ? 'Set by ' + esc(o.statusBy || USER.owner) : '')}
-      </div>
       <button class="tc-title-btn" data-open-doc="${o.id}"><span class="tc-title">${esc(o.title)}</span></button>
-      ${compact ? '' : `<div class="tc-fields">${facts.map(([l, v]) =>
-        `<div class="tc-field"><span class="tc-field-label">${esc(l)}</span><span class="tc-field-val">${v}</span></div>`).join('')}</div>`}
-      <div class="tc-foot">
-        <span class="tc-foot-who">${esc(o.owner)}</span>
+      ${snip ? `<p class="tc-snip">${snip}</p>` : ''}
+      <p class="tc-meta">${meta.join('<i class="tc-sep">·</i>')}</p>
+      ${compact ? '' : `<div class="tc-foot">
         <span class="tc-foot-act">${entryAction(act[0], act[1], `data-card-act="${o.id}"`)}</span>
-      </div>
+      </div>`}
     </div>`;
   }
 
@@ -1661,6 +2054,14 @@
             : `<span class="rm-note">of ${LIVE.length}</span>`}
       </div>
       <div class="rm-end">
+        <!-- One ordering, named after the question it answers. A real control
+             on every surface, including the landing set, where it starts on and
+             turning it off gives you what changed last. It was a dead label
+             there, which is the worst place for a dead control. -->
+        <button class="rm-sort${orderOf(st, composed) === 'attention' ? ' is-on' : ''}"
+                type="button" data-sort-attention
+                aria-pressed="${orderOf(st, composed) === 'attention'}">
+          ${ICO.flag ? ICO.flag.replace('<svg', '<svg width="12" height="12"') : ''}Needs attention</button>
         <!-- Two readings of one set. The library's segmented control, so it
              reads as a view switch rather than as an action. -->
         <div class="seg rm-views" role="group" aria-label="How to show these">
@@ -1668,6 +2069,17 @@
             type="button" data-view="${v}" aria-pressed="${(st.view || 'grid') === v}">
             ${(v === 'tree' ? ICO.folder : ICO.grid).replace('<svg', '<svg width="12" height="12"')}${esc(label)}</button>`).join('')}
         </div>
+        <!-- AFTER the switch, not before it. Rendered first, the picker moved
+             the switcher 141px right the moment you chose Folders — out from
+             under the pointer that had just clicked it. It is a sub-option OF
+             Folders, so it belongs downstream of the control that turns it on,
+             where it can appear and disappear without moving anything. -->
+        ${st.view === 'tree' ? groupPicker(st) : ''}
+        <!-- No file control here. The result line is about the set you are
+             looking at, and New document is the one action that belongs to it.
+             Starting from a file is reachable where you are already starting
+             something — the blank document's row — and by dropping one, which
+             works on this page and says what it will do. -->
         ${entryAction('direct', 'New document', 'data-new-doc="1"', ICO.plus)}
       </div>
       ${excluded || unowned ? `<div class="rm-disclosure">
@@ -1680,67 +2092,158 @@
   }
 
   /* ═══════════════════════════════════════════════
-     THE TREE — the same set, arranged rather than listed
+     THE TREE — the graph, walked one edge at a time
 
      A second view, not a second product. Whatever the filters say is what the
      tree contains, so switching between grid and tree keeps your place and
      changes only the shape of what you are looking at.
 
-     Collection → Type → document. That order because a collection is a place
-     someone owns and a type is what a thing is; the reverse would file the
-     same policy under Article in four different collections and lose the one
-     fact — who is responsible for this shelf — that a folder view is for.
+     The hierarchy used to be hard-coded Collection → Type → document, which is
+     one traversal of a graph that has eight axes, frozen. It is a **grouping**
+     now, and every axis in the list is an implicit edge type: grouping by
+     client is walking the `about` edge, grouping by owner is walking `ownedBy`.
+     A folder view over a knowledge graph is not a filing cabinet, it is a
+     choice of which relationship to see the corpus through, and `?group=` is
+     where that choice lives.
 
-     Every branch is a filter link. Opening Policies and clicking it narrows the
-     surface to Policies; the tree and the grid are two readings of one URL. It
-     is built on the library's `.tree`, which is native <details>, so it needs
-     no state of its own and survives a re-render open.
+     Three things make it a graph rather than a re-sort. The group headers are
+     entities — the name opens the peek, so a folder can tell you what it IS.
+     Documents with no value on the axis get their own honest group instead of
+     being dropped. And each document carries its asserted edges on the line
+     beneath it, so the connections are visible in the structure rather than
+     one click away inside each document.
+
+     Built on the library's `.tree`, which is native <details>, so it needs no
+     state of its own and survives a re-render open.
   ═══════════════════════════════════════════════ */
+  const GROUPS = {
+    col:    { label: 'Collection', kind: 'collection', of: (o) => o.col,
+              none: 'Not filed anywhere', order: () => USER.collections },
+    client: { label: 'Client',     kind: 'client',     of: (o) => o.client, none: 'Not about any client' },
+    prod:   { label: 'Product',    kind: 'product',    of: (o) => o.prod,   none: 'Answers for no product' },
+    owner:  { label: 'Owner',      kind: 'owner',      of: (o) => o.owner,  none: 'Nobody owns it' },
+    src:    { label: 'Source',     kind: 'source',     of: (o) => o.src,    none: 'From nowhere' },
+    region: { label: 'Region',     kind: 'region',     of: (o) => o.region, none: 'Covers no region' },
+    t:      { label: 'Type',       kind: null,         of: (o) => o.t,      none: 'Untyped' }
+  };
+
+  /* The second level is Type, unless Type is already the first — then it is
+     Collection, because a level that repeats the one above it is a level that
+     says nothing. */
+  const subGroup = (g) => (g === 't' ? 'col' : 't');
+
+  const groupName = (g, id) => !id ? GROUPS[g].none
+    : GROUPS[g].kind ? entityLabel(GROUPS[g].kind, id)
+    : (TYPES[id] || {}).label || id;
+
+  /* Narrowing the surface to a group. Most axes are filter keys; owner is not
+     — there is no `owner` in the URL — so it narrows by identity instead,
+     which is the same result reached the only way the model allows. */
+  function groupFilterAttr(g, id, docs) {
+    if (!id) return '';
+    const f = GROUPS[g].kind && ENTITY[GROUPS[g].kind].filter;
+    if (g === 't') return `data-open-axis="type:${esc(id)}"`;
+    if (!f || f === 'ids') return `data-apply-ids="${docs.map((d) => d.id).join(',')}"`;
+    return `data-open-axis="${f}:${esc(id)}"`;
+  }
+
+  /* A document's claims, on the line beneath it. Only the asserted ones: the
+     implicit edges are the tree's own structure and repeating them here would
+     print the folder name inside every folder. */
+  function treeEdges(o) {
+    const out = [];
+    EDGES.forEach((e) => {
+      if (e.from === o.id) out.push([(ASSERTED[e.type] || {}).phrase || e.type, e.to]);
+      else if (e.to === o.id) {
+        const inv = (ASSERTED[e.type] || {}).inverse;
+        out.push([(ASSERTED[inv] || {}).phrase || 'Related to', e.from]);
+      }
+    });
+    if (!out.length) return '';
+    return `<p class="ws-tree-edges">${out.map(([phrase, id]) =>
+      `<button class="ws-tree-edge" data-open-doc="${esc(id)}">
+        <em>${esc(phrase)}</em> ${esc(entityLabel('doc', id))}</button>`).join('')}</p>`;
+  }
+
+  function bucket(docs, g) {
+    const by = {};
+    docs.forEach((o) => { (by[GROUPS[g].of(o) || ''] = by[GROUPS[g].of(o) || ''] || []).push(o); });
+    const pref = (GROUPS[g].order ? GROUPS[g].order() : []).filter((k) => by[k]);
+    /* Preferred order first, then whatever else the filter dragged in, and the
+       group with no value last — it is a finding, not a heading, and it belongs
+       at the end where a finding goes. */
+    return pref
+      .concat(Object.keys(by).filter((k) => k && pref.indexOf(k) < 0).sort((a, b) =>
+        groupName(g, a).localeCompare(groupName(g, b))))
+      .concat(by[''] ? [''] : [])
+      .map((k) => [k, by[k]]);
+  }
+
   function renderTree(st, list) {
-    const byCol = {};
-    list.forEach((o) => { (byCol[o.col] = byCol[o.col] || []).push(o); });
-    /* The user's own collections first, in their order, then anything else the
-       filter dragged in. */
-    const cols = USER.collections.filter((c) => byCol[c])
-      .concat(Object.keys(byCol).filter((c) => USER.collections.indexOf(c) < 0));
+    const g = GROUPS[st.group] ? st.group : 'col';
+    const sub = subGroup(g);
+    const top = bucket(list, g);
 
     return `<div class="tree ws-tree">
-      ${cols.map((col) => {
-        const docs = byCol[col];
-        const byType = {};
-        docs.forEach((o) => { (byType[o.t] = byType[o.t] || []).push(o); });
+      ${top.map(([id, docs]) => {
         const needs = docs.filter((o) => STATUS[o.status].tone !== 'verified').length;
-        return `<details class="ws-tree-col" ${cols.length <= 2 ? 'open' : ''}>
+        const name = groupName(g, id);
+        return `<details class="ws-tree-col"${top.length <= 2 ? ' open' : ''}>
           <summary>
             <svg class="tree-chev" width="12" height="12" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
             ${ICO.folder ? ICO.folder.replace('<svg', '<svg width="13" height="13"') : ''}
-            <span class="ws-tree-name">${esc(COLLECTIONS[col])}</span>
+            ${id && GROUPS[g].kind
+              ? `<button class="ws-tree-name is-ent" data-peek="${GROUPS[g].kind}:${esc(id)}"
+                   title="What else touches ${esc(name)}">${esc(name)}</button>`
+              : `<span class="ws-tree-name${id ? '' : ' is-none'}">${esc(name)}</span>`}
             <span class="ws-tree-n">${docs.length}</span>
             ${needs ? `<span class="ws-tree-needs" title="${needs} need a person">${needs}</span>` : ''}
-            <button class="ws-tree-only" data-open-axis="collection:${col}"
-                    title="Show only ${esc(COLLECTIONS[col])}">Only this</button>
+            ${id ? `<button class="ws-tree-only" ${groupFilterAttr(g, id, docs)}
+                    title="Show only ${esc(name)}">Only this</button>` : ''}
           </summary>
           <div class="tree-children">
-            ${Object.keys(byType).map((t) => `<details class="ws-tree-type" open>
+            ${bucket(docs, sub).map(([sid, sdocs]) => `<details class="ws-tree-type" open>
               <summary>
                 <svg class="tree-chev" width="11" height="11" viewBox="0 0 24 24" fill="none"
                      stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
-                ${TYPES[t].ico.replace('<svg', '<svg width="12" height="12"')}
-                <span class="ws-tree-name">${esc(TYPES[t].label)}</span>
-                <span class="ws-tree-n">${byType[t].length}</span>
+                ${sub === 't' && TYPES[sid] ? TYPES[sid].ico.replace('<svg', '<svg width="12" height="12"') : ''}
+                <span class="ws-tree-name${sid ? '' : ' is-none'}">${esc(groupName(sub, sid))}</span>
+                <span class="ws-tree-n">${sdocs.length}</span>
               </summary>
               <div class="tree-children">
-                ${byType[t].map((o) => `<button class="tree-leaf ws-tree-doc" data-card-open="${o.id}">
-                  <span class="ws-tree-doc-title">${esc(o.title)}</span>
-                  ${statusBadge(o.status)}
-                  <span class="ws-tree-doc-who">${esc(o.owner)}</span>
-                </button>`).join('')}
+                ${sdocs.map((o) => `<div class="ws-tree-leaf">
+                  <button class="tree-leaf ws-tree-doc" data-card-open="${o.id}">
+                    <span class="ws-tree-doc-title">${esc(o.title)}</span>
+                    ${statusBadge(o.status)}
+                    <span class="ws-tree-doc-who">${esc(o.owner)}</span>
+                  </button>
+                  ${treeEdges(o)}
+                </div>`).join('')}
               </div>
             </details>`).join('')}
           </div>
         </details>`;
       }).join('')}
+    </div>`;
+  }
+
+  /* The grouping control. It is a dropdown rather than a segmented control
+     because seven axes in a row would be a menu bar pretending to be a switch. */
+  function groupPicker(st) {
+    const cur = GROUPS[st.group] ? st.group : 'col';
+    return `<div class="v2-dropdown k-filter k-group" data-group-key>
+      <button class="v2-dropdown-btn" type="button" aria-haspopup="listbox" aria-expanded="false"
+              aria-label="Group the tree by">
+        <span class="dd-label-text">Grouped by ${esc(GROUPS[cur].label.toLowerCase())}</span>
+        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+      </button>
+      <div class="v2-dropdown-panel" role="listbox">
+        ${Object.keys(GROUPS).map((k) => `<div class="v2-dropdown-option${k === cur ? ' selected' : ''}"
+          role="option" aria-selected="${k === cur}" data-value="${esc(GROUPS[k].label)}"
+          data-slug="${k}">${esc(GROUPS[k].label)}</div>`).join('')}
+      </div>
     </div>`;
   }
 
@@ -1752,10 +2255,10 @@
     /* The composed set arrives already ordered — yours first, then everything
        else, each ranked by what needs a person. Re-sorting it here is what
        silently threw the ownership half of the composition away. */
-    /* Ordering, not a control. The grid leads with the most recently updated;
-       the composed default leads with what needs a person. Neither was ever
-       something to choose, so there is nothing to choose it with. */
-    const list = composed ? composedSet() : sortSet(applyFilters(st), 'updated');
+    /* One ordering decision for both surfaces, so the toggle and the landing
+       page cannot disagree about what "needs a person" means. */
+    const order = orderOf(st, composed);
+    const list = composed ? composedSet(order) : sortSet(applyFilters(st), order);
 
     if (!list.length) { stage.innerHTML = emptyResult(st); return; }
 
@@ -1764,15 +2267,38 @@
                           : `<div class="ws-grid">${list.map((o) => typeCard(o)).join('')}</div>`);
   }
 
-  /* An empty result is a finding about the filter, not an absence. */
+  /* An empty result is a finding about the filter, not an absence — except
+     when the shelf itself is bare, and then it is the opposite finding and the
+     Clear filters button is a lie.
+
+     `LIVE.length` was printed either way, so browsing an empty archive read
+     "37 documents, none of them matching all of these filters" over a button
+     that would clear a filter that was not the reason. The count has to come
+     from the set the filter was applied TO. */
   function emptyResult(st) {
+    const shelf = ENTITLED.filter((o) => (st.archived ? o.arch : !o.arch));
+    const noun = st.archived ? 'archived document' : 'document';
+    const bare = !shelf.length;
     return `<div class="empty-state k-enter">
-      <div class="empty-state-icon">${ICO.search.replace('<svg', '<svg width="20" height="20"')}</div>
-      <div class="empty-state-title">No matches</div>
-      <div class="empty-state-desc">${LIVE.length} documents, none of them matching all of these filters.</div>
+      <div class="empty-state-icon">${(bare ? ICO.box : ICO.search).replace('<svg', '<svg width="20" height="20"')}</div>
+      <div class="empty-state-title">${bare
+        ? (st.archived ? 'Nothing is archived' : 'Nothing here yet')
+        : 'No matches'}</div>
+      <div class="empty-state-desc">${bare
+        ? (st.archived
+            ? 'Archive a document and it waits here, kept whole and restorable.'
+            : 'Write one, or drop a file on this page to start from something you already have.')
+        : shelf.length + ' ' + noun + (shelf.length === 1 ? '' : 's')
+          + ', none of them matching all of these filters.'}</div>
       <div class="k-row k-gap-2" style="justify-content:center;margin-top:14px">
-        <button class="btn btn-brand btn-sm" data-clear-all>Clear filters</button>
+        ${bare
+          ? (st.archived
+              ? '<button class="btn btn-ghost btn-sm" data-clear-all>Back to the library</button>'
+              : `<button class="btn btn-brand btn-sm" data-new-doc>New document</button>
+                 <button class="btn btn-ghost btn-sm" data-pick-files>Choose a file</button>`)
+          : '<button class="btn btn-brand btn-sm" data-clear-all>Clear filters</button>'}
       </div>
+      ${bare && !st.archived ? `<p class="empty-state-fine">${FILE_KINDS}</p>` : ''}
     </div>`;
   }
 
@@ -1800,65 +2326,9 @@
   /* Grounding, stated on the document rather than in a matrix. This is the fact
      a person actually needs about governance — can an agent answer from this —
      and it belongs where the document is. */
-  function groundingRow(o) {
-    const g = COLLECTION_META[o.col].grounding;
-    return `<div class="dv-grounding">
-      <span class="dv-prov-label">Grounding</span>
-      <span class="dv-ground-list">${AGENTS.map((a) => `<span class="dv-ground ${g[a.id] ? 'is-on' : 'is-off'}${g[a.id] && a.external ? ' is-external' : ''}">
-        ${(g[a.id] ? ICO.check : ICO.slash).replace('<svg', '<svg width="11" height="11"')}${esc(a.name)}${a.external ? ' · customer-facing' : ''}</span>`).join('')}</span>
-      <button class="dv-ground-edit" data-open-axis="collection:${o.col}">Set for ${esc(COLLECTIONS[o.col])} →</button>
-    </div>`;
-  }
 
-  function provenanceRow(o) {
-    const s = SRC[o.src];
-    return `<div class="dv-prov">
-      <div class="dv-prov-item"><span class="dv-prov-label">Source</span>
-        <span class="dv-prov-val"><span class="status-dot ${s.health === 'ok' ? 'sd-ok' : s.health === 'warn' ? 'sd-warn' : 'sd-err'}"></span>${esc(s.label)}</span></div>
-      <div class="dv-prov-item"><span class="dv-prov-label">Ingested</span><span class="dv-prov-val">${esc(fmtDate(o.ing))}</span></div>
-      <div class="dv-prov-item"><span class="dv-prov-label">Created at source</span><span class="dv-prov-val">${esc(fmtDate(o.xc))}</span></div>
-      <div class="dv-prov-item"><span class="dv-prov-label">Changed at source</span><span class="dv-prov-val${o.xu < o.upd ? ' is-overdue' : ''}">${esc(fmtDate(o.xu))}</span></div>
-      <div class="dv-prov-act">
-        ${SRC[o.src].health === 'ok'
-          ? entryAction('direct', 'Re-sync from source', `data-act="resync" data-obj="${o.id}"`)
-          : entryAction('review', 'Reconnect ' + esc(SRC[o.src].label), `data-act="reconnect" data-obj="${o.id}"`)}
-        ${o.xu < o.upd ? `<span class="dv-prov-note">The source changed after our copy.</span>` : ''}
-      </div>
-    </div>`;
-  }
 
-  function propsRow(o) {
-    const keys = Object.keys(o.props);
-    if (!keys.length) return '';
-    return `<div class="dv-props">
-      <span class="dv-prov-label">Custom properties</span>
-      <div class="dv-prop-list">${keys.map((k) =>
-        `<button class="dv-prop" data-prop="${esc(k)}:${esc(o.props[k])}">
-          <span class="dv-prop-k">${esc(k)}</span><span class="dv-prop-v">${esc(o.props[k])}</span></button>`).join('')}</div>
-    </div>`;
-  }
 
-  function relRow(o) {
-    const r = RELATED[o.id];
-    if (!r) return '';
-    const grp = (label, ids, contradiction) => !ids || !ids.length ? '' : `
-      <div class="dv-rel-group">
-        <span class="dv-rel-label">${esc(label)}</span>
-        <span class="dv-rel-items">${ids.map((id) => {
-          const x = byId(id);
-          /* Opening the other document answers nothing — you would be looking
-             at one of the two things that disagree. Comparing is the act. */
-          return x ? `<button class="dv-rel-item${contradiction ? ' is-contradiction' : ''}"
-            ${contradiction ? `data-compare-with="${o.id}"` : `data-open-doc="${x.id}"`}>
-            ${contradiction ? ICO.warn : TYPES[x.t].ico}<span>${esc(x.title)}</span></button>` : '';
-        }).join('')}</span>
-      </div>`;
-    return `<div class="dv-rel">
-      ${grp('Related', r.related)}
-      ${grp('Contradicts', r.contradicts, true)}
-      ${r.supersededBy ? grp('Superseded by', [r.supersededBy]) : ''}
-    </div>`;
-  }
 
   /* Versions, fixtures. The mind map lists seeing versions under VIEWING as
      well as editing, so the viewer carries them too — collapsed, because a
@@ -1922,87 +2392,199 @@
       : `<div class="${cls}">${inner}</div>`;
   }).join('')}</div>`;
 
-  /* ── The overlay itself ── */
-  const docModal = {
-    el: null, sheet: null, open: false,
-    /* The id of the document that was opened, not the element that opened it:
-       the grid re-renders while the modal is up, so the original node is gone
-       by the time focus needs to go back to it. The id survives, and the card
-       for that id is what the user was looking at. */
-    openerId: null,
 
-    init() {
-      this.el = $('#docOverlay');
-      this.sheet = $('#docSheet');
-      if (!this.el) return;
-      document.addEventListener('keydown', (e) => {
-        if (!this.open) return;
-        if (e.key === 'Escape' && !canvas.open && !$('#commitHost').innerHTML) { e.preventDefault(); this.close(); }
-        if (e.key === 'Tab') this.trap(e);
-      });
-      this.el.addEventListener('mousedown', (e) => { if (e.target === this.el) this.close(); });
-    },
+  /* ═══════════════════════════════════════════════
+     THE PEEK — a thing, opened where you found it
 
-    /* Focus is trapped while a document is open, and handed back to the control
-       that opened it on close. Without the hand-back a keyboard user lands at
-       the top of the document list every time they close a document. */
-    trap(e) {
-      const f = $$('a[href],button:not([disabled]),input:not([disabled]),textarea,[contenteditable="true"],[tabindex]:not([tabindex="-1"])', this.sheet)
-        .filter((x) => x.offsetParent !== null);
-      if (!f.length) return;
-      const first = f[0], last = f[f.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    },
+     Entity pages were the obvious answer and the wrong one: a route per client
+     would put back the destinations this whole build spent ten passes removing.
+     So the graph surfaces in place. Click any entity anywhere and a panel opens
+     anchored to it, carrying what it is, everything connected to it, and what
+     you can do about it. Click a connection inside the panel and you are on the
+     next thing, with a back arrow — traversal without ever leaving the page you
+     were reading.
 
-    show(html, id) {
-      /* Opening a document from inside the canvas used to leave the canvas
-         sitting on top of it. The thread survives — the AiMY mark on the input
-         reopens it — but only one of the two can be the thing you are reading. */
-      if (!this.open && canvas.open) canvas.close({ quiet: true });
-      /* Same rule the other way: opening a document from inside the settings
-         sheet closes the sheet. Two overlays stacked on each other is two
-         things claiming to be what you are looking at. */
-      if (!this.open && setModal.open) setModal.close();
-      if (id && !this.open) this.openerId = id;
-      /* A repaint of the document you are already reading must not move you.
-         Resetting the scroll on every render meant that editing a property,
-         adding a comment or re-syncing threw you to the top — the change did
-         happen, and you were carried away from it. */
-      const fresh = !this.open || id !== this.shownId;
-      const keep = fresh ? 0 : this.sheet.scrollTop;
-      this.shownId = id || null;
-      this.sheet.innerHTML = html;
-      this.sheet.scrollTop = keep;
-      if (!this.open) {
-        this.el.hidden = false;
-        void this.el.offsetWidth;
-        this.el.classList.add('open');
-        this.open = true;
-      }
-      const focusTarget = $('[data-doc-close]', this.sheet);
-      if (focusTarget) setTimeout(() => focusTarget.focus(), 60);
-    },
+     `.cite-preview` is the library's hovercard and is the right look, but it
+     cannot be the mechanism: it is `position: absolute` against a `.cite-wrap`
+     parent and its open state is `:hover` on that parent. A panel that can be
+     anchored to an owner's name in a card footer, a source in a rail and a row
+     inside itself needs fixed positioning and a click. Recorded in GAPS.md.
+  ═══════════════════════════════════════════════ */
+  let peekStack = [];
+  let peekOpener = null;
 
-    close() {
-      if (!this.open) return;
-      this.el.classList.remove('open');
-      this.open = false;
-      setTimeout(() => { this.el.hidden = true; this.sheet.innerHTML = ''; }, 220);
-      const id = this.openerId;
-      this.openerId = null;
-      /* The URL is the state, so closing is a URL change, not a DOM change. */
-      const st = readURL();
-      if (st.doc) patch({ doc: '', mode: 'view' });
-      /* Focus returns to the card for that document, re-found after the grid
-         re-rendered. Without it a keyboard user lands back at the top of the
-         page every time they close a document. */
-      setTimeout(() => {
-        const back = id && $(`[data-open-doc="${id}"]`);
-        if (back) back.focus();
-      }, 60);
+  /* What this thing is, in sentences. Same rule as everywhere else: no label
+     above a value, a phrase that carries its own meaning. */
+  function peekFacts(kind, id) {
+    const n = docsOf(kind, id).length;
+    const count = n + (n === 1 ? ' document' : ' documents');
+    if (kind === 'doc') {
+      const o = byId(id);
+      if (!o) return [];
+      return [TYPES[o.t].label + ' in ' + COLLECTIONS[o.col],
+              'Owned by ' + o.owner,
+              'Updated ' + fmtDate(o.upd),
+              STATUS[o.status].why];
     }
-  };
+    if (kind === 'source') {
+      const s = SRC[id];
+      return [s.health === 'ok' ? 'Syncing ' + s.cadence.toLowerCase() : 'Not syncing',
+              s.note, count + ' came from it'];
+    }
+    if (kind === 'collection') {
+      const m = COLLECTION_META[id];
+      const on = AGENTS.filter((a) => m.grounding[a.id]);
+      return ['Owned by ' + m.owner, count,
+              on.length ? on.map((a) => a.name).join(' and ') + ' can answer from it'
+                        : 'No agent answers from it',
+              m.retain ? 'Archives after ' + Math.round(m.retain / 30) + ' months'
+                       : 'Never archives on its own'];
+    }
+    if (kind === 'owner') {
+      const docs = docsOf(kind, id);
+      const needs = docs.filter((o) => STATUS[o.status].tone !== 'verified').length;
+      const cols = [...new Set(docs.map((o) => COLLECTIONS[o.col]))];
+      return [count, cols.length ? 'Across ' + cols.join(', ') : '',
+              needs ? needs + ' of them need a person' : 'None of them need anything'];
+    }
+    const docs = docsOf(kind, id);
+    const stale = docs.filter((o) => STATUS[o.status].tone !== 'verified').length;
+    return [count, stale ? stale + ' need a person' : 'Nothing here needs attention'];
+  }
+
+  /* ── The panel says what only it can say ──
+
+     It used to try to be a knowledge panel: the documents, then everything
+     those documents had in common, as folds. One region came out at 490px with
+     thirteen visible rows and fifty-five interactive elements behind them, six
+     of which were near-identical counts — *8 owners · 4 collections · 5 sources
+     · 2 clients · 3 products · 20 tags* — with no priority between them. A data
+     dump wearing a panel, and it was read twice as unreadable.
+
+     Every one of those questions already has a better home:
+
+       what else is in this region  →  Show its N documents
+       who owns them                →  Folders, grouped by owner
+       which of them need a person  →  Needs attention
+
+     The surface is bigger, filterable, groupable and sortable; a 320px panel
+     was competing with it and losing. So the panel keeps the one thing the
+     surface cannot tell you — what this thing IS — and hands the rest over. */
+  function peekBody(kind, id) {
+    if (kind !== 'doc') return '';
+    const groups = {};
+    edgesOf(kind, id).forEach((e) => { (groups[e.phrase] = groups[e.phrase] || []).push(e); });
+    /* Claims before fields: what somebody said about this document outranks
+       what its own fields say, and Disagrees with outranks all of it. */
+    const rank = (p) => (p === 'Disagrees with' ? 0 : ASSERTED_PHRASES.indexOf(p) > -1 ? 1 : 2);
+    return Object.keys(groups)
+      .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b))
+      .map((phrase) => `<div class="peek-group">
+        <span class="peek-phrase">${esc(phrase)}</span>
+        <div class="peek-items">
+          ${groups[phrase].map((e) => `<button class="peek-item"
+              ${e.kind === 'doc' ? `data-open-doc="${esc(e.id)}"` : `data-peek="${esc(e.kind)}:${esc(e.id)}"`}>
+            ${e.kind === 'doc' && byId(e.id) ? TYPES[byId(e.id).t].ico.replace('<svg', '<svg width="11" height="11"') : ''}
+            <span class="peek-item-label">${esc(e.label)}</span>
+            ${e.by ? `<span class="peek-by">${esc(e.by)}, ${esc(fmtShort(e.at))}</span>` : ''}
+          </button>`).join('')}
+        </div>
+      </div>`).join('');
+  }
+
+  const ASSERTED_PHRASES = Object.keys(ASSERTED).map((k) => ASSERTED[k].phrase);
+
+  function peekRender() {
+    const host = $('#peek');
+    if (!host || !peekStack.length) return;
+    const top = peekStack[peekStack.length - 1];
+    const { kind, id } = top;
+    const docs = docsOf(kind, id);
+    const facts = peekFacts(kind, id).filter(Boolean);
+    const f = ENTITY[kind] || {};
+
+    host.innerHTML = `
+      <div class="peek-head">
+        ${peekStack.length > 1
+          ? `<button class="peek-back" data-peek-back aria-label="Back">
+               ${ICO.arrow.replace('<svg', '<svg width="13" height="13" style="transform:rotate(180deg)"')}</button>`
+          : ''}
+        <span class="peek-title">${esc(entityLabel(kind, id))}</span>
+        <span class="peek-kind">${esc(f.kind || kind)}</span>
+        <button class="peek-close" data-peek-close aria-label="Close">
+          ${ICO.x.replace('<svg', '<svg width="13" height="13"')}</button>
+      </div>
+      <p class="peek-facts">${facts.map(esc).join(' · ')}</p>
+      <!-- What you can do comes BEFORE what is connected. It used to be last,
+           under 978px of list in a 520px panel, which meant the panel opened
+           showing you a list and no way out of it. -->
+      <div class="peek-foot">
+        ${kind === 'doc'
+          ? entityAction('Open it', `data-open-doc="${id}"`)
+          : docs.length
+            ? entityAction('Show its ' + docs.length + (docs.length === 1 ? ' document' : ' documents'),
+                `data-peek-show="${esc(kind)}:${esc(id)}"`)
+            : ''}
+        ${kind === 'source' ? entityAction('Settings', `data-settings="source:${id}"`) : ''}
+        ${kind === 'collection' ? entityAction('Settings', `data-settings="collection:${id}"`) : ''}
+      </div>
+      <div class="peek-body">${peekBody(kind, id)}</div>`;
+    host.hidden = false;
+    void host.offsetWidth;
+    host.classList.add('is-open');
+    peekPlace(top.rect);
+    const first = $('[data-peek-back], .peek-item, [data-peek-close]', host);
+    if (first) setTimeout(() => first.focus(), 40);
+  }
+
+  const entityAction = (label, attr) =>
+    `<button class="peek-act" ${attr}>${esc(label)}</button>`;
+
+  /* Anchored to what you clicked, and kept on screen. A panel that opens off
+     the bottom of the window is a panel that did not open. */
+  function peekPlace(rect) {
+    const host = $('#peek');
+    if (!host || !rect) return;
+    const w = host.offsetWidth, h = host.offsetHeight;
+    const pad = 10;
+    let left = rect.left + rect.width / 2 - w / 2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - w - pad));
+    let top = rect.bottom + 8;
+    if (top + h > window.innerHeight - pad) top = Math.max(pad, rect.top - h - 8);
+    host.style.left = Math.round(left) + 'px';
+    host.style.top = Math.round(top) + 'px';
+  }
+
+  function openPeek(kind, id, anchor, push) {
+    if (!ENTITY[kind]) return;
+    const rect = anchor ? anchor.getBoundingClientRect()
+                        : (peekStack[peekStack.length - 1] || {}).rect;
+    if (!push) { peekStack = []; peekOpener = anchor || null; }
+    peekStack.push({ kind: kind, id: id, rect: rect });
+    peekRender();
+  }
+
+  function closePeek() {
+    const host = $('#peek');
+    if (!host || !peekStack.length) return;
+    peekStack = [];
+    host.classList.remove('is-open');
+    setTimeout(() => { host.hidden = true; host.innerHTML = ''; }, 160);
+    const back = peekOpener;
+    peekOpener = null;
+    if (back && document.contains(back)) setTimeout(() => back.focus(), 40);
+  }
+
+  /* Focus stays inside an open overlay. Extracted from the document modal when
+     the document became a page: the settings sheet still needs it. */
+  function trapFocus(root, e) {
+    const f = $$('a[href],button:not([disabled]),input:not([disabled]),textarea,[contenteditable="true"],[tabindex]:not([tabindex="-1"])', root)
+      .filter((x) => x.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
 
   /* ── The settings sheet ──
 
@@ -2027,12 +2609,11 @@
       this.el.addEventListener('mousedown', (e) => { if (e.target === this.el) this.close(); });
     },
 
-    trap(e) { docModal.trap.call(this, e); },
+    trap(e) { trapFocus(this.sheet, e); },
 
     show(html, key) {
       /* One thing at a time on top of the work. */
       if (!this.open && canvas.open) canvas.close({ quiet: true });
-      if (!this.open && docModal.open) docModal.close();
       const fresh = !this.open || key !== this.shownKey;
       const keep = fresh ? 0 : this.sheet.scrollTop;
       this.shownKey = key || null;
@@ -2081,37 +2662,6 @@
            `${fresh ? 'Saved just now' : 'Saved · ' + rec.clock}</span>`;
   }
 
-  const docChrome = (o, mode, blank) => `
-    <div class="doc-bar">
-      <span class="doc-bar-crumb">${TYPES[o.t].ico}${esc(TYPES[o.t].label)}
-        <span class="doc-bar-sep">/</span>${esc(COLLECTIONS[o.col])}</span>
-      <span class="doc-bar-end">
-        ${mode === 'view'
-          ? `<button class="btn btn-ghost btn-sm" data-versions="${o.id}">
-               ${ICO.clock.replace('<svg', '<svg width="13" height="13"')}v${VERSIONS(o).length} · History</button>
-             <button class="btn btn-ghost btn-sm" data-edit-doc="${o.id}">${ICO.pen.replace('<svg', '<svg width="13" height="13"')}Edit</button>`
-          /* Every edit writes through as you type, so Saved is a state rather
-             than a button — a control that saves what is already saved teaches
-             people not to trust the word. What is left to do is publish.
-             It has to MOVE, though: a chip that says Saved from the moment a
-             document opens, including one that has never held anything, is
-             decoration in the shape of a status. */
-          : `${savedLabel(o)}
-             ${blank ? `<button class="btn btn-ghost btn-sm" data-discard="${o.id}">Discard</button>` : ''}
-             ${o.status === 'draft'
-               /* Disabled and stating the reason. A control that looks
-                  available and silently does nothing is the thing that teaches
-                  people to distrust every other control. */
-               ? `<button class="btn btn-brand btn-sm" data-act="publish" data-obj="${o.id}" data-publish
-                    ${String(o.sum || '').trim() ? '' : 'disabled title="A document with no content cannot go live"'}
-                  >${String(o.sum || '').trim() ? 'Publish' : 'Add some content first'}</button>`
-               /* A check, not an eye. It ends the edit; an eye draws "look at
-                  this", which is the one thing it does not mean. */
-               : `<button class="btn btn-ghost btn-sm" data-view-doc="${o.id}">${ICO.check.replace('<svg', '<svg width="13" height="13"')}Done</button>`}`}
-        <button class="doc-close" data-doc-close aria-label="Close document">
-          ${ICO.x.replace('<svg', '<svg width="15" height="15"')}</button>
-      </span>
-    </div>`;
 
   /* ── Comments ──
 
@@ -2132,113 +2682,36 @@
         ${list.length ? `<span class="comment-thread-n">${list.length}</span>` : ''}
       </div>
       ${list.length
-        ? list.map((c) => `<div class="comment">
+        ? list.map((c, i) => `<div class="comment${c.problem ? (c.done ? ' is-problem is-done' : ' is-problem') : ''}">
             <div class="avatar avatar-sm">${esc(c.initials)}</div>
             <div class="comment-body">
-              <div class="comment-head"><span class="comment-author">${esc(c.who)}</span><span class="comment-time">${esc(c.when)}</span></div>
+              <div class="comment-head"><span class="comment-author">${esc(c.who)}</span>
+                ${c.problem ? `<span class="comment-flag">${ICO.flag.replace('<svg', '<svg width="11" height="11"')}
+                  ${c.done ? 'Resolved' : 'Reported a problem'}</span>` : ''}
+                <span class="comment-time">${esc(c.when)}</span></div>
               <div class="comment-text">${esc(c.text)}</div>
+              <!-- A report is a job, so it has a way to be finished. Anyone who
+                   can read the document can close it: the person who fixed it
+                   is not always the owner, and a queue only one person can
+                   clear is a queue that does not clear. -->
+              ${c.problem && !c.done
+                ? `<button class="comment-resolve" data-resolve-problem="${i}">Mark it resolved</button>` : ''}
             </div>
           </div>`).join('')
         : `<p class="comment-empty">Nothing yet. A comment is the way to raise something
            without changing the document.</p>`}
+      <!-- One control, not two. A word-button beside a field asks you to read
+           it before you can use the field; a send glyph inside it is the same
+           affordance every message box has, and Enter already did the job. -->
       <div class="comment-compose">
         <input class="field-input" type="text" placeholder="Add a comment…" aria-label="Add a comment"
                data-comment-input>
-        <button class="btn btn-ghost btn-sm" data-comment-add>Comment</button>
+        <button class="comment-send" data-comment-add aria-label="Add this comment" title="Add this comment">
+          ${ICO.send.replace('<svg', '<svg width="14" height="14"')}</button>
       </div>
     </div>`;
   }
 
-  function renderViewer(st) {
-    const o = byId(st.doc);
-    if (!o) { patch({ doc: '' }, { replace: true }); return; }
-    const s = STATUS[o.status];
-
-    /* A notice only where there is a consequence to state. Out of date is a
-       condition, not an exclusion — it still answers, and the answer says so. */
-    const notice = (s.excluded || o.arch || o.status === 'outdated') ? `
-      <div class="dv-notice is-${o.arch || o.status === 'superseded' ? 'superseded' : 'expired'}">
-        ${o.arch ? ICO.box : o.status === 'superseded' ? ICO.arrow : ICO.refresh}
-        <span class="dv-notice-text"><strong>${o.arch ? 'Archived.' : o.status === 'superseded' ? 'Replaced.' : 'Out of date.'}</strong>
-        ${o.arch
-          ? 'Kept whole and restorable. Not used in answers.'
-          : o.status === 'superseded'
-            ? 'A newer document replaced it. Not used in answers.'
-            : esc(SRC[o.src].label) + ' changed after our copy. Still used in answers, and answers say so.'}</span>
-        ${o.arch || o.status === 'superseded'
-          ? `<button class="dv-notice-link" data-act="${o.arch ? 'restore' : 'successor'}" data-obj="${o.id}">
-               ${o.arch
-                 ? 'Restore it →'
-                 : (RELATED[o.id] || {}).supersededBy ? 'Go to the current one →' : 'Find what replaced it →'}</button>`
-          : ''}
-      </div>` : '';
-
-    docModal.show(`
-      ${docChrome(o, 'view')}
-      <div class="doc-scroll">
-        <div class="doc-view" data-status="${o.status}" data-work-state="${o.work}">
-          <div class="dv-head">
-            <div class="dv-meta">${statusBadge(o.status)}
-              ${o.region ? `<button class="tag tag-neutral tc-tag" data-add-region="${o.region}">${esc(REGIONS[o.region])}</button>` : ''}
-              ${o.client ? `<button class="tag tag-neutral tc-tag" data-add-client="${o.client}">${esc(CLIENTS[o.client])}</button>` : ''}
-            </div>
-            <h2 class="dv-title">${esc(o.title)}</h2>
-          </div>
-
-          <div class="dv-gov">
-            <div class="dv-gov-item"><span class="dv-gov-label">Owner</span><span class="dv-gov-val">${esc(o.owner)}</span></div>
-            <div class="dv-gov-item"><span class="dv-gov-label">Last updated</span><span class="dv-gov-val">${esc(fmtDate(o.upd))}</span></div>
-            <div class="dv-gov-item"><span class="dv-gov-label">Last used</span><span class="dv-gov-val${o.status === 'unused' ? ' is-overdue' : ''}">${esc(usedLabel(o))} · ${o.uses} times in 90 days</span></div>
-            <div class="dv-gov-item"><span class="dv-gov-label">Visible to</span><span class="dv-gov-val">${o.aud.map((a) =>
-              `<button class="dv-aud" data-add-audience="${a}">${esc(AUDIENCE[a])}</button>`).join('')}</span></div>
-          </div>
-          ${groundingRow(o)}
-          ${notice}
-
-          <div class="dv-body">
-            <p>${esc(o.sum)}</p>
-            ${(BODY_COPY[o.t] || []).map((p) => `<p>${esc(p)}</p>`).join('')}
-          </div>
-
-          <div class="dv-section">
-            <div class="dv-section-label">${esc(TYPES[o.t].label)} detail</div>
-            ${TEMPLATE[o.t](o)}
-          </div>
-
-          <div class="dv-tags">
-            <span class="dv-prov-label">Tags</span>
-            ${o.tags.map((tg) => `<button class="tag tag-neutral tc-tag" data-add-tag="${esc(tg)}">${esc(tg)}</button>`).join('')}
-            ${o.services.map((sv) => `<button class="tag tag-neutral tc-tag" data-add-service="${esc(sv)}">${esc(SERVICES[sv])}</button>`).join('')}
-          </div>
-          ${propsRow(o)}
-          ${provenanceRow(o)}
-          ${relRow(o)}
-
-          <details class="dv-versions" id="docVersions">
-            <summary class="dv-versions-head">Versions <span class="dv-versions-n">${VERSIONS(o).length}</span></summary>
-            ${versionList(o)}
-            <div class="ver-restore">
-              <div class="vr-effect">
-                ${ICO.warn.replace('<svg', '<svg style="width:13px;height:13px;flex-shrink:0"')}
-                <span>Restoring changes what <strong>${AGENTS.filter((a) => COLLECTION_META[o.col].grounding[a.id]).length} consuming agent(s)</strong>
-                answer from. History is preserved — restore adds a new version rather than deleting the ones it supersedes.</span>
-              </div>
-              <button class="btn btn-ghost btn-sm" data-restore="${o.id}">Restore ${esc(fmtShort(o.ing))} version</button>
-            </div>
-          </details>
-
-          ${commentThread(o)}
-
-          <div class="dv-actions">
-            <span class="dv-actions-end">
-              <button class="cite-action" data-act="report" data-obj="${o.id}">${ICO.flag}Report a problem</button>
-              <button class="cite-action" data-act="${o.arch ? 'restore' : 'archive'}" data-obj="${o.id}">${ICO.box}${o.arch ? 'Restore' : 'Archive'}</button>
-              ${o.arch ? `<button class="cite-action is-danger" data-act="delete" data-obj="${o.id}">${ICO.x}Delete</button>` : ''}
-            </span>
-          </div>
-        </div>
-      </div>`, o.id);
-  }
 
   /* ── Editor (AIMY-1146): toolbar, formatting, comments, versions, AI ── */
   const TOOLBAR = [
@@ -2251,6 +2724,90 @@
     ['undo', '&#8630;', 'Undo'], ['redo', '&#8631;', 'Redo']
   ];
 
+  /* What can be done to WORDS rather than to a block. The selection menu carries
+     these; the block toolbar carries the rest, because a heading or a list is a
+     property of the paragraph and applying one to three words means applying it
+     to the paragraph they are in. */
+  /* Each figure gets a name it keeps. Opening the native file dialog blurs the
+     page, which blurs the body, which repaints the editor — so the element that
+     asked for the file is gone by the time the file arrives. A name survives the
+     repaint; a reference does not. */
+  let figSeq = 0;
+
+  const SEL_FMT = [
+    ['bold', '<strong>B</strong>', 'Bold'],
+    ['italic', '<em>I</em>', 'Italic'],
+    ['underline', '<span style="text-decoration:underline">U</span>', 'Underline']
+  ];
+
+  /* ── The block types ──
+
+     The toolbar could already make a heading or a list out of the block you
+     were in, which is formatting. What it could not do is what every document
+     tool is expected to do: ADD a block of a different kind. So there is one
+     list of block types, reachable two ways — the + in the block toolbar, for
+     the first time, and `/` on an empty line, for every time after.
+
+     The first five run execCommand, because the browser already knows how to
+     turn a paragraph into a heading or a list. The last three insert real
+     markup, because there is no command for "a code block". */
+  /* `insertHTML` sanitises a <pre> or a <figure> into an inline span and drops
+     it wherever the caret happens to be — mid-word, inside the paragraph. A
+     block has to arrive as a block, so this places it in the body itself: after
+     the block being written, or in its place when that one is empty. The caret
+     lands on the part you would type next. */
+  function insertBlock(html) {
+    const body = $('#editBody');
+    if (!body) return;
+    let at = caretBlock();
+    if (!at || at.parentElement !== body) at = body.lastElementChild;
+
+    const wrap = document.createElement('div');
+    wrap.innerHTML = html + '<p><br></p>';
+    const made = [...wrap.children];
+    const after = at ? at.nextSibling : null;
+    made.forEach((n) => body.insertBefore(n, after));
+    /* An empty paragraph you were sitting in was only ever a place to stand, so
+       the new block takes its place. An empty code block or figure is empty on
+       purpose — waiting for you — and stays. */
+    if (at && !at.textContent.trim() && /^(P|H3|H4|DIV|BLOCKQUOTE)$/.test(at.tagName)) at.remove();
+
+    const fill = made[0].querySelector('code, figcaption') || made[made.length - 1];
+    const r = document.createRange();
+    r.selectNodeContents(fill); r.collapse(true);
+    putCaret(r);
+  }
+
+  const BLOCKS = [
+    ['Text',          'T',   () => document.execCommand('formatBlock', false, 'p')],
+    ['Heading',       'H',   () => document.execCommand('formatBlock', false, 'h3')],
+    ['Subheading',    'H',   () => document.execCommand('formatBlock', false, 'h4')],
+    ['Bulleted list', '&#8226;',  () => document.execCommand('insertUnorderedList')],
+    ['Numbered list', '1.',  () => document.execCommand('insertOrderedList')],
+    ['Quote',         '&#8220;',  () => document.execCommand('formatBlock', false, 'blockquote')],
+    /* The block arrives empty with the caret in it and its hint drawn by CSS,
+       the way a real editor does it. Placeholder *text* would have to be
+       selected to be replaced, and a selection is what makes the toolbar hand
+       over to the selection menu — so the tools would vanish on arrival. */
+    ['Code',          '&lt;&gt;', () => insertBlock('<pre class="doc-code"><code></code></pre>')],
+    /* No upload in a prototype, and a fake one would be worse than none. The
+       block says what it is waiting for, and the drop handler this document
+       already has is what fills it. */
+    /* ── Choose, do not drop ──
+
+       The placeholder used to read "Drop an image on the document to fill
+       this", which asked for the one gesture the page had already claimed: the
+       workbench's drop layer turns any dropped file into a new document, so
+       aiming at the figure made a document instead of an image. Two meanings
+       for one gesture, and the block always lost. A file field is a control
+       everyone has already been taught, and it collides with nothing. */
+    ['Image',         '&#9635;',  () => insertBlock(
+      '<figure class="doc-figure" data-fig="' + (++figSeq) + '">' +
+      '<button type="button" class="doc-figure-ph" contenteditable="false" ' +
+      'data-pick-image="' + figSeq + '">Choose an image</button><figcaption></figcaption></figure>')],
+    ['Divider',       '&#8212;',  () => insertBlock('<hr class="doc-hr">')]
+  ];
+
   /* ═══════════════════════════════════════════════
      THE EDITOR (AIMY-1146)
 
@@ -2261,28 +2818,45 @@
   ═══════════════════════════════════════════════ */
   let editorTab = 'props';
   let previewVer = null;
+  /* Which custom property is open for editing. View state, like the rest of
+     this — nobody wants to link to a document with one field unfolded. */
+  let openProp = null;
 
   const OWNERS = ['N. Wael', 'A. Mahfouz', 'O. Said', 'Sales Ops', 'Marketing', 'Brand', 'Legal', 'Unassigned'];
 
   /* Every property is a control that writes straight through to the object.
      Status is shown and not set: it is derived, and a field you could type into
-     would be the attestation model coming back through a side door. */
+     would be the attestation model coming back through a side door.
+
+     `lead` is the half of the fact the control cannot say for itself, and it
+     lives INSIDE the trigger, so the whole row is one target. `blank` completes
+     the same phrase when there is no value — *About no client*, never *None*,
+     because a document with no client is a fact and a dash is a shrug. */
+  const artic = (s) => (/^[aeiou]/i.test(s) ? 'an ' : 'a ') + s;
+
   const PROP_FIELDS = [
-    { key: 't',      label: 'Type',       map: () => opts(TYPES) },
-    { key: 'col',    label: 'Collection', map: () => opts(COLLECTIONS) },
-    { key: 'owner',  label: 'Owner',      map: () => OWNERS.map((x) => [x, x]) },
-    { key: 'prod',   label: 'Product',    map: () => opts(PRODUCTS), blank: 'None' },
-    { key: 'client', label: 'Client',     map: () => opts(CLIENTS), blank: 'None' },
-    { key: 'region', label: 'Region',     map: () => opts(REGIONS) }
+    { key: 'owner',  label: 'Owner',      lead: 'Owned by',      map: () => OWNERS.map((x) => [x, x]) },
+    { key: 't',      label: 'Type',       lead: 'It is',         map: () => opts(TYPES), disp: artic },
+    { key: 'col',    label: 'Collection', lead: 'Filed in',      map: () => opts(COLLECTIONS), blank: 'nowhere' },
+    { key: 'prod',   label: 'Product',    lead: 'Answering for', map: () => opts(PRODUCTS), blank: 'no product' },
+    { key: 'client', label: 'Client',     lead: 'About',         map: () => opts(CLIENTS), blank: 'no client' },
+    { key: 'region', label: 'Region',     lead: 'Covering',      map: () => opts(REGIONS), blank: 'no region' }
   ];
 
-  function propDropdown(f, o) {
+  /* `row` puts the lead inside the trigger and lets it fill the line. The
+     library's panel, keyboard model and ARIA are untouched — only the trigger
+     changes shape, and `data-value` carries the display form so selecting a new
+     option does not drop the article the trigger was reading with. */
+  function propDropdown(f, o, row) {
     const cur = o[f.key] || '';
-    const rows = [['', f.blank || '—', f.blank || '—']].concat(f.map().map(([v, l]) => [v, l, l]));
-    const label = rows.reduce((acc, r) => (r[0] === cur ? r[1] : acc), f.blank || '—');
-    return `<div class="v2-dropdown k-prop" data-prop-key="${f.key}">
+    const blank = f.blank || '—';
+    const rows = [['', blank, blank]]
+      .concat(f.map().map(([v, l]) => [v, f.disp ? f.disp(l) : l, l]));
+    const label = rows.reduce((acc, r) => (r[0] === cur ? r[1] : acc), blank);
+    return `<div class="v2-dropdown k-prop${row ? ' k-row' : ''}" data-prop-key="${f.key}">
       <button class="v2-dropdown-btn" type="button" aria-haspopup="listbox" aria-expanded="false"
               aria-label="${esc(f.label)}">
+        ${row && f.lead ? `<span class="prop-lead">${esc(f.lead)}</span>` : ''}
         <span class="dd-label-text">${esc(label)}</span>
         <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
              stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
@@ -2294,140 +2868,748 @@
     </div>`;
   }
 
-  const tagField = (o, key, label, lookup) => `
-    <div class="prop-row">
-      <span class="prop-label">${esc(label)}</span>
-      <div class="tag-input" data-tag-field="${key}">
-        ${(o[key] || []).map((v) => `<span class="tag-token">${esc(lookup ? lookup[v] || v : v)}
-          <button type="button" data-tag-drop="${esc(v)}" aria-label="Remove ${esc(v)}">&times;</button></span>`).join('')}
-        <input type="text" placeholder="Add…" aria-label="Add ${esc(label)}" data-tag-add="${key}">
-      </div>
+  /* An empty tag field inside a sentence used to render as a full stop after a
+     blank — "and it touches ." — so the placeholder answers the sentence
+     instead of instructing the field. */
+  const tagField = (o, key, label, lookup) => {
+    const vals = o[key] || [];
+    return `<div class="tag-input${vals.length ? '' : ' is-empty'}" data-tag-field="${key}">
+      ${vals.map((v) => `<span class="tag-token">${esc(lookup ? lookup[v] || v : v)}
+        <button type="button" data-tag-drop="${esc(v)}" aria-label="Remove ${esc(v)}">&times;</button></span>`).join('')}
+      <input type="text" placeholder="${vals.length ? 'add…' : 'nothing yet'}"
+             aria-label="Add ${esc(label)}" data-tag-add="${key}">
     </div>`;
+  };
+
+  /* ── The details are rows ──
+
+     Three shapes have now been tried on this panel. A LABEL column was two
+     things to read where one would do. A flowing SENTENCE with the controls
+     inside it fixed that and broke something else: prose wrapped around six
+     inline controls cannot avoid orphaning its own punctuation — measured at
+     three lines with a comma stranded at x=296 of 320 and a full stop starting
+     the last line — and an open panel landed on the words after it.
+
+     So: one fact per row, the phrase and its value together, and the whole row
+     is the control. The lead sits inside the trigger, which means one hit
+     target per fact, a scannable left edge, no flow, no punctuation to orphan,
+     and a panel that opens under its own row instead of over the next fact. */
+  const propRow = (lead, body) => `<div class="prop-row">
+    <span class="prop-lead">${esc(lead)}</span>${body}</div>`;
 
   function propsPanel(o) {
+    const facts = typeFacts(o);
+    const custom = Object.keys(o.props);
     return `<div class="props">
-      <div class="prop-row">
-        <span class="prop-label">Status</span>
-        <div class="prop-status">
-          ${propDropdown({ key: 'statusSet', label: 'Status', blank: 'Automatic',
-                           map: () => Object.keys(STATUS).map((k) => [k, STATUS[k].label]) }, o)}
-          <span class="prop-why">${o.statusSet
-            ? 'Set by ' + esc(o.statusBy || USER.owner) + '. Choose Automatic to compute it again.'
-            : esc(STATUS[o.status].why)}</span>
-        </div>
-      </div>
-      ${PROP_FIELDS.map((f) => `<div class="prop-row">
-        <span class="prop-label">${esc(f.label)}</span>${propDropdown(f, o)}</div>`).join('')}
-      ${tagField(o, 'tags', 'Tags')}
-      ${tagField(o, 'services', 'Services', SERVICES)}
-      <div class="prop-row">
-        <span class="prop-label">Visible to</span>
-        <div class="prop-checks">${Object.keys(AUDIENCE).map((a) => `
+      ${facts.length ? `<div class="prop-facts">${facts.map((f) => `<p>${f}</p>`).join('')}</div>` : ''}
+
+      <div class="prop-rows">
+        ${PROP_FIELDS.map((f) => propDropdown(f, o, true)).join('')}
+        ${propRow('Tagged', tagField(o, 'tags', 'Tagged'))}
+        <!-- "Touches" said nothing. The field holds which of our service lines
+             the document belongs to — Support delivery, Voice operations — and
+             "Part of Support delivery" says that without a glossary. -->
+        ${propRow('Part of', tagField(o, 'services', 'Part of', SERVICES))}
+        ${propRow('Visible to', `<div class="prop-checks">${Object.keys(AUDIENCE).map((a) => `
           <label class="ds-choice"><input type="checkbox" data-aud="${a}"${o.aud.indexOf(a) > -1 ? ' checked' : ''}>
-            <span></span><span class="prop-check-label">${esc(AUDIENCE[a])}</span></label>`).join('')}</div>
+            <span></span><span class="prop-check-label">${esc(AUDIENCE[a])}</span></label>`).join('')}</div>`)}
       </div>
-      <div class="prop-row is-stack">
-        <span class="prop-label">Properties</span>
-        <div class="prop-custom">
-          ${Object.keys(o.props).map((k) => `<div class="prop-kv">
-            <input class="field-input" value="${esc(k)}" data-prop-k="${esc(k)}" aria-label="Property name">
-            <input class="field-input" value="${esc(o.props[k])}" data-prop-v="${esc(k)}" aria-label="Property value">
-            <button class="prop-kv-x" data-prop-del="${esc(k)}" aria-label="Remove ${esc(k)}">${ICO.x.replace('<svg', '<svg width="12" height="12"')}</button>
-          </div>`).join('')}
-          <button class="prop-add" data-prop-add>+ Add a property</button>
-        </div>
+
+      <!-- Status carries a reason as well as a value, and the reason is the
+           half that matters, so it keeps its own block below the rows. -->
+      <div class="prop-status">
+        ${propDropdown({ key: 'statusSet', label: 'Status', lead: 'Status is', blank: 'Automatic',
+          map: () => Object.keys(STATUS).map((k) => [k, STATUS[k].label]) }, o, true)}
+        <span class="prop-why">${o.statusSet
+          ? 'Set by ' + esc(o.statusBy || USER.owner) + '. Choose Automatic to compute it again.'
+          : esc(STATUS[o.status].why)}</span>
+      </div>
+
+      <!-- ── Anything the fixed fields cannot hold ──
+
+           This was the one block that never got the phrase treatment: the words
+           "It also says:" over two bare text boxes, whose only names were
+           aria-label attributes a sighted reader never sees. Two unlabelled
+           inputs and a sentence fragment, which is exactly as much as it
+           explained.
+
+           It reads as a fact now — "tier is enterprise" — and becomes the two
+           inputs when you click it, which is the same rule as the title, the
+           body and every other row on this page. A new one arrives already
+           open, with the placeholders doing the naming the labels used to fail
+           to do. -->
+      <div class="prop-custom">
+        ${custom.length ? '<p class="prop-also">Other facts about it</p>' : ''}
+        ${custom.map((k) => `<div class="prop-kv${k === openProp ? ' is-open' : ''}" data-prop-pair="${esc(k)}">
+          <button class="prop-kv-read" data-prop-open="${esc(k)}">
+            <span class="prop-lead">${esc(k)}</span> is
+            <span class="prop-kv-val">${esc(o.props[k]) || '—'}</span>
+          </button>
+          <input class="field-input" value="${esc(k)}" data-prop-k="${esc(k)}"
+                 placeholder="Name" aria-label="Property name">
+          <input class="field-input" value="${esc(o.props[k])}" data-prop-v="${esc(k)}"
+                 placeholder="Value" aria-label="Value of ${esc(k)}">
+          <button class="prop-kv-x" data-prop-del="${esc(k)}" aria-label="Remove ${esc(k)}">${ICO.x.replace('<svg', '<svg width="12" height="12"')}</button>
+        </div>`).join('')}
+        <!-- "Add another" when there is nothing to add another OF. -->
+        <button class="prop-add" data-prop-add>+ Add ${custom.length ? 'another' : 'a fact'}</button>
       </div>
     </div>`;
   }
 
-  function renderEditor(st) {
-    const o = byId(st.doc);
-    if (!o) { patch({ doc: '' }, { replace: true }); return; }
-    const owns = o.owner === USER.owner;
-    const blank = !o.sum && o.title.indexOf('Untitled') === 0;
-    const preview = previewVer !== null ? VERSIONS(o)[previewVer] : null;
 
-    docModal.show(`
-      ${docChrome(o, 'edit', blank)}
-      <div class="doc-scroll">
-        ${preview ? `<div class="ver-preview">
-            ${ICO.clock.replace('<svg', '<svg width="14" height="14"')}
-            <span>Viewing <strong>${esc(preview.v === 'ai' ? 'the AiMY version' : preview.v)}</strong> ·
-              ${esc(fmtShort(preview.at))} — read only.</span>
-            <span class="ver-preview-end">
-              ${preview.current ? '' : `<button class="btn btn-ghost btn-sm" data-restore="${o.id}">Restore this version</button>`}
-              <button class="btn btn-brand btn-sm" data-close-ver>Back to current</button>
-            </span>
-          </div>`
-        : `<div class="toolbar" role="toolbar" aria-label="Formatting">
-            ${TOOLBAR.map(([cmd, glyph, label]) => cmd === '|'
-              ? '<span class="toolbar-sep"></span>'
-              : `<button class="icon-btn" aria-label="${esc(label)}" title="${esc(label)}" data-fmt="${esc(cmd)}">${glyph}</button>`).join('')}
-            <span class="toolbar-sep"></span>
-            <button class="icon-btn is-ai" aria-label="Ask AiMY to draft" title="Ask AiMY to draft"
-                    data-ai-doc aria-haspopup="true" aria-expanded="false">${AIMY_MARK(13, 15)}</button>
-          </div>`}
+  /* ═══════════════════════════════════════════════
+     THE DOCUMENT
 
-        <div class="wb-editor-split">
-          <div>
-            <div class="doc-view">
-              <div class="dv-head">
-                <div class="dv-meta">
-                  <span class="tc-type">${TYPES[o.t].ico}${esc(TYPES[o.t].label)}</span>
-                  ${statusBadge(o.status)}
-                </div>
-                <h2 class="dv-title" ${preview ? '' : 'contenteditable="true"'} spellcheck="false"
-                    data-edit-title>${esc(preview ? o.title : o.title)}</h2>
-              </div>
-              ${!preview && !owns ? `<div class="inline-note warn" style="align-items:flex-start">
-                <span class="dot" style="margin-top:6px"></span>
-                <span>Owned by <strong>${esc(o.owner)}</strong>, not you. Your edit is recorded against your name.</span>
-              </div>` : ''}
-              <div class="dv-body${!preview && !String(o.sum || '').trim() ? ' is-blank' : ''}" ${preview ? '' : 'contenteditable="true"'}
-                   spellcheck="false" id="editBody" data-drop-body
-                   data-placeholder="Write here, drop a file, or ask AiMY to draft it.">
-                ${preview
-                  ? `<p>${esc(VERSION_BODY(o, previewVer))}</p>`
-                  : blank
-                    /* Empty means empty. The hint is a CSS ::before on the
-                       element, so it is never selected, never typed over and
-                       never mistaken for something publishable. */
-                    ? ''
-                    /* The per-type boilerplate belongs to the fixture corpus. A
-                       document someone wrote or dropped in has its own words,
-                       and appending house copy to them is putting text in
-                       their mouth. */
-                    /* o.html is what the writing tools produced. Re-rendering
-                       the body as one escaped paragraph is what threw every
-                       bold and every list away on the next repaint. */
-                    : o.html || `<p>${esc(o.sum)}</p>${o.src === 'upload' && /^new-/.test(o.id)
-                        ? '' : `<p>${esc((BODY_COPY[o.t] || [''])[0])}</p>`}`}
-              </div>
-            </div>
+     One surface. There is no view mode and no edit mode, because a person
+     reading a document and a person fixing a sentence in it are the same
+     person half a second apart, and making them press a button in between was
+     the product asking them to declare an intention they had not formed yet.
 
-            ${aiDraftBlock(o)}
-          </div>
+     Click the title, you are editing the title. Click the body, you are in the
+     body. Nothing is disabled and nothing is armed; the affordance appears
+     under the pointer and is otherwise absent, so the thing reads as a document
+     rather than as a form with a document in it.
 
-          <div class="editor-side">
-            <div class="ds-tabs" role="tablist" aria-label="Document panel">
-              <button class="ds-tab${editorTab === 'props' ? ' active' : ''}" role="tab"
-                      aria-selected="${editorTab === 'props'}" data-etab="props">Properties</button>
-              <button class="ds-tab${editorTab === 'vers' ? ' active' : ''}" role="tab"
-                      aria-selected="${editorTab === 'vers'}" data-etab="vers">Versions<span class="tab-count">${VERSIONS(o).length}</span></button>
-            </div>
-            <div class="ds-tabpanel" role="tabpanel"${editorTab === 'props' ? '' : ' style="display:none"'}>
-              ${propsPanel(o)}
-            </div>
-            <div class="ds-tabpanel" role="tabpanel"${editorTab === 'vers' ? '' : ' style="display:none"'}>
-              ${versionList(o, true)}
-              <p class="ver-hint">Open a version to read it. Only the current one can be edited.</p>
-            </div>
+     It is also a page now, not a modal. A modal has no room for a rail, and a
+     document with eleven facts, its connections, its history and its comments
+     needs one. The URL is unchanged — `?doc=` — so every link still resolves
+     and Back still returns to the surface you filtered.
+  ═══════════════════════════════════════════════ */
+  let railOpen = true;
+
+  /* Some documents carry an ingestion marker in the owner field rather than a
+     person. As a label over a value that read as odd data; as a sentence,
+     "Owned by Ingested · Zendesk" reads as nonsense. The phrase treatment makes
+     the defect visible, which is the argument for the phrase treatment. */
+  const hasOwner = (o) => OWNERS.indexOf(o.owner) > -1 && o.owner !== 'Unassigned';
+  const ownerPhrase = (o) => hasOwner(o) ? 'Owned by ' + esc(o.owner)
+    : o.owner === 'Unassigned' ? 'Nobody owns it'
+    : 'No owner — it arrived from ' + esc(SRC[o.src].label);
+
+  /* The byline. Everything a masthead would say, as one line of phrases, each
+     entity in it openable. */
+  function docByline(o) {
+    const src = SRC[o.src];
+    return `<div class="doc-byline">
+      ${statusBadge(o.status, o.statusSet ? 'Set by ' + esc(o.statusBy || USER.owner) : '')}
+      <button class="doc-by-ent" data-peek="owner:${esc(o.owner)}">${ownerPhrase(o)}</button>
+      <span class="doc-by-sep">·</span>
+      <!-- ── When it changed, and every time it changed ──
+
+           This lived in the topbar behind the word "3 versions", beside the
+           save indicator, at the far end of a row you read past on your way to
+           the document. But the question a version answers is the one the
+           byline already raises: how current is this? So the date and its
+           history are one control, in the line that states the date. -->
+      ${VERSIONS(o).length ? `<details class="doc-versions doc-by-ver" id="docVersions">
+        <summary>Updated ${esc(fmtDate(o.upd))}
+          <span class="doc-by-vn">${VERSIONS(o).length} version${VERSIONS(o).length === 1 ? '' : 's'}</span></summary>
+        <div class="doc-versions-panel">
+          ${versionList(o, true)}
+          <p class="ver-hint">Open a version to read it. Only the current one can be edited.</p>
+        </div>
+      </details>`
+      /* A document written a minute ago has no history, and "0 versions" over
+         an empty panel is a control that opens onto nothing. */
+      : `<span>Updated ${esc(fmtDate(o.upd))}</span>`}
+      <span class="doc-by-sep">·</span>
+      <!-- "Came from Manual upload" is not where a document you typed came
+           from. It came from you, here. -->
+      ${bornHere(o)
+        ? '<span>Written here</span>'
+        : `<button class="doc-by-ent" data-peek="source:${o.src}">Came from ${esc(src.label)}</button>`}
+      <span class="doc-by-sep">·</span>
+      <button class="doc-by-ent" data-peek="collection:${o.col}">Filed in ${esc(COLLECTIONS[o.col])}</button>
+    </div>`;
+  }
+
+  /* The rail. Four blocks, each a `<details>` so the browser keeps what you
+     opened without any state of ours. */
+  const railBlock = (title, open, body, n) => `
+    <details class="rail-block"${open ? ' open' : ''}>
+      <summary>
+        <svg class="tree-chev" width="11" height="11" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+        <span class="rail-block-title">${esc(title)}</span>
+        ${n ? `<span class="rail-block-n">${n}</span>` : ''}
+      </summary>
+      <div class="rail-block-body">${body}</div>
+    </details>`;
+
+  /* Connections, as sentences. Each row reads "Disagrees with Returns FAQ —
+     AiMY, 18 Jul": the relationship, the thing, and who said so. An implicit
+     edge has no author because nobody authored it. */
+  /* Claims only. Measured: seven of the nine groups here — Owned by, Filed in,
+     Came from, Answers for, Covers, Touches, Tagged — were the implicit edges,
+     which are the document's own fields, which are editable rows six inches
+     above in About it. 316px of the rail restating 316px of the rail. The
+     implicit edges are real and the model still holds them; they are simply not
+     news twice on one screen.
+
+     What is left is what somebody claimed, which is the half a reader cannot
+     work out for themselves. */
+  const claimsOf = (o) => edgesOf('doc', o.id).filter((e) => ASSERTED_PHRASES.indexOf(e.phrase) > -1);
+
+  function connectionsBlock(o) {
+    const edges = claimsOf(o);
+    const groups = {};
+    edges.forEach((e) => { (groups[e.phrase] = groups[e.phrase] || []).push(e); });
+    const keys = Object.keys(groups);
+    return (keys.length
+      ? keys.map((phrase) => `<div class="rail-conn">
+          <span class="rail-conn-phrase">${esc(phrase)}</span>
+          ${groups[phrase].map((e) => `<button class="rail-conn-item"
+            ${e.kind === 'doc' ? `data-open-doc="${esc(e.id)}"` : `data-peek="${esc(e.kind)}:${esc(e.id)}"`}>
+            <span class="rail-conn-label">${esc(e.label)}</span>
+            ${e.by ? `<span class="rail-conn-by">${esc(e.by)}, ${esc(fmtShort(e.at))}</span>` : ''}
+          </button>`).join('')}
+        </div>`).join('')
+      : '<p class="rail-empty">Nobody has connected this to anything yet.</p>')
+      /* Finding a connection is a search over forty-two documents. It was in
+         here — a neighbour list plus a picker holding thirty-four hidden rows
+         — inside a 320px column, and it was most of why the rail ran to twice
+         the window. The rail describes; the canvas searches. */
+      /* Named the same thing as the starter row that opens the same surface.
+         "Find connections" described what this used to be — a discovery answer
+         in the canvas — and kept the name after it became a picker you connect
+         from, so one action had two names and neither matched its heading. */
+      + `<div class="rail-act">${entryAction('investigate', 'Connect it to documents',
+           `data-act="connect" data-obj="${o.id}"`, AIMY_MARK(12, 14))}</div>`;
+  }
+
+  /* ── What nobody claimed ──
+
+     The rest of the graph is real, it is just implicit: two documents about the
+     same client, answering for the same product, carrying the same tags. Walking
+     the edges a document already has finds its neighbours without anyone having
+     to assert anything.
+
+     They are kept apart from the claims and labelled as computed, for exactly
+     the reason a hand-set status carries a marker — a thing the system noticed
+     and a thing a person claimed must never render identically. Narrowest axis
+     first, because "also about Nordwind" is worth something and "also came from
+     Confluence" is worth almost nothing. */
+  const NEIGHBOUR = [
+    { has: (o) => !!o.client, phrase: (o) => 'Also about ' + CLIENTS[o.client],
+      match: (a, b) => b.client === a.client },
+    { has: (o) => !!o.prod,   phrase: (o) => 'Also answers for ' + PRODUCTS[o.prod],
+      match: (a, b) => b.prod === a.prod },
+    { has: (o) => o.tags.length > 1, phrase: (o) => 'Also tagged ' + o.tags.slice(0, 2).join(' and '),
+      match: (a, b) => b.tags.filter((t) => a.tags.indexOf(t) > -1).length > 1 },
+    { has: () => true,        phrase: (o) => 'Also filed in ' + COLLECTIONS[o.col],
+      match: (a, b) => b.col === a.col },
+    { has: (o) => hasOwner(o), phrase: (o) => 'Also owned by ' + o.owner,
+      match: (a, b) => b.owner === a.owner },
+    { has: () => true,        phrase: (o) => 'Also came from ' + SRC[o.src].label,
+      match: (a, b) => b.src === a.src }
+  ];
+
+  function neighbours(o, max) {
+    /* Anything already claimed is a connection, not a suggestion, and it is in
+       the block above. Suggesting it again would make asserting it look like a
+       no-op. */
+    const claimed = {};
+    EDGES.forEach((e) => {
+      if (e.from === o.id) claimed[e.to] = 1;
+      if (e.to === o.id) claimed[e.from] = 1;
+    });
+    const out = [];
+    NEIGHBOUR.forEach((n) => {
+      if (out.length >= (max || 3) || !n.has(o)) return;
+      const docs = LIVE.filter((x) => x.id !== o.id && !claimed[x.id] && n.match(o, x));
+      if (docs.length) out.push({ phrase: n.phrase(o), docs: docs });
+    });
+    return out;
+  }
+
+  /* ── Connecting is picking several things at once ──
+
+     It used to be a canvas answer: a list of neighbour groups over a search,
+     with a `+` per row that opened its own confirmation. Three problems. On a
+     document created a minute ago the suggestions are noise — a new document
+     shares its collection and owner with almost everything. The rows were
+     `data-open-doc`, so clicking one NAVIGATED AWAY from the document you were
+     connecting. And one commit per connection is the wrong unit: what you want
+     at creation is to pick the three things this relates to and be done.
+
+     One list, then. Search over all of it, checkboxes rather than links, the
+     relationship chosen once for the batch, and one confirmation. The
+     suggestions survive as a REASON on a row rather than as a section, which
+     keeps the noticed-versus-claimed distinction without giving guesses their
+     own real estate. */
+  const CONNECT_AS = [
+    ['related', 'Related to'], ['references', 'References'],
+    ['supersedes', 'Replaces'], ['answers', 'Answers']
+  ];
+
+  function connectCandidates(o) {
+    const claimed = {};
+    EDGES.forEach((e) => {
+      if (e.from === o.id) claimed[e.to] = 1;
+      if (e.to === o.id) claimed[e.from] = 1;
+    });
+    /* Why AiMY would have suggested it, as a caption — narrowest axis wins, so
+       a shared client beats a shared source. */
+    const why = {};
+    neighbours(o, 6).forEach((g) => g.docs.forEach((d) => {
+      if (!why[d.id]) why[d.id] = g.phrase;
+    }));
+    return LIVE.filter((x) => x.id !== o.id && !claimed[x.id])
+      .sort((a, b) => (why[b.id] ? 1 : 0) - (why[a.id] ? 1 : 0) || a.title.localeCompare(b.title))
+      .map((d) => ({ d: d, why: why[d.id] || '' }));
+  }
+
+  function connectPicker(o) {
+    const rows = connectCandidates(o);
+    if (!rows.length) { toast('Nothing left to connect', null, 'It is already connected to everything else'); return; }
+    commit({
+      title: 'Connect this to other documents',
+      sheet: true, width: 420,
+      rationale: `Whatever you pick becomes <strong>your</strong> claim about
+        <strong>${esc(o.title)}</strong>, and carries your name and today's date wherever it is read.`,
+      extra: '',
+      /* The foot counts what you have ticked, so the button is the answer to
+         "how many did I pick?" — the one question a long list keeps raising. */
+      confirm: 'Pick some documents', done: 'Connected',
+      effects: [['ok', 'Both documents show the connection, from either end'],
+                ['ok', 'Recorded as asserted by ' + esc(USER.owner)]],
+      body: `<div class="cx-pick">
+        <div class="cx-as">
+          <span class="cx-as-lead">Connect them as</span>
+          <div class="seg cx-seg" role="group" aria-label="What kind of connection">
+            ${CONNECT_AS.map(([v, label], i) => `<button class="seg-btn${i === 0 ? ' active' : ''}"
+              type="button" data-cx-as="${v}" aria-pressed="${i === 0}">${esc(label)}</button>`).join('')}
           </div>
         </div>
-      </div>`, o.id);
+        <input class="field-input cx-q" type="search" placeholder="Find a document"
+               aria-label="Find a document to connect" data-pick-q autocomplete="off">
+        <div class="cx-list">
+          ${rows.map(({ d, why }) => `<label class="cx-row ds-choice" data-pick-row="${esc(d.title.toLowerCase())}">
+            <input type="checkbox" data-cx-pick="${d.id}"><span></span>
+            <span class="cx-row-text">
+              <span class="cx-row-title">${esc(d.title)}</span>
+              ${why ? `<span class="cx-row-why">${esc(why)}</span>` : ''}
+            </span>
+          </label>`).join('')}
+          <p class="cx-none" hidden>Nothing here matches that.</p>
+        </div>
+      </div>`,
+      onRun: () => {
+        const type = ($('.cx-seg .seg-btn.active') || {}).getAttribute
+          ? $('.cx-seg .seg-btn.active').getAttribute('data-cx-as') : 'related';
+        const picked = $$('[data-cx-pick]').filter((c) => c.checked).map((c) => c.getAttribute('data-cx-pick'));
+        if (!picked.length) { toast('Nothing was selected', null, 'Nothing changed'); return true; }
+        picked.forEach((id) => assertEdge(o.id, id, type));
+        recompute(); render(); markCard(o.id); picked.forEach(markCard);
+        const label = (CONNECT_AS.filter((c) => c[0] === type)[0] || CONNECT_AS[0])[1].toLowerCase();
+        toast('Connected to ' + picked.length + ' document' + (picked.length === 1 ? '' : 's'),
+          'Undo', esc(o.title) + ' — ' + label);
+        /* One undo for the batch. Dropping them one at a time would leave a
+           half-made claim if you stopped halfway. */
+        undoStack = () => { picked.forEach((id) => dropEdge(o.id, id)); recompute(); render(); };
+        return true;
+      }
+    });
+    syncPickCount();
+  }
 
+  function gateReport() {
+    const btn = $('#commitRun'), box = $('[data-report-what]');
+    if (!btn || !box) return;
+    const on = !!box.value.trim();
+    btn.disabled = !on;
+    btn.style.opacity = on ? '' : '.45';
+    btn.style.cursor = on ? '' : 'not-allowed';
+  }
+
+  /* Same gating the typed confirmation uses: the button says what it will do
+     and cannot be pressed until that is something. */
+  function syncPickCount() {
+    const btn = $('#commitRun');
+    if (!btn || !$('[data-cx-pick]')) return;
+    const n = $$('[data-cx-pick]').filter((c) => c.checked).length;
+    btn.textContent = n ? 'Connect ' + n + ' document' + (n === 1 ? '' : 's') : 'Pick some documents';
+    btn.disabled = !n;
+    btn.style.opacity = n ? '' : '.45';
+    btn.style.cursor = n ? '' : 'not-allowed';
+  }
+
+  /* The source's own dates, as phrases rather than a four-cell grid of labels. */
+  /* ── Some documents have no upstream at all ──
+
+     `newDocument` files everything under the `upload` source with today's date
+     in all four fields, and this block used to print them literally. A document
+     you had just written said: *Ingested 30 Jul 2026 · Created in Manual upload
+     30 Jul 2026 · Manual upload changed it 30 Jul 2026 · Cited 0 times — last
+     today*, over a **Re-sync from Manual upload** button that would have
+     replaced the body with nothing. Four false statements and a destructive
+     dead end on every document the product invites you to make.
+
+     A dropped file and a document typed here are both origins without an
+     upstream — `dropFiles` marks the first with a `source-file` property — and
+     neither of them syncs. Nothing to sync from, so no button offering to. */
+  const bornHere = (o) => /^new-/.test(o.id) && !o.props['source-file'];
+  const noUpstream = (o) => o.src === 'upload';
+
+  function provenanceBlock(o) {
+    const s = SRC[o.src];
+    const behind = o.xu < o.upd;
+    if (noUpstream(o)) {
+      const file = o.props['source-file'];
+      return `<div class="rail-facts">
+        <p>${bornHere(o) ? 'You wrote it here, ' + esc(fmtDate(o.ing))
+                         : 'You uploaded ' + esc(file || 'it') + ', ' + esc(fmtDate(o.ing))}</p>
+        <p>Nothing syncs into it — ${bornHere(o) ? 'it has no source'
+                                                 : 'a dropped file is not a live source'}</p>
+        <p>${esc(citedPhrase(o))}</p>
+        <!-- The line above states an absence; this is the one thing you can do
+             about it, so it sits directly under it. -->
+        <div class="rail-act">
+          ${entryAction('investigate', 'Find a source for it', `data-act="ground" data-obj="${o.id}"`, AIMY_MARK(12, 14))}
+        </div>
+      </div>`;
+    }
+    return `<div class="rail-facts">
+      <p>Ingested ${esc(fmtDate(o.ing))}</p>
+      <p>Created in ${esc(s.label)} ${esc(fmtDate(o.xc))}</p>
+      <p${behind ? ' class="is-overdue"' : ''}>${esc(s.label)} changed it ${esc(fmtDate(o.xu))}</p>
+      <p>${esc(citedPhrase(o))}</p>
+      <div class="rail-act">
+        <!-- Pulling a source is not a thing you look at, so it stops carrying
+             the direct mode's eye. And finding one is AiMY's job, so it
+             carries AiMY's mark. -->
+        ${s.health === 'ok'
+          ? entryAction('direct', 'Re-sync from ' + s.label, `data-act="resync" data-obj="${o.id}"`, ICO.refresh)
+          : entryAction('review', 'Reconnect ' + s.label, `data-act="reconnect" data-obj="${o.id}"`)}
+        ${entryAction('investigate', 'Find another source', `data-act="ground" data-obj="${o.id}"`, AIMY_MARK(12, 14))}
+      </div>
+    </div>`;
+  }
+
+  function renderDoc(st) {
+    const o = byId(st.doc);
+    if (!o) { patch({ doc: '' }, { replace: true }); return; }
+    const stage = $('#wbStage');
+    /* ── A document with no body is a document with no body ──
+
+       This also required the title to start with "Untitled", which was a proxy
+       for "you just made this" and stopped being true the moment a file could
+       name one. Every ingested document therefore got the starting moves
+       suppressed — a filled title over an empty page and nothing offered, which
+       is exactly what a Word file looked like on arrival. The test is the body,
+       and the same test the drop layer uses. */
+    const blank = isBlankDoc(o);
+    const preview = previewVer !== null ? VERSIONS(o)[previewVer] : null;
+    const owns = o.owner === USER.owner;
+    const keep = stage.dataset.doc === o.id ? $('#docCanvas') && $('#docCanvas').scrollTop : 0;
+    const live = document.activeElement;
+    const armed = live && live.getAttribute && live.getAttribute('contenteditable') === 'true' && isEditable(live)
+      ? (live.id === 'editBody' ? '#editBody' : '[data-edit-title]') : null;
+
+    const notice = (STATUS[o.status].excluded || o.arch || o.status === 'outdated') ? `
+      <div class="dv-notice is-${o.arch || o.status === 'superseded' ? 'superseded' : 'expired'}">
+        ${o.arch ? ICO.box : o.status === 'superseded' ? ICO.arrow : ICO.refresh}
+        <span class="dv-notice-text"><strong>${o.arch ? 'Archived.' : o.status === 'superseded' ? 'Replaced.' : 'Out of date.'}</strong>
+        ${o.arch ? 'Kept whole and restorable. Not used in answers.'
+          : o.status === 'superseded' ? 'A newer document replaced it. Not used in answers.'
+          : esc(SRC[o.src].label) + ' changed after our copy. Still used in answers, and answers say so.'}</span>
+        ${o.arch || o.status === 'superseded'
+          ? `<button class="dv-notice-link" data-act="${o.arch ? 'restore' : 'successor'}" data-obj="${o.id}">
+               ${o.arch ? 'Restore it →'
+                 : (RELATED[o.id] || {}).supersededBy ? 'Go to the current one →' : 'Find what replaced it →'}</button>`
+          : ''}
+      </div>` : '';
+
+    stage.dataset.doc = o.id;
+    stage.innerHTML = `
+      <div class="doc-page${railOpen ? '' : ' rail-closed'}">
+        <div class="doc-topbar">
+          <button class="doc-back" data-doc-close>
+            ${ICO.arrow.replace('<svg', '<svg width="14" height="14" style="transform:rotate(180deg)"')}
+            All documents</button>
+          <span class="doc-top-end">
+            ${savedLabel(o)}
+            ${blank ? `<button class="btn btn-ghost btn-sm" data-discard="${o.id}">Discard</button>` : ''}
+            ${o.status === 'draft'
+              ? `<button class="btn btn-brand btn-sm" data-act="publish" data-obj="${o.id}" data-publish
+                   ${String(o.sum || '').trim() ? '' : 'disabled title="A document with no content cannot go live"'}
+                 >${String(o.sum || '').trim() ? 'Publish' : 'Add some content first'}</button>` : ''}
+            <button class="doc-rail-toggle" data-rail-toggle aria-expanded="${railOpen}"
+                    aria-label="${railOpen ? 'Hide details' : 'Show details'}">
+              ${ICO.sidebar ? ICO.sidebar.replace('<svg', '<svg width="15" height="15"') : ICO.eye.replace('<svg', '<svg width="15" height="15"')}</button>
+          </span>
+        </div>
+
+        <div class="doc-canvas" id="docCanvas">
+          <div class="doc-paper">
+            ${preview ? `<div class="ver-preview">
+                ${ICO.clock.replace('<svg', '<svg width="14" height="14"')}
+                <span>Reading <strong>${esc(preview.v)}</strong> from ${esc(fmtShort(preview.at))} — you cannot edit history.</span>
+                <span class="ver-preview-end">
+                  ${preview.current ? '' : `<button class="btn btn-ghost btn-sm" data-restore="${o.id}">Restore this version</button>`}
+                  <button class="btn btn-brand btn-sm" data-close-ver>Back to the current one</button>
+                </span>
+              </div>`
+            : ''}
+
+            <!-- ── Everything ABOUT the document comes before it ──
+
+                 The notice, the byline and the ownership note used to sit
+                 BETWEEN the title and the body — 73px of status interrupting
+                 the two things you can actually click and edit. The document's
+                 whole model is that you touch text and it becomes editable, and
+                 that reads as one surface only when the editable blocks are
+                 contiguous. So the head is a head: it goes above the title, and
+                 title and body are neighbours. -->
+            ${(notice || docByline(o) || (!preview && !owns)) ? `<header class="doc-head">
+              ${notice}
+              ${docByline(o)}
+              ${!preview && !owns ? `<p class="doc-note">Owned by ${esc(o.owner)}, not you. Your edit is recorded against your name.</p>` : ''}
+            </header>` : ''}
+
+            <!-- No contenteditable at rest. See armEditable: the attribute
+                 arrives under the pointer and leaves when you look away, so
+                 what you land on is a document, not a form holding one. -->
+            <h1 class="doc-title" spellcheck="false" data-edit-title
+                ${preview ? '' : 'tabindex="0" aria-label="Title — press Enter to edit"'}
+                >${esc(o.title)}</h1>
+
+            <div class="dv-body${!preview && blank ? ' is-blank' : ''}"
+                 spellcheck="false" id="editBody" data-drop-body
+                 ${preview ? '' : 'tabindex="0" aria-label="Document — press Enter to edit"'}
+                 data-placeholder="Write here, drop a file, or use Draft with AiMY above.">
+              ${preview ? `<p>${esc(VERSION_BODY(o, previewVer))}</p>`
+                /* One empty paragraph, not nothing. An empty body has no block
+                   for the caret to be IN, so `caretBlock` returned null, so the
+                   toolbar never appeared and the + with it — on the one document
+                   where you have the most to add. Typing into a bare body also
+                   makes a naked text node the block model cannot see. */
+                : blank ? '<p><br></p>'
+                : o.html || `<p>${esc(o.sum)}</p>${o.src === 'upload' && /^new-/.test(o.id)
+                    ? '' : `<p>${esc((BODY_COPY[o.t] || [''])[0])}</p>`}`}
+            </div>
+
+            <!-- A blank document's starting moves, BELOW the empty body rather
+                 than above it — put between the title and the body they would
+                 break the same run of editable blocks the head just stopped
+                 breaking. A document with a body does not need them: the
+                 assistant is on the block, and connecting is in the rail. -->
+            ${preview || !blank ? '' : `<div class="doc-start">
+              <button class="doc-ai" data-ai-doc aria-haspopup="true" aria-expanded="false">
+                ${AIMY_MARK(13, 15)}<span>Draft with AiMY</span></button>
+              <!-- Starting from a file you already have is the third way in, and
+                   it was the only one with no control — it existed as a drag
+                   gesture and nothing else. -->
+              <button class="doc-start-act" data-pick-files>
+                ${ICO.upload ? ICO.upload.replace('<svg', '<svg width="13" height="13"') : ''}<span>Start from a file</span></button>
+              <button class="doc-start-act" data-act="connect" data-obj="${o.id}">
+                ${AIMY_MARK(13, 15)}<span>Connect it to documents</span></button>
+            </div>
+            <p class="doc-start-fine">${o.pendingText
+              ? `<strong>${esc(o.pendingText)}</strong> is filed here — its text has not been
+                 pulled out yet, which needs the ingestion service. Draft from it, or write it here.`
+              : `Or drop one on the page — ${esc(FILE_KINDS)}`}</p>`}
+
+            ${aiDraftBlock(o)}
+
+            <!-- Comments belong under the writing, not beside it. You comment
+                 on a document while READING it — you have just found the thing
+                 you want to say something about — and in a 320px rail the
+                 thread was 141px of somebody else's column. -->
+            ${preview ? '' : (() => {
+              const thread = commentThread(o);
+              if (!thread) return '';
+              const n = (o.comments || []).length;
+              return `<section class="doc-comments" aria-label="Comments">
+                <h2 class="doc-comments-head">${n ? n + ' comment' + (n === 1 ? '' : 's') : 'No comments yet'}</h2>
+                ${thread}
+              </section>`;
+            })()}
+          </div>
+        </div>
+
+        <aside class="doc-rail" aria-label="About this document">
+          <!-- All three closed. The document is what you came for; the rail is
+               what you go to when you have a question about it, and three open
+               blocks answered questions nobody had asked yet.
+
+               The titles are the questions each one answers, in parallel, so
+               the summary alone tells you whether to open it. "About it" was
+               vague enough to mean any of the three. -->
+          ${railBlock('What it is', false, propsPanel(o))}
+          ${railBlock('What it connects to', false, connectionsBlock(o), claimsOf(o).length)}
+          ${railBlock('Where it came from', false, provenanceBlock(o))}
+          <div class="rail-foot">
+            <!-- Not on a draft. Nobody else can read it, so there is nobody to
+                 report it to and no thread for the report to land in — pressing
+                 this on a draft used to write a comment into a document that
+                 renders none, and say it had worked. -->
+            ${o.status === 'draft' ? ''
+              : `<button class="cite-action" data-act="report" data-obj="${o.id}">${ICO.flag}Report a problem</button>`}
+            <button class="cite-action" data-act="${o.arch ? 'restore' : 'archive'}" data-obj="${o.id}">${ICO.box}${o.arch ? 'Restore' : 'Archive'}</button>
+            ${o.arch ? `<button class="cite-action is-danger" data-act="delete" data-obj="${o.id}">${ICO.x}Delete</button>` : ''}
+          </div>
+        </aside>
+      </div>`;
+
+    const canvas = $('#docCanvas');
+    if (canvas) canvas.scrollTop = keep;
     if (!preview) wireSelectionMenu();
-    if (blank) { const t = $('[data-edit-title]'); if (t) setTimeout(() => t.focus(), 80); }
+    /* A repaint replaces the DOM the caret was living in. Scroll was already
+       carried across; the armed state has to travel with it or an AI accept
+       mid-edit would drop you back out of the text you were in. */
+    if (armed) { const el = $(armed); if (el) { armEditable(el); caretToEnd(el); } }
+    else if (blank) { const t = $('[data-edit-title]'); if (t) setTimeout(() => armEditable(t), 80); }
+  }
+
+  /* ── Read first, edit on touch ──
+
+     The page used to render with `contenteditable` already on, which made it an
+     editor displaying a document rather than a document you can change. Nothing
+     is armed now. The attribute arrives when you put the pointer in the text and
+     leaves when you look away, and the formatting toolbar comes with it — at
+     rest there is no chrome to say "this is a form".
+
+     Because the element was NOT editable when the pointer went down, the browser
+     does not place a caret for us. We place it at the point, or the click would
+     silently jump to the start of the block and you would type in the wrong
+     place. */
+  function editableAt(x, y) {
+    if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
+    if (!document.caretPositionFromPoint) return null;
+    const p = document.caretPositionFromPoint(x, y);
+    if (!p) return null;
+    const r = document.createRange();
+    r.setStart(p.offsetNode, p.offset); r.collapse(true);
+    return r;
+  }
+
+  function putCaret(range) {
+    if (!range) return;
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+  }
+
+  function caretToStart(el) { const r = document.createRange(); r.selectNodeContents(el); r.collapse(true); putCaret(r); }
+  function caretToEnd(el)   { const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); putCaret(r); }
+
+  function armEditable(el, x, y) {
+    if (!el || el.getAttribute('contenteditable') === 'true') return;
+    /* History is readable, never writable — the version banner says so and the
+       attribute must agree with it. */
+    if ($('.ver-preview')) return;
+    el.setAttribute('contenteditable', 'true');
+    const page = el.closest('.doc-page');
+    if (page && el.id === 'editBody') page.classList.add('is-writing');
+    el.focus({ preventScroll: true });
+    if (typeof x === 'number') putCaret(editableAt(x, y));
+    else caretToStart(el);
+    if (el.id === 'editBody') setTimeout(placeBlockMark, 0);
+  }
+
+  function disarmEditable(el) {
+    if (!el || !el.removeAttribute) return;
+    el.removeAttribute('contenteditable');
+    const page = el.closest && el.closest('.doc-page');
+    if (page) page.classList.remove('is-writing');
+    dropBlockMark();
+  }
+
+  /* ── One toolbar, on the block you are editing ──
+
+     The document has one rule — nothing is armed until you touch it — and the
+     writing tools used to ignore it twice over: a formatting toolbar pinned to
+     the top of the paper, occupying 46px of hidden box on every document, and
+     an assistant in the right gutter whose menu had 104px to open into and so
+     clipped itself.
+
+     They are one thing now, above the block the caret is in, where there is the
+     full measure to open into. Invisible in view mode, following the caret, and
+     gone when the caret is. */
+  function dropBlockMark() {
+    const m = $('#blkTools');
+    if (m) m.remove();
+    closeBlockMenu();
+  }
+
+  function caretBlock() {
+    const body = $('#editBody');
+    if (!body || body.getAttribute('contenteditable') !== 'true') return null;
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !body.contains(sel.anchorNode)) return null;
+    /* Two menus over one paragraph is one too many: a selection belongs to
+       wireSelectionMenu, which is already anchored to the words. */
+    if (!sel.isCollapsed) return null;
+    let n = sel.anchorNode;
+    while (n && n.parentElement !== body) n = n.parentElement;
+    return n && n.nodeType === 1 ? n : null;
+  }
+
+  function placeBlockMark() {
+    const block = caretBlock();
+    const host = $('#docCanvas');
+    if (!block || !host) { dropBlockMark(); return; }
+    let m = $('#blkTools');
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'blkTools';
+      m.className = 'toolbar blk-tools';
+      m.setAttribute('role', 'toolbar');
+      m.setAttribute('aria-label', 'Writing tools');
+      m.innerHTML = `<button class="icon-btn blk-add" type="button" data-blocks
+           aria-haspopup="true" aria-expanded="false"
+           aria-label="Add a block" title="Add a block">+</button>
+         <span class="toolbar-sep"></span>`
+        + TOOLBAR.map(([cmd, glyph, label]) => cmd === '|'
+        ? '<span class="toolbar-sep"></span>'
+        : `<button class="icon-btn" type="button" aria-label="${esc(label)}" title="${esc(label)}"
+             data-fmt="${esc(cmd)}">${glyph}</button>`).join('')
+        + '<span class="toolbar-sep"></span>'
+        + `<button class="blk-ai" type="button" data-ai-doc aria-haspopup="true" aria-expanded="false"
+             aria-label="Rewrite this with AiMY" title="Rewrite with AiMY">
+             ${AIMY_MARK(13, 15)}<span>AiMY</span></button>`;
+      host.appendChild(m);
+      syncToolbar();
+    }
+    const hr = host.getBoundingClientRect(), br = block.getBoundingClientRect();
+    /* Above the block, aligned to the text's left edge — the measure is 762px
+       wide, so the menu this opens has somewhere to go. In the gutter it had
+       104px and clipped itself. */
+    m.style.top = (br.top - hr.top + host.scrollTop - m.offsetHeight - 8) + 'px';
+    m.style.left = Math.max(0, br.left - hr.left) + 'px';
+  }
+
+  const isEditable = (el) => !!el && !!el.matches && el.matches('[data-edit-title], #editBody');
+
+  /* The block list, from the + or from a slash. `slashed` remembers that the
+     block still holds the "/" that opened it, so choosing an item clears it
+     first — otherwise every block made this way starts with a stray character. */
+  let slashed = null;
+
+  function closeBlockMenu() {
+    const m = $('#blkMenu');
+    if (m) m.remove();
+    const btn = $('[data-blocks]');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+
+  function openBlockMenu(rect, fromSlash) {
+    closeBlockMenu();
+    const host = $('#docCanvas');
+    if (!host) return;
+    slashed = fromSlash ? caretBlock() : null;
+    const hr = host.getBoundingClientRect();
+    const m = document.createElement('div');
+    m.id = 'blkMenu';
+    m.className = 'blk-menu k-enter';
+    m.setAttribute('role', 'menu');
+    m.innerHTML = BLOCKS.map(([label, glyph], i) =>
+      `<button class="blk-menu-item" type="button" role="menuitem" data-block="${i}">
+         <span class="blk-menu-ico">${glyph}</span>${esc(label)}</button>`).join('');
+    host.appendChild(m);
+    m.style.left = Math.max(0, rect.left - hr.left) + 'px';
+    m.style.top = (rect.bottom - hr.top + host.scrollTop + 6) + 'px';
   }
 
   /* ── The AiMY proposal ──
@@ -2482,8 +3664,8 @@
 
     aiDraft = { doc: o.id, label: label, was: wasText || '', proposed: proposed,
                 msg: 'ai-' + aiSeq, editing: false };
-    renderEditor(readURL());
-    markAfter('#aiSuggest', $('#docSheet'));
+    renderDoc(readURL());
+    markAfter('#aiSuggest', $('#docCanvas'));
     const card = $('#aiSuggest');
     if (card) card.scrollIntoView({ block: 'nearest' });
   }
@@ -2532,7 +3714,7 @@
     o.sum = el.innerText.trim();
     o.html = o.sum ? el.innerHTML : '';
     el.classList.toggle('is-blank', !o.sum);
-    const b = $('#docSheet [data-publish]');
+    const b = $('.doc-page [data-publish]');
     if (b) {
       const has = !!o.sum;
       b.disabled = !has;
@@ -2543,7 +3725,7 @@
 
   /* A toolbar that never shows what is already on is telling you nothing. */
   function syncToolbar() {
-    $$('#docSheet [data-fmt]').forEach((btn) => {
+    $$('.doc-page [data-fmt]').forEach((btn) => {
       const [cmd, val] = btn.getAttribute('data-fmt').split(':');
       let on = false;
       try {
@@ -2572,7 +3754,7 @@
     const st = readURL();
     renderGrid(st);
     renderBrief(st);
-    renderEditor(st);
+    renderDoc(st);
   }
 
 
@@ -2585,8 +3767,19 @@
      to a whole document. A blank one leads with the only action that matters
      when there is nothing there yet. */
   const DOC_AI = {
-    blank:  ['Write a first draft', 'Draft from a linked ticket', 'Outline it'],
-    filled: ['Rewrite for support agents', 'Shorten', 'Expand', 'Fill the gaps', 'Find a source for this']
+    /* Not a constant. "Draft from a linked ticket" was offered on every blank
+       document, and a blank document has no connections at all — so it named a
+       ticket out of nowhere, and only ever a ticket. It is offered when there
+       is something to draft FROM, it works off whatever is actually connected,
+       and it says which. The loop is: connect it, then draft from them. */
+    blank:  ['Write a first draft', 'Outline it'],
+    fromConnections: 'Draft from what it connects to',
+    /* "Find a source for this" is not a writing action — it runs
+       groundingAnswer, which finds what SUPPORTS the document — and filing it
+       under a menu named for rewriting made the one genuinely useful thing in
+       here the hardest to find. It lives in Where it came from now, beside the
+       source it is asking about. */
+    filled: ['Rewrite for support agents', 'Shorten', 'Expand', 'Fill the gaps']
   };
 
   /* ── What AiMY actually writes ──
@@ -2622,12 +3815,23 @@
           `Raise a change through the owner of ${col} rather than editing in place when the change affects what customers are told.`
         ]);
 
-      case 'Draft from a linked ticket':
+      /* Built from the documents actually connected, whatever type they are, so
+         it cannot invent a source and always says what it drew on. */
+      case DOC_AI.fromConnections: {
+        const from = claimsOf(o).slice(0, 3);
+        if (!from.length) return paras(['Nothing is connected to this yet, so there is nothing to draft from.']);
+        const names = from.map((e) => e.label);
+        const list = names.length === 1 ? names[0]
+          : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+        const kinds = [...new Set(from.map((e) => {
+          const d = byId(e.id); return d ? TYPES[d.t].label.toLowerCase() : 'document';
+        }))];
         return paras([
-          `Ticket #48120 was resolved by treating the customer's case as an exception rather than the rule, and the reasoning was never written down anywhere a second person could find it. This is that reasoning.`,
-          `The decision: the request was granted because the fault was demonstrated before the window closed, not because the window was extended. Those are different things and only the first generalises.`,
-          `One resolved ticket is evidence, not policy. It says what was decided once, for one customer.`
+          `${what} draws on ${list}. What follows is what those ${kinds.length === 1 ? kinds[0] + 's' : 'documents'} already establish, written once so a reader does not have to open all ${names.length}.`,
+          `Where they agree, the rule is stated here and they are the evidence for it. Where they disagree, the disagreement is the finding, and it is named rather than smoothed over.`,
+          `Each of them remains the record of its own case. This is the part that generalises${tags ? ', including what ' + tags + ' has in common across them' : ''}.`
         ]);
+      }
 
       case 'Outline it':
         /* Real headings, so the writing tools have something to work on. */
@@ -2670,7 +3874,8 @@
   }
 
   function aiMenu(anchor, items, attr) {
-    const host = $('#docSheet');
+    const host = $('#docCanvas');
+    if (!host) return null;
     const old = $('.ai-menu', host);
     if (old) { old.remove(); if (old.dataset.for === anchor.dataset.k) return; }
     const hr = host.getBoundingClientRect(), ar = anchor.getBoundingClientRect();
@@ -2698,7 +3903,7 @@
         kill();
         if (!sel || sel.isCollapsed || !body.contains(sel.anchorNode)) return;
         const r = sel.getRangeAt(0).getBoundingClientRect();
-        const host = $('#docSheet');
+        const host = $('#docCanvas');
         const hr = host.getBoundingClientRect();
         const menu = document.createElement('div');
         menu.className = 'ai-menu is-open k-enter';
@@ -2708,14 +3913,28 @@
            separators. It has no header slot, so the earlier version invented
            `.ai-menu-head` and `.ai-menu-item`, which resolved to nothing. */
         menu.dataset.sel = sel.toString().trim();
-        menu.innerHTML = ['Rewrite', 'Shorten', 'Add the missing scope', 'Find a source']
-          .map((l, i) => `<button${i === 0 ? ' class="ai-menu-primary"' : ''} data-ai-sel="${esc(l)}">${esc(l)}</button>`)
-          .join('<span class="sep"></span>');
+        /* ── Formatting first, because that is what a selection is for ──
+
+           This menu carried only the AiMY actions, and the formatting lived in
+           the block toolbar — which hides the moment there IS a selection, so
+           selecting a word and reaching for Bold found nothing anywhere on the
+           page. The two halves of "I have selected some words" belong in one
+           place: what to do to them, then what to ask AiMY about them. */
+        menu.innerHTML =
+          SEL_FMT.map(([cmd, glyph, label]) =>
+            `<button class="ai-menu-fmt" type="button" data-fmt="${esc(cmd)}"
+               aria-label="${esc(label)}" title="${esc(label)}">${glyph}</button>`).join('')
+          + '<span class="sep"></span>'
+          + ['Rewrite', 'Shorten', 'Add the missing scope', 'Find a source']
+            .map((l, i) => `<button${i === 0 ? ' class="ai-menu-primary"' : ''} data-ai-sel="${esc(l)}">${esc(l)}</button>`)
+            .join('<span class="sep"></span>');
         host.appendChild(menu);
+        syncToolbar();
       }, 10);
     });
     body.addEventListener('keydown', kill);
-    $('#docSheet').addEventListener('scroll', kill, { passive: true });
+    const scroller = $('#docCanvas');
+    if (scroller) scroller.addEventListener('scroll', kill, { passive: true });
   }
 
 
@@ -2744,6 +3963,7 @@
 
       document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
+        if (peekStack.length) { closePeek(); return; }
         if (calOpen) { calOpen = null; calPick = null; renderFilters(readURL()); return; }
         if (proto.open) { proto.toggle(false); return; }
         if (this.open) this.close();
@@ -2994,7 +4214,7 @@
     const row = (o, other) => `<div class="conflict-side">
       <div class="conflict-head">${statusBadge(o.status)}<span class="conflict-title">${esc(o.title)}</span></div>
       <p class="conflict-body">${esc(o.sum)}</p>
-      <div class="conflict-meta">${esc(SRC[o.src].label)} · ${esc(o.owner)} · used ${esc(usedLabel(o).toLowerCase())},
+      <div class="conflict-meta">${esc(SRC[o.src].label)} · ${esc(o.owner)} · ${neverCited(o) ? 'never used' : 'used ' + esc(usedLabel(o).toLowerCase())},
         ${o.uses} times in 90 days</div>
       ${entryAction('review', 'Make this the one', `data-resolve="${o.id}"`)}
     </div>`;
@@ -3290,7 +4510,7 @@
           <p><strong>${docs.length}</strong> ${docs.length === 1 ? 'has' : 'have'} not been cited in months
           ${scopeLine(scope, st)}.</p>
           ${docs.slice(0, 4).map((o, i) => `<p>${citeChip(i + 1, o.id, o.sum.slice(0, 120))}
-            <strong>${esc(o.title)}</strong> — ${esc(usedLabel(o).toLowerCase())}, ${o.uses} times in 90 days.</p>`).join('')}
+            <strong>${esc(o.title)}</strong> — ${esc(citedPhrase(o).toLowerCase())}.</p>`).join('')}
         </div>
         ${citedList(docs, 'Low usage is not evidence that a document is wrong. It may be that something else is found first.')}
         <div class="answer-apply">
@@ -3420,9 +4640,17 @@
     const effects = (o.effects || []).concat([['rev', o.reversible || 'Reversible for 24h · logged to the audit trail']]);
     const effIco = (k) => k === 'ok' ? ICO.check : k === 'warn' ? ICO.warn : k === 'rev' ? ICO.shield : ICO.slash;
 
+    /* ── Two shells, one surface ──
+
+       A centred box is right when the decision was made before it opened and
+       all that is left is to confirm it. Connecting is the other case: the
+       surface IS the decision, the list is as long as the library, and a box
+       that grows with its content had to be capped, which put the confirm
+       button behind a scroll. The sheet takes the full height of the window
+       instead, so the list has somewhere to go and the foot never moves. */
     host.innerHTML = `
-      <div class="modal-backdrop" style="display:flex" data-hide-on-backdrop>
-        <div class="modal" role="dialog" aria-modal="true" aria-label="${esc(o.title)}" style="width:${o.width || 560}px;max-width:100%">
+      <div class="modal-backdrop${o.sheet ? ' is-sheet' : ''}" style="display:flex" data-hide-on-backdrop>
+        <div class="modal${o.sheet ? ' modal-sheet' : ''}" role="dialog" aria-modal="true" aria-label="${esc(o.title)}" style="width:${o.width || 560}px;max-width:100%">
           <div class="modal-header">
             <div class="modal-title">${esc(o.title)}</div>
             <button class="modal-close" data-commit-close aria-label="Close">${ICO.x.replace('<svg', '<svg width="14" height="14"')}</button>
@@ -3434,6 +4662,11 @@
               <div class="gov-cr-proposed"><span class="gov-cr-label">After</span><div class="gov-cr-val">${esc(o.proposed)}</div></div>
             </div>` : ''}
             <p class="gov-cr-rationale">${o.rationale}</p>
+            <!-- A commit body that is a CHOICE, not a warning. The library's
+                 surface assumes the decision was made before it opened and it
+                 only has to be confirmed; connecting is the case where the
+                 surface is where you decide. See GAPS.md. -->
+            ${o.body || ''}
             <div class="ss-preview">
               <div class="ss-preview-head">What this will do</div>
               ${effects.map(([k, t]) => `<div class="ss-effect is-${k === 'rev' ? 'ok' : k}">${effIco(k)}<span>${t}</span></div>`).join('')}
@@ -3534,8 +4767,10 @@
      Each one ends in the same structured commit surface it always did.
      Conversation for the judgement, commit for the consequence.
   ═══════════════════════════════════════════════ */
+  /* A number stacked over its noun is the same label/value shape as everywhere
+     else, and reads as two things. "5 documents" is one. */
   const factRow = (pairs) => `<div class="conv-facts">${pairs.filter(Boolean).map(([v, l]) =>
-    `<span class="conv-fact"><span class="conv-fact-v">${v}</span><span class="conv-fact-l">${esc(l)}</span></span>`).join('')}</div>`;
+    `<span class="conv-fact"><strong>${v}</strong> ${esc(l)}</span>`).join('')}</div>`;
 
 
 
@@ -3852,19 +5087,23 @@
 
     if (forcedState === 'loading' || forcedState === 'error') { renderState(forcedState); return; }
 
-    /* The grid always renders. A document opens over it, so the surface a
-       person was working on is still there when they close the document —
-       there is no "back", because they never left. */
-    renderGrid(st);
+    /* One stage. A document is a page now, so it renders INSTEAD of the grid
+       rather than over it — a modal has no room for a rail, and a document
+       with its facts, its connections, its history and its comments needs one.
+       The filter state is untouched in the URL, so closing returns to exactly
+       the surface you left. */
+    /* A document is a page, so it gets the window. The briefing rail is about
+       what changed on the workbench since your last visit; while you are
+       reading one document it is 268px of something else, and the measure the
+       body needs is worth more than it. */
+    document.body.classList.toggle('is-doc', !!(st.doc && byId(st.doc)));
+    if (st.doc && byId(st.doc)) { renderDoc(st); }
+    else { $('#wbStage').removeAttribute('data-doc'); renderGrid(st); }
 
     if (st.settings) renderSettings(st);
     else if (setModal.open) setModal.close();
 
-    if (st.doc) {
-      if (st.mode === 'edit') renderEditor(st); else renderViewer(st);
-    } else if (docModal.open) {
-      docModal.close();
-    }
+
 
     /* The thread is part of the surface, not a transcript beside it. */
     canvas.repaint();
@@ -3890,7 +5129,7 @@
 
     /* ── Direct: a known title opens its document. No generation, no canvas ── */
     if (intent.route === 'object') {
-      patch({ doc: intent.id, mode: 'view' });
+      patch({ doc: intent.id });
       toast('Opened “' + byId(intent.id).title + '”', null, 'Named exactly — nothing was generated');
       return;
     }
@@ -3995,12 +5234,15 @@
         ['archived', 'arch:' + protoFirst((o) => o.arch)]
       ]],
       ['Surfaces', '', [
-        ['editor', 'edit:' + protoFirst((o) => !o.arch && o.owner === USER.owner)],
+        /* No "editor" any more: a document is one surface, so opening one IS
+           opening the editor. */
+        ['a document', 'doc:' + protoFirst((o) => !o.arch && o.owner === USER.owner)],
         ['new document', 'new:1'],
         ['settings — a source', 'set:source:' + (deadSrc || 'confluence')],
         ['settings — a collection', 'set:collection:' + USER.collections[0]],
         ['settings — archiving', 'set:data'],
-        ['the canvas', 'canvas:1']
+        ['the canvas', 'canvas:1'],
+        ['a peek', 'peek:client:nordwind']
       ]],
       /* Two states you cannot reach by clicking, because they only exist once
          somebody overrules the computation — and they are the ones with the
@@ -4008,6 +5250,24 @@
       ['Make a condition', 'Sets the status by hand, as a person would.', [
         ['superseded, nothing linked', 'mk:superseded'],
         ['conflicting, nothing linked', 'mk:conflicting']
+      ]],
+      /* ── Every surface that can be empty, reachable ──
+
+         An empty state is the hardest thing in a prototype to look at, because
+         the fixtures are built to be full and nothing in the product will take
+         you there. Each of these forces the REAL condition — mutating the
+         corpus where it has to — rather than faking the markup, so what you see
+         is what a person would see. "Reload the fixtures" undoes all of it. */
+      ['Empty states', 'Forces the real condition. Reload the fixtures to undo.', [
+        ['no results', 'url:?q=zzzzzz'],
+        ['no folders', 'url:?q=zzzzzz&view=tree'],
+        ['nothing archived', 'mt:archive'],
+        ['a quiet briefing', 'mt:brief'],
+        ['nothing left to connect', 'mt:connected'],
+        ['no connections', 'mt:noedges'],
+        ['no comments', 'mt:nocomments'],
+        ['a blank document', 'new:1'],
+        ['an empty library', 'mt:library']
       ]],
       ['Non-happy states', '', [
         ['loading', 'url:?state=loading'],
@@ -4046,12 +5306,17 @@
     const fb = $('#floatInput');
 
     if (kind === 'demo') { if (fb) { fb.value = DEMO[arg]; fb.focus(); } return; }
-    if (kind === 'doc')  { patch({ doc: arg, mode: 'view' }); return; }
-    if (kind === 'edit') { patch({ doc: arg, mode: 'edit' }); return; }
-    if (kind === 'arch') { patch({ archived: true, doc: arg, mode: 'view' }); return; }
+    if (kind === 'doc')  { patch({ doc: arg }); return; }
+    if (kind === 'edit') { patch({ doc: arg }); return; }
+    if (kind === 'arch') { patch({ archived: true, doc: arg }); return; }
     if (kind === 'set')  { patch({ settings: arg }); return; }
     if (kind === 'new')  { newDocument('article'); return; }
     if (kind === 'canvas') { canvas.show(['Prototype']); return; }
+    if (kind === 'peek') {
+      const [k, v] = arg.split(':');
+      openPeek(k, v, $('#protoToggle'));
+      return;
+    }
     if (kind === 'url')  { location.search = arg.replace(/^\?/, ''); return; }
     if (kind === 'reload') { location.href = location.pathname; return; }
     if (kind === 'mk') {
@@ -4063,10 +5328,76 @@
       o.statusSet = arg;
       o.statusBy = USER.owner;
       recompute();
-      patch({ doc: o.id, mode: 'view' });
+      patch({ doc: o.id });
       markCard(o.id);
       toast('Set to ' + STATUS[arg].label, 'Undo', esc(o.title) + ' · nothing is linked to it');
       undoStack = () => { delete o.statusSet; delete o.statusBy; recompute(); render(); };
+      return;
+    }
+    /* ── Emptying something, for real ──
+
+       Each of these changes the data the surface reads, so the surface is
+       genuinely in the state rather than being told to look like it. */
+    if (kind === 'mt') {
+      /* `location.href` would reload, and a reload re-runs the fixtures — which
+         would put back the very thing these triggers just took away. Every one
+         of them has to stay inside the session. */
+      if (arg === 'archive') {
+        CORPUS.forEach((o) => { o.arch = false; });
+        recompute();
+        patch({ archived: true, doc: '' });
+        return;
+      }
+      if (arg === 'library') {
+        /* Everything gone. The one state a corpus of 42 fixtures can never
+           reach on its own, and the first thing a new customer sees. */
+        [CORPUS, LIVE, ENTITLED].forEach((a) => { a.length = 0; });
+        EDGES.length = 0;
+        ASKED.length = 0;
+        USER.recent = [];
+        recompute();
+        patch({ archived: false, doc: '' });
+        render();
+        return;
+      }
+      if (arg === 'brief') {
+        /* The briefing reports failing sources, out-of-date and unused
+           documents, AiMY's drafts, unanswered questions and where you left
+           off. All six have to be false at once, which is a rare morning and a
+           perfectly ordinary one. */
+        CORPUS.forEach((o) => { o.statusSet = 'current'; o.statusBy = USER.owner; });
+        Object.keys(SRC).forEach((k) => { SRC[k].health = 'ok'; });
+        USER.recent = [];
+        ASKED.length = 0;
+        lastFilter = null;
+        recompute();
+        render();
+        toast('Nothing needs a person', null, 'Everything current, every source healthy');
+        return;
+      }
+      const o = byId(readURL().doc) || ENTITLED.filter((x) => !x.arch && x.owner === USER.owner)[0];
+      if (!o) { toast('Nothing to work with', null, 'Reload the fixtures'); return; }
+      if (arg === 'connected') {
+        /* Connected to everything, so there is nothing left to pick. */
+        LIVE.forEach((x) => { if (x.id !== o.id) assertEdge(o.id, x.id, 'related'); });
+        recompute();
+        patch({ doc: o.id });
+        toast('Connected to everything', null, 'Open Connect it to documents');
+        return;
+      }
+      if (arg === 'noedges') {
+        for (let i = EDGES.length - 1; i >= 0; i--) {
+          if (EDGES[i].from === o.id || EDGES[i].to === o.id) EDGES.splice(i, 1);
+        }
+        recompute();
+        patch({ doc: o.id });
+        return;
+      }
+      if (arg === 'nocomments') {
+        o.comments = [];
+        patch({ doc: o.id });
+        return;
+      }
       return;
     }
     if (kind === 'copy') {
@@ -4160,6 +5491,16 @@
        stated on the row it belongs to, which is rung 2 — a dialog per field was
        ceremony standing in for feedback, and the feedback is now the control
        itself changing plus an Undo. */
+    /* Which edge the tree walks. Same shape as every other state change here:
+       it goes in the URL, so a grouped tree is a link somebody can send. */
+    document.addEventListener('dd:change', (e) => {
+      const dd = e.target.closest('.v2-dropdown[data-group-key]');
+      if (!dd) return;
+      const opt = dd.querySelector('.v2-dropdown-option[aria-selected="true"]');
+      const val = opt ? (opt.dataset.slug || 'col') : 'col';
+      if (val !== readURL().group) patch({ group: val });
+    });
+
     document.addEventListener('dd:change', (e) => {
       const dd = e.target.closest('.v2-dropdown[data-set-key]');
       if (!dd) return;
@@ -4255,7 +5596,7 @@
       if (FLAG_KEYS.indexOf(key) > -1) st[key] = !!value;
       else if (DATE_KEYS.indexOf(key) > -1) st[key] = value;
       else st[key] = value ? [value] : [];
-      st.doc = ''; st.mode = 'view';
+      st.doc = '';
       rememberFilter();
       writeURL(st);
     });
@@ -4378,13 +5719,36 @@
     /* A toolbar button steals focus on mousedown and collapses the selection
        before execCommand ever runs, which is why none of these appeared to do
        anything. Cancelling the default keeps the caret where it was. */
+    /* ── Nothing in the writing chrome may take focus ──
+
+       A button that takes focus on mousedown blurs the body, which disarms it,
+       which repaints the document, which detaches the button — so the click
+       that was travelling to it never lands. It looked like "the menu just
+       closes and nothing happens".
+
+       The toolbar and the assistant were guarded; the assistant's own MENU was
+       not, so every draft action was dead. The rule is the surface, not the
+       individual control: anything inside the writing chrome cancels its
+       mousedown. */
     document.addEventListener('mousedown', (e) => {
-      if (e.target.closest && e.target.closest('[data-fmt]')) e.preventDefault();
+      if (!e.target.closest) return;
+      if (e.target.closest('.blk-tools') || e.target.closest('.ai-menu') ||
+          e.target.closest('.blk-menu') || e.target.closest('[data-fmt]') ||
+          e.target.closest('[data-pick-image]')) { e.preventDefault(); return; }
+      /* Touching anything else puts the block list away. Choosing a block and
+         pressing + again already close it; this is the third way out, which is
+         the one you reach for without thinking. */
+      if ($('#blkMenu')) closeBlockMenu();
     });
 
     /* Keep the toolbar honest about where the caret is. */
     document.addEventListener('selectionchange', () => {
-      if ($('#docSheet [data-fmt]')) syncToolbar();
+      if ($('.doc-page [data-fmt]')) syncToolbar();
+      /* The mark follows the caret from block to block, and leaves the moment
+         there is a selection or nothing is armed. One listener, because the
+         caret moving IS the only thing that can change which block it belongs
+         to. */
+      if ($('#editBody')) placeBlockMark();
     });
 
     /* The body writes through on every keystroke so the Publish gate is honest
@@ -4396,6 +5760,11 @@
       if (!o) return;
       writeBody(e.target);
       noteSave(o);
+      /* A slash alone on a block asks for the block list — the shortcut every
+         document tool has. Anything else typed closes it again. */
+      const blk = caretBlock();
+      if (blk && blk.textContent.trim() === '/') openBlockMenu(blk.getBoundingClientRect(), true);
+      else if ($('#blkMenu')) closeBlockMenu();
     }, true);
 
     /* Property key/value edits are committed on blur rather than on every
@@ -4406,19 +5775,88 @@
       if (!o || !t.hasAttribute) return;
       if (t.hasAttribute('data-prop-k')) {
         const was = t.getAttribute('data-prop-k'), now = t.value.trim();
-        if (now && now !== was) { o.props[now] = o.props[was]; delete o.props[was]; repaintEditor(); }
+        /* The key IS the identity, so a rename has to carry the open marker
+           with it or the pair folds shut under the pointer mid-edit. */
+        if (now && now !== was) {
+          o.props[now] = o.props[was]; delete o.props[was];
+          if (openProp === was) openProp = now;
+          repaintEditor();
+        }
       } else if (t.hasAttribute('data-prop-v')) {
         o.props[t.getAttribute('data-prop-v')] = t.value.trim();
+        /* Leaving the pair folds it back to the phrase — but only if focus
+           actually left the pair, not if it moved from the name to the value. */
+        const pair = t.closest('.prop-kv');
+        setTimeout(() => {
+          if (pair && pair.contains(document.activeElement)) return;
+          if (openProp !== null) { openProp = null; repaintEditor(); }
+        }, 0);
       } else if (t.id === 'editBody') {
         /* Leaving the body is when the derived status can safely catch up —
            mid-word it would repaint under the caret. */
+        disarmEditable(t);
         writeBody(t);
         recompute();
         repaintEditor();
       } else if (t.hasAttribute('data-edit-title')) {
+        disarmEditable(t);
         const v = t.textContent.trim();
         if (v && v !== o.title) { o.title = v; repaintEditor(); }
       }
+    }, true);
+
+    /* The connect picker filters in place. No repaint — a repaint would take
+       the field and everything typed into it. */
+    document.addEventListener('input', (e) => {
+      if (!e.target.hasAttribute || !e.target.hasAttribute('data-pick-q')) return;
+      const q = e.target.value.trim().toLowerCase();
+      const body = e.target.parentNode;
+      let n = 0;
+      $$('[data-pick-row]', body).forEach((r) => {
+        const on = !q || r.getAttribute('data-pick-row').indexOf(q) > -1;
+        r.hidden = !on;
+        if (on) n++;
+      });
+      const none = $('.cx-none', body) || $('.nb-none', body);
+      if (none) none.hidden = n > 0;
+    });
+
+    document.addEventListener('change', (e) => {
+      if (e.target.hasAttribute && e.target.hasAttribute('data-cx-pick')) syncPickCount();
+    });
+
+    document.addEventListener('input', (e) => {
+      if (e.target.hasAttribute && e.target.hasAttribute('data-report-what')) gateReport();
+    });
+
+    /* Put the pointer in the text and the text becomes writable, at the point
+       you touched. Nothing else on the page arms anything. */
+    document.addEventListener('mousedown', (e) => {
+      const el = e.target.closest && e.target.closest('[data-edit-title], #editBody');
+      if (el) armEditable(el, e.clientX, e.clientY);
+    }, true);
+
+    /* The keyboard cannot put a pointer anywhere, so the two blocks are
+       focusable and Enter arms them with the caret at the start. */
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = e.target;
+      if (!isEditable(el) || el.getAttribute('contenteditable') === 'true') return;
+      e.preventDefault();
+      armEditable(el);
+    });
+
+    /* Escape leaves the text — and only the text. Without the capture guard it
+       would also reach the handler that closes the document, so one key would
+       both commit the edit and throw away the page it was made on. */
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      /* One Escape, one thing: the block list closes before the writing does. */
+      if ($('#blkMenu')) { e.stopPropagation(); closeBlockMenu(); return; }
+      const el = document.activeElement;
+      if (!isEditable(el) || el.getAttribute('contenteditable') !== 'true') return;
+      e.stopPropagation();
+      el.blur();
     }, true);
 
     /* Enter is the same action as the button. A compose field that only submits
@@ -4557,7 +5995,26 @@
         writeURL(next);
         return;
       }
+      /* The relationship the whole batch is being asserted as. A segmented
+         control, so exactly one is chosen and it is chosen once. */
+      if ((el = t.closest('[data-cx-as]'))) {
+        $$('.cx-seg .seg-btn').forEach((b) => {
+          const on = b === el;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-pressed', String(on));
+        });
+        return;
+      }
       if ((el = t.closest('[data-view]'))) { patch({ view: el.getAttribute('data-view') }); return; }
+      if ((el = t.closest('[data-sort-attention]'))) {
+        /* Write the state you are turning ON, not the absence of the other —
+           an absent key means "this surface's default", and on the composed
+           set that default is already attention, so clearing it would leave
+           the button pressed and nothing changed. */
+        const st0 = readURL();
+        patch({ sort: orderOf(st0, isComposed(st0)) === 'attention' ? 'recent' : 'attention' });
+        return;
+      }
       if (t.closest('[data-toggle-mine]')) { const s = readURL(); s.mine = !s.mine; s.doc = ''; rememberFilter(); writeURL(s); return; }
       if (t.closest('[data-more]'))        { moreOpen = !moreOpen; renderFilters(readURL()); return; }
       if (t.closest('[data-resume]')) { location.search = lastFilter; return; }
@@ -4583,20 +6040,22 @@
 
       /* ── documents ── */
       if ((el = t.closest('[data-open-doc]'))) {
-        patch({ doc: el.getAttribute('data-open-doc'), mode: 'view' });
+        /* A document reference opens the document. If the reference was inside
+           the panel, the panel has done its job and goes — it closes only on
+           an outside click otherwise, which would leave it hanging over the
+           page it just sent you to. */
+        if (peekStack.length) closePeek();
+        patch({ doc: el.getAttribute('data-open-doc') });
         return;
       }
       if ((el = t.closest('[data-keep]'))) { canvas.close(); docAct('keep', el.getAttribute('data-keep')); return; }
       if ((el = t.closest('[data-compare-with]'))) { docAct('compare', el.getAttribute('data-compare-with')); return; }
       if ((el = t.closest('[data-resolve]'))) { canvas.close(); docAct('resolve', el.getAttribute('data-resolve')); return; }
-      if ((el = t.closest('[data-edit-doc]'))) { patch({ doc: el.getAttribute('data-edit-doc'), mode: 'edit' }); return; }
-      if ((el = t.closest('[data-view-doc]'))) { patch({ doc: el.getAttribute('data-view-doc'), mode: 'view' }); return; }
-      if (t.closest('[data-doc-close]')) { previewVer = null; docModal.close(); return; }
+      if (t.closest('[data-doc-close]')) { previewVer = null; patch({ doc: '' }); return; }
 
       /* ── editor: tabs, versions, properties ── */
-      if ((el = t.closest('[data-etab]'))) { editorTab = el.getAttribute('data-etab'); renderEditor(readURL()); return; }
-      if ((el = t.closest('[data-open-ver]'))) { previewVer = +el.getAttribute('data-open-ver'); renderEditor(readURL()); return; }
-      if (t.closest('[data-close-ver]')) { previewVer = null; renderEditor(readURL()); return; }
+      if ((el = t.closest('[data-open-ver]'))) { previewVer = +el.getAttribute('data-open-ver'); renderDoc(readURL()); return; }
+      if (t.closest('[data-close-ver]')) { previewVer = null; renderDoc(readURL()); return; }
       if ((el = t.closest('[data-tag-drop]'))) {
         const o = byId(readURL().doc);
         const key = el.closest('[data-tag-field]').getAttribute('data-tag-field');
@@ -4604,9 +6063,18 @@
         repaintEditor();
         return;
       }
+      if ((el = t.closest('[data-prop-open]'))) {
+        openProp = el.getAttribute('data-prop-open');
+        repaintEditor();
+        const v = $('[data-prop-v="' + openProp.replace(/"/g, '\\"') + '"]');
+        if (v) setTimeout(() => { v.focus(); v.select(); }, 40);
+        return;
+      }
       if ((el = t.closest('[data-prop-del]'))) {
         const o = byId(readURL().doc);
-        delete o.props[el.getAttribute('data-prop-del')];
+        const k = el.getAttribute('data-prop-del');
+        delete o.props[k];
+        if (openProp === k) openProp = null;
         repaintEditor();
         return;
       }
@@ -4615,14 +6083,18 @@
         let n = 1;
         while (o.props['property-' + n] !== undefined) n++;
         o.props['property-' + n] = '';
+        /* A new one arrives open — there is nothing to read yet, and the
+           placeholders are what name the two boxes. */
+        openProp = 'property-' + n;
         repaintEditor();
+        const key = $('[data-prop-k="' + openProp + '"]');
+        if (key) setTimeout(() => { key.focus(); key.select(); }, 40);
         return;
       }
       if ((el = t.closest('[data-discard]'))) {
         const o = byId(el.getAttribute('data-discard'));
         [CORPUS, LIVE, ENTITLED].forEach((arr) => { const i = arr.indexOf(o); if (i > -1) arr.splice(i, 1); });
-        docModal.close();
-        render();
+        patch({ doc: '' });
         markAfter('.rm-main');
         toast('Discarded', null, 'Nothing was saved');
         return;
@@ -4646,10 +6118,7 @@
         const [a, b] = el.getAttribute('data-set-conflict').split(':');
         const A = byId(a), B = byId(b);
         if (!A || !B) return;
-        RELATED[a] = Object.assign({ related: [], contradicts: [] }, RELATED[a]);
-        RELATED[b] = Object.assign({ related: [], contradicts: [] }, RELATED[b]);
-        if (RELATED[a].contradicts.indexOf(b) < 0) RELATED[a].contradicts.push(b);
-        if (RELATED[b].contradicts.indexOf(a) < 0) RELATED[b].contradicts.push(a);
+        assertEdge(a, b, 'contradicts');
         recompute();
         render();
         markCard(a); markCard(b);
@@ -4659,15 +6128,37 @@
       if ((el = t.closest('[data-set-successor]'))) {
         const [a, b] = el.getAttribute('data-set-successor').split(':');
         if (!byId(a) || !byId(b)) return;
-        RELATED[a] = Object.assign({ related: [], contradicts: [] }, RELATED[a], { supersededBy: b });
-        RELATED[b] = Object.assign({ related: [], contradicts: [] }, RELATED[b]);
-        if (RELATED[b].related.indexOf(a) < 0) RELATED[b].related.push(a);
+        assertEdge(a, b, 'supersededBy');
         recompute();
         canvas.close();
-        patch({ doc: b, mode: 'view' });
+        patch({ doc: b });
         markCard(a); markCard(b);
         toast('Recorded', 'Undo', esc(byId(b).title) + ' replaces ' + esc(byId(a).title));
-        undoStack = () => { delete RELATED[a].supersededBy; recompute(); render(); };
+        undoStack = () => { dropEdge(a, b); recompute(); render(); };
+        return;
+      }
+      /* Promoting a neighbour to a connection is a claim about two documents,
+         so it goes through the commit surface and comes out with a name and a
+         date on it — which is the whole difference between the two lists. */
+      if ((el = t.closest('[data-connect]'))) {
+        const [a, b] = el.getAttribute('data-connect').split('|');
+        const A = byId(a), B = byId(b);
+        if (!A || !B) return;
+        commit({
+          title: 'Connect two documents',
+          current: A.title, proposed: B.title,
+          rationale: 'AiMY noticed these share fields. Connecting them is <strong>your</strong> claim, '
+            + 'and it will carry your name and today\'s date wherever it is read.',
+          effects: [['ok', 'Both documents show <strong>Related to</strong> the other'],
+                    ['ok', 'Recorded as asserted by ' + esc(USER.owner)]],
+          confirm: 'Connect them', done: 'Connected',
+          onRun: () => {
+            assertEdge(a, b, 'related');
+            recompute(); render(); markCard(a); markCard(b);
+            toast('Connected', 'Undo', esc(A.title) + ' and ' + esc(B.title));
+            undoStack = () => { dropEdge(a, b); recompute(); render(); };
+          }
+        });
         return;
       }
       if ((el = t.closest('[data-act]'))) {
@@ -4701,6 +6192,12 @@
         try { handled = run ? run() === true : false; }
         catch (err) { failed = true; console.error('commit failed:', err); }
         closeCommit();
+        /* The second funnel. `writeURL` closes the canvas for anything that
+           changes the URL, but a commit can change the page without touching
+           it — connecting two documents rewrites the rail and leaves the
+           address alone — and the result is behind the overlay either way. A
+           commit that ran, changed something. */
+        if (!failed && canvas.open) canvas.close();
         if (failed) { toast("That didn't go through", null, 'Nothing was changed'); return; }
         /* An onRun that says something specific returns true and keeps its own
            toast. Without this the generic one lands on top of it, and the user
@@ -4725,6 +6222,31 @@
         dd.dispatchEvent(new CustomEvent('dd:change', { bubbles: true }));
         return;
       }
+      /* Folding the rail is view state, not document state — it is about this
+         screen, not about this document, so it does not belong in the URL. */
+      if (t.closest('[data-rail-toggle]')) { railOpen = !railOpen; renderDoc(readURL()); return; }
+
+      /* ── the peek ── */
+      if (t.closest('[data-peek-close]')) { closePeek(); return; }
+      if (t.closest('[data-peek-back]')) { peekStack.pop(); peekRender(); return; }
+      if ((el = t.closest('[data-peek-show]'))) {
+        const [k, v] = el.getAttribute('data-peek-show').split(':');
+        const f = (ENTITY[k] || {}).filter;
+        closePeek();
+        /* An axis the URL knows becomes that filter; anything else becomes the
+           explicit set of ids, which is the same bridge an answer uses. */
+        if (f && f !== 'ids' && LIST_KEYS.indexOf(f) > -1) patch({ [f]: [v] });
+        else patch({ ids: docsOf(k, v).map((o) => o.id) });
+        return;
+      }
+      if ((el = t.closest('[data-peek]'))) {
+        const [k, v] = el.getAttribute('data-peek').split(':');
+        /* Inside the panel it stacks; from the page it starts fresh. */
+        openPeek(k, v, el, !!t.closest('#peek'));
+        return;
+      }
+      if (peekStack.length && !t.closest('#peek')) closePeek();
+
       if (t.closest('[data-set-close]')) { setModal.close(); return; }
       if ((el = t.closest('[data-settings]'))) { patch({ settings: el.getAttribute('data-settings') }); return; }
 
@@ -4778,7 +6300,7 @@
            so it survives the repaint that used to wipe it. */
         if (verdict === 'edit') {
           aiDraft.editing = true;
-          renderEditor(readURL());
+          renderDoc(readURL());
           const box = $('#aiSuggest ins');
           if (box) {
             box.focus();
@@ -4821,7 +6343,7 @@
         aiOutcome(msg, verdict);
         repaintEditor();
         if (verdict === 'accept') {
-          markAfter('#editBody', $('#docSheet'));
+          markAfter('#editBody', $('#docCanvas'));
           markCard(o.id);
           toast('Applied', 'Undo', 'Filed as a version with AiMY as the author');
         } else {
@@ -4854,7 +6376,7 @@
             o.versions[0].html = from.html || '';
             recompute();
             repaintEditor();
-            markAfter('#editBody', $('#docSheet'));
+            markAfter('#editBody', $('#docCanvas'));
             markCard(o.id);
             toast('Restored ' + from.v, null, 'Added as the newest version — nothing was deleted');
             return true;
@@ -4862,11 +6384,74 @@
         });
         return;
       }
+      /* The figure's own file field. Its mousedown is cancelled with the rest
+         of the writing chrome, so the body is never blurred and never
+         repainted — which is what keeps this element attached long enough for
+         the picked file to land in it. */
+      if ((el = t.closest('[data-pick-image]'))) {
+        const name = el.getAttribute('data-pick-image');
+        pickFiles('image/*', false, (files) => {
+          const f = files[0];
+          /* Re-found, not remembered. The dialog blurred the page and the
+             editor repainted while it was open, so `el` and the figure it was
+             in are both detached by now. */
+          const fig = $(`.doc-figure[data-fig="${name}"]`);
+          const ph = fig && $('.doc-figure-ph', fig);
+          if (!fig) return;
+          const img = document.createElement('img');
+          img.className = 'doc-figure-img';
+          img.src = URL.createObjectURL(f);
+          img.alt = '';
+          if (ph) ph.replaceWith(img); else fig.insertBefore(img, fig.firstChild);
+          const cap = $('figcaption', fig);
+          if (cap && !cap.textContent.trim()) cap.textContent = f.name.replace(/\.[^.]+$/, '');
+          const body = $('#editBody');
+          if (body) writeBody(body);
+        });
+        return;
+      }
+      if (t.closest('[data-pick-files]')) {
+        pickFiles(FILE_ACCEPT, true, ingestFiles);
+        return;
+      }
+      if ((el = t.closest('[data-blocks]'))) {
+        const open = el.getAttribute('aria-expanded') === 'true';
+        if (open) { closeBlockMenu(); return; }
+        el.setAttribute('aria-expanded', 'true');
+        openBlockMenu(el.getBoundingClientRect(), false);
+        return;
+      }
+      if ((el = t.closest('[data-block]'))) {
+        const spec = BLOCKS[Number(el.getAttribute('data-block'))];
+        closeBlockMenu();
+        if (!spec) return;
+        const body = $('#editBody');
+        if (body) {
+          body.focus({ preventScroll: true });
+          /* Clear the "/" that summoned the menu before the block is made. */
+          if (slashed && slashed.textContent.trim() === '/') {
+            const r = document.createRange();
+            r.selectNodeContents(slashed);
+            putCaret(r);
+            document.execCommand('delete');
+          }
+          slashed = null;
+          spec[2]();
+          writeBody(body);
+          setTimeout(placeBlockMark, 0);
+        }
+        return;
+      }
       /* The toolbar's AiMY button: document scope. */
       if ((el = t.closest('[data-ai-doc]'))) {
         const o = byId(readURL().doc);
         const isBlank = o && !String(o.sum || '').trim();
-        aiMenu(el, isBlank ? DOC_AI.blank : DOC_AI.filled, 'data-ai-doc-run');
+        /* The draft-from-connections action is offered only when there is
+           something to draft from, so the menu never names a source that does
+           not exist. */
+        const items = (isBlank ? DOC_AI.blank : DOC_AI.filled)
+          .concat(o && claimsOf(o).length ? [DOC_AI.fromConnections] : []);
+        aiMenu(el, items, 'data-ai-doc-run');
         return;
       }
       if ((el = t.closest('[data-ai-doc-run]'))) {
@@ -4879,7 +6464,6 @@
            whether the corpus supports what the document says, which is a
            question about grounding — proposing it as body text was answering a
            different question in the wrong place. */
-        if (label === 'Find a source for this') { groundingAnswer(o); return; }
         aiPropose(label, aiCopy(label, o));
         return;
       }
@@ -4895,13 +6479,28 @@
         aiPropose(label, aiCopy(label, o, picked));
         return;
       }
+      if ((el = t.closest('[data-resolve-problem]'))) {
+        const o = byId(readURL().doc);
+        const i = Number(el.getAttribute('data-resolve-problem'));
+        const c = o && (o.comments || [])[i];
+        if (!c) return;
+        c.done = true;
+        c.resolvedBy = USER.owner;
+        recompute();
+        render();
+        markAfter('.comment.is-done', $('#docCanvas'));
+        markCard(o.id);
+        toast('Marked resolved', 'Undo', 'The report stays on the document, closed');
+        undoStack = () => { delete c.done; delete c.resolvedBy; recompute(); render(); };
+        return;
+      }
       if (t.closest('[data-comment-add]')) {
         const input = $('[data-comment-input]');
         const o = byId(readURL().doc);
         if (!input || !input.value.trim() || !o) return;
         addComment(o, input.value.trim());
         render();
-        markAfter('.comment:last-of-type', $('#docSheet'));
+        markAfter('.comment:last-of-type', $('#docCanvas'));
         toast('Comment added', 'Undo', 'On ' + o.title);
         undoStack = () => { o.comments.pop(); render(); };
         return;
@@ -4920,7 +6519,7 @@
       if ((el = t.closest('[data-flag]'))) {
         const id = el.getAttribute('data-flag');
         canvas.close();
-        patch({ doc: id, mode: 'view' });
+        patch({ doc: id });
         toast('Flagged — opened the source so it can be corrected', null, 'Feedback is captured per citation, not per answer');
         return;
       }
@@ -4935,7 +6534,7 @@
          a card have already claimed the click and returned by here. Placing it
          any earlier makes the card swallow its own action button. */
       if ((el = t.closest('[data-card-open]'))) {
-        patch({ doc: el.getAttribute('data-card-open'), mode: 'view' });
+        patch({ doc: el.getAttribute('data-card-open') });
         return;
       }
 
@@ -4951,7 +6550,8 @@
   /* A blank state object with the same shape readURL produces, so callers can
      build a URL from scratch without hand-writing every key. */
   function readURL0() {
-    const st = { doc: '', mode: 'view', settings: '', view: readURL().view, q: '', prop: '' };
+    const cur = readURL();
+    const st = { doc: '', settings: '', view: cur.view, group: cur.group, sort: cur.sort, q: '', prop: '' };
     LIST_KEYS.forEach((k) => { st[k] = []; });
     DATE_KEYS.forEach((k) => { st[k] = ''; });
     FLAG_KEYS.forEach((k) => { st[k] = false; });
@@ -4963,7 +6563,7 @@
     if (FLAG_KEYS.indexOf(key) > -1) st[key] = true;
     else if (LIST_KEYS.indexOf(key) > -1) { st[key] = st[key] || []; if (st[key].indexOf(value) === -1) st[key].push(value); }
     else st[key] = value;
-    st.doc = ''; st.mode = 'view';
+    st.doc = '';
     rememberFilter();
     writeURL(st);
   }
@@ -4988,6 +6588,14 @@
        "confirm it is still correct" here, because nobody performs that ritual
        and a button that claims they did is the badge lying in a new place. */
     if (kind === 'resync') {
+      /* Nothing to pull from. The rail no longer offers this on a document with
+         no upstream, but an old link or a proto entry still could, and running
+         it would replace a body with an empty source. */
+      if (noUpstream(o)) {
+        toast('Nothing to re-sync from', null,
+          bornHere(o) ? 'You wrote this here — it has no source' : 'A dropped file is not a live source');
+        return;
+      }
       const src = SRC[o.src];
       /* Same rule as the card: there is no point confirming a pull from a
          source that cannot answer. */
@@ -5011,8 +6619,8 @@
           recompute();
           undoStack = () => { Object.assign(o, before); recompute(); render(); };
           render();
-          markAfter('.dv-prov', $('#docSheet'));
-          markAfter('.dv-head .trust-state', $('#docSheet'));
+          markAfter('.rail-facts', $('#docCanvas'));
+          markAfter('.doc-byline .trust-state', $('#docCanvas'));
           markCard(o.id);
           toast('Re-synced from ' + src.label, 'Undo', 'Our copy now matches the source');
           return true;
@@ -5033,7 +6641,7 @@
           agents ? ['warn', `<strong>${agents} agent(s)</strong> ground on ${esc(COLLECTIONS[o.col])} and will stop citing it.`] : null,
           ['ok', 'Restorable from the archive with its history intact.']
         ].filter(Boolean),
-        onRun: () => { o.arch = true; docModal.close(); render(); markAfter('.rm-main'); }
+        onRun: () => { o.arch = true; patch({ doc: '' }); markAfter('.rm-main'); }
       });
       return;
     }
@@ -5056,8 +6664,7 @@
         ],
         onRun: () => {
           [CORPUS, LIVE, ENTITLED].forEach((arr) => { const i = arr.indexOf(o); if (i > -1) arr.splice(i, 1); });
-          docModal.close();
-          render();
+          patch({ doc: '' });
           markAfter('.rm-main');
           toast('Deleted', null, 'Permanent · logged to the audit trail');
           return true;
@@ -5077,14 +6684,14 @@
             ? ['skip', 'It is ' + STATUS[o.status].label.toLowerCase() + ', so it still will not be used in answers.']
             : ['ok', 'It becomes available to answers again immediately.']
         ],
-        onRun: () => { o.arch = false; docModal.close(); render(); markCard(o.id); }
+        onRun: () => { o.arch = false; patch({ doc: '' }); markCard(o.id); }
       });
       return;
     }
 
     if (kind === 'successor') {
       const r = RELATED[o.id];
-      if (r && r.supersededBy) patch({ doc: r.supersededBy, mode: 'view' });
+      if (r && r.supersededBy) patch({ doc: r.supersededBy });
       else pickRelated(o, 'successor');
       return;
     }
@@ -5158,8 +6765,7 @@
           /* Publishing leaves the editor. Staying in it meant the only feedback
              was a toast over an unchanged screen, which reads as nothing having
              happened — the card on the grid is where the result actually shows. */
-          docModal.close();
-          render();
+          patch({ doc: '' });
           markCard(o.id);
           toast('Published', 'Undo', 'Live in ' + COLLECTIONS[o.col]);
           return true;
@@ -5171,6 +6777,11 @@
     /* A contradiction is two documents, so resolving it is a choice between
        them rather than an edit to one. The loser is superseded by the winner —
        which is exactly what supersession means and why it already exists. */
+    /* A search over the whole corpus, so it opens where searches open. Same
+       rows and same `+` as before — only the container changed, from a 320px
+       rail block to something wide enough to read. */
+    if (kind === 'ground') { groundingAnswer(o); return; }
+    if (kind === 'connect') { connectPicker(o); return; }
     if (kind === 'compare' || kind === 'resolve') {
       const other = byId((RELATED[o.id] || { contradicts: [] }).contradicts[0]);
       /* Setting the status by hand says two documents disagree without saying
@@ -5195,8 +6806,9 @@
           ['skip', esc(loser.title) + ' leaves answers. Nothing else changes.']
         ],
         onRun: () => {
-          RELATED[loser.id] = Object.assign({ related: [], contradicts: [] }, RELATED[loser.id], { supersededBy: winner.id });
-          RELATED[winner.id] = Object.assign({ related: [], contradicts: [] }, RELATED[winner.id], { contradicts: [] });
+          /* The contradiction is settled, so it stops being a contradiction and
+             becomes a supersession — one edge replacing another, both authored. */
+          assertEdge(loser.id, winner.id, 'supersededBy');
           recompute();
           render();
           markCard(winner.id);
@@ -5326,7 +6938,7 @@
     /* Taking someone to the field beats telling them where it is. */
     if (kind === 'assign') {
       editorTab = 'props';
-      patch({ doc: o.id, mode: 'edit' });
+      patch({ doc: o.id });
       setTimeout(() => {
         const dd = $('.v2-dropdown[data-prop-key="owner"] .v2-dropdown-btn');
         if (dd) { dd.scrollIntoView({ block: 'center' }); dd.focus(); }
@@ -5334,7 +6946,7 @@
       return;
     }
     if (kind === 'source') { addFilter('source', o.src); return; }
-    if (kind === 'open')   { patch({ doc: o.id, mode: 'view' }); return; }
+    if (kind === 'open')   { patch({ doc: o.id }); return; }
 
     /* Set or clear the manual override. Same path from the editor and from
        chat, so the two cannot drift. */
@@ -5348,23 +6960,61 @@
       recompute();
       render();
       markCard(o.id);
-      markAfter('.dv-head .trust-state, .dv-meta .trust-state', $('#docSheet'));
+      markAfter('.doc-byline .trust-state', $('#docCanvas'));
       toast(to && to !== 'auto' ? 'Status set to ' + STATUS[to].label : 'Status back to automatic',
         'Undo', to && to !== 'auto' ? 'Set by you, and marked as such' : 'Computed from the facts again');
       return;
     }
 
+    /* ── A report has to carry what is wrong ──
+
+       This wrote one canned sentence — "Reported a problem with this document."
+       — and told you it was done. Three faults. It never asked **what** the
+       problem was, so the owner got a flag with no information and no way to
+       act on it. On a draft it lied: a draft renders no comment thread, so the
+       toast said "Added to the comments" over a thread that does not exist and
+       nothing appeared. And nothing carried the report anywhere the owner would
+       look — it sat in a thread nobody had a reason to open.
+
+       So: it asks, in the surface every consequential write already uses; it is
+       gated until there is something to send; it lands in the thread marked as
+       a problem rather than as a remark; and it shows up in the owner's
+       briefing, which is the page whose whole job is what needs a person. */
     if (kind === 'report') {
-      /* Reporting is not editing. Switching modes took the document you were
-         reading away from you as the reward for flagging it. The comment lands
-         where comments live, and the record of it is on the document. */
-      addComment(o, 'Reported a problem with this document.');
-      recompute();
-      render();
-      markAfter('.comment:last-of-type', $('#docSheet'));
-      markCard(o.id);
-      toast('Reported', 'Undo', 'Added to the comments on this document');
-      undoStack = () => { o.comments.pop(); render(); };
+      commit({
+        title: 'Report a problem with this document',
+        width: 520,
+        rationale: `This goes to <strong>${esc(o.owner)}</strong>, who owns
+          <strong>${esc(o.title)}</strong>, with your name and today's date on it.
+          It does not change the document.`,
+        confirm: 'Send it', done: 'Reported',
+        effects: [['ok', 'Shows on the document as a reported problem'],
+                  ['ok', 'Appears in ' + esc(o.owner) + '&rsquo;s briefing until it is resolved'],
+                  ['warn', 'Anyone who can read this document can read the report']],
+        body: `<div class="rp-form">
+          <label class="field-label" for="rpWhat">What is wrong with it?</label>
+          <textarea class="field-input rp-what" id="rpWhat" rows="3" data-report-what
+            placeholder="The 14-day window contradicts the warranty article, which says 30."></textarea>
+          <p class="rp-hint">One sentence is enough. Say what you expected and what it says.</p>
+        </div>`,
+        onRun: () => {
+          const box = $('[data-report-what]');
+          const what = box ? box.value.trim() : '';
+          if (!what) return true;
+          addComment(o, what, true);
+          recompute();
+          render();
+          markAfter('.comment:last-of-type', $('#docCanvas'));
+          markCard(o.id);
+          toast('Reported', 'Undo', 'On ' + o.title + ' — ' + o.owner + ' will see it');
+          undoStack = () => { o.comments.pop(); render(); };
+          return true;
+        }
+      });
+      /* Same gating as the typed confirmation: the button cannot be pressed
+         until it would send something. An empty report is the defect this is
+         fixing, so it must not be reachable by pressing straight through. */
+      gateReport();
       return;
     }
   }
@@ -5375,8 +7025,10 @@
      else can see and is one click to discard, so a gate in front of it was
      ceremony around an action with no consequence. Every field it needs is in
      the editor's Properties panel, which is where you were going anyway. */
+  /* `quiet` makes one without going to it — ingestion needs that, because five
+     dropped files cannot all be opened and only the last one would win. */
   let newSeq = 0;
-  function newDocument(type, seed) {
+  function newDocument(type, seed, quiet) {
     const t = TYPES[type] ? type : 'article';
     const id = 'new-' + (++newSeq);
     const doc = Object.assign({
@@ -5393,7 +7045,7 @@
     recompute();
     editorTab = 'props';
     previewVer = null;
-    patch({ doc: id, mode: 'edit' });
+    if (!quiet) patch({ doc: id });
     return doc;
   }
 
@@ -5406,30 +7058,201 @@
                      ppt: 'asset', pptx: 'asset', png: 'asset', jpg: 'asset', jpeg: 'asset',
                      csv: 'icp', xlsx: 'icp', html: 'webpage', htm: 'webpage' };
   const TEXTY = /\.(md|txt|csv|html?|json)$/i;
+  /* Ingestion has worked since the fifth pass and nothing on the page said so.
+     A capability you only discover by already dragging a file at it is a
+     capability for people who guessed. This string is what it takes, said in
+     the places somebody is looking for a way in. */
+  const FILE_KINDS = 'Word, PDF, PowerPoint, Excel, Markdown, text, CSV, HTML or an image.';
+  const FILE_ACCEPT = '.md,.txt,.doc,.docx,.pdf,.ppt,.pptx,.csv,.xlsx,.html,.htm,.png,.jpg,.jpeg';
+
+  /* One input, reused. Dropping is a gesture you have to know about; choosing is
+     one every file field has taught. Both end in the same function. */
+  let filePicker = null;
+  function pickFiles(accept, multiple, onPick) {
+    if (!filePicker) {
+      filePicker = document.createElement('input');
+      filePicker.type = 'file';
+      filePicker.hidden = true;
+      document.body.appendChild(filePicker);
+    }
+    filePicker.value = '';
+    filePicker.accept = accept || '';
+    filePicker.multiple = !!multiple;
+    filePicker.onchange = () => { if (filePicker.files && filePicker.files.length) onPick(filePicker.files); };
+    filePicker.click();
+  }
+
+  const isBlankDoc = (o) => o && !String(o.sum || '').trim() && !String(o.html || '').trim();
+
+  /* ── What a drop means depends on where you drop it ──
+
+     One sentence covered every case and was wrong in two of them. Dropping a
+     file while a document you had just created was open made a SECOND document
+     and navigated to it, leaving the blank one behind — and dropping while
+     editing a written document threw you off the page you were writing. */
+  function dropIntent() {
+    const o = byId(readURL().doc);
+    if (isBlankDoc(o)) {
+      return { title: 'Drop to fill this document',
+               sub: 'The file becomes “' + o.title + '”. Nothing else is created.' };
+    }
+    if (o) {
+      return { title: 'Drop to add to Knowledge',
+               sub: 'A draft per file. This document stays open.' };
+    }
+    return { title: 'Drop to add to Knowledge',
+             sub: 'A draft per file, owned by you. Nothing goes live until you say so.' };
+  }
+
+  /* ── A file arrives as blocks, not as one paragraph of its own source ──
+
+     Ingestion used to put the raw text into `o.sum`, which the document renders
+     as a single `<p>`. A Markdown file therefore arrived with its headings,
+     lists and quotes visible as `#` and `-` in the middle of a sentence, and a
+     document with structure came in with none. `o.html` is what the body reads
+     when it has one, so that is what a file should produce. */
+  const mdInline = (s) => esc(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
+
+  function mdToHTML(src) {
+    const out = [];
+    let list = null, code = null;
+    const closeList = () => { if (list) { out.push('</' + list + '>'); list = null; } };
+    src.split(/\r?\n/).forEach((raw) => {
+      const line = raw.replace(/\s+$/, '');
+      if (/^\s*```/.test(line)) {
+        if (code) { out.push('<pre class="doc-code"><code>' + esc(code.join('\n')) + '</code></pre>'); code = null; }
+        else { closeList(); code = []; }
+        return;
+      }
+      if (code) { code.push(raw); return; }
+      if (!line.trim()) { closeList(); return; }
+      let m;
+      if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
+        closeList();
+        /* The document's own scale is h3 / h4 — the title is the h1 and there
+           is no h2 in it, so an imported heading tree flattens into those two
+           rather than introducing a third size nothing else uses. */
+        const lvl = Math.min(m[1].length + 2, 4);
+        out.push('<h' + lvl + '>' + mdInline(m[2]) + '</h' + lvl + '>');
+        return;
+      }
+      if (/^\s*[-*+]\s+/.test(line)) {
+        if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul'; }
+        out.push('<li>' + mdInline(line.replace(/^\s*[-*+]\s+/, '')) + '</li>');
+        return;
+      }
+      if (/^\s*\d+[.)]\s+/.test(line)) {
+        if (list !== 'ol') { closeList(); out.push('<ol>'); list = 'ol'; }
+        out.push('<li>' + mdInline(line.replace(/^\s*\d+[.)]\s+/, '')) + '</li>');
+        return;
+      }
+      if (/^\s*>\s?/.test(line)) {
+        closeList();
+        out.push('<blockquote>' + mdInline(line.replace(/^\s*>\s?/, '')) + '</blockquote>');
+        return;
+      }
+      if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { closeList(); out.push('<hr class="doc-hr">'); return; }
+      closeList();
+      out.push('<p>' + mdInline(line) + '</p>');
+    });
+    if (code) out.push('<pre class="doc-code"><code>' + esc(code.join('\n')) + '</code></pre>');
+    closeList();
+    return out.join('');
+  }
+
+  const plainToHTML = (src) => src.split(/\r?\n\s*\r?\n/)
+    .map((b) => b.trim()).filter(Boolean)
+    .map((b) => '<p>' + esc(b).replace(/\r?\n/g, '<br>') + '</p>')
+    .join('') || '<p><br></p>';
+
+  const textOf = (html) => {
+    const d = document.createElement('div');
+    d.innerHTML = html;
+    return (d.textContent || '').replace(/\s+/g, ' ').trim();
+  };
+
+  function readInto(doc, f) {
+    const done = () => {
+      recompute();
+      if (readURL().doc === doc.id) renderDoc(readURL());
+    };
+    if (!TEXTY.test(f.name)) {
+      /* Nothing to read without an extraction service. The body stays EMPTY —
+         writing the explanation into it would fill the document with a sentence
+         about itself, and a document with a body loses the starting moves that
+         are the whole answer to "so what do I do with this". The fact is
+         recorded on the document and stated above those moves instead. */
+      doc.pendingText = f.name;
+      done();
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      let text = String(reader.result);
+      if (/\.html?$/i.test(f.name)) text = text.replace(/<[^>]*>/g, ' ');
+      const md = /\.(md|markdown)$/i.test(f.name);
+      /* A Markdown file's first `# Heading` IS the document's title, and
+         repeating it as the first block of its own body is the thing every
+         importer gets wrong once. */
+      if (md) {
+        const m = text.match(/^\s*#\s+(.+?)\s*(\r?\n|$)/);
+        if (m) { doc.title = m[1]; text = text.slice(m[0].length); }
+      }
+      doc.html = md ? mdToHTML(text) : plainToHTML(text);
+      doc.sum = textOf(doc.html).slice(0, 400);
+      done();
+    };
+    reader.readAsText(f);
+  }
 
   function ingestFiles(files) {
     const list = Array.from(files || []);
     if (!list.length) return;
-    let first = null;
-    list.forEach((f) => {
+    const open = byId(readURL().doc);
+
+    /* A blank document is a document waiting for content. Filling it is what
+       you meant; making a second one beside it never was. */
+    if (isBlankDoc(open) && list.length === 1) {
+      const f = list[0];
+      open.title = f.name.replace(/\.[^.]+$/, '');
+      open.props = Object.assign({}, open.props,
+        { 'source-file': f.name, size: Math.max(1, Math.round(f.size / 1024)) + ' KB' });
+      readInto(open, f);
+      recompute();
+      renderDoc(readURL());
+      toast('Filled from “' + f.name + '”', null, 'Still a draft, still yours');
+      return;
+    }
+
+    const made = list.map((f) => {
       const ext = (f.name.split('.').pop() || '').toLowerCase();
       const doc = newDocument(EXT_TYPE[ext] || 'article', {
         title: f.name.replace(/\.[^.]+$/, ''),
         props: { 'source-file': f.name, size: Math.max(1, Math.round(f.size / 1024)) + ' KB' }
-      });
-      first = first || doc;
-      if (TEXTY.test(f.name)) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          doc.sum = String(reader.result).trim().slice(0, 400);
-          recompute();
-          if (readURL().doc === doc.id) renderEditor(readURL());
-        };
-        reader.readAsText(f);
-      }
+      }, true);
+      readInto(doc, f);
+      return doc;
     });
-    toast(list.length === 1 ? 'Added “' + list[0].name + '”' : 'Added ' + list.length + ' files',
-      null, 'Draft, owned by you. Nothing is live until you say so.');
+
+    const one = made.length === 1;
+    /* Opening the new draft is right when you were browsing and made one thing.
+       It is wrong when you were reading something else, and wrong when there
+       are five of them and only the last would win. */
+    if (one && !open) { patch({ doc: made[0].id }); return; }
+    recompute();
+    render();
+    made.forEach((d) => markCard(d.id));
+    toast(one ? 'Added “' + list[0].name + '”' : 'Added ' + list.length + ' files',
+      one ? 'Open it' : null, open ? 'Draft, owned by you. ' + open.title + ' stays open.'
+                                   : 'Draft, owned by you. Nothing is live until you say so.');
+    /* The toast has one action slot and it runs `undoStack`. This is the one
+       case where that action is not an undo: staying put is the right default,
+       so the way to the thing you just made has to be offered rather than
+       taken. */
+    if (one) undoStack = () => patch({ doc: made[0].id });
   }
 
   /* The drop layer covers the whole workbench. dragenter/dragleave fire on every
@@ -5439,10 +7262,22 @@
     const layer = $('#dropLayer');
     if (!layer) return;
     let depth = 0;
-    const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).indexOf('Files') > -1;
+    /* Not while a commit surface is up. A sheet or a modal is a question the
+       page is waiting on an answer to, and quietly making four documents
+       behind it is not an answer to any of them. */
+    const hasFiles = (e) => e.dataTransfer &&
+      Array.from(e.dataTransfer.types || []).indexOf('Files') > -1 &&
+      !($('#commitHost') || {}).innerHTML;
+    const title = $('.drop-title', layer), sub = $('.drop-sub', layer);
     document.addEventListener('dragenter', (e) => {
       if (!hasFiles(e)) return;
       depth++;
+      /* Written at the moment it appears, because what a drop does here is a
+         function of what is open, and the answer changes while the page is
+         alive. */
+      const say = dropIntent();
+      if (title) title.textContent = say.title;
+      if (sub) sub.textContent = say.sub;
       layer.hidden = false;
       /* Reflow, not rAF — same as the document sheet. rAF does not run in a
          throttled tab, and this is the one layer whose whole job is to appear. */
@@ -5493,7 +7328,6 @@
   ═══════════════════════════════════════════════ */
   function init() {
     canvas.init();
-    docModal.init();
     setModal.init();
     wire();
     wireDrop();
