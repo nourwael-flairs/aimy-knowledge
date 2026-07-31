@@ -63,10 +63,51 @@ if (ctrl.length) {
   process.exit(1);
 }
 
+/* ── Spacing ──
+
+   The library declares a 4px scale (`--sp-1…--sp-15`) and says in its own
+   documentation: "No hard-coded colors or spacing in product code." An audit
+   found 62% of this product's spacing off that scale — thirteen different gap
+   values, chosen a component at a time over many rounds, which is exactly what
+   uneven rhythm looks like from the inside.
+
+   The scale used here is the library's plus the two dense steps it does not
+   have — 2 and 6 — because a 4→8 jump is 100% and small controls need
+   something between. The library's own components prove the need: it uses 6px
+   42 times and 10px 67 times. Recorded in GAPS.md.
+
+   Above 60 anything on an 8px grid passes: those are layout offsets, not
+   rhythm — clearing a fixed input, not spacing two labels. */
+const SPACE = [2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 48, 60];
+const ok = (n) => SPACE.includes(n) || (n > 60 && n % 8 === 0);
+
+const bad = [];
+const noComments = fs.readFileSync(path.join(here, 'knowledge.css'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+noComments.split(/\r?\n/).forEach((line, i) => {
+  /* Every declaration on the line, not just the first — one-line rules are
+     common here and a guard that stops at the first is a guard with a hole. */
+  for (const m of line.matchAll(/(?<![-\w])(padding|margin|gap|row-gap|column-gap)(-top|-right|-bottom|-left)?\s*:([^;{}]+);/g)) {
+    /* Negative values are optical corrections, not rhythm. Each one is a
+       judgment about a specific glyph and does not belong to a scale. */
+    (m[3].match(/(?<!-)\b\d+(?:\.\d+)?px/g) || []).forEach((v) => {
+      const n = parseFloat(v);
+      if (n > 0 && !ok(n)) bad.push([i + 1, n, line.trim().slice(0, 62)]);
+    });
+  }
+});
+
+if (bad.length) {
+  console.error('\n  ' + bad.length + ' spacing value(s) off the scale:\n');
+  bad.forEach((row) => console.error('    knowledge.css:' + row[0] + '  ' + row[1] + 'px  ' + row[2]));
+  console.error('\n  Scale: ' + SPACE.join(' · ') + ' (and 8px multiples above 60).\n');
+  process.exit(1);
+}
+
 if (orphans.length) {
   console.error('\n  ' + orphans.length + ' class(es) rendered with no CSS rule anywhere:\n');
   orphans.forEach((c) => console.error('    .' + c));
   console.error('');
   process.exit(1);
 }
-console.log('css-audit: ' + used.size + ' classes checked, no orphans.');
+console.log('css-audit: ' + used.size + ' classes checked, no orphans, spacing on scale.');

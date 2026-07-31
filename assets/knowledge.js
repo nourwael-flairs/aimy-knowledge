@@ -44,6 +44,8 @@
     arrow:    svg('<path d="M4 12h13"/><path d="M13 6l6 6-6 6"/>', 2.4),
     eye:      svg('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
     search:   svg('<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'),
+    folder:   svg('<path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>'),
+    grid:     svg('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
     scales:   svg('<path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-2 6h4z"/><path d="M19 7l-2 6h4z"/>'),
     refresh:  svg('<path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/>'),
     check:    svg('<path d="M20 6L9 17l-5-5"/>'),
@@ -101,8 +103,12 @@
                    why: 'Nobody is accountable for it.' },
     unused:      { label: 'Unused',      ico: ICO.clock,    tone: 'due',        excluded: false,
                    why: 'Nothing has cited or opened it in three months.' },
-    current:     { label: 'Current',     ico: ICO.check,    tone: 'verified',   excluded: false,
-                   why: 'In use, owned, and matching its source.' }
+    /* Not "Current". That reads as a word about dates, so it sounded like a
+       claim about recency — and it is not: it is the one status that means the
+       computation found nothing wrong. Naming it after the absence makes the
+       whole set read as a list of problems with one clear entry. */
+    current:     { label: 'No issues',   ico: ICO.check,    tone: 'verified',   excluded: false,
+                   why: 'Owned, in use, matching its source, and nothing disagrees with it.' }
   };
 
   function statusOf(o) {
@@ -674,7 +680,8 @@
   function readURL() {
     const p = new URLSearchParams(location.search);
     const st = { doc: p.get('doc') || '', mode: p.get('mode') || 'view',
-                 settings: p.get('settings') || '' };
+                 settings: p.get('settings') || '',
+                 view: p.get('view') === 'tree' ? 'tree' : 'grid' };
     LIST_KEYS.forEach((k) => { st[k] = (p.get(k) || '').split(',').filter(Boolean); });
     DATE_KEYS.forEach((k) => { st[k] = p.get(k) || ''; });
     FLAG_KEYS.forEach((k) => { st[k] = p.get(k) === '1'; });
@@ -702,6 +709,7 @@
     if (st.prop) p.set('prop', st.prop);
     if (st.doc) { p.set('doc', st.doc); if (st.mode === 'edit') p.set('mode', 'edit'); }
     if (st.settings) p.set('settings', st.settings);
+    if (st.view === 'tree') p.set('view', 'tree');
     /* Prototype affordance, carried so a forced state survives a filter change
        and the degraded case can actually be driven rather than just looked at. */
     if (forcedState) p.set('state', forcedState);
@@ -764,8 +772,14 @@
       if (st[k] && st[k].length) out = out.filter((o) => st[k].some((v) => o[MULTI_OF[k]].indexOf(v) > -1));
     });
     DATE_KEYS.forEach((k) => {
-      const w = WINDOWS[st[k]];
-      if (w) out = out.filter((o) => o[DATE_FIELD[k]] <= w);
+      const v = st[k];
+      if (!v) return;
+      if (WINDOWS[v]) { out = out.filter((o) => o[DATE_FIELD[k]] <= WINDOWS[v]); return; }
+      const m = RANGE_RE.exec(v);
+      if (!m) return;
+      /* Stored as days-before-today, so the OLDER end is the larger number. */
+      const older = offsetOf(m[1]), newer = offsetOf(m[2]);
+      out = out.filter((o) => o[DATE_FIELD[k]] <= older && o[DATE_FIELD[k]] >= newer);
     });
     if (st.prop) {
       const [pk, pv] = st.prop.split(':');
@@ -1034,7 +1048,7 @@
     archived: () => 'Archived only'
   };
   function valueLabel(key, v) {
-    if (DATE_KEYS.indexOf(key) > -1) return WINDOW_LABEL[v] || v;
+    if (DATE_KEYS.indexOf(key) > -1) return rangeLabel(v);
     const f = VALUE_LABEL[key];
     return f ? f(v) : String(v);
   }
@@ -1077,7 +1091,13 @@
       if (DD_KEYS.indexOf(k) > -1 && st[k].length < 2) return;
       (st[k] || []).forEach((v) => out.push(chip(k, v, valueLabel(k, v))));
     });
-    DATE_KEYS.forEach((k) => { if (st[k] && DD_KEYS.indexOf(k) === -1) out.push(chip(k, st[k], valueLabel(k, st[k]))); });
+    /* One date axis is on the control. If a link or an agent set more than one,
+       the rest become chips — a control that can only name one must not be the
+       reason the others are invisible. */
+    const shown = activeDateKey(st);
+    DATE_KEYS.forEach((k) => {
+      if (st[k] && k !== shown) out.push(chip(k, st[k], valueLabel(k, st[k])));
+    });
     if (st.prop) out.push(chip('prop', st.prop, st.prop.replace(':', ' = ')));
     if (st.q) out.push(chip('q', st.q, '“' + st.q + '”'));
     return out;
@@ -1109,21 +1129,24 @@
   ═══════════════════════════════════════════════ */
   const opts = (obj, order) => (order || Object.keys(obj)).map((k) => [k, typeof obj[k] === 'string' ? obj[k] : obj[k].label]);
 
+  /* The order is a hierarchy, not a list: where a document lives, who it is
+     for, which product it serves — then what it is and what state it is in.
+     Type and Status were leading, which put the system's vocabulary in front of
+     the reader's. */
   const PRIMARY_FILTERS = [
-    { key: 'type',    label: 'Type',    list: () => opts(TYPES) },
-    { key: 'status',  label: 'Status',  list: () => opts(STATUS) },
-    { key: 'source',  label: 'Source',  list: () => opts(SRC) },
-    { key: 'updated', label: 'Updated', list: () => opts(WINDOW_LABEL) }
+    { key: 'collection', label: 'Collection', list: () => opts(COLLECTIONS) },
+    { key: 'client',     label: 'Client',     list: () => opts(CLIENTS) },
+    { key: 'product',    label: 'Product',    list: () => opts(PRODUCTS) },
+    { key: 'type',       label: 'Type',       list: () => opts(TYPES) },
+    { key: 'status',     label: 'Status',     list: () => opts(STATUS) }
   ];
   const MORE_FILTERS = [
-    { key: 'collection', label: 'Collection', list: () => opts(COLLECTIONS) },
-    { key: 'product',    label: 'Product',    list: () => opts(PRODUCTS) },
-    { key: 'client',     label: 'Client',     list: () => opts(CLIENTS) },
-    { key: 'region',     label: 'Region',     list: () => opts(REGIONS) },
-    { key: 'service',    label: 'Service',    list: () => opts(SERVICES) },
-    { key: 'audience',   label: 'Audience',   list: () => opts(AUDIENCE) },
-    { key: 'work',       label: 'Work state', list: () => opts(WORK_LABEL) },
-    { key: 'archived',   label: 'Archive',    list: () => [['1', 'Archived']] }
+    { key: 'source',   label: 'Source',     list: () => opts(SRC) },
+    { key: 'region',   label: 'Region',     list: () => opts(REGIONS) },
+    { key: 'service',  label: 'Service',    list: () => opts(SERVICES) },
+    { key: 'audience', label: 'Audience',   list: () => opts(AUDIENCE) },
+    { key: 'work',     label: 'Work state', list: () => opts(WORK_LABEL) },
+    { key: 'archived', label: 'Archive',    list: () => [['1', 'Archived']] }
   ];
 
   /* The current value of an axis, whatever shape it is stored in. */
@@ -1131,6 +1154,169 @@
     if (FLAG_KEYS.indexOf(key) > -1) return st[key] ? '1' : '';
     if (DATE_KEYS.indexOf(key) > -1) return st[key];
     return (st[key] || [])[0] || '';
+  }
+
+  /* ═══════════════════════════════════════════════
+     DATE RANGE — the design system's .cal, given two ends
+
+     The library ships `.cal` as a single-date month calendar: head with two
+     nav buttons, a seven-column grid, and `.muted` / `.today` / `.selected`
+     days. Every one of those parts is used here unchanged. What it does not
+     ship is a RANGE — there is no start, no end, and nothing to draw the days
+     between — so those three states are added as a product extension and
+     recorded in GAPS.md rather than quietly forked.
+
+     The trigger is the same `.v2-dropdown-btn` the other filters use. A filter
+     row where one control looks foreign is worse than one that is slightly
+     less literal about what opens underneath it.
+
+     Both shapes live in the same URL key: `updated=30d` is a rolling window and
+     `updated=2026-06-01..2026-07-30` is a fixed range. The tokens stay because
+     chat writes them ("updated this year") and because a rolling window is a
+     different question from a fixed one — "the last 7 days" keeps meaning the
+     last 7 days tomorrow, and a range does not.
+  ═══════════════════════════════════════════════ */
+  const RANGE_RE = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/;
+  const iso = (d) => d.toISOString().slice(0, 10);
+  /* Everything on an object is stored as days-before-today, so a date coming
+     out of the calendar is converted once, here, and never again. */
+  const offsetOf = (isoStr) => Math.round((TODAY.getTime() - new Date(isoStr + 'T00:00:00Z').getTime()) / dayMs);
+
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+                  'July', 'August', 'September', 'October', 'November', 'December'];
+  const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  const rangeLabel = (v) => {
+    const m = RANGE_RE.exec(v || '');
+    if (!m) return WINDOW_LABEL[v] || v;
+    const a = new Date(m[1] + 'T00:00:00Z'), b = new Date(m[2] + 'T00:00:00Z');
+    const opt = { day: 'numeric', month: 'short', timeZone: 'UTC' };
+    const sameYear = a.getUTCFullYear() === b.getUTCFullYear();
+    return a.toLocaleDateString('en-GB', opt) + ' – ' +
+      b.toLocaleDateString('en-GB', sameYear ? opt : Object.assign({ year: 'numeric' }, opt));
+  };
+
+  /* Which calendar is open, which month it is showing, and the first end of a
+     range that has been started but not finished. View state, so none of it is
+     in the URL — a half-picked range is not a thing to link to. */
+  let calOpen = null;
+  let calMonth = null;
+  let calPick = null;
+
+  /* Four axes, one control. Four separate pickers put four pieces of furniture
+     on the row to ask one question — WHEN — and only ever answered it about one
+     of them at a time anyway. The axis is a choice inside the control now, and
+     choosing a different one moves the value rather than adding a second
+     filter. All four keys stay in the URL, so a link or an agent can still set
+     any of them; if a link sets more than one, the extras show as chips rather
+     than disappearing behind a control that can only name one. */
+  const DATE_FILTERS = [
+    { key: 'updated',    label: 'Updated',    short: 'Updated' },
+    { key: 'ingested',   label: 'Ingested',   short: 'Ingested' },
+    { key: 'extCreated', label: 'Created at source', short: 'Created' },
+    { key: 'extUpdated', label: 'Changed at source', short: 'Changed' }
+  ];
+
+  /* Which axis the control is editing. Defaults to whichever one already
+     carries a value, so opening it lands on what you can see. */
+  let dateField = null;
+  const activeDateKey = (st) => (DATE_FILTERS.find((f) => st[f.key]) || DATE_FILTERS[0]).key;
+
+  function calGrid(key, cur) {
+    const m = RANGE_RE.exec(cur || '');
+    const startOff = m ? offsetOf(m[2]) : null;          // newer end = smaller offset
+    const endOff   = m ? offsetOf(m[1]) : null;          // older end = larger offset
+    const pickOff  = calPick !== null ? calPick : null;
+
+    const view = calMonth || new Date(Date.UTC(TODAY.getUTCFullYear(), TODAY.getUTCMonth(), 1));
+    const y = view.getUTCFullYear(), mo = view.getUTCMonth();
+    const first = new Date(Date.UTC(y, mo, 1));
+    const lead = first.getUTCDay();
+    const days = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+    const prevDays = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+
+    const cells = [];
+    for (let i = lead - 1; i >= 0; i--) cells.push({ n: prevDays - i, muted: true, d: new Date(Date.UTC(y, mo - 1, prevDays - i)) });
+    for (let i = 1; i <= days; i++)     cells.push({ n: i, muted: false, d: new Date(Date.UTC(y, mo, i)) });
+    while (cells.length % 7) { const i = cells.length - lead - days + 1; cells.push({ n: i, muted: true, d: new Date(Date.UTC(y, mo + 1, i)) }); }
+
+    return `<div class="cal">
+      <div class="cal-head">
+        <button class="cal-nav" type="button" data-cal-nav="-1" aria-label="Previous month">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <div class="cal-title">${esc(MONTHS[mo])} ${y}</div>
+        <button class="cal-nav" type="button" data-cal-nav="1" aria-label="Next month">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
+      <div class="cal-grid">
+        ${DOW.map((d) => `<div class="cal-dow">${d}</div>`).join('')}
+        ${cells.map((c) => {
+          const off = Math.round((TODAY.getTime() - c.d.getTime()) / dayMs);
+          const future = off < 0;
+          const isStart = off === startOff, isEnd = off === endOff;
+          const between = startOff !== null && off < endOff && off > startOff;
+          const isPick = pickOff !== null && off === pickOff;
+          const cls = ['cal-day']
+            .concat(c.muted ? ['muted'] : [])
+            .concat(off === 0 ? ['today'] : [])
+            .concat(isStart || isEnd || isPick ? ['selected'] : [])
+            .concat(isEnd && startOff !== endOff ? ['range-start'] : [])
+            .concat(isStart && startOff !== endOff ? ['range-end'] : [])
+            .concat(between ? ['in-range'] : []);
+          /* Nothing here has a date in the future, so offering one would be a
+             control that can only ever return nothing. */
+          return `<button class="${cls.join(' ')}" type="button" ${future ? 'disabled' : ''}
+            data-cal-day="${iso(c.d)}" aria-label="${esc(fmtDate(off))}">${c.n}</button>`;
+        }).join('')}
+      </div>
+      <div class="cal-hint">${calPick !== null
+        ? 'Pick the second date.'
+        : 'Pick two dates for a range.'}</div>
+    </div>`;
+  }
+
+  function dateFilter(st) {
+    const key = dateField || activeDateKey(st);
+    const c = DATE_FILTERS.find((f) => f.key === key);
+    const cur = st[key] || '';
+    const open = calOpen === 'date';
+    /* WINDOW_LABEL reads mid-sentence elsewhere ("updated in the last 30 days"),
+       so it is sentence-cased here and nowhere else. */
+    const raw = cur ? rangeLabel(cur) : '';
+    const label = cur
+      ? c.short + ' · ' + raw.charAt(0).toUpperCase() + raw.slice(1)
+      : 'Any date';
+    /* NOT .v2-dropdown-btn. In this design system that class carries behaviour,
+       not just looks: aimy-ds.js binds every one of them on the page and then
+       calls closest('.v2-dropdown'), which is null for anything that is not a
+       listbox — it threw on the first click. The trigger is styled from the
+       same tokens instead. Recorded in GAPS.md. */
+    return `<div class="k-date${open ? ' is-open' : ''}" data-date-key="${key}">
+      <button class="k-date-btn${cur ? ' active-filter' : ''}" type="button"
+              aria-haspopup="dialog" aria-expanded="${open}" aria-label="${esc(c.label)}">
+        ${ICO.clock.replace('<svg', '<svg class="k-date-ico" width="12" height="12"')}
+        <span class="dd-label-text">${esc(label)}</span>
+        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+      </button>
+      ${open ? `<div class="k-date-panel" role="dialog" aria-label="Date range">
+        <div class="k-date-field">
+          <span class="k-date-field-label">Which date</span>
+          <div class="seg">
+            ${DATE_FILTERS.map((f) => `<button class="seg-btn${f.key === key ? ' active' : ''}" type="button"
+              data-date-field="${f.key}">${esc(f.short)}</button>`).join('')}
+          </div>
+        </div>
+        <div class="k-date-body">
+        <div class="k-date-quick">
+          ${[['', 'Any time']].concat(Object.keys(WINDOW_LABEL).map((w) => [w, WINDOW_LABEL[w]]))
+            .map(([slug, text]) => `<button class="k-date-q${slug === cur ? ' is-on' : ''}" type="button"
+              data-date-set="${slug}">${esc(text.charAt(0).toUpperCase() + text.slice(1))}</button>`).join('')}
+        </div>
+        ${calGrid(key, cur)}
+        </div>
+      </div>` : ''}
+    </div>`;
   }
 
   function dropdown(c, st) {
@@ -1151,11 +1337,17 @@
              stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
       </button>
       <div class="v2-dropdown-panel" role="listbox">
+        ${rows.length > 6 ? `<div class="dd-search">
+          ${ICO.search.replace('<svg', '<svg width="12" height="12"')}
+          <input type="text" placeholder="Search ${esc(c.label.toLowerCase())}" aria-label="Search ${esc(c.label)}"
+                 data-dd-search spellcheck="false" autocomplete="off">
+        </div>` : ''}
         ${rows.map(([slug, value, text]) => {
           const on = slug === cur;
           return `<div class="v2-dropdown-option${on ? ' selected' : ''}" role="option"
             aria-selected="${on}" data-value="${esc(value)}" data-slug="${esc(slug)}">${esc(text)}</div>`;
         }).join('')}
+        <div class="dd-none" hidden>Nothing matches</div>
       </div>
     </div>`;
   }
@@ -1172,6 +1364,7 @@
     host.innerHTML = `
       <div class="filter-row">
         ${PRIMARY_FILTERS.map((c) => dropdown(c, st)).join('')}
+        ${dateFilter(st)}
         <button class="k-toggle${st.mine ? ' is-on' : ''}" data-toggle-mine
                 aria-pressed="${st.mine ? 'true' : 'false'}">Mine</button>
         <button class="k-more${open ? ' is-open' : ''}" data-more aria-expanded="${open}">
@@ -1342,7 +1535,7 @@
     : `<span class="tc-approval is-pending">${ICO.clock.replace('<svg', '<svg width="11" height="11"')}Awaiting approval</span>`;
 
   const fieldRows = (pairs) => `<div class="tc-fields">${pairs
-    .map(([l, v]) => `<span class="tc-field-label">${esc(l)}</span><span class="tc-field-val">${v}</span>`).join('')}</div>`;
+    .map(([l, v]) => `<div class="tc-field"><span class="tc-field-label">${esc(l)}</span><span class="tc-field-val">${v}</span></div>`).join('')}</div>`;
 
   const TEMPLATE = {
     article:  (o) => fieldRows([['Applies to', esc(o.x.applies)], ['Collection', esc(COLLECTIONS[o.col])]]),
@@ -1423,7 +1616,7 @@
       </div>
       <button class="tc-title-btn" data-open-doc="${o.id}"><span class="tc-title">${esc(o.title)}</span></button>
       ${compact ? '' : `<div class="tc-fields">${facts.map(([l, v]) =>
-        `<span class="tc-field-label">${esc(l)}</span><span class="tc-field-val">${v}</span>`).join('')}</div>`}
+        `<div class="tc-field"><span class="tc-field-label">${esc(l)}</span><span class="tc-field-val">${v}</span></div>`).join('')}</div>`}
       <div class="tc-foot">
         <span class="tc-foot-who">${esc(o.owner)}</span>
         <span class="tc-foot-act">${entryAction(act[0], act[1], `data-card-act="${o.id}"`)}</span>
@@ -1468,6 +1661,13 @@
             : `<span class="rm-note">of ${LIVE.length}</span>`}
       </div>
       <div class="rm-end">
+        <!-- Two readings of one set. The library's segmented control, so it
+             reads as a view switch rather than as an action. -->
+        <div class="seg rm-views" role="group" aria-label="How to show these">
+          ${VIEWS.map(([v, label]) => `<button class="seg-btn${(st.view || 'grid') === v ? ' active' : ''}"
+            type="button" data-view="${v}" aria-pressed="${(st.view || 'grid') === v}">
+            ${(v === 'tree' ? ICO.folder : ICO.grid).replace('<svg', '<svg width="12" height="12"')}${esc(label)}</button>`).join('')}
+        </div>
         ${entryAction('direct', 'New document', 'data-new-doc="1"', ICO.plus)}
       </div>
       ${excluded || unowned ? `<div class="rm-disclosure">
@@ -1478,6 +1678,73 @@
       </div>` : ''}
     </div>`;
   }
+
+  /* ═══════════════════════════════════════════════
+     THE TREE — the same set, arranged rather than listed
+
+     A second view, not a second product. Whatever the filters say is what the
+     tree contains, so switching between grid and tree keeps your place and
+     changes only the shape of what you are looking at.
+
+     Collection → Type → document. That order because a collection is a place
+     someone owns and a type is what a thing is; the reverse would file the
+     same policy under Article in four different collections and lose the one
+     fact — who is responsible for this shelf — that a folder view is for.
+
+     Every branch is a filter link. Opening Policies and clicking it narrows the
+     surface to Policies; the tree and the grid are two readings of one URL. It
+     is built on the library's `.tree`, which is native <details>, so it needs
+     no state of its own and survives a re-render open.
+  ═══════════════════════════════════════════════ */
+  function renderTree(st, list) {
+    const byCol = {};
+    list.forEach((o) => { (byCol[o.col] = byCol[o.col] || []).push(o); });
+    /* The user's own collections first, in their order, then anything else the
+       filter dragged in. */
+    const cols = USER.collections.filter((c) => byCol[c])
+      .concat(Object.keys(byCol).filter((c) => USER.collections.indexOf(c) < 0));
+
+    return `<div class="tree ws-tree">
+      ${cols.map((col) => {
+        const docs = byCol[col];
+        const byType = {};
+        docs.forEach((o) => { (byType[o.t] = byType[o.t] || []).push(o); });
+        const needs = docs.filter((o) => STATUS[o.status].tone !== 'verified').length;
+        return `<details class="ws-tree-col" ${cols.length <= 2 ? 'open' : ''}>
+          <summary>
+            <svg class="tree-chev" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+            ${ICO.folder ? ICO.folder.replace('<svg', '<svg width="13" height="13"') : ''}
+            <span class="ws-tree-name">${esc(COLLECTIONS[col])}</span>
+            <span class="ws-tree-n">${docs.length}</span>
+            ${needs ? `<span class="ws-tree-needs" title="${needs} need a person">${needs}</span>` : ''}
+            <button class="ws-tree-only" data-open-axis="collection:${col}"
+                    title="Show only ${esc(COLLECTIONS[col])}">Only this</button>
+          </summary>
+          <div class="tree-children">
+            ${Object.keys(byType).map((t) => `<details class="ws-tree-type" open>
+              <summary>
+                <svg class="tree-chev" width="11" height="11" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+                ${TYPES[t].ico.replace('<svg', '<svg width="12" height="12"')}
+                <span class="ws-tree-name">${esc(TYPES[t].label)}</span>
+                <span class="ws-tree-n">${byType[t].length}</span>
+              </summary>
+              <div class="tree-children">
+                ${byType[t].map((o) => `<button class="tree-leaf ws-tree-doc" data-card-open="${o.id}">
+                  <span class="ws-tree-doc-title">${esc(o.title)}</span>
+                  ${statusBadge(o.status)}
+                  <span class="ws-tree-doc-who">${esc(o.owner)}</span>
+                </button>`).join('')}
+              </div>
+            </details>`).join('')}
+          </div>
+        </details>`;
+      }).join('')}
+    </div>`;
+  }
+
+  const VIEWS = [['grid', 'Cards'], ['tree', 'Folders']];
 
   function renderGrid(st) {
     const stage = $('#wbStage');
@@ -1493,7 +1760,8 @@
     if (!list.length) { stage.innerHTML = emptyResult(st); return; }
 
     stage.innerHTML = resultMeta(st, list, composed) +
-      `<div class="ws-grid">${list.map((o) => typeCard(o)).join('')}</div>`;
+      (st.view === 'tree' ? renderTree(st, list)
+                          : `<div class="ws-grid">${list.map((o) => typeCard(o)).join('')}</div>`);
   }
 
   /* An empty result is a finding about the filter, not an absence. */
@@ -1845,6 +2113,42 @@
       </span>
     </div>`;
 
+  /* ── Comments ──
+
+     In the viewer, not the editor. Commenting on a document is something you do
+     while READING it — you have just found the thing you want to say something
+     about. Putting the thread behind Edit meant taking a document out of
+     everyone's hands to leave a note on it, and it hid the notes from every
+     person who only ever reads.
+
+     A draft still has none: nobody can read it, so there is nobody to discuss
+     it with. Publishing is what gives a document readers. */
+  function commentThread(o) {
+    if (o.status === 'draft') return '';
+    const list = o.comments || [];
+    return `<div class="comment-thread">
+      <div class="comment-thread-head">
+        <span class="comment-thread-label">Comments</span>
+        ${list.length ? `<span class="comment-thread-n">${list.length}</span>` : ''}
+      </div>
+      ${list.length
+        ? list.map((c) => `<div class="comment">
+            <div class="avatar avatar-sm">${esc(c.initials)}</div>
+            <div class="comment-body">
+              <div class="comment-head"><span class="comment-author">${esc(c.who)}</span><span class="comment-time">${esc(c.when)}</span></div>
+              <div class="comment-text">${esc(c.text)}</div>
+            </div>
+          </div>`).join('')
+        : `<p class="comment-empty">Nothing yet. A comment is the way to raise something
+           without changing the document.</p>`}
+      <div class="comment-compose">
+        <input class="field-input" type="text" placeholder="Add a comment…" aria-label="Add a comment"
+               data-comment-input>
+        <button class="btn btn-ghost btn-sm" data-comment-add>Comment</button>
+      </div>
+    </div>`;
+  }
+
   function renderViewer(st) {
     const o = byId(st.doc);
     if (!o) { patch({ doc: '' }, { replace: true }); return; }
@@ -1922,6 +2226,8 @@
               <button class="btn btn-ghost btn-sm" data-restore="${o.id}">Restore ${esc(fmtShort(o.ing))} version</button>
             </div>
           </details>
+
+          ${commentThread(o)}
 
           <div class="dv-actions">
             <span class="dv-actions-end">
@@ -2100,25 +2406,6 @@
             </div>
 
             ${aiDraftBlock(o)}
-
-            <!-- Nobody can read a draft, so there is nobody to discuss it
-                 with. This used to key off an empty body, which is a question
-                 about content standing in for a question about audience — so
-                 the thread reappeared the moment AiMY filled the body or you
-                 typed a title. Publishing is what gives a document readers. -->
-            ${o.status === 'draft' ? '' : `<div class="comment-thread">
-              ${(o.comments || []).map((c) => `<div class="comment">
-                <div class="avatar avatar-sm">${esc(c.initials)}</div>
-                <div class="comment-body">
-                  <div class="comment-head"><span class="comment-author">${esc(c.who)}</span><span class="comment-time">${esc(c.when)}</span></div>
-                  <div class="comment-text">${esc(c.text)}</div>
-                </div>
-              </div>`).join('')}
-              <div class="comment-compose">
-                <input class="field-input" type="text" placeholder="Add a comment…" aria-label="Add a comment">
-                <button class="btn btn-ghost btn-sm" data-comment-add>Comment</button>
-              </div>
-            </div>`}
           </div>
 
           <div class="editor-side">
@@ -2457,6 +2744,7 @@
 
       document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
+        if (calOpen) { calOpen = null; calPick = null; renderFilters(readURL()); return; }
         if (proto.open) { proto.toggle(false); return; }
         if (this.open) this.close();
       });
@@ -4000,6 +4288,47 @@
       }
     });
 
+    /* Search inside a filter. The library's dropdown has letter typeahead — one
+       key, 500ms buffer, jump to the first match — which is a different thing:
+       it finds a value you can already spell. With a list of clients you cannot,
+       so this narrows instead of jumping. Recorded in GAPS.md. */
+    document.addEventListener('input', (e) => {
+      const box = e.target.closest && e.target.closest('[data-dd-search]');
+      if (!box) return;
+      const panel = box.closest('.v2-dropdown-panel');
+      const q = box.value.trim().toLowerCase();
+      let hits = 0;
+      $$('.v2-dropdown-option', panel).forEach((o) => {
+        /* The first row is the axis's "All", and clearing a filter should not
+           be something you have to spell your way back to. */
+        const keep = !q || !o.dataset.slug || o.textContent.toLowerCase().indexOf(q) > -1;
+        o.hidden = !keep;
+        if (keep && o.dataset.slug) hits++;
+      });
+      const none = $('.dd-none', panel);
+      if (none) none.hidden = !q || hits > 0;
+    });
+
+    /* The search field sits INSIDE the panel, and the library's dropdown closes
+       on any click that is not an option or the trigger — so clicking into the
+       search box shut the thing you were about to search. Both events are held
+       at the document's capture phase, before the library's own document-level
+       listeners run. Focus and the caret are default actions, not listeners, so
+       they still happen. */
+    ['click', 'mousedown'].forEach((type) => {
+      document.addEventListener(type, (e) => {
+        if (e.target.closest && e.target.closest('[data-dd-search]')) e.stopPropagation();
+      }, true);
+    });
+
+    /* Typing in the search must not reach the listbox's keyboard model, or the
+       first letter jumps the selection somewhere behind the panel. */
+    document.addEventListener('keydown', (e) => {
+      if (!e.target.closest || !e.target.closest('[data-dd-search]')) return;
+      if (e.key === 'Escape') return;                 // Escape still closes it
+      e.stopPropagation();
+    }, true);
+
     /* A toolbar button steals focus on mousedown and collapses the selection
        before execCommand ever runs, which is why none of these appeared to do
        anything. Cancelling the default keeps the caret where it was. */
@@ -4046,6 +4375,15 @@
       }
     }, true);
 
+    /* Enter is the same action as the button. A compose field that only submits
+       from a button is a field that has to be explained. */
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || !e.target.hasAttribute || !e.target.hasAttribute('data-comment-input')) return;
+      e.preventDefault();
+      const btn = $('[data-comment-add]');
+      if (btn) btn.click();
+    });
+
     /* Tag entry. Enter commits a token, Backspace on an empty field removes the
        last one — the two things every tag field is expected to do. */
     document.addEventListener('keydown', (e) => {
@@ -4071,6 +4409,64 @@
     document.addEventListener('click', (e) => {
       const t = e.target;
       let el;
+
+      /* ── the date range controls ── */
+      if ((el = t.closest('[data-cal-nav]'))) {
+        const step = +el.getAttribute('data-cal-nav');
+        const base = calMonth || new Date(Date.UTC(TODAY.getUTCFullYear(), TODAY.getUTCMonth(), 1));
+        calMonth = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + step, 1));
+        renderFilters(readURL());
+        return;
+      }
+      if ((el = t.closest('[data-cal-day]'))) {
+        const key = el.closest('[data-date-key]').getAttribute('data-date-key');
+        const off = offsetOf(el.getAttribute('data-cal-day'));
+        if (calPick === null) {
+          /* First end picked. Nothing is written yet — half a range is not a
+             filter, and writing one would empty the grid mid-gesture. */
+          calPick = off;
+          renderFilters(readURL());
+          return;
+        }
+        const older = Math.max(calPick, off), newer = Math.min(calPick, off);
+        calPick = null;
+        calOpen = null;
+        patch({ [key]: iso(dateOf(older)) + '..' + iso(dateOf(newer)) });
+        return;
+      }
+      if ((el = t.closest('[data-date-field]'))) {
+        const to = el.getAttribute('data-date-field');
+        const st = readURL();
+        const from = dateField || activeDateKey(st);
+        dateField = to;
+        calPick = null;
+        /* Moving, not adding. Asking "when" twice about two different fields is
+           a query nobody types and a row nobody can read back. */
+        if (from !== to && st[from]) patch({ [from]: '', [to]: st[from] });
+        else renderFilters(readURL());
+        return;
+      }
+      if ((el = t.closest('[data-date-set]'))) {
+        const key = el.closest('[data-date-key]').getAttribute('data-date-key');
+        calPick = null;
+        calOpen = null;
+        patch({ [key]: el.getAttribute('data-date-set') });
+        return;
+      }
+      if ((el = t.closest('.k-date-btn'))) {
+        const key = el.closest('[data-date-key]').getAttribute('data-date-key');
+        const cur = readURL()[key];
+        calOpen = calOpen === 'date' ? null : 'date';
+        calPick = null;
+        /* Open on the month the range already names, not on today — otherwise
+           changing a June range starts you in July every time. */
+        const m = RANGE_RE.exec(cur || '');
+        const on = m ? new Date(m[2] + 'T00:00:00Z') : TODAY;
+        calMonth = calOpen ? new Date(Date.UTC(on.getUTCFullYear(), on.getUTCMonth(), 1)) : null;
+        renderFilters(readURL());
+        return;
+      }
+      if (calOpen && !t.closest('.k-date')) { calOpen = null; calPick = null; renderFilters(readURL()); }
 
       /* ── prototype panel ── */
       if (t.closest('#protoToggle')) { proto.toggle(); return; }
@@ -4115,6 +4511,7 @@
         writeURL(next);
         return;
       }
+      if ((el = t.closest('[data-view]'))) { patch({ view: el.getAttribute('data-view') }); return; }
       if (t.closest('[data-toggle-mine]')) { const s = readURL(); s.mine = !s.mine; s.doc = ''; rememberFilter(); writeURL(s); return; }
       if (t.closest('[data-more]'))        { moreOpen = !moreOpen; renderFilters(readURL()); return; }
       if (t.closest('[data-resume]')) { location.search = lastFilter; return; }
@@ -4453,12 +4850,14 @@
         return;
       }
       if (t.closest('[data-comment-add]')) {
-        const input = $('.comment-compose input');
+        const input = $('[data-comment-input]');
         const o = byId(readURL().doc);
         if (!input || !input.value.trim() || !o) return;
         addComment(o, input.value.trim());
-        renderEditor(readURL());
+        render();
         markAfter('.comment:last-of-type', $('#docSheet'));
+        toast('Comment added', 'Undo', 'On ' + o.title);
+        undoStack = () => { o.comments.pop(); render(); };
         return;
       }
 
@@ -4506,7 +4905,7 @@
   /* A blank state object with the same shape readURL produces, so callers can
      build a URL from scratch without hand-writing every key. */
   function readURL0() {
-    const st = { doc: '', mode: 'view', settings: '', q: '', prop: '' };
+    const st = { doc: '', mode: 'view', settings: '', view: readURL().view, q: '', prop: '' };
     LIST_KEYS.forEach((k) => { st[k] = []; });
     DATE_KEYS.forEach((k) => { st[k] = ''; });
     FLAG_KEYS.forEach((k) => { st[k] = false; });
@@ -4916,8 +5315,9 @@
       addComment(o, 'Reported a problem with this document.');
       recompute();
       render();
+      markAfter('.comment:last-of-type', $('#docSheet'));
       markCard(o.id);
-      toast('Reported', 'Undo', 'Recorded on the document · ' + o.comments.length + ' comment(s)');
+      toast('Reported', 'Undo', 'Added to the comments on this document');
       undoStack = () => { o.comments.pop(); render(); };
       return;
     }
