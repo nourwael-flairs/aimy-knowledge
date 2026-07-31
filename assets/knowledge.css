@@ -1413,7 +1413,7 @@ body {
 }
 .dd-search input::placeholder { color: var(--d600); }
 .dd-none {
-  padding: 12px 12px;
+  padding: 12px;
   font-size: var(--fs-xs); color: var(--d500); font-style: italic;
 }
 

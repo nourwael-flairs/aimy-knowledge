@@ -4288,6 +4288,49 @@
       }
     });
 
+  /* The list is there when you open it, and searching narrows it. The field is
+     a way through a long list, not a gate in front of it.
+
+     Non-matching options are DETACHED rather than hidden. The library's
+     keyboard model reads `.v2-dropdown-option` straight from the DOM and does
+     not check `hidden`, so arrow keys would walk through rows nobody can see.
+     Removing them keeps that model honest without touching the library, and the
+     full ordered set is held here so reattaching restores the order exactly. */
+  const ddAll = new WeakMap();
+
+  function ddFilter(panel) {
+    if (!panel) return;
+    const box = $('[data-dd-search]', panel);
+    if (!box) return;
+    let all = ddAll.get(panel);
+    if (!all) { all = $$('.v2-dropdown-option', panel); ddAll.set(panel, all); }
+
+    const q = box.value.trim().toLowerCase();
+    const none = $('.dd-none', panel);
+
+    /* No query, no narrowing. The axis's "All" row survives either way:
+       clearing a filter must never be something you have to spell your way
+       back to. */
+    const show = all.filter((o) => !q || !o.dataset.slug ||
+      o.textContent.toLowerCase().indexOf(q) > -1);
+
+    all.forEach((o) => { if (o.parentNode) o.remove(); });
+    show.forEach((o) => panel.insertBefore(o, none));
+
+    const hits = show.filter((o) => o.dataset.slug).length;
+    if (none) none.hidden = !q || hits > 0;
+
+    /* The library points aria-activedescendant at the selected option when it
+       opens the panel — which is a moment before this runs, so it can be left
+       naming a node that is no longer in the document. A screen reader would be
+       told the active item is something it cannot find. */
+    const active = panel.getAttribute('aria-activedescendant');
+    if (active && !document.getElementById(active)) {
+      panel.removeAttribute('aria-activedescendant');
+      $$('.v2-dropdown-option.is-active', panel).forEach((o) => o.classList.remove('is-active'));
+    }
+  }
+
     /* Search inside a filter. The library's dropdown has letter typeahead — one
        key, 500ms buffer, jump to the first match — which is a different thing:
        it finds a value you can already spell. With a list of clients you cannot,
@@ -4295,18 +4338,21 @@
     document.addEventListener('input', (e) => {
       const box = e.target.closest && e.target.closest('[data-dd-search]');
       if (!box) return;
-      const panel = box.closest('.v2-dropdown-panel');
-      const q = box.value.trim().toLowerCase();
-      let hits = 0;
-      $$('.v2-dropdown-option', panel).forEach((o) => {
-        /* The first row is the axis's "All", and clearing a filter should not
-           be something you have to spell your way back to. */
-        const keep = !q || !o.dataset.slug || o.textContent.toLowerCase().indexOf(q) > -1;
-        o.hidden = !keep;
-        if (keep && o.dataset.slug) hits++;
-      });
-      const none = $('.dd-none', panel);
-      if (none) none.hidden = !q || hits > 0;
+      ddFilter(box.closest('.v2-dropdown-panel'));
+    });
+
+    /* Cull on open too, so the list is closed before the first keystroke rather
+       than blinking shut after it. Next tick: the library opens the panel from
+       its own click listener and this has to land after that. */
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest && e.target.closest('.v2-dropdown-btn');
+      if (!btn) return;
+      const panel = $('.v2-dropdown-panel', btn.closest('.v2-dropdown') || document.body);
+      const box = panel && $('[data-dd-search]', panel);
+      if (!box) return;
+      /* Reopening starts from the whole list. A search you cannot see the end
+         of, still applied from last time, is a filter hiding inside a filter. */
+      setTimeout(() => { box.value = ''; ddFilter(panel); }, 0);
     });
 
     /* The search field sits INSIDE the panel, and the library's dropdown closes
