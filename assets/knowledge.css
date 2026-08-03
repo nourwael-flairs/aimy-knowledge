@@ -663,6 +663,156 @@ body {
   background: rgba(16,24,40,0.04); border-color: rgba(16,24,40,0.10);
 }
 
+/* ── Version link ──────────────────────────────────────────────────
+   A destination, not a state you toggle, so it is quieter than a product tab
+   and reads as chrome. One link rather than a segmented pair: you are on V2,
+   so the only thing worth offering is the way out.
+
+   Same component as QA's, on this file's tokens — QA's --wash-6 is what
+   --glass-border already is here, and the focus ring follows .topnav-tab. */
+.ver-link {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  padding: 4px 10px; border-radius: var(--r-pill);
+  font-family: var(--font-sans);
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); line-height: var(--lh-snug);
+  color: var(--d500); text-decoration: none;
+  border: 1px solid var(--glass-border);
+  transition: background-color var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.ver-link:hover { background: rgba(255,255,255,0.08); color: var(--d100); border-color: var(--card-border); }
+:root[data-theme="light"] .ver-link:hover { background: rgba(16,24,40,0.07); }
+.ver-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.ver-link-ico { width: 10px; height: 10px; opacity: 0.75; }
+/* The flanks split what the six tabs leave, and the right one runs out first:
+   below this the pill crosses the tabs strip rather than sitting beside it.
+   V1 is the only thing in the topnav that goes somewhere else rather than
+   carrying state, so it is the one that drops — the same call the user's name
+   already makes 120px earlier. */
+@media (max-width: 1000px) {
+  .ver-link { display: none; }
+}
+
+/* ── The notifications panel ───────────────────────────────────────
+   The bell was an inert <div> carrying a dot nothing could clear. What it
+   opens is the queue of what is still waiting on a person — derived from the
+   same model the briefing rail and the Status filter read, so the three
+   cannot disagree and none of them goes stale when a draft is published.
+
+   Panel chrome follows .peek rather than the QA original's inlined literals:
+   the radius, the shadow and the wash QA had to hard-code because six files
+   disagreed about them are all declared here, and a second dropdown language
+   on one page is one too many. */
+.ntf-anchor { position: relative; display: flex; align-items: center; flex-shrink: 0; }
+.topnav-bell:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.bell-dot[hidden] { display: none; }
+
+.ntf-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 940;
+  width: 360px; max-width: calc(100vw - 32px);
+  max-height: min(70vh, 520px); overflow-y: auto;
+  padding: 6px; text-align: left;
+  background: var(--panel-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-xl);
+  backdrop-filter: blur(12px);
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.06) transparent;
+}
+.ntf-panel[hidden] { display: none; }
+.ntf-panel::-webkit-scrollbar { width: 4px; }
+.ntf-panel::-webkit-scrollbar-track { background: transparent; }
+.ntf-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+:root[data-theme="light"] .ntf-panel { scrollbar-color: rgba(16,24,40,0.12) transparent; }
+:root[data-theme="light"] .ntf-panel::-webkit-scrollbar-thumb { background: rgba(16,24,40,0.12); }
+
+.ntf-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 10px; }
+.ntf-head b {
+  font-family: var(--font-display); font-size: var(--fs-sm);
+  font-weight: var(--fw-bold); color: var(--d50);
+}
+.ntf-count {
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  padding: 1px 7px; border-radius: var(--r-pill);
+  background: var(--accent-dim); color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.ntf-count[hidden] { display: none; }
+.ntf-clear {
+  margin-left: auto; background: none; border: 0; padding: 2px 4px; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-2xs); font-weight: var(--fw-semibold);
+  color: var(--d500); border-radius: var(--r-xs);
+  transition: color var(--t-fast);
+}
+.ntf-clear:hover { color: var(--d100); }
+.ntf-clear:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+.ntf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ntf-row {
+  display: flex; gap: 9px; padding: 10px; border-radius: var(--r-md);
+  transition: background-color var(--t-fast), opacity var(--t-fast);
+}
+.ntf-row:hover { background: rgba(255,255,255,0.04); }
+:root[data-theme="light"] .ntf-row:hover { background: rgba(16,24,40,0.04); }
+/* Read, not gone. What is outstanding stays outstanding until the corpus
+   changes; the count under the bell is the thing marking clears. */
+.ntf-row.is-read { opacity: 0.45; }
+/* Tone on one leading dot, same as .brief-text — the rail and the bell are
+   two views of one model and they should not look like two components. */
+.ntf-sev {
+  width: 5px; height: 5px; border-radius: 50%;
+  margin-top: 7px; flex-shrink: 0; background: var(--d500);
+}
+.ntf-sev.p1 { background: var(--err); }
+.ntf-sev.p2 { background: var(--warn); }
+.ntf-sev.p3 { background: var(--brand); }
+.ntf-row-main { flex: 1; min-width: 0; }
+.ntf-row-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+.ntf-row-type { font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--d50); }
+.ntf-row-when { margin-left: auto; font-size: var(--fs-2xs); color: var(--d500); flex-shrink: 0; }
+.ntf-row-body { margin: 0 0 7px; font-size: var(--fs-xs); line-height: var(--lh-base); color: var(--d300); }
+.ntf-row-cta {
+  font-family: inherit; font-size: var(--fs-2xs); font-weight: var(--fw-bold); cursor: pointer;
+  padding: 4px 10px; border-radius: var(--r-pill);
+  background: var(--accent-dim); color: var(--accent);
+  border: 1px solid rgba(var(--accent-rgb), 0.26);
+  transition: background-color var(--t-fast), border-color var(--t-fast);
+}
+.ntf-row-cta:hover { background: rgba(var(--accent-rgb), 0.22); border-color: rgba(var(--accent-rgb), 0.40); }
+.ntf-row-cta:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.ntf-foot { padding: 8px 4px 4px; margin-top: 6px; border-top: 1px solid var(--hairline); }
+.ntf-foot-btn {
+  width: 100%; padding: 8px; cursor: pointer; font-family: inherit;
+  font-size: var(--fs-xs); font-weight: var(--fw-bold);
+  border-radius: var(--r-md); color: var(--d300);
+  background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
+  transition: background-color var(--t-fast), color var(--t-fast);
+}
+.ntf-foot-btn:hover { background: rgba(255,255,255,0.08); color: var(--d50); }
+.ntf-foot-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+:root[data-theme="light"] .ntf-foot-btn { background: rgba(16,24,40,0.04); }
+:root[data-theme="light"] .ntf-foot-btn:hover { background: rgba(16,24,40,0.07); }
+/* Nothing waiting is a real state and the best one this panel can report.
+   It was unreachable while the dot was written into the markup. */
+.ntf-empty { padding: 22px 12px; text-align: center; font-size: var(--fs-xs); color: var(--d500); }
+
+/* The bell sits ~90px in from the window edge, so a 360px card anchored to it
+   runs off the LEFT of the screen before the viewport is narrow enough for
+   max-width to catch it — the constraint is measured from the wrong side.
+   Below the width where the anchor still leaves room, pin the panel to the
+   window instead. */
+@media (max-width: 520px) {
+  .ntf-panel {
+    position: fixed;
+    top: calc(var(--topbar-height) + 4px);
+    right: 12px; left: 12px;
+    width: auto; max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ntf-row, .ntf-row-cta, .ntf-foot-btn, .ntf-clear { transition: none; }
+}
+
 /* Theme toggle — moved here from the design system's documentation chrome */
 .ds-theme-toggle {
   display: inline-flex; align-items: center; justify-content: center;

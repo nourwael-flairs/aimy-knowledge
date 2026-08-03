@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Poppins:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="assets/aimy-ds.css" />
-  <link rel="stylesheet" href="assets/knowledge.css?v=64" />
+  <link rel="stylesheet" href="assets/knowledge.css?v=70" />
 
   <script>
     /* Apply saved theme before paint to avoid flash. Default = dark. */
@@ -78,6 +78,19 @@
   </div>
 
   <div class="topnav-right">
+    <!-- V1 opens in a new tab so the two builds can be compared side by side.
+         One link, not a segmented pair: you are on V2, so the only thing worth
+         offering is the way out. The href is the placeholder — one value to
+         change, and the only thing here that is not already wired. -->
+    <a class="ver-link" href="#" target="_blank" rel="noopener noreferrer"
+       title="Open V1 in a new tab">
+      V1
+      <svg class="ver-link-ico" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+           stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4.5 2.5H2.5v7h7v-2M7 2.5h2.5V5M9.5 2.5L5.5 6.5"/>
+      </svg>
+    </a>
+
     <button class="ds-theme-toggle" id="ds-theme-toggle" type="button" aria-label="Toggle light / dark theme" title="Toggle theme">
       <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
@@ -87,9 +100,29 @@
       </svg>
     </button>
 
-    <div class="topnav-bell" role="button" tabindex="0" aria-label="3 notifications">
-      <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
-      <span class="bell-dot"></span>
+    <!-- Notifications. This was an inert <div> carrying a hard-coded "3" and a
+         red dot nothing could clear — a count that is always three is not a
+         count. It is a real button now, and what it opens is the queue of what
+         is still waiting on a person, derived from the corpus. Every row ends
+         in the canvas rather than in a dead end. -->
+    <div class="ntf-anchor">
+      <button class="topnav-bell" id="ntfBell" type="button"
+              aria-haspopup="dialog" aria-expanded="false" aria-controls="ntfPanel"
+              aria-label="Notifications">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        <span class="bell-dot" id="ntfDot" hidden></span>
+      </button>
+      <div class="ntf-panel" id="ntfPanel" hidden role="dialog" aria-label="Needs you">
+        <div class="ntf-head">
+          <b>Needs you</b>
+          <span class="ntf-count" id="ntfCount" hidden>0</span>
+          <button class="ntf-clear" id="ntfClear" type="button">Mark all read</button>
+        </div>
+        <ul class="ntf-list" id="ntfList"></ul>
+        <div class="ntf-foot">
+          <button class="ntf-foot-btn" id="ntfAskAll" type="button">Ask AiMY what to do first</button>
+        </div>
+      </div>
     </div>
 
     <div class="topnav-user" role="button" tabindex="0">
@@ -286,6 +319,6 @@
 
 
 <script src="assets/aimy-ds.js"></script>
-<script src="assets/knowledge.js?v=64"></script>
+<script src="assets/knowledge.js?v=70"></script>
 </body>
 </html>

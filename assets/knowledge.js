@@ -179,7 +179,7 @@
      says so rather than implying a completeness it cannot deliver.
   ═══════════════════════════════════════════════ */
   const USER = {
-    name: 'Nour Wael', initials: 'NW', role: 'Knowledge owner · Support Ops',
+    name: 'Nour Wael', initials: 'NW', role: 'Product Design',
     owner: 'N. Wael',
     collections: ['policies', 'support', 'marketing', 'sales'],   // legal is not entitled
     recent: ['article-sso', 'ticket-48120', 'story-nordwind']
@@ -1839,6 +1839,312 @@
         </div>
       </div>`;
   }
+
+
+  /* ═══════════════════════════════════════════════
+     THE BELL — what is still waiting on a person
+
+     The rail says what CHANGED since Thursday. The bell says what is still
+     OUTSTANDING, which is a different question and the only one worth putting
+     a dot on the chrome for: a source that came back and a document that was
+     published both leave the rail's story true and this one's false.
+
+     Both read the same model, so the two can never contradict each other, and
+     neither is a hand-written list that survives what it describes being
+     fixed. The bell it replaces carried a hard-coded "3 notifications" and a
+     red dot with nothing behind it — a count that is always three is not a
+     count, and a dot nothing can clear is not a signal.
+
+     Every row ends somewhere real, and which route it takes is the row's own
+     business: a single report opens that document, a set becomes the surface,
+     a question goes to the canvas. That is the same four-route contract the
+     input bar honours, so the panel is not a fifth way to do things.
+  ═══════════════════════════════════════════════ */
+  function needsYou() {
+    const out = [];
+    const withStatus = (s) => LIVE.filter((o) => o.status === s);
+    /* Counts here are the corpus's, not a fixture's, so every one of them can
+       legitimately be 1 — and a row reading "1 documents" is a row nobody
+       believes the rest of. */
+    const docs = (n) => n + (n === 1 ? ' document' : ' documents');
+    const is = (n, one, many) => (n === 1 ? one : many);
+
+    /* A dead source leads whether or not it has cost a document yet: it is the
+       only entry here that keeps getting worse while you read the others. */
+    const failing = Object.keys(SRC).filter((k) => SRC[k].health === 'failed');
+    if (failing.length) {
+      const names = failing.map((k) => SRC[k].label);
+      const starved = LIVE.filter((o) => failing.indexOf(o.src) > -1);
+      out.push({
+        id: 'source', sev: 'p1', type: 'Sync blocked',
+        when: failing.length === 1 ? SRC[failing[0]].last + 'd down' : failing.length + ' sources',
+        body: names.join(' and ') + ' stopped syncing. ' + (starved.length
+          ? docs(starved.length) + ' ' + is(starved.length, 'has', 'have') + ' not updated since.'
+          : 'Nothing here is drawn from them yet.'),
+        why: 'It is the only one that keeps getting worse while you read the rest.',
+        cta: 'Why it stopped',
+        ids: starved.map((o) => o.id),
+        go: () => submit('Which sources stopped syncing, and what has it cost?')
+      });
+    }
+
+    /* The one entry a PERSON put here. Everything else is derived, which is
+       exactly why this cannot be left to sort itself out. */
+    const reported = LIVE.filter((o) => openProblems(o));
+    if (reported.length) {
+      const n = reported.reduce((a, o) => a + openProblems(o), 0);
+      out.push({
+        id: 'reported', sev: 'p1', type: 'Reported',
+        when: n + ' open',
+        body: n === 1
+          ? 'Somebody reported a problem with ' + reported[0].title + ', and nobody has answered it.'
+          : n + ' reported problems across ' + docs(reported.length) + ' are unanswered.',
+        why: 'A person put it there, so nothing but a person will clear it.',
+        cta: reported.length === 1 ? 'Open the report' : 'Show them',
+        ids: reported.map((o) => o.id),
+        go: () => reported.length === 1
+          ? patch({ doc: reported[0].id })
+          : patch({ ids: reported.map((o) => o.id) })
+      });
+    }
+
+    const conflicting = withStatus('conflicting');
+    if (conflicting.length) {
+      out.push({
+        id: 'conflicting', sev: 'p1', type: 'Conflict',
+        when: docs(conflicting.length),
+        body: docs(conflicting.length) + ' ' + is(conflicting.length, 'disagrees', 'disagree')
+          + ' with another document, and answers still stand on both sides.',
+        why: 'Two answers to one question is worse than none, because both look confident.',
+        cta: 'Compare them',
+        ids: conflicting.map((o) => o.id),
+        go: () => submit('Which documents contradict each other, and which one should win?')
+      });
+    }
+
+    const outdated = withStatus('outdated');
+    if (outdated.length) {
+      out.push({
+        id: 'outdated', sev: 'p2', type: 'Behind source',
+        when: docs(outdated.length),
+        body: docs(outdated.length) + ' ' + is(outdated.length, 'is', 'are')
+          + ' behind their source. Answers still cite them, and say so.',
+        why: 'Wrong, but not getting wronger — and a blocked source is why some of it is.',
+        cta: 'Re-sync them',
+        ids: outdated.map((o) => o.id),
+        go: () => submit('Which documents are out of date against their source?')
+      });
+    }
+
+    const drafted = withStatus('draft');
+    if (drafted.length) {
+      out.push({
+        id: 'drafts', sev: 'p2', type: 'Not live',
+        when: drafted.length + ' drafted',
+        body: 'AiMY drafted ' + docs(drafted.length) + '. ' + is(drafted.length,
+          'It answers nothing until you publish it.',
+          'None of them answers anything until you publish them.'),
+        why: 'Work already done that nobody can reach yet — the cheapest thing on this list to finish.',
+        cta: is(drafted.length, 'Read the draft', 'Read the drafts'),
+        ids: drafted.map((o) => o.id),
+        /* Status is a LIST key — a bare string writes nothing and the row
+           becomes a button that quietly does not work. */
+        go: () => patch({ status: ['draft'] })
+      });
+    }
+
+    const unowned = withStatus('unowned');
+    if (unowned.length) {
+      out.push({
+        id: 'unowned', sev: 'p2', type: 'Unowned',
+        when: docs(unowned.length),
+        body: docs(unowned.length) + ' ' + is(unowned.length, 'has', 'have')
+          + ' nobody accountable for ' + is(unowned.length, 'it', 'them') + '.',
+        why: 'Every other line on this list needs somebody to send it to.',
+        cta: is(unowned.length, 'Who should own it', 'Who should own them'),
+        ids: unowned.map((o) => o.id),
+        go: () => submit('Which documents are unowned, and who should own each one?')
+      });
+    }
+
+    /* A gap is the absence of a document, so there is nothing to filter to and
+       the row stages a write rather than running one. */
+    if (ASKED.length && LIVE.length) {
+      const asked = ASKED.reduce((s, a) => s + a.n, 0);
+      const lead = ASKED.slice().sort((a, b) => b.n - a.n)[0];
+      out.push({
+        id: 'gap', sev: 'p3', type: 'Coverage gap',
+        when: asked + ' asked',
+        body: asked + ' question' + (asked === 1 ? '' : 's') + ' came in that nothing here answers. '
+          + lead.topic + ' leads.',
+        why: 'Nothing on the surface would ever have said so — an absence has no card.',
+        cta: 'Draft the answer',
+        ids: [],
+        go: () => canvas.stage(lead.prompt, ['Coverage gap', asked + ' unanswered questions', 'Nothing to filter to'])
+      });
+    }
+
+    const unused = withStatus('unused');
+    if (unused.length) {
+      out.push({
+        id: 'unused', sev: 'p3', type: 'Unused',
+        when: 'no citations',
+        body: docs(unused.length) + ' ' + is(unused.length, 'has', 'have')
+          + ' not been cited or opened in three months.',
+        why: 'Either dead weight or a gap in how people find things, and both are worth a look.',
+        cta: is(unused.length, 'Triage it', 'Triage them'),
+        ids: unused.map((o) => o.id),
+        go: () => submit('Which documents has nobody used, and are any worth keeping?')
+      });
+    }
+
+    return out;
+  }
+
+  /* The panel's own action, and the one question it cannot answer by listing
+     itself again. Severity order is the answer, so the answer says why that is
+     the order rather than restating the rows. */
+  function triageAnswer() {
+    const q = needsYou();
+    if (!q.length) return `<div class="answer-surface">
+      <div class="answer-body">
+        <p>Nothing is waiting on you. Everything you can see is owned, in use, matching its
+        source, and nothing disagrees with anything else.</p>
+      </div>
+    </div>`;
+    const lead = q[0], rest = q.slice(1);
+    return `<div class="answer-surface">
+      <div class="answer-body">
+        <p><strong>${esc(lead.type)}, first.</strong> ${esc(lead.body)} ${esc(lead.why)}</p>
+        ${rest.length ? `<p>Then, in this order:</p>` +
+          rest.map((t) => `<p><strong>${esc(t.type)}</strong> — ${esc(t.body)} ${esc(t.why)}</p>`).join('') : ''}
+        <p>That order is severity, not age: what is still getting worse comes before what is
+        merely wrong, and what is merely wrong comes before what is only untidy.</p>
+      </div>
+      ${lead.ids.length ? applyBtn(lead.ids, 'Show what the first one covers') : ''}
+    </div>`;
+  }
+
+  const bell = {
+    btn: null, panel: null, list: null, dot: null, count: null, open: false, read: {},
+
+    init() {
+      this.btn = $('#ntfBell');
+      this.panel = $('#ntfPanel');
+      this.list = $('#ntfList');
+      if (!this.btn || !this.panel || !this.list) return;
+      this.dot = $('#ntfDot');
+      this.count = $('#ntfCount');
+
+      this.btn.addEventListener('click', (e) => { e.stopPropagation(); this.toggle(); });
+
+      const clear = $('#ntfClear');
+      if (clear) clear.addEventListener('click', () => {
+        needsYou().forEach((t) => { this.read[t.id] = true; });
+        this.paint();
+        this.sync();
+      });
+
+      const askAll = $('#ntfAskAll');
+      if (askAll) askAll.addEventListener('click', () => {
+        this.close();
+        canvas.ask('Across everything waiting on me right now, what should I do first and why?',
+          ['Source health', 'Reported problems', 'Every status in the library'], () => triageAnswer());
+      });
+
+      /* Chrome that survives you clicking the work behind it is a modal
+         pretending not to be one. Escape is handled in the canvas's chain,
+         where every dismissable layer on this page is ordered once. */
+      document.addEventListener('click', (e) => {
+        if (!this.open || this.panel.contains(e.target) || this.btn.contains(e.target)) return;
+        this.close();
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (!this.open || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
+        const items = $$('.ntf-row-cta', this.list);
+        if (!items.length) return;
+        e.preventDefault();
+        const i = items.indexOf(document.activeElement);
+        if (i === -1) { items[0].focus(); return; }
+        items[e.key === 'ArrowDown' ? (i + 1) % items.length
+                                    : (i - 1 + items.length) % items.length].focus();
+      });
+
+      this.sync();
+    },
+
+    /* The dot and the count are DERIVED, on every render, from the same corpus
+       the surface is drawing. Publish the drafts and the number goes down
+       without anything having to remember to tell it. */
+    sync() {
+      if (!this.btn) return;
+      const n = needsYou().filter((t) => !this.read[t.id]).length;
+      if (this.count) { this.count.textContent = n; this.count.hidden = n === 0; }
+      if (this.dot) this.dot.hidden = n === 0;
+      this.btn.setAttribute('aria-label', n === 0
+        ? 'Notifications, nothing waiting on you'
+        : 'Notifications, ' + n + ' waiting on you');
+      if (this.open) this.paint();
+    },
+
+    paint() {
+      const q = needsYou();
+      this.list.innerHTML = '';
+      if (!q.length) {
+        const empty = document.createElement('li');
+        empty.className = 'ntf-empty';
+        empty.textContent = 'Nothing is waiting on you.';
+        this.list.appendChild(empty);
+        return;
+      }
+      q.forEach((t) => {
+        const li = document.createElement('li');
+        li.className = 'ntf-row' + (this.read[t.id] ? ' is-read' : '');
+        li.innerHTML =
+          `<span class="ntf-sev ${t.sev}" aria-hidden="true"></span>
+           <div class="ntf-row-main">
+             <div class="ntf-row-head">
+               <span class="ntf-row-type">${esc(t.type)}</span>
+               <span class="ntf-row-when">${esc(t.when)}</span>
+             </div>
+             <p class="ntf-row-body">${esc(t.body)}</p>
+             <button class="ntf-row-cta" type="button">${esc(t.cta)}</button>
+           </div>`;
+        $('.ntf-row-cta', li).addEventListener('click', () => this.start(t));
+        this.list.appendChild(li);
+      });
+    },
+
+    /* Acting on a row is what marks it read — there is no separate gesture for
+       saying you have seen something you are about to deal with. The panel goes
+       first, so it cannot be left floating over whatever the row just opened. */
+    start(t) {
+      this.read[t.id] = true;
+      this.close();
+      t.go();
+    },
+
+    toggle() { if (this.open) this.close(true); else this.show(); },
+
+    show() {
+      this.paint();
+      this.panel.hidden = false;
+      this.open = true;
+      this.btn.setAttribute('aria-expanded', 'true');
+      const first = $('.ntf-row-cta', this.list);
+      if (first) first.focus();
+    },
+
+    close(returnFocus) {
+      if (!this.panel || !this.open) return;
+      this.panel.hidden = true;
+      this.open = false;
+      this.btn.setAttribute('aria-expanded', 'false');
+      if (returnFocus) this.btn.focus();
+      this.sync();
+    }
+  };
 
 
   /* The last filter the user ran, so the rail can offer it back. Session only:
@@ -3963,6 +4269,9 @@
 
       document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
+        /* Topmost first. The bell panel is a dropdown off the chrome, so it is
+           always the shallowest thing open and always the first to go. */
+        if (bell.open) { bell.close(true); return; }
         if (peekStack.length) { closePeek(); return; }
         if (calOpen) { calOpen = null; calPick = null; renderFilters(readURL()); return; }
         if (proto.open) { proto.toggle(false); return; }
@@ -5082,6 +5391,9 @@
   function render() {
     const st = readURL();
     renderBrief(st);
+    /* The bell is derived state like the rail, so it repaints with it rather
+       than being told by whoever happened to change the corpus. */
+    bell.sync();
     renderFilters(st);
     renderChips(st);
 
@@ -7328,6 +7640,7 @@
   ═══════════════════════════════════════════════ */
   function init() {
     canvas.init();
+    bell.init();
     setModal.init();
     wire();
     wireDrop();
