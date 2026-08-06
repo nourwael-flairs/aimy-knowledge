@@ -2,3 +2,10 @@
 GAPS.md
 readme.md
 design-system/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
