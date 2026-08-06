@@ -1308,6 +1308,18 @@ body {
 #canvasOpen { cursor: pointer; }
 #canvasOpen:hover { border-color: rgba(139,79,244,0.6); }
 
+/* The blanket `cursor: default` on the bar's children (§ FORM-CONTROL RESET)
+   is right for its inert furniture — the "Enter to run" hint, the spinner —
+   but it also caught the two things in the bar that do something when clicked.
+   The unread badge is part of the opener's hit area: clicking it opens the
+   canvas, so it must not be the one spot on that button where the cursor
+   goes flat.
+
+   The send needs the id to clear that blanket rule's specificity; the badge
+   does not, because it sits inside the opener rather than beside it. */
+.float-badge,
+#floatSend { cursor: pointer; }
+
 /* Working set — the viewer, editor and version panel own their columns. */
 .ws-single .doc-view,
 .wb-editor-split .doc-view,
