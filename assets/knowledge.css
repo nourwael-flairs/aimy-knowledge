@@ -1171,6 +1171,22 @@ body {
 .answer-surface .trust-disclosure,
 .answer-surface .agent-steps { max-width: none; }
 
+/* ── A citation says what it is citing ──
+
+   The title was a bare text node, which as a flex child is an anonymous item
+   nothing can style. With the type mark now sharing the row it needs to be the
+   thing that gives way, so it takes the shrink and the ellipsis and the
+   connector, status and type all keep their whole words. */
+.source-item .source-title {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.source-item .tc-kind { flex-shrink: 0; color: var(--d500); font-weight: var(--fw-medium); }
+.source-item .tc-kind svg { width: 12px; height: 12px; }
+.source-item .source-domain { margin-left: 0; }
+.cp-src .tc-kind { display: inline-flex; align-items: center; gap: 4px; }
+.cp-src .tc-kind svg { width: 10px; height: 10px; }
+
 /* ═══════════════════════════════════════════════
    THE SETTINGS SHEET
 
@@ -1554,6 +1570,11 @@ body.is-doc .page-inner { max-width: none; }
   margin: 0;
 }
 .doc-by-sep { color: var(--d600); }
+/* Not a button: every other entity on this line opens a peek, and there is no
+   peek for a type — the filter for it is the grid's own dropdown. So it reads
+   as a fact rather than advertising a target that does not exist. */
+.doc-by-kind { display: inline-flex; align-items: center; gap: 4px; }
+.doc-by-kind svg { width: 12px; height: 12px; }
 .doc-by-ent {
   background: none; border: 0; padding: 0; cursor: pointer;
   font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--d400);
@@ -1774,11 +1795,12 @@ body.is-doc .page-inner { max-width: none; }
 .doc-page .comment-text { font-size: 13px; }
 .doc-page .comment-compose { max-width: 80ch; }
 .doc-page .props { gap: 12px; }
-.prop-facts { display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--hairline); }
-/* The type facts take the lead-in role rather than a sixth style of their own —
-   they are what the document says about itself, in the same voice as the rows
-   below them. */
-.prop-facts p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--d400); }
+/* `.prop-facts` stood here: the type's fields, read aloud as phrases above the
+   rows. They are controls now (see .prop-typed), and a value printed above the
+   field that holds it is the same fact twice. */
+/* The type's own fields, separated from the taxonomy every type shares —
+   the same hairline the facts block used to carry. */
+.prop-typed { padding-bottom: 12px; border-bottom: 1px solid var(--hairline); }
 
 @media (max-width: 1100px) {
   .doc-page { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
@@ -2808,9 +2830,37 @@ body.is-doc .page-inner { max-width: none; }
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   overflow: hidden; text-wrap: pretty;
 }
-.tc-snip {
-  margin: 6px 0 0; padding: 0 16px;
+/* ── The body is the only zone that varies ──
+
+   The library's spec is eight templates over one governance row, and the one
+   thing it varies is `.tc-body`. This card kept the collapse of METADATA onto
+   one dim line — that was the right move and it stays — but shrank the body to
+   a single truncated fact, which is what left eight types looking alike.
+
+   Nothing here changes what a library component looks like. It sets the
+   product's own gutter (16px, matching .tc-meta) and the product's own type
+   ramp (13px / --d300 — tier two, declared above), and it sets the height
+   budget, which is a property of a stretched grid rather than of a component.
+   Filed in GAPS.md: the library's .tc-* scale is a 320px specimen scale and
+   this is the second time the product has had to re-step it. */
+.type-card .tc-body { padding: 0 16px; margin-top: 6px; gap: 4px; }
+.type-card .tc-summary {
+  padding: 0;
   font-size: 13px; line-height: 1.45; color: var(--d300);
+  display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;
+  -webkit-line-clamp: 1;
+}
+/* Two lines when the prose IS the body, one when it shares the zone with a
+   pill row or a quote. Same total either way, so a Ticket and an Article end
+   at the same height in a row that stretches — and the rule is CSS rather than
+   a string-length guess in JS, so it holds at every viewport. */
+.type-card .tc-summary:only-child { -webkit-line-clamp: 2; }
+.type-card .tc-quote {
+  display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;
+  -webkit-line-clamp: 1;
+}
+.type-card .tc-mono {
+  margin: 0; font-size: 13px; color: var(--d300);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .tc-meta {
@@ -2820,7 +2870,12 @@ body.is-doc .page-inner { max-width: none; }
 }
 .tc-sep { font-style: normal; color: var(--d600); }
 .tc-kind { display: inline-flex; align-items: center; gap: 4px; }
-.tc-kind svg { width: 11px; height: 11px; opacity: 0.7; }
+/* No opacity. The glyph is the strongest type cue the meta line has, and it
+   was dimmed for no stated reason on top of an 11px --d500 run that already
+   measures 3.51:1. It stays the same size and colour as its neighbours, so
+   un-dimming does not make it outrank the status beside it — status is the
+   only COLOURED run on the card, and colour is what wins here. */
+.tc-kind svg { width: 11px; height: 11px; }
 /* The one coloured thing on the card, and it is four characters wide. */
 .tc-st {
   display: inline-flex; align-items: center; gap: 4px;
@@ -2839,6 +2894,16 @@ body.is-doc .page-inner { max-width: none; }
 .tc-who.is-none { max-width: none; font-style: italic; color: var(--d500); }
 .tc-who:hover { color: var(--accent); }
 .tc-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+/* Same entity treatment as the owner beside it — both open a peek, so both
+   have to look like they do. No max-width: a connector name is two words and
+   clipping "Manual upload" to 12ch would invent an ambiguity. */
+.tc-src {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: var(--font-sans); font-size: inherit; font-weight: inherit; color: inherit;
+  white-space: nowrap;
+}
+.tc-src:hover { color: var(--accent); }
+.tc-src:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
 /* Compact cards live inside answers and connection groups, where the row is
    the point and the action belongs to the panel around it. */
 .type-card.is-compact .tc-title-btn { padding-top: 8px; }
@@ -2907,7 +2972,29 @@ body.is-doc .page-inner { max-width: none; }
   letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
   margin-right: 2px;
 }
-.dv-body .tc-fields { margin-top: 8px; }
+/* ── The document's type slot ──
+
+   Same shapes as the card's body, unclamped: the document has the width the
+   card does not, and the rows the card drops are the reason to open it.
+   Replaces `.dv-body .tc-fields`, which was this idea written into the
+   stylesheet and never wired to any markup.
+
+   It sits OUTSIDE #editBody. See renderDoc: the body is contenteditable and
+   its innerHTML is written back on the first edit, so a derived block rendered
+   inside it would become the document's own stored content. */
+.dv-typed { display: flex; flex-direction: column; gap: 8px; margin: 16px 0 24px; }
+/* In the head the column's own gap does the spacing, the same way the notice
+   and the ownership note already surrender their margins to it. */
+.doc-head .dv-typed { margin: 4px 0 0; }
+.dv-typed .tc-body { padding: 0; margin: 0; gap: 8px; }
+/* Tier two at the document's scale, matching .dv-body's own 15px prose rather
+   than the card's 13px — one ramp per surface, not one ramp everywhere. */
+.dv-typed .tc-summary { margin: 0; padding: 0; font-size: 15px; line-height: 1.6; color: var(--d200); }
+.dv-typed .tc-mono { margin: 0; font-size: 13px; color: var(--d300); word-break: break-all; }
+.dv-typed .tc-tags { gap: 6px; }
+/* `--d600` measures 2.49:1 on a dark card — the marker would be quieter than
+   the criterion it marks. `--d500` is the step this ramp uses for punctuation. */
+.tc-list li::before { color: var(--d500); }
 
 /* ═══════════════════════════════════════════════
    ANSWER → SURFACE
@@ -3181,10 +3268,26 @@ body.is-doc .page-inner { max-width: none; }
    target and the panel opens under its own row. At rest there is no box: the
    value's weight is the only thing separating it from the words around it, and
    the chevron and the background arrive under the pointer. */
+/* ── One left edge for every lead in the panel ──
+
+   Three row shapes share this column — a dropdown, a click-to-edit field and a
+   plain row — and all three use the same trick to bleed their hover left while
+   keeping their text on the block edge: `margin-left: -8px` against
+   `padding-left: 8px`. Only the dropdown did not land on it. Its lead sat 5px
+   right of the other twelve, which down a 320px rail is a ragged column of
+   leads and the kind of thing you see before you can name it.
+
+   Two causes, both here. The 1px transparent border was one pixel the other
+   two rows do not carry. The other four came from the negative margin itself:
+   `.v2-dropdown` is a FLEX container, so a 100%-wide item pulled 8px left
+   leaves 8px of free space in the line, and the item does not simply start at
+   -8. Widening it by exactly the margin removes the free space, and
+   `flex: 0 0 auto` stops the shrink that would put it back. */
 .k-prop.k-row .v2-dropdown-btn {
-  width: 100%; height: auto; justify-content: flex-start; gap: 6px;
+  width: calc(100% + 8px); flex: 0 0 auto;
+  height: auto; justify-content: flex-start; gap: 6px;
   padding: 6px 8px; margin-left: -8px; border-radius: var(--r-sm);
-  background: none; border: 1px solid transparent;
+  background: none; border: 0;
   font-size: 12.5px; font-weight: 400; line-height: 1.5; text-align: left;
   color: var(--d400);
 }
@@ -3214,6 +3317,18 @@ body.is-doc .page-inner { max-width: none; }
 /* Empty, the placeholder is the answer to the sentence, so it needs the room
    to say it: "It touches nothing yet". */
 .props .tag-input.is-empty input { width: 12ch; min-width: 12ch; }
+/* ── A list of sentences, not of slugs ──
+
+   An ICP's fit criteria are prose — "Existing QA function with a named owner"
+   — so the tokens stack one per line instead of flowing inline, and the field
+   takes the full width because 6ch is a control for typing `emea` into. */
+.props .tag-input.is-prose { display: flex; flex-direction: column; align-items: stretch; width: 100%; gap: 4px; }
+.props .tag-input.is-prose .tag-token {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+  width: 100%; white-space: normal; text-align: left; line-height: 1.45;
+}
+.props .tag-input.is-prose input,
+.props .tag-input.is-prose.is-empty input { width: 100%; min-width: 0; }
 .prop-checks { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; }
 /* The checkbox carries the state, so its word is a lead-in, not a value. The
    weight has to be stated too — `.ds-choice` sets 500 on its label, which is a
@@ -3233,6 +3348,23 @@ body.is-doc .page-inner { max-width: none; }
 .prop-kv .field-input { height: 28px; padding: 0 8px; font-size: var(--fs-xs); }
 /* Closed: the read row spans the whole grid and the inputs are not rendered. */
 .prop-kv:not(.is-open) { grid-template-columns: minmax(0, 1fr) 24px; }
+/* A type field has no delete control and no key to rename — the key belongs to
+   the type, and removing it would be changing what kind of thing this is. So
+   one column open or closed, where a custom fact needs two and a bin. */
+.prop-kv.is-fixed,
+.prop-kv.is-fixed:not(.is-open) { grid-template-columns: minmax(0, 1fr); }
+
+/* ── The long-text surface ──
+   Which document you are editing, because the modal covers the title that
+   would otherwise say so. */
+.xm-of { margin: 0 0 12px; font-size: var(--fs-xs); color: var(--d400); }
+.xm-of strong { color: var(--d100); font-weight: var(--fw-semibold); }
+/* A sentence needs the measure and the wrap a rail input cannot give it.
+   Resize stays vertical: horizontal would drag it out of the modal. */
+.xm-text {
+  width: 100%; min-height: 96px; resize: vertical;
+  padding: 8px; font-family: var(--font-sans); font-size: 13px; line-height: 1.6;
+}
 .prop-kv:not(.is-open) .field-input { display: none; }
 .prop-kv.is-open .prop-kv-read { display: none; }
 .prop-kv-read {

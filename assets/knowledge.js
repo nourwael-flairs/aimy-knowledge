@@ -91,6 +91,33 @@
   ═══════════════════════════════════════════════ */
   const UNUSED_DAYS = 90;
 
+  /* ── Who answers for a document ──
+
+     A ticket's `owner` is its ingestion marker — *Ingested · Zendesk* — not a
+     person, so the accountable party is the assignee. Everything that asks
+     "who answers for this" goes through here rather than reading `o.owner`,
+     which is what let the same screen disagree with itself: the byline read
+     "No owner — it arrived from Zendesk" while the rail's Owner row two inches
+     below read "Owned by —", because one printed the field and the other
+     looked it up in OWNERS and found nothing.
+
+     It stays in the owner SLOT on every surface. Moving an assignee somewhere
+     else per type would ask a scanner to relearn the position eight times,
+     which is the one thing the library's card spec is most explicit about.
+
+     Declared here, above `statusOf`, because `recompute()` runs during module
+     evaluation and a `const` declared further down would be a TDZ crash at
+     load rather than a bug you find later. */
+  const responsible = (o) => (o.x && o.x.assignee) || o.owner;
+
+  /* Symmetric, and it has to be: the rail's Owner row is a control, not a
+     label. Reading the assignee while writing `o.owner` would leave the
+     dropdown shadowed by the field it was not writing to — a control that
+     changes nothing and says nothing about why. */
+  const setResponsible = (o, v) => {
+    if (o.x && 'assignee' in o.x) o.x.assignee = v; else o.owner = v;
+  };
+
   /* `tone` maps onto the library's state pill, which carries the colour ramp.
      The class is named for trust; what it actually implements is a tone-bearing
      status pill, and reusing it beats writing a parallel one. See ../GAPS.md. */
@@ -127,7 +154,7 @@
     if (o.src !== 'upload' && o.xu < o.upd) return 'outdated';
     if (r && r.contradicts && r.contradicts.length) return 'conflicting';
     if (o.work === 'drafted') return 'draft';
-    if (o.owner === 'Unassigned') return 'unowned';
+    if (responsible(o) === 'Unassigned') return 'unowned';
     if (o.used > UNUSED_DAYS) return 'unused';
     return 'current';
   }
@@ -360,37 +387,37 @@
       title:'#48120 — Refund declined after activation', col:'support', src:'zendesk', prod:'copilot', client:'nordwind',
       tags:['refunds','eu'], upd:150, ing:150, xc:158, xu:150,
       sum:'Customer activated before requesting a refund; policy exception granted on goodwill.',
-      x:{ requester:'Nordwind GmbH', status:'Resolved', resolution:'Goodwill credit issued; policy exception logged.' } },
+      x:{ requester:'Nordwind GmbH', assignee:'A. Mahfouz', status:'Resolved', resolution:'Goodwill credit issued; policy exception logged.' } },
 
     { id:'ticket-51004', t:'ticket', work:'completed', owner:'Ingested · Zendesk',
       title:'#51004 — SCIM group mapping fails silently', col:'support', src:'zendesk', prod:'copilot', client:'meridian',
       tags:['sso','enterprise','provisioning'], upd:34, ing:34, xc:38, xu:34,
       sum:'Groups synced but roles did not apply. Root cause was a stale mapping cache.',
-      x:{ requester:'Meridian Health', status:'Resolved', resolution:'Cache invalidated on mapping change; fix shipped 24 Jun.' } },
+      x:{ requester:'Meridian Health', assignee:'N. Wael', status:'Resolved', resolution:'Cache invalidated on mapping change; fix shipped 24 Jun.' } },
 
     { id:'ticket-51877', t:'ticket', work:'completed', owner:'Ingested · Zendesk',
       title:'#51877 — Data residency question, APAC contract', col:'support', src:'zendesk', prod:'copilot', client:'tavola',
       tags:['gdpr','apac','security'], upd:9, ing:9, xc:11, xu:9,
       sum:'Asked where APAC data is stored under an enterprise contract. Answer could not be grounded.',
-      x:{ requester:'Tavola Retail', status:'Awaiting legal', resolution:'Open — routed to the policy owner.' } },
+      x:{ requester:'Tavola Retail', assignee:'O. Said', status:'Awaiting legal', resolution:'Open — routed to the policy owner.' } },
 
     { id:'ticket-52310', t:'ticket', work:'completed', owner:'Ingested · Zendesk',
       title:'#52310 — Proration disputed on mid-cycle upgrade', col:'support', src:'zendesk', prod:'sales', client:'orbit',
       tags:['billing'], upd:4, ing:4, xc:5, xu:4,
       sum:'Customer expected a credit rather than a prorated charge.',
-      x:{ requester:'Orbit BPO', status:'Resolved', resolution:'Credit applied; billing article flagged as unclear.' } },
+      x:{ requester:'Orbit BPO', assignee:'N. Wael', status:'Resolved', resolution:'Credit applied; billing article flagged as unclear.' } },
 
     { id:'ticket-52488', t:'ticket', work:'failed', owner:'Ingested · Zendesk',
       title:'#52488 — Voice call dropped at handoff', col:'support', src:'zendesk', prod:'voice', client:'orbit',
       tags:['voice','sla'], upd:2, ing:2, xc:2, xu:2,
       sum:'Ingestion incomplete — the transcript attachment could not be fetched.',
-      x:{ requester:'Orbit BPO', status:'Open', resolution:'Blocked — Zendesk credentials expired mid-sync.' } },
+      x:{ requester:'Orbit BPO', assignee:'Unassigned', status:'Open', resolution:'Blocked — Zendesk credentials expired mid-sync.' } },
 
     { id:'icp-bpo', t:'icp', work:'recommended', owner:'Sales Ops',
       title:'Mid-market BPO — EMEA', col:'sales', src:'hubspot', prod:'sales', client:'',
       tags:['emea','sales','qa'], upd:171, ing:400, xc:430, xu:171,
       sum:'Outsourced contact-centre operators between 200 and 2,000 seats across EMEA.',
-      x:{ segment:'200–2,000 seats · outsourced support',
+      x:{ segment:'200–2,000 seats · outsourced support', score:92,
           fit:['Multi-client contact centre operation','Existing QA function with a named owner'],
           dis:['Single-client captive centres','Under 200 seats — no QA budget'] } },
 
@@ -398,7 +425,7 @@
       title:'Mid-market BPO — APAC', col:'sales', src:'hubspot', prod:'sales', client:'',
       tags:['apac','sales','qa'], upd:290, ing:420, xc:450, xu:290,
       sum:'The APAC cut of the BPO segment. Nothing has cited it since February.',
-      x:{ segment:'150–1,500 seats · outsourced support',
+      x:{ segment:'150–1,500 seats · outsourced support', score:61,
           fit:['English-language delivery','Regional QA mandate'],
           dis:['Domestic-only operators','No data residency requirement'] } },
 
@@ -406,7 +433,7 @@
       title:'Regulated healthcare support — EU', col:'sales', src:'hubspot', prod:'sales', client:'',
       tags:['eu','security','sales'], upd:23, ing:200, xc:230, xu:23,
       sum:'In-house support teams inside regulated healthcare providers.',
-      x:{ segment:'Regulated providers · in-house support',
+      x:{ segment:'Regulated providers · in-house support', score:84,
           fit:['Named compliance owner','Existing audit obligation'],
           dis:['No residency requirement','Outsourced support only'] } },
 
@@ -414,7 +441,7 @@
       title:'Retail voice operations', col:'sales', src:'upload', prod:'voice', client:'',
       tags:['voice','sales'], upd:8, ing:8, xc:8, xu:8,
       sum:'Drafted by AiMY from six won deals. No owner.',
-      x:{ segment:'Retail · seasonal voice volume',
+      x:{ segment:'Retail · seasonal voice volume', score:44,
           fit:['Seasonal peaks above 3× baseline','Existing IVR'],
           dis:['Flat annual volume','No voice channel'] } },
 
@@ -510,19 +537,23 @@
       title:'Pricing — Enterprise tier', col:'marketing', src:'web', prod:'sales', client:'',
       tags:['pricing','enterprise'], upd:134, ing:400, xc:600, xu:26,
       sum:'The live pricing page. Changed at source three weeks after our last crawl.',
-      x:{ url:'aimy.app/pricing/enterprise', crawl:'134 days ago', change:'Detected 26 days ago' } },
+      /* No `crawl` or `change` string. Both were hand-written phrases that
+         disagreed with the numbers beside them — page-security read
+         "7 days ago" against an `upd` of 21 — so they are derived now:
+         `upd` IS the last crawl, and `xu` is when the source moved. */
+      x:{ url:'aimy.app/pricing/enterprise' } },
 
     { id:'page-security', t:'webpage', work:'completed', owner:'O. Said',
       title:'Security overview', col:'marketing', src:'web', prod:'copilot', client:'',
       tags:['security','gdpr'], upd:21, ing:300, xc:410, xu:21,
       sum:'The public security page. Crawled weekly, no unexplained drift.',
-      x:{ url:'aimy.app/security', crawl:'7 days ago', change:'None since last crawl' } },
+      x:{ url:'aimy.app/security' } },
 
     { id:'page-status', t:'webpage', work:'failed', owner:'Unassigned',
       title:'Service status and incident history', col:'support', src:'web', prod:'copilot', client:'',
       tags:['sla','support'], upd:19, ing:210, xc:300, xu:19,
       sum:'Crawl blocked since 11 July. What is stored is nineteen days old.',
-      x:{ url:'status.aimy.app', crawl:'19 days ago', change:'Unknown — crawler blocked' } },
+      x:{ url:'status.aimy.app' } },
 
     /* ── Legal. Not entitled to this user, and therefore never counted, never
        ranked and never cited. The three objects exist so the entitlement
@@ -542,7 +573,7 @@
       title:'#49002 — Legal hold on an account under dispute', col:'legal', src:'zendesk', prod:'copilot', client:'orbit',
       tags:['security'], upd:70, ing:70, xc:72, xu:70,
       sum:'Account data preserved pending resolution.',
-      x:{ requester:'Orbit BPO', status:'On hold', resolution:'Open — legal hold in force.' } }
+      x:{ requester:'Orbit BPO', assignee:'Legal', status:'On hold', resolution:'Open — legal hold in force.' } }
   ];
 
   /* Per-object overrides, kept out of the records above so the corpus stays
@@ -693,7 +724,7 @@
   /* Read straight off the document. The phrase is what gets rendered — the
      relationship is the sentence, not a label above a value. */
   const IMPLICIT = [
-    { type: 'ownedBy',   to: 'owner',      phrase: 'Owned by',      get: (o) => o.owner ? [o.owner] : [] },
+    { type: 'ownedBy',   to: 'owner',      phrase: 'Owned by',      get: (o) => responsible(o) ? [responsible(o)] : [] },
     { type: 'in',        to: 'collection', phrase: 'Filed in',      get: (o) => [o.col] },
     { type: 'from',      to: 'source',     phrase: 'Came from',     get: (o) => [o.src] },
     { type: 'about',     to: 'client',     phrase: 'About',         get: (o) => o.client ? [o.client] : [] },
@@ -1028,7 +1059,7 @@
     /* Archived content is out of the way, not gone. It stays addressable and
        restorable, and asking for it is one parameter. */
     let out = ENTITLED.filter((o) => (st.archived ? o.arch : !o.arch));
-    if (st.mine) out = out.filter((o) => o.owner === USER.owner);
+    if (st.mine) out = out.filter((o) => responsible(o) === USER.owner);
     Object.keys(FIELD_OF).forEach((k) => {
       if (st[k] && st[k].length) out = out.filter((o) => st[k].indexOf(o[FIELD_OF[k]]) > -1);
     });
@@ -1061,7 +1092,7 @@
   const NEED_SCORE = { outdated: 5, conflicting: 5, draft: 3, unowned: 2, unused: 2, superseded: 1, current: 0 };
   const WORK_SCORE = { failed: 4, drafted: 3, detected: 3, recommended: 2, completed: 0 };
   const needScore = (o) =>
-    (NEED_SCORE[o.status] || 0) + (WORK_SCORE[o.work] || 0) + (o.owner === USER.owner ? 2 : 0);
+    (NEED_SCORE[o.status] || 0) + (WORK_SCORE[o.work] || 0) + (responsible(o) === USER.owner ? 2 : 0);
 
   const COMPOSED_CAP = 12;
 
@@ -1087,7 +1118,7 @@
      The order is passed in rather than hard-coded, so one function decides it
      for every surface and the toggle is a live control here too. */
   function composedSet(sort) {
-    const mine = LIVE.filter((o) => o.owner === USER.owner || USER.recent.indexOf(o.id) > -1);
+    const mine = LIVE.filter((o) => responsible(o) === USER.owner || USER.recent.indexOf(o.id) > -1);
     const rest = LIVE.filter((o) => mine.indexOf(o) === -1);
     return sortSet(mine, sort).concat(sortSet(rest, sort)).slice(0, COMPOSED_CAP);
   }
@@ -2175,54 +2206,35 @@
 
   /* ── The card ──
 
-     Two labelled facts per type, chosen as the two a reader needs before they
-     decide whether to open it. A Ticket without its resolution is useless; an
-     ICP without its region and services is not an ICP; a Success Story without
-     its client is an anecdote. The full record is one click away in the modal,
-     so the card's job is to be scannable, not complete. */
+     What a reader needs before deciding whether to open it. A Ticket without
+     its resolution is useless; an ICP without its region and services is not
+     an ICP; a Success Story without its client is an anecdote. The full record
+     is one click away in the document, so the card's job is to be scannable,
+     not complete — which is why the body is clamped there and not here. */
+  /* ── The crawl, in the numbers rather than in a sentence ──
 
-  /* One classified action per card, chosen by what the object actually needs. */
-  /* ═══════════════════════════════════════════════
-     FACTS ARE PHRASES
+     `upd` IS the last crawl: when our copy last changed is when we last
+     fetched it. `xu` is when the source moved, so a change is only DETECTED
+     where the source moved after our copy — the same test `statusOf` uses to
+     call a web page out of date. A blocked crawler knows neither.
 
-     `REQUESTER` over `Nordwind GmbH` is two things to read where one would do,
-     and the shouting 9px uppercase run was carrying a hierarchy that size,
-     weight and position are for. A fact says itself now: *Raised by Nordwind
-     GmbH*. Fewer words on screen, not more.
+     Both replaced hand-written strings that disagreed with the numbers beside
+     them: page-security read "7 days ago" against an `upd` of 21, and the
+     change guard tested `=== 'None'` while the corpus stored "None since last
+     crawl", so every web page's rail read "None since last crawl since the
+     last crawl". A phrase where a date belongs is the same defect twice. */
+  const crawlPhrase = (o) => 'Crawled ' + esc(fmtDate(o.upd));
+  const changePhrase = (o) => o.work === 'failed'
+    ? 'Changes unknown — the crawler is blocked'
+    : o.xu < o.upd ? 'Source changed ' + esc(fmtDate(o.xu))
+    : 'Unchanged since the last crawl';
 
-     Where the value is already a badge — a status, an approval — the badge
-     stands alone. A coloured pill reading *Resolved* does not need the word
-     STATUS above it.
-
-     One table, used by the card (first two) and by the document's rail (all).
-     They cannot drift apart because there is nothing to keep in step.
-  ═══════════════════════════════════════════════ */
-  const TYPE_FACTS = {
-    article:  (o) => ['Applies to ' + esc(o.x.applies).toLowerCase(),
-                      neverCited(o) ? 'Never cited' : 'Last cited ' + esc(usedLabel(o).toLowerCase())],
-    ticket:   (o) => ['Raised by ' + esc(o.x.requester),
-                      o.x.status === 'Resolved' ? 'Resolved' : 'Still open',
-                      o.x.resolution && o.x.resolution !== '—' ? 'Closed with ' + esc(o.x.resolution).replace(/\.$/, '') : ''],
-    icp:      (o) => ['Covers ' + esc(REGIONS[o.region]),
-                      o.services.length ? 'Part of ' + esc(o.services.map((s) => SERVICES[s].toLowerCase()).join(' and ')) : '',
-                      o.x.segment && o.x.segment !== '—' ? 'Segment: ' + esc(o.x.segment) : ''],
-    campaign: (o) => ['Ran ' + esc(o.x.window),
-                      'Aimed at ' + esc(o.x.objective).toLowerCase(),
-                      o.x.assets && o.x.assets !== '—' ? esc(o.x.assets) : ''],
-    asset:    (o) => [esc(o.x.format) + ' — ' + esc(o.x.usage).toLowerCase(),
-                      o.x.approval === 'approved' ? 'Cleared for use' : 'Approval still pending'],
-    story:    (o) => ['About ' + esc(CLIENTS[o.client] || 'no named client'),
-                      'Outcome: ' + esc(o.x.outcome),
-                      o.x.approval === 'approved' ? 'Cleared to quote' : 'Not cleared to quote'],
-    blog:     (o) => [o.x.pub === 'Published' ? 'Published' : esc(o.x.pub),
-                      'Written by ' + esc(o.x.author),
-                      o.x.canonical && o.x.canonical !== '—' ? 'Canonical at ' + esc(o.x.canonical) : ''],
-    webpage:  (o) => ['Crawled ' + esc(o.x.crawl),
-                      o.x.change === 'None' ? 'Unchanged since the last crawl' : esc(o.x.change) + ' since the last crawl',
-                      o.x.url && o.x.url !== '—' ? esc(o.x.url) : '']
-  };
-
-  const typeFacts = (o) => (TYPE_FACTS[o.t] || (() => []))(o).filter(Boolean);
+  /* TYPE_FACTS lived here: eight functions turning `o.x` into read-only
+     phrases for the rail. The rail renders those same fields as CONTROLS now
+     — see TYPE_FIELDS — and a table whose only job was to say a value out
+     loud beside the field that holds it is a second vocabulary to keep in
+     step. The lead phrases moved into TYPE_FIELDS with it, so nothing it said
+     was lost; it just says it next to something you can change. */
 
   /* What the document says about itself, beyond its type. Phrases, in the
      order somebody would ask them. */
@@ -2234,6 +2246,188 @@
     'Visible to ' + esc(o.aud.map((a) => AUDIENCE[a].toLowerCase()).join(' and ')),
     o.tags.length ? 'Tagged ' + esc(o.tags.join(', ')) : ''
   ].filter(Boolean);
+
+  /* ═══════════════════════════════════════════════
+     TYPE BODIES — the one zone that varies
+
+     The library's spec is eight templates over one fixed governance row, and
+     the only zone it varies is the body. This card kept the collapse of
+     METADATA onto one dim line — that was right and it stays — but shrank the
+     body to a single truncated fact, which is what left eight types looking
+     alike: an 11px icon halfway along a five-item line was carrying the whole
+     distinction.
+
+     Differentiation is by SHAPE. The library forbids carrying type in colour,
+     and the zone's position is fixed on all eight, so texture is the channel
+     left — and it is the one that survives a glance. A coloured pill over a
+     sentence does not read like a row of tags, which does not read like a
+     monospace URL, which does not read like a ruled quotation. Nobody has to
+     read the label to know which is which.
+
+     `full` is the document, which has width the card does not and can afford
+     the rows the card clamps away. ONE table for both, so the grid and the
+     opened document cannot describe the same object differently — the rule
+     TYPE_FACTS was written under, applied where it actually holds.
+
+     Two rules this table is written to, both checkable against the corpus:
+       · A fact earns space only if it VARIES within its type. `src` is zendesk
+         for six tickets out of six and hubspot for three ICPs out of four —
+         zero information there, real information on an article or a blog.
+       · Never restate the meta line. Status, owner, edited and used are tier
+         three. Repeating one here is the five-row card coming back.
+
+     Class attributes are whole static literals, never interpolated: the
+     audit's scanner (css-audit.js:30) skips any `class="…"` holding a `$`, so
+     a composed class would leave every variant unchecked.
+  ═══════════════════════════════════════════════ */
+  const tcList = (items, negative) => !items || !items.length ? ''
+    : (negative ? '<ul class="tc-list is-negative">' : '<ul class="tc-list">') +
+      items.map((i) => `<li>${esc(i)}</li>`).join('') + '</ul>';
+
+  const tcSum = (s) => s ? `<p class="tc-summary">${esc(s)}</p>` : '';
+
+  /* Three bars and a number. The band is colour AND meter height AND the digits,
+     so none of the three is carrying it alone. */
+  const confBadge = (n, label) => {
+    if (typeof n !== 'number' || !n) return '';
+    const open = n >= 75 ? '<span class="conf-badge conf-high">'
+      : n >= 50 ? '<span class="conf-badge conf-medium">'
+      : '<span class="conf-badge conf-low">';
+    return open + '<span class="conf-meter"><i></i><i></i><i></i></span>' +
+      esc(label) + `<span class="conf-val">${n}</span></span>`;
+  };
+
+  /* Region and the service lines, as tags — the two axes both profile-shaped
+     types are filed on, and the two a reader filters by. One builder, so an
+     ICP and the Success Story that proves it cannot describe the same two
+     axes differently. `lead` is whatever goes in front: the ICP's fit meter,
+     and nothing for a story, which has no score to show.
+
+     Two services is the cap. Every fixture carries at most two, and with the
+     region in front a third would take the row to three lines at 300px. */
+  const axisTags = (o, lead) => '<div class="tc-tags">' + (lead || '') +
+    `<span class="tag tag-neutral">${esc(REGIONS[o.region] || o.region)}</span>` +
+    o.services.slice(0, 2).map((s) =>
+      `<span class="tag tag-neutral">${esc(SERVICES[s] || s)}</span>`).join('') +
+    '</div>';
+
+  const TYPE_BODY = {
+    /* The document's own words. An article IS its prose, so on the card the
+       summary is the whole answer.
+
+       Not in `full`, though: the document renders `o.sum` as the body's first
+       paragraph, so repeating it in the head puts the same sentence on screen
+       twice, forty pixels apart. What the document adds is the fact the card
+       had no room for. */
+    article:  (o, full) => (full ? '' : tcSum(o.sum)) +
+      (full && o.x.applies && o.x.applies !== '—' ? tcSum('Applies to ' + o.x.applies) : ''),
+
+    campaign: (o, full) => (full ? '' : tcSum(o.sum)) +
+      (full ? tcSum([o.x.objective, o.x.window].filter((v) => v && v !== '—').join(' · ')) : ''),
+
+    /* `x.status` is the ticket's state AT SOURCE — Resolved, Awaiting legal,
+       On hold — and is not `o.status`, which is ours and already on the meta
+       line. It keeps the source's own word rather than translating it into our
+       vocabulary, because a ticket that says "Awaiting legal" is telling you
+       something none of our seven statuses can. */
+    ticket:   (o, full) => (o.x.status === 'Resolved'
+        ? '<div class="tc-tags"><span class="tag tag-ok">'
+        : '<div class="tc-tags"><span class="tag tag-warn">') +
+      esc(o.x.status) + '</span></div>' +
+      (o.x.resolution && o.x.resolution !== '—' ? tcSum(o.x.resolution) : '') +
+      (full && o.x.requester && o.x.requester !== '—' ? tcSum('Raised by ' + o.x.requester) : ''),
+
+    /* Fit, then the two axes an ICP is filed on, as the tags the profile is
+       actually indexed by. Four pills is the cap — at 300px a fifth wraps to a
+       third row and the card stops sharing a height with its neighbours.
+
+       `full` is where fit and disqualifiers finally render. BODY_COPY.icp has
+       told every reader that fit is "assessed on the criteria below" for the
+       life of this prototype, while the criteria sat in the fixture and on no
+       screen. Copy that describes content nobody built is worse than no copy. */
+    icp:      (o, full) => axisTags(o, confBadge(o.x.score, 'Fit')) +
+      (full ? (o.x.segment && o.x.segment !== '—' ? tcSum(o.x.segment) : '') +
+        tcList(o.x.fit) + tcList(o.x.dis, true) : ''),
+
+    /* Approval decides whether the thing can leave the building, which is the
+       only question anyone asks an asset before using it. */
+    asset:    (o, full) => `<div class="tc-tags">${approvalPill(o.x.approval)}</div>` +
+      tcSum(full ? [o.x.format, o.x.usage].filter((v) => v && v !== '—').join(' · ') : o.x.format),
+
+    /* The outcome is the claim, the quote is the evidence for it, and the
+       client is who it happened to. The quote earns the ruled treatment
+       because it is the one run on the grid that is somebody else's words.
+
+       Region and services are here for the same reason they are on an ICP:
+       this is the proof you reach for when a prospect matches that shape, and
+       a story you cannot filter to a region is a story nobody finds. An
+       earlier pass left them off to keep the card from looking like an ICP —
+       wrong trade, and the wrong worry: an ICP leads with a fit meter and a
+       story leads with prose, which is difference enough.
+
+       The quote is the document's, not the card's. With the tags in it was a
+       third body row and 22px on every grid row holding a story — paid for a
+       fact nothing asked the card to carry. It is the evidence behind the
+       outcome, and evidence is what you open something to read. */
+    story:    (o, full) => tcSum(o.x.outcome +
+        (o.client && CLIENTS[o.client] ? ' · ' + CLIENTS[o.client] : '')) +
+      axisTags(o) +
+      (full && o.x.quote ? `<blockquote class="tc-quote">${esc(o.x.quote)}</blockquote>` : '') +
+      (full && o.x.customer && o.x.customer !== '—' ? tcSum(o.x.customer) : ''),
+
+    /* A byline, and only where there is a date to stand behind. `x.pub` is a
+       state word rather than a date, so the publish date comes from `xc` — when
+       the post was created at source, which for a published post is when it
+       went out — and an unpublished draft gets no date at all rather than one
+       that would be a claim about something that has not happened.
+
+       The canonical URL is the post's public address and belongs on the card
+       for the reason a Web Page's does: it is what the customer sees, and the
+       one fact that says whether this copy and the live one are the same page.
+       Same monospace run, so the two web-shaped types read alike. */
+    blog:     (o, full) => tcSum('By ' + o.x.author +
+        (o.x.pub === 'Published' ? ' · ' + fmtDate(o.xc) : '')) +
+      (o.x.canonical && o.x.canonical !== '—'
+        ? `<p class="tc-mono">${esc(o.x.canonical)}</p>` : ''),
+
+    /* The URL is the whole of what makes a web page a web page, and monospace
+       is the only run of that texture anywhere on the grid. */
+    webpage:  (o, full) => (o.x.url && o.x.url !== '—'
+        ? `<p class="tc-mono">${esc(o.x.url)}</p>` : '') +
+      (full ? '' : tcSum(o.sum)) +
+      (full ? tcSum(crawlPhrase(o) + ' · ' + changePhrase(o).toLowerCase()) : '')
+  };
+
+  /* One wrapper, so the gutter and the clamp are declared once and a type with
+     nothing to say renders no zone rather than an empty box still taking its
+     padding. The fallback is the summary, which every type has. */
+  function typeBody(o, full) {
+    const f = TYPE_BODY[o.t];
+    const inner = f ? f(o, full) : tcSum(o.sum);
+    return inner ? `<div class="tc-body">${inner}</div>` : '';
+  }
+
+  /* ── The exit a type deserves when nothing is wrong with it ──
+
+     *Open* is right for all eight and specific to none. The library's templates
+     name the verb the object actually takes, and a grid of mixed types reads
+     faster when the button under each card says what it is about to open.
+
+     Only the LABEL moves. The mode and the action key stay the status's,
+     because what a document needs DOING to it is a property of its condition,
+     not of its kind — and because the click path re-derives through
+     `cardAction`, so a card whose status moved between render and click still
+     performs the current correct action rather than a stale one.
+
+     Deliberately narrow: the other exits — Publish, Re-sync, Set an owner,
+     Archive or keep, Compare — describe the remedy for a condition and read
+     identically well on all eight. Retyping those per type would be eight ways
+     to say one thing. */
+  const TYPE_EXIT = {
+    article:  'Open article',   ticket:  'Open ticket',  icp:   'Review fit criteria',
+    campaign: 'Open campaign',  asset:   'Download asset', story: 'Open story',
+    blog:     'Open post',      webpage: 'Open page'
+  };
 
   /* One action per card, and it is the status's exit — so the card offers the
      thing the badge implies rather than a second vocabulary of its own. */
@@ -2249,7 +2443,10 @@
        remedy for an out-of-date document behind a dead source is the source. */
     if (o.status === 'outdated' && SRC[o.src].health !== 'ok')
       return ['review', 'Reconnect ' + SRC[o.src].label, 'reconnect'];
-    return STATUS_EXIT[o.status] || ['direct', 'Open', 'open'];
+    const exit = STATUS_EXIT[o.status] || ['direct', 'Open', 'open'];
+    return exit[2] === 'open' && TYPE_EXIT[o.t]
+      ? [exit[0], TYPE_EXIT[o.t], exit[2]]
+      : exit;
   }
 
   /* Status as ink, not as a pill above the title. The dot and the word take the
@@ -2279,13 +2476,18 @@
      of size, weight, colour and position, which is what makes the hierarchy
      legible without a single label.
 
+     What changed since: tier two is the TYPE's body rather than one truncated
+     fact. The collapse was never the problem — the problem was that collapsing
+     the metadata took the type's own content down with it, and eight kinds of
+     object ended up sharing one sentence shape. Three tiers still, and the
+     middle one now says something different per type.
+
      One footer, not two. The library's card ends with a bordered, tinted
      `.tc-gov` strip followed by a bordered `.tc-action` strip holding a
      full-width button — two rules and a banner where one row does the job. */
   function typeCard(o, compact) {
     const t = TYPES[o.t];
     const act = cardAction(o);
-    const snip = compact ? '' : (typeFacts(o)[0] || '');
     const meta = [
       statusInk(o),
       `<span class="tc-kind">${t.ico}${esc(t.label)}</span>`,
@@ -2294,18 +2496,30 @@
          as two more items and pointed the peek at an owner that does not exist.
          Same test the document's byline uses. */
       hasOwner(o)
-        ? `<button class="tc-who" data-peek="owner:${esc(o.owner)}">${esc(o.owner)}</button>`
+        ? `<button class="tc-who" data-peek="owner:${esc(responsible(o))}">${esc(responsible(o))}</button>`
         /* When the STATUS is already Unowned the phrase would say it twice on
            one line. It still earns its place on a draft or an out-of-date
            document, where nobody being accountable is the second finding. */
         : o.status === 'unowned' ? ''
-        : `<span class="tc-who is-none">${o.owner === 'Unassigned' ? 'nobody owns it' : 'no owner'}</span>`,
+        : `<span class="tc-who is-none">${responsible(o) === 'Unassigned' ? 'nobody owns it' : 'no owner'}</span>`,
+      /* Where it came from, in the governance run beside who answers for it —
+         the same pair the document's byline carries, and the same peek target.
+         It earns the slot on every type, not just the two that asked for it:
+         an Article that arrived from Confluence and one somebody uploaded are
+         different objects, and the card said nothing about which. */
+      compact ? '' : `<button class="tc-src" data-peek="source:${o.src}">${esc(SRC[o.src].label)}</button>`,
       /* Both dates, because they answer different questions and one is not the
          other: a document edited last week can still be one nobody has cited in
-         four months, and that gap IS the finding. Edited takes a date because
+         four months, and that gap IS the finding. The date takes a date because
          it is a point in time; used takes a distance because the question is
-         how long it has been. */
-      compact ? '' : `<span>edited ${esc(fmtDate(o.upd))}</span>`,
+         how long it has been.
+
+         The VERB follows the provenance. Nobody edits a crawled page and
+         nobody edits a synced ticket — `upd` is when our copy last changed, and
+         for everything with an upstream that change was an ingestion, not an
+         edit. Saying "edited" of all three was one word doing three jobs and
+         getting two of them wrong. */
+      compact ? '' : `<span>${noUpstream(o) ? 'edited' : o.t === 'webpage' ? 'crawled' : 'ingested'} ${esc(fmtDate(o.upd))}</span>`,
       compact ? '' : `<span>${neverCited(o) ? 'never used' : 'used ' + esc(usedLabel(o).toLowerCase())}</span>`
     ].filter(Boolean);
     /* The whole card opens the document. The title stays a real button so the
@@ -2315,7 +2529,7 @@
     return `<div class="type-card${compact ? ' is-compact' : ''}" data-obj="${o.id}" data-status="${o.status}"
          data-work-state="${o.work}" data-card-open="${o.id}">
       <button class="tc-title-btn" data-open-doc="${o.id}"><span class="tc-title">${esc(o.title)}</span></button>
-      ${snip ? `<p class="tc-snip">${snip}</p>` : ''}
+      ${compact ? '' : typeBody(o)}
       <p class="tc-meta">${meta.join('<i class="tc-sep">·</i>')}</p>
       ${compact ? '' : `<div class="tc-foot">
         <span class="tc-foot-act">${entryAction(act[0], act[1], `data-card-act="${o.id}"`)}</span>
@@ -2346,7 +2560,7 @@
 
   function resultMeta(st, list, composed) {
     const excluded = list.filter((o) => STATUS[o.status].excluded).length;
-    const unowned  = list.filter((o) => o.owner === 'Unassigned').length;
+    const unowned  = list.filter((o) => responsible(o) === 'Unassigned').length;
     const axis = talkativeAxis(st);
     const axisLabel = axis && (axis.key === 'collection' ? COLLECTIONS[axis.value] : SRC[axis.value].label);
     return `<div class="rm">
@@ -2427,7 +2641,7 @@
               none: 'Not filed anywhere', order: () => USER.collections },
     client: { label: 'Client',     kind: 'client',     of: (o) => o.client, none: 'Not about any client' },
     prod:   { label: 'Product',    kind: 'product',    of: (o) => o.prod,   none: 'Answers for no product' },
-    owner:  { label: 'Owner',      kind: 'owner',      of: (o) => o.owner,  none: 'Nobody owns it' },
+    owner:  { label: 'Owner',      kind: 'owner',      of: (o) => responsible(o),  none: 'Nobody owns it' },
     src:    { label: 'Source',     kind: 'source',     of: (o) => o.src,    none: 'From nowhere' },
     region: { label: 'Region',     kind: 'region',     of: (o) => o.region, none: 'Covers no region' },
     t:      { label: 'Type',       kind: null,         of: (o) => o.t,      none: 'Untyped' }
@@ -2522,7 +2736,7 @@
                   <button class="tree-leaf ws-tree-doc" data-card-open="${o.id}">
                     <span class="ws-tree-doc-title">${esc(o.title)}</span>
                     ${statusBadge(o.status)}
-                    <span class="ws-tree-doc-who">${esc(o.owner)}</span>
+                    <span class="ws-tree-doc-who">${esc(responsible(o))}</span>
                   </button>
                   ${treeEdges(o)}
                 </div>`).join('')}
@@ -2620,7 +2834,10 @@
   ═══════════════════════════════════════════════ */
   const BODY_COPY = {
     article: ['This is the stored body — what AiMY answers from, which is not always what the live source says.'],
-    icp: ['Fit is assessed on the criteria below, in order. A prospect failing any disqualifier is out regardless of how well it scores elsewhere.'],
+    /* "the criteria below" for the life of this prototype, over criteria that
+       were in the fixture and on no screen. They render above it now, so the
+       sentence points at something and only the direction had to change. */
+    icp: ['Fit is assessed on the criteria above, in order. A prospect failing any disqualifier is out regardless of how well it scores elsewhere.'],
     ticket: ['Ingested from the source system. Ticket content is evidence, not policy — it records what was decided once, for one customer.'],
     story: ['Cleared claims only. Anything not listed as an outcome has not been measured and must not be repeated externally.'],
     campaign: ['Campaign records are operational, not promotional. The asset list is the authority on what may be sent.'],
@@ -2656,8 +2873,8 @@
   function seedVersions(o) {
     o.versions = [
       { v: 'v3', label: 'Clarified the ' + TYPES[o.t].label.toLowerCase() + ' scope',
-        who: o.owner, how: 'edited in the document editor', at: o.upd, body: o.sum, current: true },
-      { v: 'v2', label: 'Rewritten from 12 resolved tickets', who: 'AiMY', how: 'accepted by ' + o.owner,
+        who: responsible(o), how: 'edited in the document editor', at: o.upd, body: o.sum, current: true },
+      { v: 'v2', label: 'Rewritten from 12 resolved tickets', who: 'AiMY', how: 'accepted by ' + responsible(o),
         at: o.upd + 26, ai: true, body: 'Rewritten from twelve resolved tickets. ' + o.sum },
       { v: 'v1', label: 'Imported from ' + SRC[o.src].label, who: 'A. Mahfouz', how: 'first ingestion',
         at: o.ing, body: 'Imported from ' + SRC[o.src].label + '. ' + (o.sum || '').split('.')[0] + '.' }
@@ -2728,7 +2945,7 @@
       const o = byId(id);
       if (!o) return [];
       return [TYPES[o.t].label + ' in ' + COLLECTIONS[o.col],
-              'Owned by ' + o.owner,
+              'Owned by ' + responsible(o),
               'Updated ' + fmtDate(o.upd),
               STATUS[o.status].why];
     }
@@ -2826,7 +3043,10 @@
            showing you a list and no way out of it. -->
       <div class="peek-foot">
         ${kind === 'doc'
-          ? entityAction('Open it', `data-open-doc="${id}"`)
+          /* The panel's first fact already says what kind of thing this is, so
+             the button under it may as well name the same object. Falls back to
+             the generic word for anything without a type. */
+          ? entityAction(TYPE_EXIT[(byId(id) || {}).t] || 'Open it', `data-open-doc="${id}"`)
           : docs.length
             ? entityAction('Show its ' + docs.length + (docs.length === 1 ? ' document' : ' documents'),
                 `data-peek-show="${esc(kind)}:${esc(id)}"`)
@@ -3154,7 +3374,12 @@
      changes shape, and `data-value` carries the display form so selecting a new
      option does not drop the article the trigger was reading with. */
   function propDropdown(f, o, row) {
-    const cur = o[f.key] || '';
+    /* `x.` addresses the type's own bag. One accessor rather than a second
+       dropdown builder, so every field on this panel keeps the same trigger,
+       the same panel and the same keyboard model. */
+    const cur = (f.key === 'owner' ? responsible(o)
+      : f.key.slice(0, 2) === 'x.' ? xVal(o, f.key.slice(2))
+      : o[f.key]) || '';
     const blank = f.blank || '—';
     const rows = [['', blank, blank]]
       .concat(f.map().map(([v, l]) => [v, f.disp ? f.disp(l) : l, l]));
@@ -3177,6 +3402,172 @@
   /* An empty tag field inside a sentence used to render as a full stop after a
      blank — "and it touches ." — so the placeholder answers the sentence
      instead of instructing the field. */
+  /* ═══════════════════════════════════════════════
+     THE TYPE'S OWN FIELDS, AS CONTROLS
+
+     Everything in `o.x` was read-only. Eight types' worth of facts that the
+     card renders, the document renders and the rail read aloud — a ticket's
+     resolution, a blog's author, a web page's URL, an ICP's fit criteria —
+     and not one of them could be changed anywhere in the product. The panel's
+     own rule two hundred lines up is that every property here is a control
+     that writes straight through to the object; the type-specific half had
+     simply never been given one.
+
+     This REPLACES the read-only facts block that used to sit at the top of
+     the panel. That block rendered these same values as phrases, so keeping
+     both would put every fact on screen twice, four rows apart — once as
+     prose and once as a field. The lead phrases below are the ones the facts
+     block used, so nothing about how it reads has been lost.
+
+     Four kinds, because four is what the data actually is:
+       text   — a phrase. Reads as a fact, becomes an input when clicked,
+                the same rule the title, the body and the custom facts follow.
+       pick   — a closed set. A ticket is Resolved or it is not, and a text
+                box would invite a ninth spelling of a word with four.
+       number — the ICP's fit score, clamped 0-100 because it is a percentage
+                and a field that accepts 900 is a field that will hold 900.
+       list   — the ICP's criteria, which are SENTENCES. `tagField` cannot
+                hold them: it slugs its input on Enter, so "Existing QA
+                function" would be stored as "existing-qa-function".
+
+     Ticket assignee is deliberately absent: it is edited through the Owner
+     row, which is where every surface already puts whoever answers for the
+     document. Two controls for one field is how they drift.
+  ═══════════════════════════════════════════════ */
+  const TYPE_FIELDS = {
+    article:  [['applies', 'Applies to', 'text']],
+    ticket:   [['status', 'At source it is', 'pick', ['Resolved', 'Open', 'Awaiting legal', 'On hold']],
+               ['requester', 'Raised by', 'text'],
+               ['resolution', 'Closed with', 'long']],
+    icp:      [['score', 'Fit score', 'number'],
+               ['segment', 'Segment', 'text'],
+               ['fit', 'Fits when', 'list'],
+               ['dis', 'Ruled out by', 'list']],
+    campaign: [['objective', 'Aimed at', 'text'],
+               ['window', 'Ran', 'text'],
+               ['assets', 'Includes', 'text']],
+    asset:    [['format', 'Format', 'text'],
+               ['usage', 'Used', 'pick', ['External — customer-facing', 'External — under NDA', 'Internal only']],
+               ['approval', 'Approval', 'pick', [['approved', 'Approved'], ['pending', 'Awaiting approval']]]],
+    story:    [['customer', 'Customer', 'text'],
+               ['outcome', 'Outcome', 'text'],
+               ['quote', 'They said', 'long'],
+               ['approval', 'Approval', 'pick', [['approved', 'Cleared to quote'], ['pending', 'Not cleared']]]],
+    blog:     [['pub', 'State', 'pick', ['Published', 'Draft — unpublished']],
+               ['author', 'Written by', 'text'],
+               ['canonical', 'Canonical at', 'text']],
+    webpage:  [['url', 'Source URL', 'text']]
+  };
+
+  /* Which type field is unfolded. Its own variable rather than a namespaced
+     `openProp`, because custom property keys are free text and a collision
+     would fold the wrong row. */
+  let openXField = null;
+
+  const xVal = (o, k) => (o.x || {})[k];
+
+  /* Same click-to-edit shape as a custom fact, minus the key input and the
+     delete button — the key is the type's, not yours, and the field cannot be
+     removed without changing what kind of thing the document is. */
+  const xText = (o, k, lead, isNum) => {
+    const v = xVal(o, k);
+    const shown = v === undefined || v === '' || v === '—' ? '—' : String(v);
+    return `<div class="prop-kv is-fixed${openXField === k ? ' is-open' : ''}" data-x-pair="${esc(k)}">
+      <button class="prop-kv-read" data-x-open="${esc(k)}">
+        <span class="prop-lead">${esc(lead)}</span>
+        <span class="prop-kv-val">${esc(shown)}</span>
+      </button>
+      <input class="field-input" type="${isNum ? 'number' : 'text'}"${isNum ? ' min="0" max="100" step="1"' : ''}
+             value="${esc(v === undefined || v === '—' ? '' : String(v))}" data-x-val="${esc(k)}"
+             placeholder="${esc(lead)}" aria-label="${esc(lead)}">
+    </div>`;
+  };
+
+  /* Reads exactly like a text row — same lead, same left edge, same truncation
+     — and opens the modal instead of unfolding an input. The affordance has to
+     be identical or the panel grows a second kind of row for a difference the
+     reader cannot see. */
+  const xLong = (o, k, lead) => {
+    const v = xVal(o, k);
+    const shown = v === undefined || v === '' || v === '—' ? '—' : String(v);
+    return `<div class="prop-kv is-fixed" data-x-pair="${esc(k)}">
+      <button class="prop-kv-read" data-x-modal="${esc(k)}" data-x-lead="${esc(lead)}">
+        <span class="prop-lead">${esc(lead)}</span>
+        <span class="prop-kv-val">${esc(shown)}</span>
+      </button>
+    </div>`;
+  };
+
+  /* Prose, not slugs. Reuses the token look and nothing else — the add field
+     is wide because a criterion is a sentence, and Enter stores what you
+     typed rather than a hyphenated version of it. */
+  const xList = (o, k, lead) => {
+    const vals = xVal(o, k) || [];
+    return `<div class="tag-input is-prose${vals.length ? '' : ' is-empty'}" data-x-list="${esc(k)}">
+      ${vals.map((v, i) => `<span class="tag-token">${esc(v)}
+        <button type="button" data-x-drop="${i}" aria-label="Remove ${esc(v)}">&times;</button></span>`).join('')}
+      <input type="text" placeholder="${vals.length ? 'add another…' : 'nothing yet'}"
+             aria-label="Add to ${esc(lead)}" data-x-add="${esc(k)}">
+    </div>`;
+  };
+
+  /* ── A field too long for the rail ──
+
+     A resolution and a customer quote are sentences, and a 320px column shows
+     about thirty characters of one before the ellipsis takes over. Inline, the
+     value could neither be READ nor sensibly edited: a single-line input
+     scrolling a fifty-character sentence four characters at a time is a worse
+     way to fix a typo than not offering to.
+
+     So the row stays a row — same lead, same left edge, same click — and what
+     opens is a surface with room. Not `commit()`: that surface exists to stage
+     a consequential write, and it always ends in an effects list and a
+     reversibility line. Every other field on this panel writes straight
+     through, and a field that demanded confirmation because its VALUE is long
+     would be ceremony chosen by character count. Same library modal, none of
+     the ritual. */
+  function xModal(o, k, lead) {
+    const host = $('#commitHost');
+    if (!host) return;
+    const v = xVal(o, k);
+    host.innerHTML = `
+      <div class="modal-backdrop" style="display:flex" data-xm-backdrop>
+        <div class="modal" role="dialog" aria-modal="true" aria-label="${esc(lead)}"
+             style="width:520px;max-width:100%">
+          <div class="modal-header">
+            <div class="modal-title">${esc(lead)}</div>
+            <button class="modal-close" data-xm-close aria-label="Close">${ICO.x.replace('<svg', '<svg width="14" height="14"')}</button>
+          </div>
+          <div class="modal-body">
+            <p class="xm-of">On <strong>${esc(o.title)}</strong></p>
+            <textarea class="field-input xm-text" data-xm-val="${esc(k)}" rows="5"
+                      spellcheck="false" aria-label="${esc(lead)}"
+                      placeholder="${esc(lead)}">${esc(v === undefined || v === '—' ? '' : String(v))}</textarea>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-xm-close>Cancel</button>
+            <button class="btn btn-brand" data-xm-save="${esc(k)}">Save</button>
+          </div>
+        </div>
+      </div>`;
+    const ta = $('.xm-text', host);
+    if (ta) setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 60);
+  }
+
+  const closeXModal = () => { const h = $('#commitHost'); if (h) h.innerHTML = ''; };
+
+  function typeFieldRows(o) {
+    return (TYPE_FIELDS[o.t] || []).map(([k, lead, kind, opts]) => {
+      if (kind === 'pick') return propDropdown({
+        key: 'x.' + k, label: lead, lead: lead, blank: '—',
+        map: () => opts.map((v) => (Array.isArray(v) ? v : [v, v]))
+      }, o, true);
+      if (kind === 'list') return propRow(lead, xList(o, k, lead));
+      if (kind === 'long') return xLong(o, k, lead);
+      return xText(o, k, lead, kind === 'number');
+    }).join('');
+  }
+
   const tagField = (o, key, label, lookup) => {
     const vals = o[key] || [];
     return `<div class="tag-input${vals.length ? '' : ' is-empty'}" data-tag-field="${key}">
@@ -3204,10 +3595,34 @@
     <span class="prop-lead">${esc(lead)}</span>${body}</div>`;
 
   function propsPanel(o) {
-    const facts = typeFacts(o);
     const custom = Object.keys(o.props);
+    const typed = typeFieldRows(o);
     return `<div class="props">
-      ${facts.length ? `<div class="prop-facts">${facts.map((f) => `<p>${f}</p>`).join('')}</div>` : ''}
+
+      <!-- ── Status first ──
+
+           It kept its own block BELOW the rows on the argument that it carries
+           a reason as well as a value. The block is right; the position was
+           not. Status is the only field here that decides whether AiMY may use
+           the document at all, and it was the last thing in the panel — nine
+           rows and a tag field down, past the fold on a 320px rail, inside a
+           details element that was itself closed. The one control anybody
+           opens this panel to reach was the hardest thing in it to reach.
+
+           The reason still travels with it. That is why it is a block and not
+           another row. -->
+      <div class="prop-status">
+        ${propDropdown({ key: 'statusSet', label: 'Status', lead: 'Status is', blank: 'Automatic',
+          map: () => Object.keys(STATUS).map((k) => [k, STATUS[k].label]) }, o, true)}
+        <span class="prop-why">${o.statusSet
+          ? 'Set by ' + esc(o.statusBy || USER.owner) + '. Choose Automatic to compute it again.'
+          : esc(STATUS[o.status].why)}</span>
+      </div>
+
+      <!-- What this KIND of thing says about itself, before the taxonomy every
+           kind shares. A ticket's resolution is the reason you opened the
+           ticket; which collection it is filed in is not. -->
+      ${typed ? `<div class="prop-rows prop-typed">${typed}</div>` : ''}
 
       <div class="prop-rows">
         ${PROP_FIELDS.map((f) => propDropdown(f, o, true)).join('')}
@@ -3219,16 +3634,6 @@
         ${propRow('Visible to', `<div class="prop-checks">${Object.keys(AUDIENCE).map((a) => `
           <label class="ds-choice"><input type="checkbox" data-aud="${a}"${o.aud.indexOf(a) > -1 ? ' checked' : ''}>
             <span></span><span class="prop-check-label">${esc(AUDIENCE[a])}</span></label>`).join('')}</div>`)}
-      </div>
-
-      <!-- Status carries a reason as well as a value, and the reason is the
-           half that matters, so it keeps its own block below the rows. -->
-      <div class="prop-status">
-        ${propDropdown({ key: 'statusSet', label: 'Status', lead: 'Status is', blank: 'Automatic',
-          map: () => Object.keys(STATUS).map((k) => [k, STATUS[k].label]) }, o, true)}
-        <span class="prop-why">${o.statusSet
-          ? 'Set by ' + esc(o.statusBy || USER.owner) + '. Choose Automatic to compute it again.'
-          : esc(STATUS[o.status].why)}</span>
       </div>
 
       <!-- ── Anything the fixed fields cannot hold ──
@@ -3288,9 +3693,9 @@
      person. As a label over a value that read as odd data; as a sentence,
      "Owned by Ingested · Zendesk" reads as nonsense. The phrase treatment makes
      the defect visible, which is the argument for the phrase treatment. */
-  const hasOwner = (o) => OWNERS.indexOf(o.owner) > -1 && o.owner !== 'Unassigned';
-  const ownerPhrase = (o) => hasOwner(o) ? 'Owned by ' + esc(o.owner)
-    : o.owner === 'Unassigned' ? 'Nobody owns it'
+  const hasOwner = (o) => OWNERS.indexOf(responsible(o)) > -1 && responsible(o) !== 'Unassigned';
+  const ownerPhrase = (o) => hasOwner(o) ? 'Owned by ' + esc(responsible(o))
+    : responsible(o) === 'Unassigned' ? 'Nobody owns it'
     : 'No owner — it arrived from ' + esc(SRC[o.src].label);
 
   /* The byline. Everything a masthead would say, as one line of phrases, each
@@ -3299,7 +3704,14 @@
     const src = SRC[o.src];
     return `<div class="doc-byline">
       ${statusBadge(o.status, o.statusSet ? 'Set by ' + esc(o.statusBy || USER.owner) : '')}
-      <button class="doc-by-ent" data-peek="owner:${esc(o.owner)}">${ownerPhrase(o)}</button>
+      <!-- What kind of thing it is, first. The byline said status, owner, date,
+           source and collection and never once said whether you were looking at
+           a ticket or a policy — the most basic fact about an object, and the
+           only masthead in the product that left it out. Icon AND label, never
+           colour, which is the library's rule for type everywhere. -->
+      <span class="doc-by-kind">${TYPES[o.t].ico}${esc(TYPES[o.t].label)}</span>
+      <span class="doc-by-sep">·</span>
+      <button class="doc-by-ent" data-peek="owner:${esc(responsible(o))}">${ownerPhrase(o)}</button>
       <span class="doc-by-sep">·</span>
       <!-- ── When it changed, and every time it changed ──
 
@@ -3405,8 +3817,8 @@
       match: (a, b) => b.tags.filter((t) => a.tags.indexOf(t) > -1).length > 1 },
     { has: () => true,        phrase: (o) => 'Also filed in ' + COLLECTIONS[o.col],
       match: (a, b) => b.col === a.col },
-    { has: (o) => hasOwner(o), phrase: (o) => 'Also owned by ' + o.owner,
-      match: (a, b) => b.owner === a.owner },
+    { has: (o) => hasOwner(o), phrase: (o) => 'Also owned by ' + responsible(o),
+      match: (a, b) => responsible(b) === responsible(a) },
     { has: () => true,        phrase: (o) => 'Also came from ' + SRC[o.src].label,
       match: (a, b) => b.src === a.src }
   ];
@@ -3607,7 +4019,7 @@
        and the same test the drop layer uses. */
     const blank = isBlankDoc(o);
     const preview = previewVer !== null ? VERSIONS(o)[previewVer] : null;
-    const owns = o.owner === USER.owner;
+    const owns = responsible(o) === USER.owner;
     const keep = stage.dataset.doc === o.id ? $('#docCanvas') && $('#docCanvas').scrollTop : 0;
     const live = document.activeElement;
     const armed = live && live.getAttribute && live.getAttribute('contenteditable') === 'true' && isEditable(live)
@@ -3671,7 +4083,34 @@
             ${(notice || docByline(o) || (!preview && !owns)) ? `<header class="doc-head">
               ${notice}
               ${docByline(o)}
-              ${!preview && !owns ? `<p class="doc-note">Owned by ${esc(o.owner)}, not you. Your edit is recorded against your name.</p>` : ''}
+              <!-- ── What kind of thing this is, in its own shape ──
+
+                   The same TYPE_BODY the card renders, unclamped. The document
+                   had exactly one type-aware run in it — a single sentence of
+                   boilerplate in the second paragraph — so a Ticket and an ICP
+                   opened to the same page with different words on it. The
+                   library's spec calls this the viewer's "type-appropriate body
+                   slot"; the .dv-body .tc-fields rule in the stylesheet was
+                   somebody writing its CSS and never wiring it up.
+
+                   IN THE HEAD, for the reason the head exists. It sat between
+                   the title and the body for one pass, which put derived
+                   metadata through the middle of the two editable blocks — the
+                   exact defect the note above says the head was created to fix,
+                   reintroduced by the next thing that needed a home. Everything
+                   ABOUT the document is above it; the title and the body are
+                   neighbours, and the only editable run is contiguous.
+
+                   OUTSIDE #editBody either way. The body is contenteditable and
+                   its innerHTML is written back to o.html on the first edit, so
+                   anything rendered inside it would be swallowed into the
+                   document's own content the first time somebody typed.
+
+                   Suppressed while previewing a version, because it would be
+                   describing the current object beside an older body; and on a
+                   blank document, which has nothing to say about itself yet. -->
+              ${preview || blank ? '' : `<div class="dv-typed">${typeBody(o, true)}</div>`}
+              ${!preview && !owns ? `<p class="doc-note">Owned by ${esc(responsible(o))}, not you. Your edit is recorded against your name.</p>` : ''}
             </header>` : ''}
 
             <!-- No contenteditable at rest. See armEditable: the attribute
@@ -3736,14 +4175,20 @@
         </div>
 
         <aside class="doc-rail" aria-label="About this document">
-          <!-- All three closed. The document is what you came for; the rail is
-               what you go to when you have a question about it, and three open
-               blocks answered questions nobody had asked yet.
+          <!-- What it is opens; the other two wait to be asked.
+
+               All three used to be closed, on the argument that three open
+               blocks answer questions nobody put. That holds for the other
+               two — what a document connects to and where it came from are
+               things you go looking for. It does not hold for the first one,
+               which is the only place the document's properties can be
+               CHANGED. Closed, every field on the page was a click away from
+               being visible at all, and the rail read as three labels.
 
                The titles are the questions each one answers, in parallel, so
                the summary alone tells you whether to open it. "About it" was
                vague enough to mean any of the three. -->
-          ${railBlock('What it is', false, propsPanel(o))}
+          ${railBlock('What it is', true, propsPanel(o))}
           ${railBlock('What it connects to', false, connectionsBlock(o), claimsOf(o).length)}
           ${railBlock('Where it came from', false, provenanceBlock(o))}
           <div class="rail-foot">
@@ -4269,7 +4714,11 @@
 
       document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        /* Topmost first. The bell panel is a dropdown off the chrome, so it is
+        /* Topmost first. A modal over the rail is the deepest thing on the
+           page and the only one holding an unsaved edit, so it goes before
+           anything underneath it can take the key. */
+        if (($('#commitHost') || {}).innerHTML && $('[data-xm-save]')) { closeXModal(); return; }
+        /* The bell panel is a dropdown off the chrome, so it is
            always the shallowest thing open and always the first to go. */
         if (bell.open) { bell.close(true); return; }
         if (peekStack.length) { closePeek(); return; }
@@ -4435,19 +4884,40 @@
      cited ids into the URL, so the conversation and the page stop being two
      products. That is the mind map's "filter by document ids" node.
   ═══════════════════════════════════════════════ */
+  /* ── A citation says what it is citing ──
+
+     Both renderings carried title, source and status and neither said whether
+     the thing behind the number was a policy article or one customer's ticket
+     — which is exactly the distinction that decides how much weight an answer
+     deserves. A resolved ticket records what was decided once, for one
+     customer; an article is the policy. Cited side by side they were byte
+     identical.
+
+     Same idiom as the card's meta line: icon AND label, never colour. */
+  const typeMark = (o) => `<span class="tc-kind">${TYPES[o.t].ico}${esc(TYPES[o.t].label)}</span>`;
+
   function citeChip(n, id, passage) {
     const o = byId(id);
     return `<span class="cite-wrap"><span class="cite" tabindex="0" role="button" aria-describedby="kcp${n}">${n}</span>` +
       `<span class="cite-preview" id="kcp${n}" role="tooltip">` +
       `<span class="cp-head"><span class="cp-title">${esc(o.title)}</span>${statusBadge(o.status)}</span>` +
       `<span class="cp-passage">“${esc(passage)}”</span>` +
-      `<span class="cp-foot"><span class="cp-src">${esc(SRC[o.src].label)} · ${esc(COLLECTIONS[o.col])}</span>` +
+      `<span class="cp-foot"><span class="cp-src">${typeMark(o)} · ${esc(SRC[o.src].label)} · ${esc(COLLECTIONS[o.col])}</span>` +
       `<button class="cite-action is-flag" data-flag="${o.id}">${ICO.flag}Flag</button></span></span></span>`;
   }
 
+  /* The type goes in FRONT of the title, where it reads as a label on the row
+     rather than as another field beside the connector. The connector keeps its
+     slot: which system a claim came from is provenance, and the type does not
+     replace it.
+
+     `data-open-doc` because the row has had `cursor: pointer` and no handler
+     for as long as it has existed — a row that says it is clickable and is
+     not. The router already knows the attribute; it was only ever missing. */
   function sourceRow(n, id) {
     const o = byId(id);
-    return `<div class="source-item"><span class="cite">${n}</span>${esc(o.title)}` +
+    return `<div class="source-item" data-open-doc="${o.id}"><span class="cite">${n}</span>` +
+      `${typeMark(o)}<span class="source-title">${esc(o.title)}</span>` +
       `<span class="source-domain">${esc(SRC[o.src].label)}</span>${statusBadge(o.status)}</div>`;
   }
 
@@ -4523,7 +4993,7 @@
     const row = (o, other) => `<div class="conflict-side">
       <div class="conflict-head">${statusBadge(o.status)}<span class="conflict-title">${esc(o.title)}</span></div>
       <p class="conflict-body">${esc(o.sum)}</p>
-      <div class="conflict-meta">${esc(SRC[o.src].label)} · ${esc(o.owner)} · ${neverCited(o) ? 'never used' : 'used ' + esc(usedLabel(o).toLowerCase())},
+      <div class="conflict-meta">${esc(SRC[o.src].label)} · ${esc(responsible(o))} · ${neverCited(o) ? 'never used' : 'used ' + esc(usedLabel(o).toLowerCase())},
         ${o.uses} times in 90 days</div>
       ${entryAction('review', 'Make this the one', `data-resolve="${o.id}"`)}
     </div>`;
@@ -4703,15 +5173,30 @@
       const h = hay(o);
       return { o: o, n: sharp.filter((w) => h.indexOf(w) > -1).length };
     }).filter((x) => x.n > 0).sort((a, b) => b.n - a.n || a.o.upd - b.o.upd);
+    /* Which type the question narrowed to, where it named one. "Expired ICPs,
+       why did they lapse?" really does scope the pool by type and the answer
+       said only "across the 4 in scope" — a number over an axis it applied and
+       did not mention. Carried out so the scope line can name it. */
+    const typeAxis = axisScoped && axes.type && axes.type.length
+      ? axes.type.map((t) => (TYPES[t] || {}).label).filter(Boolean) : null;
+
     /* Naming nothing the corpus recognises does not make the question empty:
        "what is out of date?" is about the whole surface. Only a question whose
        words match no document AND asks nothing computable is a coverage gap. */
     return { docs: scored.length ? scored.map((x) => x.o) : pool, terms: words,
-             broad: !scored.length, axis: axisScoped };
+             broad: !scored.length, axis: axisScoped,
+             types: typeAxis && typeAxis.length ? typeAxis : null };
   }
 
+  /* An acronym keeps its case — "icps" is not a word — and a -y pluralises
+     properly, so Success Story does not come out as Success Storys. */
+  const typeWord = (label) => label === label.toUpperCase() ? label : label.toLowerCase();
+  const plural = (s) => /y$/.test(s) ? s.slice(0, -1) + 'ies' : s + 's';
+  const typeScope = (scope) => scope.types
+    ? ' ' + scope.types.map((l) => plural(typeWord(l))).join(' and ') : '';
+
   const scopeLine = (scope, st) => scope.axis
-    ? 'across the ' + scope.docs.length + ' in scope'
+    ? 'across the ' + scope.docs.length + typeScope(scope) + ' in scope'
     : scope.broad
       ? (activeChips(st).length ? 'across what is on your surface' : 'across your four collections')
       : scope.docs.length === 1 ? 'in the one document that mentions it'
@@ -4729,16 +5214,17 @@
   const COMPUTED = {
     owner(scope, st, q) {
       const docs = scope.docs;
-      /* "Who owns this" means "who do I ask". Some documents carry an
-         ingestion marker in that field rather than a person — counting
-         "Ingested · Zendesk" as an owner answers the question with something
-         you cannot send a message to. */
-      const named = (o) => OWNERS.indexOf(o.owner) > -1 && o.owner !== 'Unassigned';
+      /* "Who owns this" means "who do I ask", which is why this goes through
+         `responsible` and not the raw field: some documents carry an ingestion
+         marker there rather than a person, and answering with
+         "Ingested · Zendesk" names something you cannot send a message to.
+         An ingested document with an assignee now has somebody to ask, and
+         `hasOwner` is the same test every other surface applies. */
       const by = {};
-      docs.filter(named).forEach((o) => { by[o.owner] = (by[o.owner] || 0) + 1; });
+      docs.filter(hasOwner).forEach((o) => { by[responsible(o)] = (by[responsible(o)] || 0) + 1; });
       const top = Object.keys(by).sort((a, b) => by[b] - by[a]).slice(0, 3);
-      const nobody = docs.filter((o) => !named(o));
-      const unassigned = nobody.filter((o) => o.owner === 'Unassigned');
+      const nobody = docs.filter((o) => !hasOwner(o));
+      const unassigned = nobody.filter((o) => responsible(o) === 'Unassigned');
       const ingested = nobody.length - unassigned.length;
       return `<div class="answer-surface">
         <div class="answer-body">
@@ -5042,7 +5528,7 @@
     const from = 'everything on the surface';
 
     const excluded = scope.filter((o) => STATUS[o.status].excluded);
-    const unowned  = scope.filter((o) => o.owner === 'Unassigned');
+    const unowned  = scope.filter((o) => responsible(o) === 'Unassigned');
     const willAct  = scope.length - (key === 'verify' ? unowned.length : 0);
 
     commit({
@@ -5171,7 +5657,7 @@
     const m = COLLECTION_META[col];
     const live = LIVE.filter((o) => o.col === col);
     const stale = live.filter((o) => o.status === 'outdated' || o.status === 'unused');
-    const unowned = live.filter((o) => o.owner === 'Unassigned');
+    const unowned = live.filter((o) => responsible(o) === 'Unassigned');
     const external = AGENTS.filter((a) => a.external && m.grounding[a.id]);
     return setChrome(COLLECTIONS[col], 'Owned by ' + m.owner) + `
       <div class="doc-scroll">
@@ -5548,7 +6034,7 @@
       ['Surfaces', '', [
         /* No "editor" any more: a document is one surface, so opening one IS
            opening the editor. */
-        ['a document', 'doc:' + protoFirst((o) => !o.arch && o.owner === USER.owner)],
+        ['a document', 'doc:' + protoFirst((o) => !o.arch && responsible(o) === USER.owner)],
         ['new document', 'new:1'],
         ['settings — a source', 'set:source:' + (deadSrc || 'confluence')],
         ['settings — a collection', 'set:collection:' + USER.collections[0]],
@@ -5687,7 +6173,7 @@
         toast('Nothing needs a person', null, 'Everything current, every source healthy');
         return;
       }
-      const o = byId(readURL().doc) || ENTITLED.filter((x) => !x.arch && x.owner === USER.owner)[0];
+      const o = byId(readURL().doc) || ENTITLED.filter((x) => !x.arch && responsible(x) === USER.owner)[0];
       if (!o) { toast('Nothing to work with', null, 'Reload the fixtures'); return; }
       if (arg === 'connected') {
         /* Connected to everything, so there is nothing left to pick. */
@@ -5790,7 +6276,14 @@
         repaintEditor();
         return;
       }
-      o[key] = val;
+      /* Owner goes through the same accessor the byline reads, so an ingested
+         document's row writes the assignee rather than an `owner` field the
+         display would then ignore. */
+      if (key === 'owner') setResponsible(o, val);
+      /* The type's own bag, addressed by the same `x.` prefix the trigger
+         was built with. */
+      else if (key.slice(0, 2) === 'x.') { o.x = o.x || {}; o.x[key.slice(2)] = val; }
+      else o[key] = val;
       /* Changing the type changes which fields the card and viewer draw, so the
          type-specific bag has to gain the shape the new type expects. */
       if (key === 't') o.x = Object.assign({}, BLANK_X[o.t] || {}, o.x);
@@ -6085,6 +6578,18 @@
       const t = e.target;
       const o = byId(readURL().doc);
       if (!o || !t.hasAttribute) return;
+      if (t.hasAttribute('data-x-val')) {
+        const k = t.getAttribute('data-x-val');
+        const raw = t.value.trim();
+        /* A score is a percentage. A field that accepts 900 is a field that
+           will hold 900, and the badge would render a meter off its own end. */
+        o.x = o.x || {};
+        o.x[k] = t.type === 'number'
+          ? (raw === '' ? 0 : Math.max(0, Math.min(100, Math.round(Number(raw) || 0))))
+          : raw;
+        if (openXField !== null) { openXField = null; repaintEditor(); }
+        return;
+      }
       if (t.hasAttribute('data-prop-k')) {
         const was = t.getAttribute('data-prop-k'), now = t.value.trim();
         /* The key IS the identity, so a rename has to carry the open marker
@@ -6178,6 +6683,31 @@
       e.preventDefault();
       const btn = $('[data-comment-add]');
       if (btn) btn.click();
+    });
+
+    /* The same two moves for a prose list, minus the slug. A tag is a machine
+       value and gets lowercased and hyphenated; a fit criterion is a sentence
+       somebody wrote and gets stored as typed. */
+    document.addEventListener('keydown', (e) => {
+      const t = e.target;
+      if (!t.hasAttribute || !t.hasAttribute('data-x-add')) return;
+      const o = byId(readURL().doc);
+      if (!o) return;
+      const k = t.getAttribute('data-x-add');
+      o.x = o.x || {};
+      const list = o.x[k] || [];
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const v = t.value.trim();
+        if (!v) return;
+        if (list.indexOf(v) === -1) o.x[k] = list.concat([v]);
+        t.value = '';
+        repaintEditor();
+      } else if (e.key === 'Backspace' && !t.value && list.length) {
+        e.preventDefault();
+        o.x[k] = list.slice(0, -1);
+        repaintEditor();
+      }
     });
 
     /* Tag entry. Enter commits a token, Backspace on an empty field removes the
@@ -6375,8 +6905,49 @@
         repaintEditor();
         return;
       }
+      /* The long-text surface. Save writes and repaints; Cancel and the
+         backdrop leave the value alone, which is the whole reason a field
+         that opens a surface gets a Cancel and an inline one does not. */
+      if ((el = t.closest('[data-xm-save]'))) {
+        const o = byId(readURL().doc);
+        const k = el.getAttribute('data-xm-save');
+        const ta = $('[data-xm-val="' + k.replace(/"/g, '\\"') + '"]');
+        if (o && ta) { o.x = o.x || {}; o.x[k] = ta.value.trim(); }
+        closeXModal();
+        repaintEditor();
+        return;
+      }
+      if (t.closest('[data-xm-close]') || t.hasAttribute('data-xm-backdrop')) {
+        closeXModal();
+        return;
+      }
+      if ((el = t.closest('[data-x-modal]'))) {
+        const o = byId(readURL().doc);
+        if (o) xModal(o, el.getAttribute('data-x-modal'), el.getAttribute('data-x-lead'));
+        return;
+      }
+      /* A type field unfolds the same way a custom fact does, and closes the
+         other one on the way — two open inputs in a 320px rail is two carets
+         and no way to tell which one Enter belongs to. */
+      if ((el = t.closest('[data-x-open]'))) {
+        openXField = el.getAttribute('data-x-open');
+        openProp = null;
+        repaintEditor();
+        const v = $('[data-x-val="' + openXField.replace(/"/g, '\\"') + '"]');
+        if (v) setTimeout(() => { v.focus(); v.select(); }, 40);
+        return;
+      }
+      if ((el = t.closest('[data-x-drop]'))) {
+        const o = byId(readURL().doc);
+        const k = el.closest('[data-x-list]').getAttribute('data-x-list');
+        const i = +el.getAttribute('data-x-drop');
+        o.x[k] = (o.x[k] || []).filter((_, n) => n !== i);
+        repaintEditor();
+        return;
+      }
       if ((el = t.closest('[data-prop-open]'))) {
         openProp = el.getAttribute('data-prop-open');
+        openXField = null;
         repaintEditor();
         const v = $('[data-prop-v="' + openProp.replace(/"/g, '\\"') + '"]');
         if (v) setTimeout(() => { v.focus(); v.select(); }, 40);
@@ -7065,7 +7636,7 @@
           agents.length
             ? ['warn', `<strong>${agents.map((a) => esc(a.name)).join(', ')}</strong> may start citing it immediately.`]
             : ['skip', 'No agent grounds on this collection, so nothing starts citing it.'],
-          o.owner === 'Unassigned' ? ['warn', 'It has no owner. Publishing does not give it one.'] : null
+          responsible(o) === 'Unassigned' ? ['warn', 'It has no owner. Publishing does not give it one.'] : null
         ].filter(Boolean),
         onRun: () => {
           const before = { work: o.work, upd: o.upd, versions: VERSIONS(o).slice() };
@@ -7296,12 +7867,12 @@
       commit({
         title: 'Report a problem with this document',
         width: 520,
-        rationale: `This goes to <strong>${esc(o.owner)}</strong>, who owns
+        rationale: `This goes to <strong>${esc(responsible(o))}</strong>, who owns
           <strong>${esc(o.title)}</strong>, with your name and today's date on it.
           It does not change the document.`,
         confirm: 'Send it', done: 'Reported',
         effects: [['ok', 'Shows on the document as a reported problem'],
-                  ['ok', 'Appears in ' + esc(o.owner) + '&rsquo;s briefing until it is resolved'],
+                  ['ok', 'Appears in ' + esc(responsible(o)) + '&rsquo;s briefing until it is resolved'],
                   ['warn', 'Anyone who can read this document can read the report']],
         body: `<div class="rp-form">
           <label class="field-label" for="rpWhat">What is wrong with it?</label>
@@ -7318,7 +7889,7 @@
           render();
           markAfter('.comment:last-of-type', $('#docCanvas'));
           markCard(o.id);
-          toast('Reported', 'Undo', 'On ' + o.title + ' — ' + o.owner + ' will see it');
+          toast('Reported', 'Undo', 'On ' + o.title + ' — ' + responsible(o) + ' will see it');
           undoStack = () => { o.comments.pop(); render(); };
           return true;
         }
@@ -7618,13 +8189,14 @@
      anyone has filled anything in. */
   const BLANK_X = {
     article:  { applies: '—' },
-    ticket:   { requester: '—', status: 'Open', resolution: '—' },
-    icp:      { segment: '—', fit: [], dis: [] },
+    ticket:   { requester: '—', assignee: 'Unassigned', status: 'Open', resolution: '—' },
+    icp:      { segment: '—', score: 0, fit: [], dis: [] },
     campaign: { objective: '—', window: '—', assets: '—' },
     asset:    { format: '—', usage: 'Internal only', approval: 'pending' },
     story:    { customer: '—', outcome: '—', quote: '', approval: 'pending' },
     blog:     { pub: 'Draft', canonical: '—', author: USER.owner },
-    webpage:  { url: '—', crawl: '—', change: 'None' }
+    /* No crawl or change: both are derived from `upd` and `xu` now. */
+    webpage:  { url: '—' }
   };
 
   /* The card's one classified action. Each terminates in a completed action, a
