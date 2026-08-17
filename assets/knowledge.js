@@ -59,6 +59,10 @@
     trophy:   svg('<path d="M8 21h8"/><path d="M12 17v4"/><path d="M17 4h3v3a5 5 0 01-5 5H9a5 5 0 01-5-5V4h3"/><path d="M7 4h10v4a5 5 0 01-10 0z"/>', 2),
     book:     svg('<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>', 2),
     globe:    svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 010 18a15 15 0 010-18z"/>', 2),
+    /* A screen on a stand. Distinct from `image` at 11px, which is the size the
+       card's meta line draws a type glyph at — a deck and a marketing asset are
+       neighbours in the taxonomy and must not be neighbours in silhouette. */
+    deck:     svg('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4"/><path d="M8.5 20h7"/>', 2),
     flag:     svg('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>'),
     quote:    svg('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>'),
     left:     svg('<path d="M15 18l-6-6 6-6"/>'),
@@ -225,6 +229,12 @@
     icp:      { label: 'ICP',             ico: ICO.target },
     campaign: { label: 'Campaign',        ico: ICO.megaphone },
     asset:    { label: 'Marketing Asset', ico: ICO.image },
+    /* The slug is the format because that is what everyone calls the thing;
+       the LABEL is the kind of thing it is, because a reader scanning mixed
+       results needs a noun, not a file extension. A deck is not a Marketing
+       Asset with a different format: an asset is sent, a deck is PRESENTED, so
+       what it carries is a slide count and where it was last shown. */
+    pptx:     { label: 'Presentation',    ico: ICO.deck },
     story:    { label: 'Success Story',   ico: ICO.trophy },
     blog:     { label: 'Blog',            ico: ICO.book },
     webpage:  { label: 'Web Page',        ico: ICO.globe }
@@ -469,11 +479,17 @@
       sum:'Two-page PDF used in outbound to the BPO segment.',
       x:{ format:'PDF · A4 · 2pp', usage:'External — customer-facing', approval:'approved' } },
 
-    { id:'asset-deck-security', t:'asset', work:'recommended', owner:'Brand',
+    /* Filed as a Marketing Asset until there was a Presentation to file it as —
+       a "buyer deck" whose format field read "16:9 · 14 slides", which is the
+       taxonomy admitting through a text field what it had no type for. The id
+       keeps its `asset-` prefix: two EDGES and one EXTRA row address it, and an
+       id is an opaque handle rather than a claim about the object. */
+    { id:'asset-deck-security', t:'pptx', work:'recommended', owner:'Brand',
       title:'Security and residency — buyer deck', col:'marketing', src:'upload', prod:'sales', client:'',
       tags:['security','gdpr','collateral'], upd:96, ing:96, xc:96, xu:96,
       sum:'Used in enterprise deals. Cites the residency article, which is itself due.',
-      x:{ format:'PDF · 16:9 · 14 slides', usage:'External — under NDA', approval:'approved' } },
+      props:{ 'source-file': 'security-residency-buyer-deck.pptx', size: '4.2 MB' },
+      x:{ slides:14, presented:'Enterprise deals — ongoing', usage:'External — under NDA', approval:'approved' } },
 
     { id:'asset-voice-demo', t:'asset', work:'drafted', owner:'Unassigned',
       title:'Voice handoff — demo script', col:'marketing', src:'upload', prod:'voice', client:'',
@@ -632,7 +648,10 @@
      already says which region it is about; audience falls out of the type,
      because what makes a document client-visible is what kind of document it
      is. Both are overridable in EXTRA where the real answer is not derivable. */
-  const CLIENT_FACING = ['blog', 'webpage', 'asset', 'story'];
+  /* A deck is shown TO a customer, so it is client-facing by default for the
+     same reason an asset is. Whether it may leave the building is `x.approval`,
+     which is a separate question from who can see it here. */
+  const CLIENT_FACING = ['blog', 'webpage', 'asset', 'story', 'pptx'];
   CORPUS.forEach((o) => {
     Object.assign(o, EXTRA[o.id] || {});
     if (!o.region) {
@@ -1027,6 +1046,15 @@
        again, and leaving one document open on top of a set you can no longer
        see is the classic lost-place bug. */
     if (Object.keys(changes).some((k) => ALL_KEYS.indexOf(k) > -1)) st.doc = '';
+    /* The type-switch note describes a switch you JUST made. Leaving the
+       document ends "just", so it does not wait on the object to be reopened
+       days later and announce itself as news. */
+    if (changes.doc !== undefined && switchNoted && switchNoted.doc !== changes.doc) switchNoted = null;
+    /* An unfolded row belongs to the document it was unfolded on. Left set,
+       the next document that happens to have a field of the same name would
+       open with that row already unfolded and the caret in it, which is a
+       different document answering for a click made on this one. */
+    if (changes.doc !== undefined) { openXField = null; openProp = null; }
     writeURL(st, opt);
   }
 
@@ -1151,6 +1179,9 @@
     [/\bicps?\b|\bideal customer\b/i,     { type: 'icp' }],
     [/\bcampaigns?\b/i,                   { type: 'campaign' }],
     [/\b(?:marketing )?assets?\b|\bcollateral\b/i, { type: 'asset' }],
+    /* Every word anybody uses for one, including the format itself — "the pptx"
+       is what somebody types when they are looking for the deck. */
+    [/\bpresentations?\b|\bdecks?\b|\bpptx?\b|\bpower ?points?\b|\bslides?\b/i, { type: 'pptx' }],
     [/\bsuccess stor(?:y|ies)\b|\bcase stud(?:y|ies)\b/i, { type: 'story' }],
     [/\bblogs?(?: posts?)?\b/i,           { type: 'blog' }],
     [/\bweb ?pages?\b|\bpages?\b/i,       { type: 'webpage' }],
@@ -2313,46 +2344,39 @@
 
   const TYPE_BODY = {
     /* The document's own words. An article IS its prose, so on the card the
-       summary is the whole answer.
+       summary is the whole answer. */
+    article:  (o) => tcSum(o.sum),
 
-       Not in `full`, though: the document renders `o.sum` as the body's first
-       paragraph, so repeating it in the head puts the same sentence on screen
-       twice, forty pixels apart. What the document adds is the fact the card
-       had no room for. */
-    article:  (o, full) => (full ? '' : tcSum(o.sum)) +
-      (full && o.x.applies && o.x.applies !== '—' ? tcSum('Applies to ' + o.x.applies) : ''),
-
-    campaign: (o, full) => (full ? '' : tcSum(o.sum)) +
-      (full ? tcSum([o.x.objective, o.x.window].filter((v) => v && v !== '—').join(' · ')) : ''),
+    campaign: (o) => tcSum(o.sum),
 
     /* `x.status` is the ticket's state AT SOURCE — Resolved, Awaiting legal,
        On hold — and is not `o.status`, which is ours and already on the meta
        line. It keeps the source's own word rather than translating it into our
        vocabulary, because a ticket that says "Awaiting legal" is telling you
        something none of our seven statuses can. */
-    ticket:   (o, full) => (o.x.status === 'Resolved'
+    ticket:   (o) => (o.x.status === 'Resolved'
         ? '<div class="tc-tags"><span class="tag tag-ok">'
         : '<div class="tc-tags"><span class="tag tag-warn">') +
       esc(o.x.status) + '</span></div>' +
-      (o.x.resolution && o.x.resolution !== '—' ? tcSum(o.x.resolution) : '') +
-      (full && o.x.requester && o.x.requester !== '—' ? tcSum('Raised by ' + o.x.requester) : ''),
+      (o.x.resolution && o.x.resolution !== '—' ? tcSum(o.x.resolution) : ''),
 
     /* Fit, then the two axes an ICP is filed on, as the tags the profile is
        actually indexed by. Four pills is the cap — at 300px a fifth wraps to a
-       third row and the card stops sharing a height with its neighbours.
-
-       `full` is where fit and disqualifiers finally render. BODY_COPY.icp has
-       told every reader that fit is "assessed on the criteria below" for the
-       life of this prototype, while the criteria sat in the fixture and on no
-       screen. Copy that describes content nobody built is worse than no copy. */
-    icp:      (o, full) => axisTags(o, confBadge(o.x.score, 'Fit')) +
-      (full ? (o.x.segment && o.x.segment !== '—' ? tcSum(o.x.segment) : '') +
-        tcList(o.x.fit) + tcList(o.x.dis, true) : ''),
+       third row and the card stops sharing a height with its neighbours. */
+    icp:      (o) => axisTags(o, confBadge(o.x.score, 'Fit')),
 
     /* Approval decides whether the thing can leave the building, which is the
        only question anyone asks an asset before using it. */
-    asset:    (o, full) => `<div class="tc-tags">${approvalPill(o.x.approval)}</div>` +
-      tcSum(full ? [o.x.format, o.x.usage].filter((v) => v && v !== '—').join(' · ') : o.x.format),
+    asset:    (o) => `<div class="tc-tags">${approvalPill(o.x.approval)}</div>` +
+      tcSum(o.x.format),
+
+    /* Same approval pill as an asset, because it answers the same question
+       before anybody uses one. What differs is the second run: an asset says
+       what FORMAT it is, a deck says how long it is and where it was last
+       shown — the two facts that decide whether you can reuse it on Thursday. */
+    pptx:     (o) => `<div class="tc-tags">${approvalPill(o.x.approval)}</div>` +
+      tcSum([o.x.slides ? o.x.slides + ' slides' : '', o.x.presented]
+        .filter((v) => v && v !== '—').join(' · ')),
 
     /* The outcome is the claim, the quote is the evidence for it, and the
        client is who it happened to. The quote earns the ruled treatment
@@ -2369,11 +2393,9 @@
        third body row and 22px on every grid row holding a story — paid for a
        fact nothing asked the card to carry. It is the evidence behind the
        outcome, and evidence is what you open something to read. */
-    story:    (o, full) => tcSum(o.x.outcome +
+    story:    (o) => tcSum(o.x.outcome +
         (o.client && CLIENTS[o.client] ? ' · ' + CLIENTS[o.client] : '')) +
-      axisTags(o) +
-      (full && o.x.quote ? `<blockquote class="tc-quote">${esc(o.x.quote)}</blockquote>` : '') +
-      (full && o.x.customer && o.x.customer !== '—' ? tcSum(o.x.customer) : ''),
+      axisTags(o),
 
     /* A byline, and only where there is a date to stand behind. `x.pub` is a
        state word rather than a date, so the publish date comes from `xc` — when
@@ -2385,25 +2407,30 @@
        for the reason a Web Page's does: it is what the customer sees, and the
        one fact that says whether this copy and the live one are the same page.
        Same monospace run, so the two web-shaped types read alike. */
-    blog:     (o, full) => tcSum('By ' + o.x.author +
+    blog:     (o) => tcSum('By ' + o.x.author +
         (o.x.pub === 'Published' ? ' · ' + fmtDate(o.xc) : '')) +
       (o.x.canonical && o.x.canonical !== '—'
         ? `<p class="tc-mono">${esc(o.x.canonical)}</p>` : ''),
 
     /* The URL is the whole of what makes a web page a web page, and monospace
        is the only run of that texture anywhere on the grid. */
-    webpage:  (o, full) => (o.x.url && o.x.url !== '—'
+    webpage:  (o) => (o.x.url && o.x.url !== '—'
         ? `<p class="tc-mono">${esc(o.x.url)}</p>` : '') +
-      (full ? '' : tcSum(o.sum)) +
-      (full ? tcSum(crawlPhrase(o) + ' · ' + changePhrase(o).toLowerCase()) : '')
+      tcSum(o.sum)
   };
 
   /* One wrapper, so the gutter and the clamp are declared once and a type with
      nothing to say renders no zone rather than an empty box still taking its
-     padding. The fallback is the summary, which every type has. */
-  function typeBody(o, full) {
+     padding. The fallback is the summary, which every type has.
+
+     This took a `full` flag while the document replayed the card's body
+     unclamped in its head. The document has its own record now — the same
+     facts as editable rows, in the order the type reads — so every `full`
+     branch was unreachable and is gone. What is left is the card's, which is
+     the only caller. */
+  function typeBody(o) {
     const f = TYPE_BODY[o.t];
-    const inner = f ? f(o, full) : tcSum(o.sum);
+    const inner = f ? f(o) : tcSum(o.sum);
     return inner ? `<div class="tc-body">${inner}</div>` : '';
   }
 
@@ -2425,8 +2452,12 @@
      to say one thing. */
   const TYPE_EXIT = {
     article:  'Open article',   ticket:  'Open ticket',  icp:   'Review fit criteria',
-    campaign: 'Open campaign',  asset:   'Download asset', story: 'Open story',
-    blog:     'Open post',      webpage: 'Open page'
+    /* Not "Download asset": docAct has no `download` kind, so the card
+       promised a file it never delivered — and the document it opens onto now
+       offers Replace, which is the honest action on a file this prototype does
+       not store. An exit has to lead somewhere. */
+    campaign: 'Open campaign',  asset:   'Open asset',   story: 'Open story',
+    blog:     'Open post',      webpage: 'Open page',    pptx:  'Open deck'
   };
 
   /* One action per card, and it is the status's exit — so the card offers the
@@ -2558,6 +2589,54 @@
     return { key: named[0], value: st[named[0]][0] };
   }
 
+  /* ── Eight kinds, and one line each on what it is for ──
+
+     The button made whatever the filter happened to be pointing at —
+     `newDocument(readURL().type[0])`, which on the unfiltered library is an
+     Article — so choosing a kind meant making the wrong one first and
+     correcting it in the rail afterwards. The kind is now the choice, and the
+     choice is made where the action is.
+
+     Still no gate and no second step. The argument at newDocument's own
+     comment holds: an empty draft commits nothing, changes nothing anyone else
+     can see, and is one click to discard. Picking from a menu is not a
+     confirmation of an action — it IS the action, with its one parameter.
+
+     Type by icon, label and the line under it, never colour (§6.3). The glyph
+     is the same one the byline and the card's meta line use, so a reader
+     learns one mapping for the whole product. */
+  const TYPE_FOR = {
+    article:  'A rule or an answer, written out.',
+    ticket:   'One customer case, and how it was closed.',
+    icp:      'Who to sell to, and who to rule out.',
+    campaign: 'An objective, a window, and what ran.',
+    asset:    'A file, with its usage rights and approval.',
+    pptx:     'A slide deck, and whether it may be shown.',
+    story:    'A customer outcome, with a quote cleared to use.',
+    blog:     'A post, and where it is published.',
+    webpage:  'A page we crawl, and what changed since.'
+  };
+
+  /* The trigger is passed in, because the two surfaces that offer this have
+     different buttons — a text action on the result line, a filled one on the
+     empty state — and only the panel is shared. Closing on outside-click and
+     on Escape is the design system's, already wired. */
+  function newDocMenu(trigger) {
+    return `<span class="menu-anchor">
+      ${trigger}
+      <div class="menu new-menu" role="menu" aria-label="What kind of document">
+        <div class="menu-label">New document</div>
+        ${Object.keys(TYPES).map((k) => `<button class="menu-item" type="button" role="menuitem" data-new-type="${k}">
+          ${TYPES[k].ico.replace('<svg', '<svg width="14" height="14"')}
+          <span class="new-menu-text">
+            <span class="new-menu-name">${esc(TYPES[k].label)}</span>
+            <span class="new-menu-for">${esc(TYPE_FOR[k])}</span>
+          </span>
+        </button>`).join('')}
+      </div>
+    </span>`;
+  }
+
   function resultMeta(st, list, composed) {
     const excluded = list.filter((o) => STATUS[o.status].excluded).length;
     const unowned  = list.filter((o) => responsible(o) === 'Unassigned').length;
@@ -2600,7 +2679,7 @@
              Starting from a file is reachable where you are already starting
              something — the blank document's row — and by dropping one, which
              works on this page and says what it will do. -->
-        ${entryAction('direct', 'New document', 'data-new-doc="1"', ICO.plus)}
+        ${newDocMenu(entryAction('direct', 'New document', 'data-new-menu="1" aria-haspopup="true" aria-expanded="false"', ICO.plus))}
       </div>
       ${excluded || unowned ? `<div class="rm-disclosure">
         ${excluded ? `<span class="rm-flag is-err">${ICO.slash.replace('<svg', '<svg width="12" height="12"')}
@@ -2814,7 +2893,7 @@
         ${bare
           ? (st.archived
               ? '<button class="btn btn-ghost btn-sm" data-clear-all>Back to the library</button>'
-              : `<button class="btn btn-brand btn-sm" data-new-doc>New document</button>
+              : `${newDocMenu('<button class="btn btn-brand btn-sm" data-new-menu aria-haspopup="true" aria-expanded="false">New document</button>')}
                  <button class="btn btn-ghost btn-sm" data-pick-files>Choose a file</button>`)
           : '<button class="btn btn-brand btn-sm" data-clear-all>Clear filters</button>'}
       </div>
@@ -2842,6 +2921,7 @@
     story: ['Cleared claims only. Anything not listed as an outcome has not been measured and must not be repeated externally.'],
     campaign: ['Campaign records are operational, not promotional. The asset list is the authority on what may be sent.'],
     asset: ['Approval and usage rights travel with the asset. Verified is not the same as cleared for external use.'],
+    pptx: ['The deck is the content; this is the note beside it. What a reader needs from here is whether it may be shown, and whether it has been shown recently enough to still be true.'],
     blog: ['Published content. The canonical URL is what search engines and customers see; this is the copy AiMY grounds on.'],
     webpage: ['Crawled content. Where the live page has changed since the last crawl, what is stored here is what AiMY answers from.']
   };
@@ -3449,6 +3529,14 @@
     asset:    [['format', 'Format', 'text'],
                ['usage', 'Used', 'pick', ['External — customer-facing', 'External — under NDA', 'Internal only']],
                ['approval', 'Approval', 'pick', [['approved', 'Approved'], ['pending', 'Awaiting approval']]]],
+    /* No `format` row: the format IS the type, and a field whose only honest
+       value is the name of the type it is on is the same fact twice. */
+    /* A deck is not a percentage, so it does not stop at 100. 999 is not a
+       real ceiling either — it is the point past which a number is a typo. */
+    pptx:     [['slides', 'Slides', 'number', { max: 999 }],
+               ['presented', 'Last presented', 'text'],
+               ['usage', 'Shown', 'pick', ['External — customer-facing', 'External — under NDA', 'Internal only']],
+               ['approval', 'Approval', 'pick', [['approved', 'Cleared to present'], ['pending', 'Not cleared']]]],
     story:    [['customer', 'Customer', 'text'],
                ['outcome', 'Outcome', 'text'],
                ['quote', 'They said', 'long'],
@@ -3469,7 +3557,7 @@
   /* Same click-to-edit shape as a custom fact, minus the key input and the
      delete button — the key is the type's, not yours, and the field cannot be
      removed without changing what kind of thing the document is. */
-  const xText = (o, k, lead, isNum) => {
+  const xText = (o, k, lead, cfg) => {
     const v = xVal(o, k);
     const shown = v === undefined || v === '' || v === '—' ? '—' : String(v);
     return `<div class="prop-kv is-fixed${openXField === k ? ' is-open' : ''}" data-x-pair="${esc(k)}">
@@ -3477,9 +3565,7 @@
         <span class="prop-lead">${esc(lead)}</span>
         <span class="prop-kv-val">${esc(shown)}</span>
       </button>
-      <input class="field-input" type="${isNum ? 'number' : 'text'}"${isNum ? ' min="0" max="100" step="1"' : ''}
-             value="${esc(v === undefined || v === '—' ? '' : String(v))}" data-x-val="${esc(k)}"
-             placeholder="${esc(lead)}" aria-label="${esc(lead)}">
+      ${xInput(o, k, lead, cfg || {})}
     </div>`;
   };
 
@@ -3509,6 +3595,64 @@
       <input type="text" placeholder="${vals.length ? 'add another…' : 'nothing yet'}"
              aria-label="Add to ${esc(lead)}" data-x-add="${esc(k)}">
     </div>`;
+  };
+
+  /* ── A field whose read face is a shape ──
+
+     A fit score reads as a three-bar meter, an approval as a pill, a canonical
+     URL as a monospace run. Each of those is also a field somebody edits, and
+     the obvious build — draw the shape, then draw the row underneath it —
+     puts the same fact on screen twice forty pixels apart, which is exactly
+     what TYPE_FACTS was deleted for (:2232).
+
+     So the shape IS the read face of the row. Same `prop-kv` grid, same
+     unfold, same commit path, same `data-x-val` the focusout handler already
+     reads — this is `xText` with `esc(shown)` swapped for trusted markup, and
+     it wires to nothing new.
+
+     `face` is markup this file built from a value it already escaped —
+     confBadge, approvalPill, a `.tc-mono` span — and never a raw field. A
+     caller passing user input straight in would be writing the one XSS hole in
+     the product, so callers build the face through the same primitives the
+     card uses. */
+  const xFaced = (o, k, lead, face, opt) => {
+    const cfg = opt || {};
+    return `<div class="prop-kv is-fixed${!cfg.modal && openXField === k ? ' is-open' : ''}" data-x-pair="${esc(k)}">
+      <button class="prop-kv-read"
+        ${cfg.modal ? `data-x-modal="${esc(k)}" data-x-lead="${esc(lead)}"` : `data-x-open="${esc(k)}"`}>
+        <span class="prop-lead">${esc(lead)}</span>
+        <span class="prop-kv-val">${face}</span>
+      </button>
+      ${cfg.modal ? '' : xInput(o, k, lead, cfg)}
+    </div>`;
+  };
+
+  /* ── The editing control for a field, in the product's own clothes ──
+
+     A number was `<input type="number">` and nothing else, so the browser drew
+     its own stepper on it: two grey chevrons that belong to Chrome, next to a
+     page where every other control is the design system's. The library ships a
+     `.stepper` — bordered, its own buttons, the native spin buttons already
+     suppressed — and it was simply never used here.
+
+     `data-step` carries the direction rather than a handler per button, and the
+     input keeps `data-x-val`, so the stepper commits through exactly the same
+     writer as typing into it does. Nothing about the commit path is new. */
+  const xInput = (o, k, lead, cfg) => {
+    const raw = xVal(o, k);
+    const blankish = raw === undefined || raw === '—';
+    const val = esc(blankish ? '' : String(raw));
+    if (!cfg.num) {
+      return `<input class="field-input" type="text" value="${val}" data-x-val="${esc(k)}"
+             placeholder="${esc(lead)}" aria-label="${esc(lead)}">`;
+    }
+    return `<span class="stepper">
+      <button type="button" data-step="-1" aria-label="Less" tabindex="-1">&minus;</button>
+      <input type="number" inputmode="numeric" min="${cfg.min === undefined ? 0 : cfg.min}"
+             max="${cfg.max === undefined ? 100 : cfg.max}" step="1"
+             value="${val}" data-x-val="${esc(k)}" aria-label="${esc(lead)}">
+      <button type="button" data-step="1" aria-label="More" tabindex="-1">+</button>
+    </span>`;
   };
 
   /* ── A field too long for the rail ──
@@ -3556,15 +3700,23 @@
 
   const closeXModal = () => { const h = $('#commitHost'); if (h) h.innerHTML = ''; };
 
-  function typeFieldRows(o) {
-    return (TYPE_FIELDS[o.t] || []).map(([k, lead, kind, opts]) => {
+  /* `skip` lets a view draw one of its own rows as a faced row (§xFaced) and
+     suppress the plain one, without a fifth `kind` and without TYPE_FIELDS
+     growing a column that only two types would use. One fact, one control. */
+  function typeFieldRows(o, skip) {
+    const drop = skip || [];
+    return (TYPE_FIELDS[o.t] || []).filter(([k]) => drop.indexOf(k) < 0).map(([k, lead, kind, opts]) => {
       if (kind === 'pick') return propDropdown({
         key: 'x.' + k, label: lead, lead: lead, blank: '—',
         map: () => opts.map((v) => (Array.isArray(v) ? v : [v, v]))
       }, o, true);
       if (kind === 'list') return propRow(lead, xList(o, k, lead));
       if (kind === 'long') return xLong(o, k, lead);
-      return xText(o, k, lead, kind === 'number');
+      /* For a number the fourth slot carries its bounds — `pick` is the only
+         other kind that uses it, and it is not a number. A slide count and a
+         percentage do not share a ceiling. */
+      if (kind === 'number') return xText(o, k, lead, Object.assign({ num: true }, opts || {}));
+      return xText(o, k, lead, null);
     }).join('');
   }
 
@@ -3594,9 +3746,95 @@
   const propRow = (lead, body) => `<div class="prop-row">
     <span class="prop-lead">${esc(lead)}</span>${body}</div>`;
 
+  /* ── Changing the type swaps the record; it does not accumulate two ──
+
+     The old line was `o.x = Object.assign({}, BLANK_X[o.t] || {}, o.x)`, which
+     merges the new type's blank UNDERNEATH everything the document has ever
+     held. An object that has been an Article, a Ticket and an ICP therefore
+     carries `applies`, `requester`, `assignee`, `status`, `resolution`,
+     `segment`, `score`, `fit` and `dis` for the rest of its life. Nothing on
+     screen showed it, because each TYPE_VIEW reads only its own keys — and
+     that is what made it worth fixing rather than tolerating: `responsible()`
+     reads `x.assignee`, so a ticket key nobody could see went on deciding who
+     owned an article, which decides its status, which decides its badge.
+
+     Swap, stash, and state it. The outgoing record is kept whole under its own
+     slug, so switching back restores what you typed rather than a blank. The
+     incoming one is the new type's blank, filled from its own stash if it has
+     one. Nothing is silently destroyed and nothing invisible is carried. */
+  let switchNoted = null;
+
+  function switchType(o, was) {
+    o.xStash = o.xStash || {};
+    const out = o.x || {};
+    const back = o.xStash[o.t];
+    const whoWas = responsible(o);
+    /* The PHRASE, not the name. "Owned by Unassigned" is not a sentence
+       anybody wrote — ownerPhrase already knows that an unassigned document
+       reads "Nobody owns it" and an ingestion marker reads "No owner — it
+       arrived from Zendesk", and the note has no business inventing a second
+       way to say either. Captured before the swap, because after it the
+       function would describe the state it is trying to contrast with. */
+    const ownedWas = ownerPhrase(o);
+    /* Ownership is a fact about the document, not a field of the ticket it
+       used to be. Dropping `x.assignee` with the rest of the bag would move
+       responsible() silently, which is the defect this function exists to
+       fix — so the fact is promoted on the way out rather than stashed. */
+    if (was === 'ticket' && out.assignee && out.assignee !== 'Unassigned') o.owner = out.assignee;
+    o.xStash[was] = out;
+    o.x = Object.assign({}, BLANK_X[o.t] || {}, back || {});
+    delete o.xStash[o.t];
+    switchNoted = { doc: o.id, was: was, now: o.t, restored: !!back,
+                    kept: Object.keys(out).length,
+                    ownedWas: responsible(o) !== whoWas ? ownedWas : '' };
+    /* Before the undo closure is built: statusOf reads responsible(). */
+    recompute();
+    undoStack = () => {
+      o.t = was; o.x = out; delete o.xStash[was];
+      if (back) o.xStash[o.t] = back;
+      if (was === 'ticket') o.owner = whoWas;
+      switchNoted = null; recompute(); render();
+    };
+    repaintEditor();
+    /* Three surfaces, each doing its own job (:4436 — an action has to be
+       visible where you are looking). The record flashes because the record is
+       what moved; the toast is the receipt and the way back; the line inside
+       the record is the part that outlives both, because a toast is gone in
+       four seconds and an ownership change is not. */
+    markAfter('.dv-record', $('#docCanvas'));
+    /* Labels keep their own case. `.toLowerCase()` reads fine on Article and
+       Ticket and turns ICP into "icp", which is the acronym announcing that a
+       string got a transformation nobody checked against the whole table. */
+    toast('Now ' + artic(TYPES[o.t].label), 'Undo',
+      (back ? 'Its ' + TYPES[o.t].label + ' record came back'
+            : 'A blank ' + TYPES[o.t].label + ' record') +
+      ' — the ' + TYPES[was].label + "'s is kept");
+  }
+
+  /* The switch, stated where it happened, until you have read it. `.prop-why`
+     is already exactly this shape — a value and the reason behind it — so this
+     borrows the pattern rather than inventing a fourth kind of notice.
+
+     Deliberately NOT `.dv-notice`: that primitive means "trust state excludes
+     this document from retrieval", direction §6.4 requires it whenever trust
+     holds an excluded value, and it ships into other agents' surfaces. A third
+     tone on it for a reversible edit you just made would dilute the one badge
+     that means AiMY may not answer from this. */
+  function switchNote(o) {
+    const n = switchNoted;
+    if (!n || n.doc !== o.id) return '';
+    return `<p class="prop-why">Was ${artic(TYPES[n.was].label)}.
+      ${n.restored ? 'Its ' + TYPES[n.now].label + ' record came back.'
+                   : 'This record starts blank.'}
+      The ${TYPES[n.was].label}'s ${n.kept} field${n.kept === 1 ? '' : 's'}
+      ${n.kept === 1 ? 'is' : 'are'} kept — switch back and ${n.kept === 1 ? 'it returns' : 'they return'}.
+      ${n.ownedWas ? `Who owns it moved with the record. As ${artic(TYPES[n.was].label)}:
+        ${n.ownedWas}. Now: ${ownerPhrase(o)}.` : ''}
+      <button class="prop-add" data-note-clear>Got it</button></p>`;
+  }
+
   function propsPanel(o) {
     const custom = Object.keys(o.props);
-    const typed = typeFieldRows(o);
     return `<div class="props">
 
       <!-- ── Status first ──
@@ -3619,11 +3857,17 @@
           : esc(STATUS[o.status].why)}</span>
       </div>
 
-      <!-- What this KIND of thing says about itself, before the taxonomy every
-           kind shares. A ticket's resolution is the reason you opened the
-           ticket; which collection it is filed in is not. -->
-      ${typed ? `<div class="prop-rows prop-typed">${typed}</div>` : ''}
+      <!-- What this KIND of thing says about itself has LEFT this panel. A
+           ticket's resolution is the reason you opened the ticket, and it was
+           in a 320px column behind a <details>, described in the head by a
+           read-only sentence you could not act on. It is the record on the
+           document now — same rows, same commit path, moved rather than
+           copied, because openXField resolves by global selector and two
+           copies of one key would unfold both and focus the wrong input.
 
+           What stays is the taxonomy every kind shares, which is the split
+           §6.4 draws: constant governance chrome in the rail, type-appropriate
+           rendering on the document. -->
       <div class="prop-rows">
         ${PROP_FIELDS.map((f) => propDropdown(f, o, true)).join('')}
         ${propRow('Tagged', tagField(o, 'tags', 'Tagged'))}
@@ -3769,8 +4013,14 @@
      work out for themselves. */
   const claimsOf = (o) => edgesOf('doc', o.id).filter((e) => ASSERTED_PHRASES.indexOf(e.phrase) > -1);
 
-  function connectionsBlock(o) {
-    const edges = claimsOf(o);
+  /* `skip` names phrases the DOCUMENT is already carrying as content — a
+     ticket's *Related to* renders beside its resolution, where it is the
+     evidence trail rather than a description of the object. Leaving it in both
+     places is 316px of the rail restating the page, which is the finding this
+     block was already cut down for. Defaults to skipping nothing. */
+  function connectionsBlock(o, skip) {
+    const drop = skip || [];
+    const edges = claimsOf(o).filter((e) => drop.indexOf(e.phrase) < 0);
     const groups = {};
     edges.forEach((e) => { (groups[e.phrase] = groups[e.phrase] || []).push(e); });
     const keys = Object.keys(groups);
@@ -3970,7 +4220,11 @@
   const bornHere = (o) => /^new-/.test(o.id) && !o.props['source-file'];
   const noUpstream = (o) => o.src === 'upload';
 
-  function provenanceBlock(o) {
+  /* `opt.skipSync` drops the re-sync action, for the one type that states its
+     crawl freshness on the document itself and therefore owns the button that
+     answers it. Everything else about the block is unchanged. */
+  function provenanceBlock(o, opt) {
+    const cfg = opt || {};
     const s = SRC[o.src];
     const behind = o.xu < o.upd;
     if (noUpstream(o)) {
@@ -3997,13 +4251,487 @@
         <!-- Pulling a source is not a thing you look at, so it stops carrying
              the direct mode's eye. And finding one is AiMY's job, so it
              carries AiMY's mark. -->
-        ${s.health === 'ok'
+        ${cfg.skipSync ? ''
+          : s.health === 'ok'
           ? entryAction('direct', 'Re-sync from ' + s.label, `data-act="resync" data-obj="${o.id}"`, ICO.refresh)
           : entryAction('review', 'Reconnect ' + s.label, `data-act="reconnect" data-obj="${o.id}"`)}
         ${entryAction('investigate', 'Find another source', `data-act="ground" data-obj="${o.id}"`, AIMY_MARK(12, 14))}
       </div>
     </div>`;
   }
+
+  /* ── One gate, two readers ──
+
+     renderDoc draws the Publish button and writeBody re-labels it on every
+     keystroke, and each held its own copy of the test. Two copies of a rule
+     drift, and this one had already drifted into saying the wrong thing: the
+     only reason either could give was "Add some content first", which is a
+     true sentence about an article and a false one about an asset whose
+     content is a file. The gate returns the REASON it is closed, so the
+     button's label is the reason and there is one place to change it. */
+  function publishGate(o) {
+    return viewFor(o).ready(o);
+  }
+
+  /* The rail's three blocks, addressed by name so a view can order them and
+     say which one opens. `railBlock` itself is untouched — still a native
+     `<details>`, so what you opened survives every repaint with no state of
+     ours. `view` is optional: without one every block behaves exactly as it
+     did when the order was hard-coded. */
+  /* The boilerplate second paragraph, suppressed for anything you made here —
+     a document you just typed has no ingestion to describe. Lifted out of the
+     body template unchanged. */
+  const bodyBoilerplate = (o) => o.src === 'upload' && /^new-/.test(o.id)
+    ? '' : `<p>${esc((BODY_COPY[o.t] || [''])[0])}</p>`;
+
+  /* A blank document's starting moves, BELOW the empty body rather than above
+     it — put between the title and the body they would break the same run of
+     editable blocks the head exists to keep contiguous. A document with a body
+     does not need them: the assistant is on the block, connecting is in the
+     rail. Which moves are offered is the view's, because "start from a file"
+     is the whole point on an asset and noise on a ticket. */
+  function startMoves(o, view) {
+    const want = (view && view.start) || ['ai', 'file', 'connect'];
+    const btn = {
+      ai: `<button class="doc-ai" data-ai-doc aria-haspopup="true" aria-expanded="false">
+             ${AIMY_MARK(13, 15)}<span>Draft with AiMY</span></button>`,
+      /* Starting from a file you already have is the third way in, and it was
+         the only one with no control — a drag gesture and nothing else. */
+      file: `<button class="doc-start-act" data-pick-files>
+               ${ICO.upload ? ICO.upload.replace('<svg', '<svg width="13" height="13"') : ''}<span>Start from a file</span></button>`,
+      connect: `<button class="doc-start-act" data-act="connect" data-obj="${o.id}">
+                  ${AIMY_MARK(13, 15)}<span>Connect it to documents</span></button>`
+    };
+    return `<div class="doc-start">${want.map((k) => btn[k] || '').join('')}</div>
+      <p class="doc-start-fine">${o.pendingText
+        ? `<strong>${esc(o.pendingText)}</strong> is filed here — its text has not been
+           pulled out yet, which needs the ingestion service. Draft from it, or write it here.`
+        : `Or drop one on the page — ${esc(FILE_KINDS)}`}</p>`;
+  }
+
+  /* Reading history is reading one body, not eight templates: the version you
+     opened is a string this object held on a date, and no record, subject or
+     starting move belongs beside it. It short-circuits the whole region list. */
+  const previewBody = (o) => `<div class="dv-body" spellcheck="false" id="editBody" data-drop-body
+       data-placeholder="Write here, drop a file, or use Draft with AiMY above."
+     ><p>${esc(VERSION_BODY(o, previewVer))}</p></div>`;
+
+  const RAIL_BLOCK = {
+    what: (o, open) => railBlock('What it is', open, propsPanel(o)),
+    connects: (o, open, view) => {
+      const skip = view && view.links ? [view.links.phrase] : [];
+      return railBlock('What it connects to', open, connectionsBlock(o, skip),
+        claimsOf(o).filter((e) => skip.indexOf(e.phrase) < 0).length);
+    },
+    came: (o, open, view) => railBlock('Where it came from', open,
+      provenanceBlock(o, view && view.ownsSync ? { skipSync: true } : null))
+  };
+
+  /* ── The regions a document is made of ──
+
+     Addressed by string key so a view's content order is pure data: `regions:
+     ['record', 'prose']` is a statement anybody can read, and a test can
+     assert the eight orders without executing them.
+
+     Every one of these is a SIBLING of `#editBody`, never a child. The body is
+     contenteditable and `writeBody` writes its innerHTML back to `o.html` on
+     the first edit, so anything rendered inside it becomes the document's own
+     stored content the first time somebody types. */
+  /* The claims a type carries as CONTENT rather than as rail description. A
+     ticket's resolution that nobody can trace is evidence of one case only, so
+     the article that answers it belongs beside it rather than three blocks
+     away behind a closed <details>. The rail's own block still renders every
+     OTHER phrase — RAIL_BLOCK.connects is told which one it has lost. */
+  function recordLinks(o, spec) {
+    const rows = claimsOf(o).filter((e) => e.phrase === spec.phrase && e.kind === 'doc');
+    return `<div class="dv-links">
+      <span class="prop-lead">${esc(spec.lead)}</span>
+      ${rows.length
+        ? rows.map((e) => `<button class="rail-conn-item" data-open-doc="${esc(e.id)}">
+            ${byId(e.id) ? TYPES[byId(e.id).t].ico.replace('<svg', '<svg width="11" height="11"') : ''}
+            <span class="rail-conn-label">${esc(e.label)}</span>
+            ${e.by ? `<span class="rail-conn-by">${esc(e.by)}, ${esc(fmtShort(e.at))}</span>` : ''}
+          </button>`).join('')
+        : `<p class="rail-empty">${esc(spec.empty)}</p>`}
+      ${entryAction('investigate', 'Connect it to documents',
+        `data-act="connect" data-obj="${o.id}"`, AIMY_MARK(12, 14))}
+    </div>`;
+  }
+
+  /* ── The record: what this kind of thing is, editable where it leads ──
+
+     Two strata and nothing between them. `facts` is DERIVED — a crawl date, a
+     client name, the axes a profile is indexed by — and is also the texture
+     channel, because type is carried by shape and never by colour. `fields` is
+     EDITABLE, and it is `typeFieldRows` verbatim: the same rows the rail drew,
+     moved rather than copied, because `openXField` resolves by global selector
+     and two copies of one key would unfold both and focus the wrong input.
+
+     One fact, one control. Nothing appears in both strata. */
+  function docRecord(o, view) {
+    const facts  = view.facts  ? view.facts(o)  : '';
+    const fields = view.fields ? view.fields(o) : '';
+    const links  = view.links  ? recordLinks(o, view.links) : '';
+    const note   = switchNote(o);
+    /* A type with nothing to say renders no zone rather than an empty box
+       still taking its padding — the rule typeBody already follows. */
+    if (!facts && !fields && !links && !note) return '';
+    return `<section class="dv-record" data-type="${esc(o.t)}"
+                     aria-label="${esc(TYPES[o.t].label)} record">
+      ${note}
+      ${facts ? `<div class="dv-typed">${facts}</div>` : ''}
+      ${fields ? `<div class="prop-rows">${fields}</div>` : ''}
+      ${links}
+    </section>`;
+  }
+
+  /* ── The subject: the thing the document is ABOUT ──
+
+     Two types are not documents so much as records of something else — a file,
+     and a live page — and for those the subject leads and the prose is a note
+     about it. Selected by o.t rather than by a class hole, so the audit still
+     reads every class literally. */
+  /* The file a subject-led type is about. `source-file` is what ingestion
+     recorded; `pendingText` is what a drop recorded when there was no text to
+     extract, which for a deck is always. One accessor, so the subject, the
+     publish gate and the replace label cannot disagree about whether there is
+     a file. */
+  const subjectFile = (o) => o.props['source-file'] || o.pendingText || '';
+
+  function docSubject(o) {
+    if (o.t === 'webpage') {
+      const url = xVal(o, 'url');
+      /* Re-sync lives HERE and not in the rail for this type: the crawl state
+         is stated on this line, and the one thing you can do about it belongs
+         under the statement rather than three blocks away. provenanceBlock is
+         told to leave it out, so it is offered once. */
+      return `<section class="dv-subject" data-type="webpage" aria-label="The live page">
+        ${xFaced(o, 'url', 'Source URL', url && url !== '—'
+          ? `<span class="tc-mono">${esc(url)}</span>` : '—')}
+        <p class="dv-subject-state">${crawlPhrase(o)} · ${changePhrase(o)}</p>
+        <div class="rail-act">${SRC[o.src].health === 'ok'
+          ? entryAction('direct', 'Re-sync from ' + SRC[o.src].label,
+              `data-act="resync" data-obj="${o.id}"`, ICO.refresh)
+          : entryAction('review', 'Reconnect ' + SRC[o.src].label,
+              `data-act="reconnect" data-obj="${o.id}"`)}</div>
+      </section>`;
+    }
+    const file = subjectFile(o);
+
+    /* A deck is the one type whose content is a file nobody can read here and
+       nobody should have to: you present it. So the subject is the deck, the
+       upload is the primary action, and the two facts under it are how long it
+       is and whether it may be shown — which is what somebody asks before
+       reusing one on Thursday.
+
+       The picker is narrowed to presentation formats. This control says "the
+       deck"; a picker that would also accept a spreadsheet is offering to make
+       something the sentence above it just said this was not. */
+    if (o.t === 'pptx') {
+      const n = +xVal(o, 'slides') || 0;
+      const cleared = xVal(o, 'approval') === 'approved';
+      return `<section class="dv-subject" data-type="pptx" aria-label="The deck">
+        <p class="tc-mono">${esc(file || 'No deck uploaded')}</p>
+        <p class="dv-subject-state">${file
+          ? esc(n ? n + (n === 1 ? ' slide' : ' slides') : 'Slide count not recorded') + ' · ' +
+            (cleared ? 'cleared to present' : 'not cleared to present')
+          : 'Its content is the deck, and there is not one yet — so there is nothing here to present or cite.'}</p>
+        <div class="rail-act">${entryAction('direct', file ? 'Replace the deck' : 'Upload the deck',
+          `data-pick-files="${esc(DECK_ACCEPT)}"`, ICO.upload)}</div>
+      </section>`;
+    }
+
+    /* An asset's content is the file. The document is the record ABOUT it, and
+       the honest set of actions on a file this prototype does not store is:
+       say what it is, and replace it. No Download control — a button that has
+       to explain why it did nothing is a button admitting it should not have
+       been offered. */
+    return `<section class="dv-subject" data-type="asset" aria-label="The file">
+      <p class="tc-mono">${esc(file || 'No file is attached')}</p>
+      <p class="dv-subject-state">${file
+        ? 'This is the record about the file. Its rights and approval are below.'
+        : 'Its content is the file, and there is not one yet — so nothing here can be cited.'}</p>
+      <div class="rail-act">${entryAction('direct', file ? 'Replace the file' : 'Attach a file',
+        'data-pick-files', ICO.upload)}</div>
+    </section>`;
+  }
+
+  const DOC_REGION = {
+    record:  (o, view) => docRecord(o, view),
+    subject: (o) => docSubject(o),
+    prose: (o, view, blank) => {
+      const cfg = (view && view.copy) || {};
+      /* 'absent' means the type does not INVITE prose, not that prose is
+         impossible. An asset ingested with a description still shows it; a
+         blank one shows no empty page and no placeholder asking to be filled
+         with the one thing that is not the point.
+
+         The starting moves stay. Returning nothing here left a blank asset
+         with no body to type into and no way to make one — "does not invite"
+         had quietly become "cannot ever", which is a different decision and
+         not one anybody took. */
+      if (view && view.prose === 'absent' && blank) return startMoves(o, view);
+      /* Prose that is not the point still has to say what it is for. Quieter
+         than a heading inside the body, which is the document's own writing. */
+      const label = view && view.prose === 'secondary' && cfg.prose
+        ? `<h2 class="dv-run-label">${esc(cfg.prose)}</h2>` : '';
+      return label + `<div class="dv-body${blank ? ' is-blank' : ''}"
+             spellcheck="false" id="editBody" data-drop-body
+             tabindex="0" aria-label="Document — press Enter to edit"
+             data-placeholder="${esc(cfg.body || 'Write here, drop a file, or use Draft with AiMY above.')}">
+          ${/* One empty paragraph, not nothing. An empty body has no block for
+               the caret to be IN, so `caretBlock` returned null, so the toolbar
+               never appeared and the + with it — on the one document where you
+               have the most to add. Typing into a bare body also makes a naked
+               text node the block model cannot see. */
+            blank ? '<p><br></p>' : o.html || `<p>${esc(o.sum)}</p>${bodyBoilerplate(o)}`}
+        </div>`
+        + (blank ? startMoves(o, view) : '');
+    }
+  };
+
+  /* ═══════════════════════════════════════════════
+     THE EIGHT VIEWS — §6.3, wired
+
+     The library's spec is eight templates over one fixed governance row, and
+     for the life of this prototype the document honoured the second half only:
+     ONE template, no type dispatch, and the type's own facts rendered as a
+     read-only sentence in the head while the fields holding them sat in a
+     320px rail behind a closed <details>. A Ticket without its resolution in
+     front of you is useless; an ICP whose disqualifiers are three clicks away
+     is misleading. So the record leads, per type, and it is editable where it
+     leads.
+
+     What is CONSTANT is §6.4's list and it deliberately does not appear here:
+     the topbar, the notice, the byline (status · type · owner · updated ·
+     source · collection), the title, the AiMY proposal, the comments and the
+     rail's foot. Someone scanning mixed types must not have to relearn where
+     trust lives. This table declares only what §6.4 calls variable.
+
+     Two invariants, both checkable:
+
+       · ONE FACT, ONE CONTROL. A TYPE_FIELDS key renders as its editable row
+         in `fields` and nowhere else. `facts` carries only what is DERIVED,
+         which is also the texture channel — a ruled quote does not read like a
+         row of tags, which does not read like a monospace URL — because type
+         is carried by shape and never by colour.
+
+       · WHERE PROSE LEADS, NOTHING COMES BETWEEN THE TITLE AND THE BODY. The
+         head exists because status used to interrupt the only two editable
+         blocks on the page; a structured block dropped in there would be the
+         same defect wearing a new name.
+  ═══════════════════════════════════════════════ */
+  const TYPE_VIEW = {
+
+    /* An article IS its prose. Its one row qualifies what you just read rather
+       than being the thing you came for, so it follows the body. */
+    article: {
+      regions: ['prose', 'record'],
+      prose:   'primary',
+      rail:    [['what', true], ['connects', false], ['came', false]],
+      fields:  (o) => typeFieldRows(o),
+      start:   ['ai', 'file', 'connect'],
+      ai:      { blank:  ['Write a first draft', 'Outline it'],
+                 filled: ['Rewrite for support agents', 'Shorten', 'Expand', 'Fill the gaps'] },
+      ready:   (o) => String(o.sum || '').trim() ? '' : 'Add some content first',
+      copy:    { body: 'Write here, drop a file, or use Draft with AiMY above.' }
+    },
+
+    /* A case record, in the order somebody reads one: the state the source has
+       it in, who raised it, how it was closed, and what answered it. `x.status`
+       is the SOURCE's word — "Awaiting legal" says something none of our seven
+       statuses can — and is not o.status, which is ours and on the byline.
+
+       The narrative from Zendesk is evidence under the record, not the point
+       of the page. And "Where it came from" opens, because a ticket's identity
+       IS its source record and that is the second question after the fix. */
+    ticket: {
+      regions: ['record', 'prose'],
+      prose:   'secondary',
+      rail:    [['came', true], ['what', false], ['connects', false]],
+      fields:  (o) => typeFieldRows(o),
+      /* §6.3 names "linked articles" as a ticket's distinguishing CONTENT. The
+         real edge is `answers`, so from this end it reads "Answered by". */
+      links:   { phrase: 'Answered by', lead: 'Answered by',
+                 empty:  'Nothing answers it yet — a resolution nobody can trace is evidence of one case only.' },
+      start:   ['ai', 'connect'],
+      ai:      { blank:  ['Write a first draft'],
+                 filled: ['Rewrite for support agents', 'Shorten', 'Fill the gaps'] },
+      /* A ticket with no resolution is the one thing §6.3 says a ticket cannot
+         be. "Add some content first" was the only reason the gate could give,
+         and on a ticket it named the wrong absence. */
+      ready:   (o) => !String(o.sum || '').trim() ? 'Add some content first'
+                    : xVal(o, 'resolution') && xVal(o, 'resolution') !== '—' ? ''
+                    : 'Say how it was closed first',
+      copy:    { body: 'What the customer asked, and what was said back.',
+                 prose: 'What the ticket says' }
+    },
+
+    /* Segment, fit, disqualifiers — the three things §6.3 names, as the
+       document's primary content. BODY_COPY.icp has told every reader that fit
+       is assessed "on the criteria above" for the life of this prototype,
+       while the criteria sat in the fixture and on no screen worth the name.
+       They render here now, and the copy finally points at something.
+
+       The fit meter is the read AND the control: confBadge is the read face of
+       the score field, so the number is not on screen twice. */
+    icp: {
+      regions: ['record', 'prose'],
+      prose:   'secondary',
+      rail:    [['what', true], ['connects', false], ['came', false]],
+      /* Region and the service lines. Derived from o.region / o.services, not
+         from o.x, so no field row restates them — and they are the two axes a
+         seller filters a profile by. */
+      facts:   (o) => axisTags(o),
+      fields:  (o) => xFaced(o, 'score', 'Fit score',
+                        confBadge(o.x.score, 'Fit') || '—', { num: true }) +
+                      typeFieldRows(o, ['score']),
+      start:   ['ai', 'connect'],
+      ai:      { blank:  ['Write a first draft', 'Outline it'],
+                 filled: ['Rewrite for sellers', 'Shorten', 'Fill the gaps'] },
+      /* Both halves, because §6.3's argument is specifically that a profile
+         without its disqualifiers is worse than no profile. */
+      ready:   (o) => !(xVal(o, 'fit') || []).length ? 'Add a fit criterion first'
+                    : !(xVal(o, 'dis') || []).length ? 'Add a disqualifier first' : '',
+      copy:    { body: 'How to use the profile — and what it is not for.',
+                 prose: 'How to use this profile' }
+    },
+
+    /* An objective, a window, and what actually ran. The assets are `references`
+       edges, and they are the campaign's content: a campaign record whose asset
+       list you cannot see is a date range. */
+    campaign: {
+      regions: ['record', 'prose'],
+      prose:   'secondary',
+      rail:    [['what', true], ['connects', false], ['came', false]],
+      fields:  (o) => typeFieldRows(o),
+      links:   { phrase: 'References', lead: 'What it ran',
+                 empty:  'Nothing is linked to it yet — the asset list is the authority on what may be sent.' },
+      start:   ['ai', 'connect'],
+      ai:      { blank:  ['Write a first draft', 'Outline it'],
+                 filled: ['Rewrite for marketing', 'Shorten', 'Fill the gaps'] },
+      ready:   (o) => xVal(o, 'objective') && xVal(o, 'objective') !== '—' ? ''
+                    : 'Say what it aimed at first',
+      copy:    { body: 'How it ran, and what was learned.',
+                 prose: 'Campaign notes' }
+    },
+
+    /* The one type whose content is not text. The file leads; the record is
+       about the file; and the prose is absent rather than an empty page
+       inviting the one thing that is not the point. */
+    asset: {
+      regions: ['subject', 'record', 'prose'],
+      prose:   'absent',
+      /* The document is a record ABOUT a file, so picking a file replaces the
+         one it is about rather than making a second document beside it. */
+      ownsFile: true,
+      rail:    [['what', true], ['came', false], ['connects', false]],
+      fields:  (o) => typeFieldRows(o),
+      /* No 'file': the subject already carries Attach/Replace, and it is the
+         one control on the page that is about the actual content. Two buttons
+         opening the same picker on one screen is the same fact twice. */
+      start:   ['ai', 'connect'],
+      ai:      { blank:  ['Write a first draft'],
+                 filled: ['Rewrite for marketing', 'Shorten'] },
+      /* Not the body: an asset's content is the file, so the gate asks for the
+         thing that makes the record usable instead. */
+      ready:   (o) => xVal(o, 'format') && xVal(o, 'format') !== '—' ? ''
+                    : 'Say what format it is first',
+      copy:    { body: 'Anything worth saying about the file.',
+                 prose: 'About the file' }
+    },
+
+    /* A deck reads like an asset and is governed like one, and the two things
+       that differ are the two that matter. Its content is a file nobody can
+       read in a browser and nobody should have to — you present it — so the
+       deck leads and uploading it is the primary action.
+
+       And its gate is the deck itself, not a metadata field. An asset with no
+       file still describes something somebody can go and find; a Presentation
+       with no deck is a title and four empty rows, and publishing it would put
+       a citable document into the corpus with nothing behind it. */
+    pptx: {
+      regions: ['subject', 'record', 'prose'],
+      prose:   'absent',
+      ownsFile: true,
+      rail:    [['what', true], ['came', false], ['connects', false]],
+      fields:  (o) => typeFieldRows(o),
+      start:   ['ai', 'connect'],
+      ai:      { blank:  ['Write a first draft'],
+                 filled: ['Rewrite for sellers', 'Shorten'] },
+      ready:   (o) => subjectFile(o) ? '' : 'Upload the deck first',
+      copy:    { body: 'What to say alongside it, and what changed since it was last shown.',
+                 prose: 'Notes for presenting it' }
+    },
+
+    /* The outcome is the claim, the quote is the evidence, and approval decides
+       whether either may leave the building. The quote earns the ruled
+       treatment because it is somebody else's words. */
+    story: {
+      regions: ['record', 'prose'],
+      prose:   'secondary',
+      rail:    [['what', true], ['connects', false], ['came', false]],
+      facts:   (o) => axisTags(o) + (o.client && CLIENTS[o.client] ? tcSum(CLIENTS[o.client]) : ''),
+      fields:  (o) => typeFieldRows(o, ['quote']) +
+                      xFaced(o, 'quote', 'They said', xVal(o, 'quote')
+                        ? `<blockquote class="tc-quote">${esc(xVal(o, 'quote'))}</blockquote>` : '—',
+                        { modal: true }),
+      start:   ['ai', 'connect'],
+      ai:      { blank:  ['Write a first draft', 'Outline it'],
+                 filled: ['Rewrite for sellers', 'Shorten', 'Fill the gaps'] },
+      /* Gated on the outcome, not on approval. §6.3 is explicit that approval
+         is not verification and leaves whether it becomes a trust value open;
+         making Publish depend on it would settle that ruling here, in the one
+         primitive that ships into other agents' surfaces. */
+      ready:   (o) => xVal(o, 'outcome') && xVal(o, 'outcome') !== '—' ? ''
+                    : 'Say what the outcome was first',
+      copy:    { body: 'What happened, in order.',
+                 prose: 'The full story' }
+    },
+
+    /* A post IS the post, so prose leads exactly as it does on an article.
+       Where it is published follows it. */
+    blog: {
+      regions: ['prose', 'record'],
+      prose:   'primary',
+      rail:    [['what', true], ['came', false], ['connects', false]],
+      fields:  (o) => typeFieldRows(o, ['canonical']) +
+                      xFaced(o, 'canonical', 'Canonical at', xVal(o, 'canonical') && xVal(o, 'canonical') !== '—'
+                        ? `<span class="tc-mono">${esc(xVal(o, 'canonical'))}</span>` : '—'),
+      start:   ['ai', 'file', 'connect'],
+      ai:      { blank:  ['Write a first draft', 'Outline it'],
+                 filled: ['Rewrite for readers', 'Shorten', 'Expand', 'Fill the gaps'] },
+      ready:   (o) => String(o.sum || '').trim() ? '' : 'Add some content first',
+      copy:    { body: 'The post, as published.' }
+    },
+
+    /* Blog and Web Page are both web-shaped and share the monospace texture,
+       and they diverge on purpose: a post's content is the writing, a web page
+       is a COPY we crawl. Only one of them has change detection, and change
+       detection is a claim about the copy rather than about the writing — so
+       the URL and the freshness lead, and the stored text is what we answer
+       from underneath it. The one field it has is in the subject, so there is
+       no record region to draw. */
+    webpage: {
+      /* `record` earns its place here even with no fields of its own: it draws
+         nothing unless there is something to draw, and it is where the
+         type-switch note lives. Without it, switching TO a Web Page would
+         report the switch nowhere. */
+      regions: ['subject', 'record', 'prose'],
+      prose:   'secondary',
+      ownsSync: true,
+      rail:    [['came', true], ['what', false], ['connects', false]],
+      start:   ['ai', 'connect'],
+      ai:      { blank:  ['Write a first draft'],
+                 filled: ['Rewrite for readers', 'Shorten', 'Fill the gaps'] },
+      ready:   (o) => xVal(o, 'url') && xVal(o, 'url') !== '—' ? ''
+                    : 'Give it a source URL first',
+      copy:    { body: 'What we stored from the page.',
+                 prose: 'What we stored from it' }
+    }
+  };
+
+  const viewFor = (o) => TYPE_VIEW[o.t] || TYPE_VIEW.article;
 
   function renderDoc(st) {
     const o = byId(st.doc);
@@ -4024,6 +4752,28 @@
     const live = document.activeElement;
     const armed = live && live.getAttribute && live.getAttribute('contenteditable') === 'true' && isEditable(live)
       ? (live.id === 'editBody' ? '#editBody' : '[data-edit-title]') : null;
+    /* ── A record field keeps its caret across the repaint that commits it ──
+
+       For a list field the repaint IS the commit: `data-x-add` writes the
+       value and calls repaintEditor, which replaces the input the caret was
+       in. That was survivable in a rail nobody types into more than once. It
+       is not survivable now that an ICP's fit criteria are the document's
+       primary content and three of them meant three clicks back into the same
+       box.
+
+       `pendingFocus` when we got here through repaintEditor, which captured it
+       before renderGrid detached the element; activeElement when renderDoc was
+       called directly and nothing has been wiped yet. Mutually exclusive with
+       `armed` — isEditable matches only the body and the title, and neither
+       carries a data-x attribute. */
+    const xKeep = pendingFocus || focusKeyOf(live);
+    pendingFocus = null;
+    /* Why Publish is closed, if it is. Empty means it is open. */
+    const why = publishGate(o);
+    /* Which record this kind of thing is, and in what order it reads. */
+    const view = viewFor(o);
+    const regions = view.regions;
+    const rail = view.rail;
 
     const notice = (STATUS[o.status].excluded || o.arch || o.status === 'outdated') ? `
       <div class="dv-notice is-${o.arch || o.status === 'superseded' ? 'superseded' : 'expired'}">
@@ -4051,8 +4801,8 @@
             ${blank ? `<button class="btn btn-ghost btn-sm" data-discard="${o.id}">Discard</button>` : ''}
             ${o.status === 'draft'
               ? `<button class="btn btn-brand btn-sm" data-act="publish" data-obj="${o.id}" data-publish
-                   ${String(o.sum || '').trim() ? '' : 'disabled title="A document with no content cannot go live"'}
-                 >${String(o.sum || '').trim() ? 'Publish' : 'Add some content first'}</button>` : ''}
+                   ${why ? `disabled title="${esc(why)} — a document that does not say what it is cannot go live"` : ''}
+                 >${why || 'Publish'}</button>` : ''}
             <button class="doc-rail-toggle" data-rail-toggle aria-expanded="${railOpen}"
                     aria-label="${railOpen ? 'Hide details' : 'Show details'}">
               ${ICO.sidebar ? ICO.sidebar.replace('<svg', '<svg width="15" height="15"') : ICO.eye.replace('<svg', '<svg width="15" height="15"')}</button>
@@ -4083,33 +4833,12 @@
             ${(notice || docByline(o) || (!preview && !owns)) ? `<header class="doc-head">
               ${notice}
               ${docByline(o)}
-              <!-- ── What kind of thing this is, in its own shape ──
-
-                   The same TYPE_BODY the card renders, unclamped. The document
-                   had exactly one type-aware run in it — a single sentence of
-                   boilerplate in the second paragraph — so a Ticket and an ICP
-                   opened to the same page with different words on it. The
-                   library's spec calls this the viewer's "type-appropriate body
-                   slot"; the .dv-body .tc-fields rule in the stylesheet was
-                   somebody writing its CSS and never wiring it up.
-
-                   IN THE HEAD, for the reason the head exists. It sat between
-                   the title and the body for one pass, which put derived
-                   metadata through the middle of the two editable blocks — the
-                   exact defect the note above says the head was created to fix,
-                   reintroduced by the next thing that needed a home. Everything
-                   ABOUT the document is above it; the title and the body are
-                   neighbours, and the only editable run is contiguous.
-
-                   OUTSIDE #editBody either way. The body is contenteditable and
-                   its innerHTML is written back to o.html on the first edit, so
-                   anything rendered inside it would be swallowed into the
-                   document's own content the first time somebody typed.
-
-                   Suppressed while previewing a version, because it would be
-                   describing the current object beside an older body; and on a
-                   blank document, which has nothing to say about itself yet. -->
-              ${preview || blank ? '' : `<div class="dv-typed">${typeBody(o, true)}</div>`}
+              <!-- The type's own content used to render HERE, as a read-only
+                   replay of the card's body — the one type-aware run on the
+                   page, describing fields you then had to open a rail to
+                   change. It is the record region now: same facts, in the
+                   order the type reads, with the fields as the controls. The
+                   head keeps what §6.4 calls constant and nothing else. -->
               ${!preview && !owns ? `<p class="doc-note">Owned by ${esc(responsible(o))}, not you. Your edit is recorded against your name.</p>` : ''}
             </header>` : ''}
 
@@ -4120,41 +4849,16 @@
                 ${preview ? '' : 'tabindex="0" aria-label="Title — press Enter to edit"'}
                 >${esc(o.title)}</h1>
 
-            <div class="dv-body${!preview && blank ? ' is-blank' : ''}"
-                 spellcheck="false" id="editBody" data-drop-body
-                 ${preview ? '' : 'tabindex="0" aria-label="Document — press Enter to edit"'}
-                 data-placeholder="Write here, drop a file, or use Draft with AiMY above.">
-              ${preview ? `<p>${esc(VERSION_BODY(o, previewVer))}</p>`
-                /* One empty paragraph, not nothing. An empty body has no block
-                   for the caret to be IN, so `caretBlock` returned null, so the
-                   toolbar never appeared and the + with it — on the one document
-                   where you have the most to add. Typing into a bare body also
-                   makes a naked text node the block model cannot see. */
-                : blank ? '<p><br></p>'
-                : o.html || `<p>${esc(o.sum)}</p>${o.src === 'upload' && /^new-/.test(o.id)
-                    ? '' : `<p>${esc((BODY_COPY[o.t] || [''])[0])}</p>`}`}
-            </div>
+            <!-- ── What this KIND of thing is, in the order it reads ──
 
-            <!-- A blank document's starting moves, BELOW the empty body rather
-                 than above it — put between the title and the body they would
-                 break the same run of editable blocks the head just stopped
-                 breaking. A document with a body does not need them: the
-                 assistant is on the block, and connecting is in the rail. -->
-            ${preview || !blank ? '' : `<div class="doc-start">
-              <button class="doc-ai" data-ai-doc aria-haspopup="true" aria-expanded="false">
-                ${AIMY_MARK(13, 15)}<span>Draft with AiMY</span></button>
-              <!-- Starting from a file you already have is the third way in, and
-                   it was the only one with no control — it existed as a drag
-                   gesture and nothing else. -->
-              <button class="doc-start-act" data-pick-files>
-                ${ICO.upload ? ICO.upload.replace('<svg', '<svg width="13" height="13"') : ''}<span>Start from a file</span></button>
-              <button class="doc-start-act" data-act="connect" data-obj="${o.id}">
-                ${AIMY_MARK(13, 15)}<span>Connect it to documents</span></button>
-            </div>
-            <p class="doc-start-fine">${o.pendingText
-              ? `<strong>${esc(o.pendingText)}</strong> is filed here — its text has not been
-                 pulled out yet, which needs the ingestion service. Draft from it, or write it here.`
-              : `Or drop one on the page — ${esc(FILE_KINDS)}`}</p>`}
+                 One template served all eight for the life of this prototype,
+                 which the library's own spec never asked for: eight templates
+                 over one fixed governance row. The row is everything above and
+                 below this line — notice, byline, title, proposal, comments,
+                 rail foot — and stays in the same place whatever you opened.
+                 What varies is here. -->
+            ${preview ? previewBody(o)
+              : regions.map((k) => (DOC_REGION[k] ? DOC_REGION[k](o, view, blank) : '')).join('')}
 
             ${aiDraftBlock(o)}
 
@@ -4188,9 +4892,7 @@
                The titles are the questions each one answers, in parallel, so
                the summary alone tells you whether to open it. "About it" was
                vague enough to mean any of the three. -->
-          ${railBlock('What it is', true, propsPanel(o))}
-          ${railBlock('What it connects to', false, connectionsBlock(o), claimsOf(o).length)}
-          ${railBlock('Where it came from', false, provenanceBlock(o))}
+          ${rail.map(([k, open]) => RAIL_BLOCK[k](o, open, view)).join('')}
           <div class="rail-foot">
             <!-- Not on a draft. Nobody else can read it, so there is nobody to
                  report it to and no thread for the report to land in — pressing
@@ -4210,7 +4912,36 @@
     /* A repaint replaces the DOM the caret was living in. Scroll was already
        carried across; the armed state has to travel with it or an AI accept
        mid-edit would drop you back out of the text you were in. */
-    if (armed) { const el = $(armed); if (el) { armEditable(el); caretToEnd(el); } }
+    /* ── Whatever was being typed into keeps the caret ──
+
+       One chain, in the order of what the person is doing, and exactly one
+       branch runs.
+
+       An OPEN ROW outranks the armed body: clicking a field while the body was
+       armed is a request to edit the field, and re-arming the body would take
+       the caret straight back out of the row that just unfolded.
+
+       This is also the ONLY place a row's input gets focused. It used to be
+       the click handler, which captured the element and focused it on a 40ms
+       timer — so the reference went stale if anything repainted in between,
+       and the row unfolded under the pointer with the caret nowhere. Focusing
+       it here happens in the same synchronous render that created it, and it
+       re-establishes on every later repaint for as long as the row is open. */
+    const openInput = openXField ? `[data-x-val="${openXField.replace(/"/g, '\\"')}"]`
+      : openProp ? `[data-prop-v="${openProp.replace(/"/g, '\\"')}"]` : null;
+
+    /* Mid-commit: the repaint IS the write, so go back to the field it came
+       from. Not `select()` on an add-input — it is empty by definition after a
+       commit, and selecting nothing then typing reads as a lost keystroke. */
+    if (xKeep) {
+      const f = $(`[${xKeep[0]}="${xKeep[1].replace(/"/g, '\\"')}"]`);
+      if (f) { f.focus(); if (xKeep[0] === 'data-x-val' && f.select) f.select(); }
+    }
+    else if (openInput) {
+      const f = $(openInput);
+      if (f) { f.focus(); if (f.select) f.select(); }
+    }
+    else if (armed) { const el = $(armed); if (el) { armEditable(el); caretToEnd(el); } }
     else if (blank) { const t = $('[data-edit-title]'); if (t) setTimeout(() => armEditable(t), 80); }
   }
 
@@ -4467,9 +5198,11 @@
     el.classList.toggle('is-blank', !o.sum);
     const b = $('.doc-page [data-publish]');
     if (b) {
-      const has = !!o.sum;
-      b.disabled = !has;
-      b.textContent = has ? 'Publish' : 'Add some content first';
+      /* The same gate renderDoc drew the button with, so typing into the body
+         cannot leave the label saying something the gate no longer says. */
+      const why = publishGate(o);
+      b.disabled = !!why;
+      b.textContent = why || 'Publish';
     }
     return o;
   }
@@ -4499,9 +5232,79 @@
 
   /* A property changed: write it, re-derive, and repaint both the editor and
      the grid behind it, so the badge on the card moves as you edit. */
+  /* ── The field the repaint is about to destroy ──
+
+     `renderGrid` writes to `#wbStage`, which is the same stage the document
+     lives in, so by the time `renderDoc` runs the element that had focus is
+     already detached and `document.activeElement` is the body. Reading it
+     there finds nothing, every time. It has to be captured before the wipe,
+     which means here — the single funnel every property write goes through. */
+  let pendingFocus = null;
+
+  const focusKeyOf = (el) => el && el.getAttribute
+    ? (el.hasAttribute('data-x-add') ? ['data-x-add', el.getAttribute('data-x-add')]
+      : el.hasAttribute('data-x-val') ? ['data-x-val', el.getAttribute('data-x-val')] : null)
+    : null;
+
+  /* ── One writer per field, called rather than fired ──
+
+     These lived inside the focusout listener, which made "click somewhere
+     else" the only way to commit. Enter now calls the same function directly
+     instead of calling blur() and hoping the focus event arrives: a commit
+     that depends on a focus event firing is a commit that silently does
+     nothing wherever those events do not arrive, and the difference between
+     "wrote nothing" and "wrote nothing and said so" is invisible here.
+
+     Returns whether anything changed, so the caller decides about repainting —
+     focusout has folding rules of its own that Enter does not share. */
+  /* A field that accepts 900 is a field that will hold 900, and a fit meter
+     would render off its own end. The bounds come off the CONTROL rather than
+     being written here: a percentage and a slide count do not share a ceiling,
+     and a clamp that disagrees with the input it is clamping is a clamp nobody
+     can see is wrong. */
+  const clampToField = (t, raw) => {
+    if (raw === '') return 0;
+    const lo = t.min === '' || t.min === undefined ? -Infinity : Number(t.min);
+    const hi = t.max === '' || t.max === undefined ? Infinity : Number(t.max);
+    return Math.max(lo, Math.min(hi, Math.round(Number(raw) || 0)));
+  };
+
+  function commitXField(t) {
+    const o = byId(readURL().doc);
+    if (!o || !t || !t.getAttribute) return false;
+    const k = t.getAttribute('data-x-val');
+    if (!k) return false;
+    const raw = String(t.value || '').trim();
+    o.x = o.x || {};
+    o.x[k] = t.type === 'number' ? clampToField(t, raw) : raw;
+    return true;
+  }
+
+  function commitProp(t) {
+    const o = byId(readURL().doc);
+    if (!o || !t || !t.hasAttribute) return false;
+    if (t.hasAttribute('data-prop-k')) {
+      const was = t.getAttribute('data-prop-k');
+      const now = String(t.value || '').trim();
+      /* The key IS the identity, so a rename has to carry the open marker with
+         it or the pair folds shut under the pointer mid-edit. */
+      if (!now || now === was) return false;
+      o.props[now] = o.props[was];
+      delete o.props[was];
+      if (openProp === was) openProp = now;
+      return true;
+    }
+    if (t.hasAttribute('data-prop-v')) {
+      o.props[t.getAttribute('data-prop-v')] = String(t.value || '').trim();
+      return true;
+    }
+    return false;
+  }
+
   function repaintEditor() {
     noteSave(byId(readURL().doc));
     recompute();
+    pendingFocus = focusKeyOf(document.activeElement);
     const st = readURL();
     renderGrid(st);
     renderBrief(st);
@@ -4557,6 +5360,30 @@
     const sent = sentences(body);
     const tags = (o.tags || []).slice(0, 2).join(' and ');
 
+    /* ── Rewriting for an audience, for any audience ──
+
+       This was one `case 'Rewrite for support agents'`, from when every type
+       opened the same menu. Now that a profile offers "Rewrite for sellers"
+       and a campaign "Rewrite for marketing", a single case would let the
+       other three fall through to `default:` — which returns the first
+       sentence of the SELECTION, and at document scope there is no selection,
+       so it returns nothing. The menu would have offered an action that
+       proposed replacing the document with an empty one.
+
+       The audience is in the label, so one branch reads it and covers all
+       four. The plain-language substitutions are audience-neutral and stay. */
+    const forWhom = /^Rewrite for (.+)$/.exec(action);
+    if (forWhom) {
+      const LEAD = {
+        'support agents': 'The exception first, because it is what the customer is already asking about.',
+        'sellers':        'What qualifies a prospect, and what rules one out — in that order.',
+        'marketing':      'What may be said outside the building, and what may not.',
+        'readers':        'The short answer first. The reasoning under it.'
+      };
+      return paras([LEAD[forWhom[1]] || 'Written for ' + forWhom[1] + '.']
+        .concat(sent.map((s) => s.replace(/\bshall\b/gi, 'must').replace(/\bmay be\b/gi, 'can be'))));
+    }
+
     switch (action) {
       /* ── a blank document ── */
       case 'Write a first draft':
@@ -4599,13 +5426,6 @@
         return paras(sent.concat([
           `Two cases come up often enough to state: a request made inside the window but completed outside it, and one made by someone other than the account holder. The first is in scope; the second needs the account holder's confirmation first.`
         ]));
-
-      case 'Rewrite for support agents':
-        /* Short sentences, the exception before the rule, no policy voice. */
-        return paras(
-          [`The exception first: if the item has been activated, this does not apply — use the warranty process instead.`]
-            .concat(sent.map((s) => s.replace(/\bshall\b/gi, 'must').replace(/\bmay be\b/gi, 'can be')))
-        );
 
       case 'Fill the gaps':
         return paras(sent.concat([
@@ -5516,8 +6336,24 @@
        through the scope machinery below — it goes to the same commit surface
        the New document button uses. */
     if (['add', 'create', 'new', 'draft'].indexOf(key) > -1) {
+      /* ── Which kind, said in words ──
+
+         `intent.set` was the fallback here and it is never populated on this
+         route: parseIntent returns at WRITE_VERB, several lines before
+         parseFilters ever runs. So the only thing that worked was a literal
+         SLUG in the sentence — "create an article" and "create a ticket", and
+         nothing else. "Create a success story", "a web page", "a marketing
+         asset" and now "a deck" all silently made an Article, which is the one
+         type whose slug is also the word people reach for when they mean
+         "a document".
+
+         The lexicon already knows every word for every type. Running it here
+         is what the dead fallback was reaching for. Slug first, because a slug
+         is unambiguous; then the lexicon, which is where "deck" and "case
+         study" live. */
+      const spoken = parseFilters(intent.text).set.type;
       const named = Object.keys(TYPES).find((k) => new RegExp('\\b' + k + '\\b', 'i').test(intent.text)) ||
-                    (intent.set && intent.set.type ? intent.set.type[0] : '');
+                    (spoken && spoken[0]) || '';
       newDocument(named || 'article');
       return;
     }
@@ -6108,7 +6944,9 @@
     if (kind === 'edit') { patch({ doc: arg }); return; }
     if (kind === 'arch') { patch({ archived: true, doc: arg }); return; }
     if (kind === 'set')  { patch({ settings: arg }); return; }
-    if (kind === 'new')  { newDocument('article'); return; }
+    /* A deep link can name the kind now that the button can. Unknown or absent
+       still lands on an article, which is what newDocument would do anyway. */
+    if (kind === 'new')  { newDocument(TYPES[arg] ? arg : 'article'); return; }
     if (kind === 'canvas') { canvas.show(['Prototype']); return; }
     if (kind === 'peek') {
       const [k, v] = arg.split(':');
@@ -6276,6 +7114,9 @@
         repaintEditor();
         return;
       }
+      /* Taken before the write, because `o[key] = val` is what makes o.t the
+         NEW type and the swap needs to know which record it is putting away. */
+      const wasType = o.t;
       /* Owner goes through the same accessor the byline reads, so an ingested
          document's row writes the assignee rather than an `owner` field the
          display would then ignore. */
@@ -6284,9 +7125,10 @@
          was built with. */
       else if (key.slice(0, 2) === 'x.') { o.x = o.x || {}; o.x[key.slice(2)] = val; }
       else o[key] = val;
-      /* Changing the type changes which fields the card and viewer draw, so the
-         type-specific bag has to gain the shape the new type expects. */
-      if (key === 't') o.x = Object.assign({}, BLANK_X[o.t] || {}, o.x);
+      /* Changing the type changes which record the document draws, so the bag
+         is SWAPPED for the new type's rather than merged under it. switchType
+         repaints and reports; there is nothing to do after it. */
+      if (key === 't' && o.t !== wasType) { switchType(o, wasType); return; }
       repaintEditor();
     });
 
@@ -6539,7 +7381,24 @@
       if (!e.target.closest) return;
       if (e.target.closest('.blk-tools') || e.target.closest('.ai-menu') ||
           e.target.closest('.blk-menu') || e.target.closest('[data-fmt]') ||
-          e.target.closest('[data-pick-image]')) { e.preventDefault(); return; }
+          e.target.closest('[data-pick-image]') ||
+          /* The record is a run of editable rows in the same column as the
+             body. A button in it that takes focus on mousedown blurs the body,
+             which repaints the page, which detaches the button the click was
+             travelling to — the same defect, in a place it could not reach
+             while these rows lived in the rail.
+
+             `.prop-kv-read` only: it re-focuses its input programmatically
+             after the repaint, exactly as the toolbar does. The design
+             system's dropdown trigger is deliberately NOT here — it opens on
+             click through its own controller, and cancelling mousedown under
+             it is a change to a component this file does not own. */
+          e.target.closest('.prop-kv-read') ||
+          /* A stepper button that takes focus blurs the input beside it, which
+             commits and folds the row out from under the second click. */
+          e.target.closest('[data-step]') ||
+          e.target.closest('.dv-subject .entry-action') ||
+          e.target.closest('.dv-links .entry-action')) { e.preventDefault(); return; }
       /* Touching anything else puts the block list away. Choosing a block and
          pressing + again already close it; this is the third way out, which is
          the one you reach for without thinking. */
@@ -6579,28 +7438,14 @@
       const o = byId(readURL().doc);
       if (!o || !t.hasAttribute) return;
       if (t.hasAttribute('data-x-val')) {
-        const k = t.getAttribute('data-x-val');
-        const raw = t.value.trim();
-        /* A score is a percentage. A field that accepts 900 is a field that
-           will hold 900, and the badge would render a meter off its own end. */
-        o.x = o.x || {};
-        o.x[k] = t.type === 'number'
-          ? (raw === '' ? 0 : Math.max(0, Math.min(100, Math.round(Number(raw) || 0))))
-          : raw;
+        commitXField(t);
         if (openXField !== null) { openXField = null; repaintEditor(); }
         return;
       }
       if (t.hasAttribute('data-prop-k')) {
-        const was = t.getAttribute('data-prop-k'), now = t.value.trim();
-        /* The key IS the identity, so a rename has to carry the open marker
-           with it or the pair folds shut under the pointer mid-edit. */
-        if (now && now !== was) {
-          o.props[now] = o.props[was]; delete o.props[was];
-          if (openProp === was) openProp = now;
-          repaintEditor();
-        }
+        if (commitProp(t)) repaintEditor();
       } else if (t.hasAttribute('data-prop-v')) {
-        o.props[t.getAttribute('data-prop-v')] = t.value.trim();
+        commitProp(t);
         /* Leaving the pair folds it back to the phrase — but only if focus
            actually left the pair, not if it moved from the name to the value. */
         const pair = t.closest('.prop-kv');
@@ -6663,6 +7508,25 @@
       armEditable(el);
     });
 
+    /* ── A title is one line, so Enter ends it ──
+
+       The body is prose and Enter belongs to it: it makes the next paragraph.
+       A title is a single value, and in a contenteditable <h1> the same key
+       was putting a line break inside the heading — a title with a newline in
+       it, committed on some later blur, from a keystroke that in every other
+       field on this page now means "done".
+
+       Blur commits through the focusout writer, which is the same path
+       clicking away already used. */
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.shiftKey) return;
+      const el = e.target;
+      if (!el || !el.hasAttribute || !el.hasAttribute('data-edit-title')) return;
+      if (el.getAttribute('contenteditable') !== 'true') return;
+      e.preventDefault();
+      el.blur();
+    });
+
     /* Escape leaves the text — and only the text. Without the capture guard it
        would also reach the handler that closes the document, so one key would
        both commit the edit and throw away the page it was made on. */
@@ -6684,6 +7548,64 @@
       const btn = $('[data-comment-add]');
       if (btn) btn.click();
     });
+
+    /* ── A field commits on Enter and cancels on Escape ──
+
+       Every single-value field on this product committed on focusout and on
+       nothing else: you clicked the row, typed, pressed the one key everybody
+       presses to mean "done", and nothing happened. The only way to keep what
+       you had written was to click somewhere else — which nobody does, because
+       the field has not told them it worked yet.
+
+       That was survivable while these rows lived in a 320px rail behind a
+       closed <details>. They are the document's own content now: a Web Page IS
+       its source URL, a Presentation IS its deck and slide count. A control
+       whose commit you can only reach by clicking away from it reads as a
+       control that does not work, which is exactly how it was reported.
+
+       Both keys route through the SAME focusout writer rather than each
+       writing its own copy of the value. Enter blurs, and blur commits.
+       Escape puts the stored value back FIRST, so the commit its blur triggers
+       is a no-op and the field returns to the state it opened in. One writer,
+       three ways in, and no chance of the three drifting apart.
+
+       Escape is capture-phase and stops there. Without the guard the same
+       keystroke travels on to the handler that closes whatever is open behind
+       the field — the same reason the body's own Escape is guarded. */
+    const FIELD_ATTR = ['data-x-val', 'data-prop-v', 'data-prop-k'];
+    document.addEventListener('keydown', (e) => {
+      const t = e.target;
+      if (!t || !t.hasAttribute) return;
+      const attr = FIELD_ATTR.filter((a) => t.hasAttribute(a))[0];
+      if (!attr) return;
+      if (e.key !== 'Enter' && e.key !== 'Escape') return;
+      e.preventDefault();
+      /* Escape must not travel on to the handler that closes whatever is open
+         behind the field — the same reason the body's own Escape is guarded. */
+      if (e.key === 'Escape') e.stopPropagation();
+
+      /* Escape restores the stored value before committing, so the commit is a
+         no-op and the field returns to the state it opened in. Enter commits
+         what was typed. Either way the row folds, which is the feedback that
+         was missing: a field that stays open after you press Enter has told
+         you nothing about whether it heard you. */
+      if (e.key === 'Escape') {
+        const o = byId(readURL().doc);
+        const k = t.getAttribute(attr);
+        /* A custom property's KEY is its own stored value — the attribute
+           holds the name the row was opened under. */
+        const v = !o ? '' : attr === 'data-x-val' ? xVal(o, k)
+          : attr === 'data-prop-v' ? o.props[k] : k;
+        t.value = v === undefined || v === '—' ? '' : String(v);
+      }
+      if (attr === 'data-x-val') commitXField(t); else commitProp(t);
+      openXField = null;
+      openProp = null;
+      /* Blur too, so the browser's own focus ring does not survive on an
+         element the repaint is about to replace. */
+      t.blur();
+      repaintEditor();
+    }, true);
 
     /* The same two moves for a prose list, minus the slug. A tag is a machine
        value and gets lowercased and hyphenated; a fit criterion is a sentence
@@ -6926,15 +7848,40 @@
         if (o) xModal(o, el.getAttribute('data-x-modal'), el.getAttribute('data-x-lead'));
         return;
       }
+      /* The type-switch note is read once. It also clears itself when you leave
+         the document — see patch() — because it is about one switch on one
+         object, not a standing fact about it. */
+      if (t.closest('[data-note-clear]')) { switchNoted = null; repaintEditor(); return; }
+      /* ── The stepper's buttons, minus the part the library already does ──
+
+         `[data-step]` belongs to the design system and it steps the input
+         itself. Stepping it here as well is how one press moved a fit score by
+         two — the product re-implementing a library behaviour it had only read
+         the CSS for.
+
+         What the library cannot know is this field's ceiling and where the
+         value is stored, so that is all that is left to do: clamp what it
+         wrote, and commit it through the same writer typing uses, so a nudge
+         and a keystroke cannot store different things. */
+      if ((el = t.closest('[data-step]'))) {
+        const inp = el.parentNode.querySelector('[data-x-val]');
+        if (!inp) return;
+        inp.value = String(clampToField(inp, String(inp.value).trim()));
+        commitXField(inp);
+        repaintEditor();
+        return;
+      }
       /* A type field unfolds the same way a custom fact does, and closes the
          other one on the way — two open inputs in a 320px rail is two carets
          and no way to tell which one Enter belongs to. */
       if ((el = t.closest('[data-x-open]'))) {
         openXField = el.getAttribute('data-x-open');
         openProp = null;
+        /* renderDoc focuses the row it just unfolded — see the focus chain at
+           the end of it. Doing it here on a timer meant holding a reference to
+           an element a later repaint could replace, and racing a delay nobody
+           could tune. */
         repaintEditor();
-        const v = $('[data-x-val="' + openXField.replace(/"/g, '\\"') + '"]');
-        if (v) setTimeout(() => { v.focus(); v.select(); }, 40);
         return;
       }
       if ((el = t.closest('[data-x-drop]'))) {
@@ -6948,9 +7895,8 @@
       if ((el = t.closest('[data-prop-open]'))) {
         openProp = el.getAttribute('data-prop-open');
         openXField = null;
+        /* Focused by renderDoc's chain, same as a type field. */
         repaintEditor();
-        const v = $('[data-prop-v="' + openProp.replace(/"/g, '\\"') + '"]');
-        if (v) setTimeout(() => { v.focus(); v.select(); }, 40);
         return;
       }
       if ((el = t.closest('[data-prop-del]'))) {
@@ -7048,7 +7994,18 @@
         docAct(el.getAttribute('data-act'), el.getAttribute('data-obj'), el.getAttribute('data-arg'));
         return;
       }
-      if ((el = t.closest('[data-new-doc]'))) { newDocument(readURL().type[0]); return; }
+      /* The trigger only opens the panel. `aria-expanded` is kept honest here
+         rather than left to the design system's outside-click closer, which
+         removes the class and knows nothing about the button that owns it. */
+      if ((el = t.closest('[data-new-menu]'))) {
+        const anchor = el.closest('.menu-anchor');
+        if (anchor) {
+          const open = anchor.classList.toggle('open');
+          el.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+        return;
+      }
+      if ((el = t.closest('[data-new-type]'))) { newDocument(el.getAttribute('data-new-type')); return; }
       if ((el = t.closest('[data-apply-ids]'))) {
         const ids = el.getAttribute('data-apply-ids').split(',');
         canvas.close();
@@ -7293,8 +8250,14 @@
         });
         return;
       }
-      if (t.closest('[data-pick-files]')) {
-        pickFiles(FILE_ACCEPT, true, ingestFiles);
+      /* The attribute's VALUE narrows the picker, for a control that is about
+         one particular file rather than about adding to Knowledge. A bare
+         `data-pick-files` reads as '' and keeps the old behaviour exactly:
+         everything, many at a time. A narrowed one takes a single file,
+         because "Replace the deck" is not a bulk action. */
+      if ((el = t.closest('[data-pick-files]'))) {
+        const only = el.getAttribute('data-pick-files');
+        pickFiles(only || FILE_ACCEPT, !only, ingestFiles);
         return;
       }
       if ((el = t.closest('[data-blocks]'))) {
@@ -7332,7 +8295,12 @@
         /* The draft-from-connections action is offered only when there is
            something to draft from, so the menu never names a source that does
            not exist. */
-        const items = (isBlank ? DOC_AI.blank : DOC_AI.filled)
+        /* The view's list, so a ticket is not offered "Expand" and a profile
+           is rewritten for sellers rather than for support agents. DOC_AI
+           stays as the fallback for anything without a view. */
+        const ai = o ? viewFor(o).ai : null;
+        const items = ((ai ? ai[isBlank ? 'blank' : 'filled'] : null) ||
+                       (isBlank ? DOC_AI.blank : DOC_AI.filled))
           .concat(o && claimsOf(o).length ? [DOC_AI.fromConnections] : []);
         aiMenu(el, items, 'data-ai-doc-run');
         return;
@@ -7916,7 +8884,11 @@
     const id = 'new-' + (++newSeq);
     const doc = Object.assign({
       id: id, work: 'drafted', owner: USER.owner, t: t,
-      title: 'Untitled ' + TYPES[t].label.toLowerCase(), col: USER.collections[0],
+      /* The label's own case. Lowercasing reads fine on Article and Ticket and
+         produces "Untitled icp" — which nobody saw while the only way to make
+         one was to filter to ICP first, and which the kind menu now puts one
+         click from the landing set. */
+      title: 'Untitled ' + TYPES[t].label, col: USER.collections[0],
       src: 'upload', prod: 'copilot', client: '', tags: [], services: [], props: {},
       aud: ['admins', 'stakeholders'], region: 'global', arch: false,
       upd: 0, ing: 0, xc: 0, xu: 0, used: 0, uses: 0, sum: '', comments: [], versions: [],
@@ -7937,16 +8909,24 @@
      Text arrives as text; anything else records what was dropped and leaves the
      body for AiMY to draft into. Guessing a type from an extension is a guess,
      and the Properties panel is one click away to correct it. */
+  /* `.ppt`/`.pptx` filed as `asset` here until a Presentation existed to file
+     them as. A deck arriving as a Marketing Asset was the guess this table
+     admits to making, and it is the one guess the extension actually settles. */
   const EXT_TYPE = { md: 'article', txt: 'article', doc: 'article', docx: 'article', pdf: 'asset',
-                     ppt: 'asset', pptx: 'asset', png: 'asset', jpg: 'asset', jpeg: 'asset',
+                     ppt: 'pptx', pptx: 'pptx', key: 'pptx', odp: 'pptx',
+                     png: 'asset', jpg: 'asset', jpeg: 'asset',
                      csv: 'icp', xlsx: 'icp', html: 'webpage', htm: 'webpage' };
+  /* What the deck's own upload control will take. Narrower than FILE_ACCEPT on
+     purpose: that control says "the deck", so it should not open a picker
+     offering to make one out of a spreadsheet. */
+  const DECK_ACCEPT = '.ppt,.pptx,.key,.odp';
   const TEXTY = /\.(md|txt|csv|html?|json)$/i;
   /* Ingestion has worked since the fifth pass and nothing on the page said so.
      A capability you only discover by already dragging a file at it is a
      capability for people who guessed. This string is what it takes, said in
      the places somebody is looking for a way in. */
   const FILE_KINDS = 'Word, PDF, PowerPoint, Excel, Markdown, text, CSV, HTML or an image.';
-  const FILE_ACCEPT = '.md,.txt,.doc,.docx,.pdf,.ppt,.pptx,.csv,.xlsx,.html,.htm,.png,.jpg,.jpeg';
+  const FILE_ACCEPT = '.md,.txt,.doc,.docx,.pdf,.ppt,.pptx,.key,.odp,.csv,.xlsx,.html,.htm,.png,.jpg,.jpeg';
 
   /* One input, reused. Dropping is a gesture you have to know about; choosing is
      one every file field has taught. Both end in the same function. */
@@ -8097,16 +9077,30 @@
     const open = byId(readURL().doc);
 
     /* A blank document is a document waiting for content. Filling it is what
-       you meant; making a second one beside it never was. */
-    if (isBlankDoc(open) && list.length === 1) {
+       you meant; making a second one beside it never was.
+
+       And so is a document whose subject IS a file, blank or not. "Replace the
+       deck" on a Presentation that had presenter notes in it used to fall
+       through to the branch below and create a SECOND Presentation beside the
+       one you were looking at — a button labelled Replace that added. What is
+       being replaced is the file, and on these types the prose is a note about
+       it rather than the thing itself. */
+    const owns = open && viewFor(open).ownsFile;
+    if (list.length === 1 && (isBlankDoc(open) || owns)) {
       const f = list[0];
-      open.title = f.name.replace(/\.[^.]+$/, '');
+      const had = owns ? subjectFile(open) : '';
+      /* A title you chose survives the file you attach under it. Only a title
+         nobody has set yet takes the filename. */
+      if (!had || /^Untitled\s/i.test(open.title) || !String(open.title || '').trim()) {
+        open.title = f.name.replace(/\.[^.]+$/, '');
+      }
       open.props = Object.assign({}, open.props,
         { 'source-file': f.name, size: Math.max(1, Math.round(f.size / 1024)) + ' KB' });
       readInto(open, f);
       recompute();
       renderDoc(readURL());
-      toast('Filled from “' + f.name + '”', null, 'Still a draft, still yours');
+      toast(had ? 'Replaced with “' + f.name + '”' : 'Filled from “' + f.name + '”',
+        null, had ? 'The notes and the record are unchanged' : 'Still a draft, still yours');
       return;
     }
 
@@ -8193,6 +9187,10 @@
     icp:      { segment: '—', score: 0, fit: [], dis: [] },
     campaign: { objective: '—', window: '—', assets: '—' },
     asset:    { format: '—', usage: 'Internal only', approval: 'pending' },
+    /* `slides: 0` rather than '—': it is a count, the number input writes a
+       number, and 0 is what "no deck yet" honestly is. TYPE_BODY tests it as
+       falsy so a deck with no file states no slide count at all. */
+    pptx:     { slides: 0, presented: '—', usage: 'Internal only', approval: 'pending' },
     story:    { customer: '—', outcome: '—', quote: '', approval: 'pending' },
     blog:     { pub: 'Draft', canonical: '—', author: USER.owner },
     /* No crawl or change: both are derived from `upd` and `xu` now. */

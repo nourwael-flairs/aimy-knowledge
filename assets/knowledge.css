@@ -1796,11 +1796,15 @@ body.is-doc .page-inner { max-width: none; }
 .doc-page .comment-compose { max-width: 80ch; }
 .doc-page .props { gap: 12px; }
 /* `.prop-facts` stood here: the type's fields, read aloud as phrases above the
-   rows. They are controls now (see .prop-typed), and a value printed above the
-   field that holds it is the same fact twice. */
-/* The type's own fields, separated from the taxonomy every type shares —
-   the same hairline the facts block used to carry. */
-.prop-typed { padding-bottom: 12px; border-bottom: 1px solid var(--hairline); }
+   rows. They became controls, and a value printed above the field that holds
+   it is the same fact twice.
+
+   `.prop-typed` stood here too: those controls, separated from the taxonomy
+   every type shares by a hairline. They have left this panel entirely — the
+   type's own fields are the record on the document now, where the type leads.
+   What the rail keeps is the shared taxonomy, which is the split §6.4 draws.
+   Both rules are removed rather than kept: a rule with no markup is invisible
+   to the audit, which only ever looks the other way round. */
 
 @media (max-width: 1100px) {
   .doc-page { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
@@ -1870,6 +1874,13 @@ body.is-doc .page-inner { max-width: none; }
 .cx-seg { padding: 2px; }
 .cx-seg .seg-btn { height: 28px; padding: 0 12px; font-size: var(--fs-2xs); }
 .cx-q { height: 32px; padding: 0 12px; font-size: var(--fs-xs); }
+/* Chrome draws its own clear button inside a `type=search` field: a grey ✕
+   belonging to the browser, sitting in a field wearing the product's own
+   class. Same defect as the number stepper, different chrome. Scoped to
+   `.field-input` so it covers every search field this product ever puts on a
+   surface, not just this one. */
+.field-input::-webkit-search-cancel-button,
+.field-input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
 .cx-list {
   display: flex; flex-direction: column; gap: 2px;
   max-height: 280px; overflow-y: auto;
@@ -2747,6 +2758,34 @@ body.is-doc .page-inner { max-width: none; }
 .rm-flag.is-warn { color: var(--warn); }
 .rm-flag strong { color: inherit; }
 
+/* ── The kind menu on New document ──
+
+   The design system's `.menu`, with two lines per item instead of one: the
+   name, and what that kind is for. Eight labels alone would ask somebody to
+   already know the difference between a Campaign and a Marketing Asset, which
+   is exactly the knowledge a person creating their first one does not have.
+
+   `.rm-end .entry-action { margin-left: auto }` used to push this button to
+   the right end of the row. The button is inside an anchor now, so the rule
+   fires on a child that is already alone in its box and the anchor stays where
+   the flow put it — the pusher has to move out with it.
+
+   The panel opens from the RIGHT edge for the same reason: anchored left at
+   280px wide it would start at the row's right end and run off the region. */
+.rm-end .menu-anchor { margin-left: auto; }
+.rm-end .menu-anchor .entry-action { margin-left: 0; }
+.rm-end .new-menu { left: auto; right: 0; }
+.new-menu { min-width: 280px; }
+/* The item is two stacked lines, so it stops centring on one. */
+.new-menu .menu-item { align-items: flex-start; padding: 8px; width: 100%; text-align: left; }
+.new-menu .menu-item svg { margin-top: 2px; }
+.new-menu-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.new-menu-name { font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--d100); }
+/* 11px, the same step the card's meta line and the rail's supporting run use.
+   This is the quietest of the three, and it is still a sentence somebody
+   reads — `--d500` measures 3.51:1, which is where that ramp stops. */
+.new-menu-for { font-size: 11px; color: var(--d500); line-height: 1.45; }
+
 /* ═══════════════════════════════════════════════
    TYPE CARD — product-owned bits only
 ═══════════════════════════════════════════════ */
@@ -2983,9 +3022,10 @@ body.is-doc .page-inner { max-width: none; }
    its innerHTML is written back on the first edit, so a derived block rendered
    inside it would become the document's own stored content. */
 .dv-typed { display: flex; flex-direction: column; gap: 8px; margin: 16px 0 24px; }
-/* In the head the column's own gap does the spacing, the same way the notice
-   and the ownership note already surrender their margins to it. */
-.doc-head .dv-typed { margin: 4px 0 0; }
+/* `.doc-head .dv-typed` stood here, for when this block was a read-only replay
+   of the card's body in the document's head. It is the record's derived
+   stratum now and the head no longer carries it, so the override went with the
+   markup it was written for. */
 .dv-typed .tc-body { padding: 0; margin: 0; gap: 8px; }
 /* Tier two at the document's scale, matching .dv-body's own 15px prose rather
    than the card's 13px — one ramp per surface, not one ramp everywhere. */
@@ -2995,6 +3035,82 @@ body.is-doc .page-inner { max-width: none; }
 /* `--d600` measures 2.49:1 on a dark card — the marker would be quieter than
    the criterion it marks. `--d500` is the step this ramp uses for punctuation. */
 .tc-list li::before { color: var(--d500); }
+
+/* ═══════════════════════════════════════════════
+   THE EIGHT VIEWS — layout only
+
+   Every shape below belongs to the design system; these rules place it in a
+   760px column instead of a 320px rail, and nothing more. Per-type variation
+   is selected on [data-type] over a static class — a data- attribute is not
+   scanned by css-audit.js's class regex, so all eight variants stay audited
+   where an interpolated class would leave seven of them unchecked. And what
+   varies is column count and order, never colour: colour is status's.
+═══════════════════════════════════════════════ */
+
+/* ── A secondary run, named ──
+
+   Prose that is not the point still has to say what it is for. An <h2> is the
+   right rung — the title is the page's only h1 and #editBody emits h3/h4, so
+   this sits between them, the same level `.doc-comments-head` already uses.
+   It reads as a label rather than a heading, because the document's own
+   headings are the ones inside the body. */
+.dv-run-label {
+  margin: 0 0 8px;
+  font-size: 12px; font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+}
+
+/* ── The type's record, in the document ──
+
+   The rail's rows were built for 320px: one column, the lead above or beside
+   its value, the value taking whatever is left. At the document's measure that
+   leaves a twelve-character phrase against 600px of value and the left edge
+   stops being scannable. Same rows, two columns, and the measure capped at
+   80ch for the same reason the paragraphs are — a line you cannot track back
+   to is not more readable for being wider. */
+.dv-record { display: flex; flex-direction: column; gap: 12px; max-width: 80ch; margin: 0 0 32px; }
+.dv-record .dv-typed { margin: 0; }
+.dv-record .prop-rows { gap: 4px; }
+.dv-record .prop-kv-read {
+  display: grid; grid-template-columns: 160px minmax(0, 1fr);
+  align-items: baseline; gap: 8px;
+}
+/* The rail truncates because it has 320px. The document does not have to. */
+.dv-record .prop-kv-val { white-space: normal; font-size: 14px; }
+.dv-record .prop-why { margin: 0; }
+
+/* A case record is a register: state, who raised it, how it closed. A tighter
+   left column than the default, because none of its leads is long. */
+.dv-record[data-type="ticket"] .prop-kv-read { grid-template-columns: 140px minmax(0, 1fr); }
+
+/* A profile is read as two lists side by side — what qualifies and what rules
+   out — because that comparison IS the profile. Nothing here sets a colour;
+   what varies per type is the column count, which is shape. */
+.dv-record[data-type="icp"] .prop-rows {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 24px;
+}
+.dv-record[data-type="icp"] .prop-rows > .prop-kv { grid-column: 1 / -1; }
+
+/* Somebody else's words, at the document's scale rather than the card's. */
+.dv-record[data-type="story"] .prop-kv-val .tc-quote { margin: 0; font-size: 15px; }
+
+/* ── The subject: the file, or the live page ── */
+.dv-subject { display: flex; flex-direction: column; gap: 8px; max-width: 80ch; margin: 0 0 24px; }
+.dv-subject .tc-mono { margin: 0; font-size: 14px; word-break: break-all; }
+.dv-subject-state { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--d400); }
+.dv-subject .rail-act { margin-top: 0; }
+
+/* ── Linked documents as content, not as description ──
+   Same row the rail uses, so a linked article reads identically in both. */
+.dv-links { display: flex; flex-direction: column; gap: 4px; }
+.dv-links .entry-action { align-self: flex-start; margin-top: 4px; }
+
+@media (max-width: 900px) {
+  /* Two lists side by side stop comparing and start wrapping. */
+  .dv-record[data-type="icp"] .prop-rows { grid-template-columns: minmax(0, 1fr); }
+  .dv-record .prop-kv-read,
+  .dv-record[data-type="ticket"] .prop-kv-read { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* ═══════════════════════════════════════════════
    ANSWER → SURFACE
@@ -3366,6 +3482,22 @@ body.is-doc .page-inner { max-width: none; }
   padding: 8px; font-family: var(--font-sans); font-size: 13px; line-height: 1.6;
 }
 .prop-kv:not(.is-open) .field-input { display: none; }
+/* ── The number field's editing control ──
+
+   A number rendered as a bare `input type=number`, so the browser drew its own
+   stepper on it: two grey chevrons belonging to Chrome, on a page where every
+   other control is the library's. The library ships `.stepper` and it was
+   never used here.
+
+   These rules do not draw it — that is the library's. They fold it away with
+   the row it belongs to, which the rule above only knew how to do for
+   `.field-input`, and bring it down to the 28px this panel's fields use from
+   the 34px a standalone stepper is. */
+.prop-kv:not(.is-open) .stepper { display: none; }
+.prop-kv .stepper button { width: 28px; height: 28px; font-size: 15px; }
+.prop-kv .stepper input { width: 44px; height: 28px; font-size: var(--fs-xs); }
+.prop-kv .stepper button:focus-visible,
+.prop-kv .stepper input:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .prop-kv.is-open .prop-kv-read { display: none; }
 .prop-kv-read {
   display: flex; align-items: baseline; gap: 6px; min-width: 0;
