@@ -236,16 +236,134 @@ button {
 .set-list .copy-field { max-width: 260px; }
 
 /* ═══════════════════════════════════════════════
-   CANVAS COLUMN — centred on .app-main, matching QA
+/* ═══════════════════════════════════════════════
+   THE CANVAS TAKES THE WINDOW, AND A COLUMN GOES BESIDE THE THREAD
 
-   The float bar and the overlay both live inside .app-main, so they centre on
-   the content column by default. This block previously compensated by half the
-   sidebar to pull the column onto the window's centre instead.
+   The design system ships `.aimy-overlay { position: absolute; inset: 0 }`,
+   which makes the canvas a child of the surface it is meant to sit above. It
+   opened inside `.app-main` only — offset by the briefing rail — and anything
+   that scrolled or grew that column carried the canvas with it.
 
-   Reverted to match QA, which centres on the content column: the bar sits over
-   the content it is asking about, and its centre agrees with the page's own.
-   Nothing to declare — removing the compensation is the whole change.
+   Both problems close the same way. `fixed` to the viewport under the top bar,
+   and `left: 0` rather than an offset, because a canvas that cannot use the
+   whole window cannot hold a conversation ABOUT something and show that
+   something at the same time. The offsets are the layout's own tokens rather
+   than numbers, so they cannot drift from the shell they clear.
+
+   The briefing rail is covered while the canvas is open. That is a deviation
+   from doctrine §6.1 — "the product shell (sidebar, topbar) remains
+   interactive" — and only half of it: the top bar still is, the rail is not.
+   Declared in GAPS.md rather than smuggled through.
+
+   ROW, AND THE LIBRARY'S COLUMN MOVES INSIDE. `display: flex` alone is not
+   enough. The library declares `flex-direction: column; align-items: center;
+   justify-content: flex-end; padding: 0 0 28px` — one centred stack pinned to
+   the bottom, which is exactly right for a thread over an input and exactly
+   wrong for a column beside them; left at `column` the chat list stacks ON TOP
+   of the canvas. The whole inner contract moves to `.overlay-main` unchanged,
+   so the badge, close, basis bar, thread and input keep the geometry the
+   system gives them — and they position against `.overlay-main`, because that
+   is what is now `position: relative`.
+
+   Ported from AiMY Sales, which argued all of this first and is the only
+   product in the ecosystem that had it.
 ═══════════════════════════════════════════════ */
+.aimy-overlay {
+  position: fixed;
+  top: var(--topbar-height); right: 0; bottom: 0; left: 0;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0;
+}
+
+/* ── The chat column, and the thread beside it ──
+   Fixed column, flexible thread: the list of conversations does not get wider
+   on a wider screen, because a title is a title. */
+.overlay-chats {
+  width: 240px; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 20px;
+  padding: 20px 12px;
+  overflow-y: auto;
+  border-right: 1px solid var(--glass-border);
+}
+.overlay-main {
+  flex: 1; min-width: 0; position: relative;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end;
+  /* 24, not the library's 28. Carrying a value across is not a licence to
+     carry an off-scale one — 28 is not on the spacing scale this project
+     audits against, and four pixels at the bottom of a full-height overlay is
+     invisible next to a rule that says spacing is chosen once. */
+  padding: 0 0 24px;
+}
+
+/* Starting one, then finding one. The column's only filled control, because
+   starting is the verb and everything under it is the qualifier. */
+.ov-chat-new { width: 100%; justify-content: center; margin-bottom: 8px; }
+.ov-chat-new svg { width: 14px; height: 14px; }
+/* Find a conversation. Second in the column, because a list you scroll to
+   search is a list you have already failed to search. */
+.ov-chat-find { display: block; margin-bottom: 20px; }
+.ov-chat-input {
+  width: 100%; min-height: 24px; padding: 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--glass-border); background: transparent;
+  font-family: inherit; font-size: var(--fs-xs); color: var(--d100);
+}
+.ov-chat-input::placeholder { color: var(--d600); }
+.ov-chat-input:focus-visible { outline: 2px solid var(--brand); outline-offset: -1px; }
+
+.ov-chat-group { display: flex; flex-direction: column; gap: 2px; }
+/* 8 under the label, 20 between groups — the ratio rule, and it is what makes
+   a group read as a group rather than as a list with a heading in it. */
+.ov-chat-cap {
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--d500); padding: 0 8px; margin-bottom: 8px;
+}
+.ov-chat {
+  /* `flex-start`, so a title can run to two lines: centred would float the
+     turn count against the middle of a wrapped question. */
+  display: flex; align-items: flex-start; gap: 8px;
+  min-height: 24px; padding: 8px; border-radius: var(--r-sm);
+  font-size: var(--fs-xs); color: var(--d300);
+  cursor: pointer; text-align: left; width: 100%;
+  transition: background-color var(--t-fast), color var(--t-fast);
+}
+.ov-chat:hover { background: var(--accent-dim); color: var(--d50); }
+.ov-chat:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.ov-chat.is-here { background: var(--accent-dim); color: var(--d50); font-weight: var(--fw-semibold); }
+/* Wraps rather than ellipsises, like everything else here that was truncating.
+   A session's title IS the question that was asked, and "What does the corpus
+   say about data resi…" is the half of it that does not say which question.
+   The rows in this column are what you are choosing between; a list you cannot
+   read is a list you cannot choose from. */
+.ov-chat-name { min-width: 0; line-height: var(--lh-snug); }
+.ov-chat-n {
+  margin-left: auto; flex-shrink: 0;
+  font-size: var(--fs-2xs); color: var(--d500); font-variant-numeric: tabular-nums;
+}
+.ov-chat-none { font-size: var(--fs-base); color: var(--d500); line-height: var(--lh-relaxed); padding: 0 8px; }
+
+/* Below this the column and a readable thread cannot both fit, and the thread
+   is what you came for. */
+@media (max-width: 900px) {
+  .overlay-chats { display: none; }
+}
+/* At phone width there is not enough height to spend clearing the top bar. */
+@media (max-width: 720px) {
+  .aimy-overlay { top: 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Opacity only. Sales tried a `translateX(-12px)` entrance twice and both
+     times the column stranded at the offset, cropped by the overlay's bounds.
+     A transform that can leave an element outside its own container has a
+     failure mode; opacity has none. */
+  .aimy-overlay.open .overlay-chats { animation: kChatsIn 220ms var(--ease-out); }
+  @keyframes kChatsIn { from { opacity: 0; } }
+}
 
 /* ═══════════════════════════════════════════════
    CANVAS THREAD — soften the scroll edge
@@ -843,8 +961,9 @@ body {
    aimy-ds.css so the extracted stylesheet stays a faithful copy of the
    library and this divergence stays visible.
 
-   --sidebar-width also drives the canvas column and float bar
-   (see the CANVAS COLUMN block), so both follow automatically. */
+   It drives the rail and nothing else now: the canvas is fixed to the window
+   and the float bar is centred on it, so neither reads this token — see THE
+   CANVAS TAKES THE WINDOW. */
 :root { --sidebar-width: 220px; }
 .sidebar-nav .nav-item { padding: 12px 16px; gap: 12px; }
 

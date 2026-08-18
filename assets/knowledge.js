@@ -961,13 +961,27 @@
   const FLAG_KEYS = ['mine', 'archived'];
   const ALL_KEYS  = LIST_KEYS.concat(DATE_KEYS, FLAG_KEYS, ['q', 'prop']);
 
-  function readURL() {
-    const p = new URLSearchParams(location.search);
+  /* Parse a query string into the full state object. Split out from `readURL`
+     so a stored conversation can be turned back into state by the same code
+     that reads the address bar — a session's snapshot IS a query string, and
+     two parsers for one format is one parser too many.
+
+     Every key is written, defaulted when absent. That is what makes restoring
+     a session a RESET rather than a merge: a partial object would leave
+     whatever filters happened to be set standing underneath the ones it
+     restores, and the surface would be neither state. */
+  function parseParams(p) {
     /* No mode. A document is one surface — reading and writing are the same
        act — so there is nothing for the URL to say about which one you are in.
        `?mode=edit` in an old link is simply ignored. */
     const st = { doc: p.get('doc') || '',
                  settings: p.get('settings') || '',
+                 /* Which conversation is open. Not a filter — it changes
+                    nothing about the working set — but it is a place you
+                    can be, so it is addressable like every other place,
+                    and a link to it carries the thread as well as the
+                    surface. */
+                 chat: p.get('chat') || '',
                  view: p.get('view') === 'tree' ? 'tree' : 'grid',
                  /* Which edge the tree walks. Every axis in the folder view is
                     an implicit edge type, so grouping by client IS traversing
@@ -994,6 +1008,8 @@
     return st;
   }
 
+  function readURL() { return parseParams(new URLSearchParams(location.search)); }
+
   /* True when the URL carries no filter at all — the landing case, where the
      surface composes a working set rather than showing the whole corpus. */
   function isComposed(st) {
@@ -1001,18 +1017,15 @@
       LIST_KEYS.every((k) => !st[k].length) && DATE_KEYS.every((k) => !st[k]);
   }
 
-  function writeURL(st, opt) {
-    /* ── The canvas gets out of the way of its own results ──
+  /* THE ONE SERIALIZER. `writeURL` puts this in the address bar, and a
+     conversation stores it verbatim as the surface it was had on — so the two
+     can never disagree about what a state looks like, and what a session
+     restores is exactly what a pasted link would restore.
 
-       Anything that changes the page while the canvas is open was clicked IN
-       the canvas — it is a full overlay, so nothing behind it is reachable —
-       and the point of clicking it was to see what it did. This used to be ten
-       scattered `canvas.close()` calls at ten call sites, which meant every new
-       action arrived not closing it until somebody noticed.
-
-       One rule at the funnel every URL change already goes through. `ask()`
-       does not write the URL, so a follow-up answer still opens normally. */
-    if (canvas && canvas.open) canvas.close();
+     Stored as this string rather than as a parsed object, because the string
+     is what a pasted link already carries and there is then only one thing
+     that can be wrong. */
+  function serialize(st) {
     const p = new URLSearchParams();
     if (st.q) p.set('q', st.q);
     LIST_KEYS.forEach((k) => { if (st[k] && st[k].length) p.set(k, st[k].join(',')); });
@@ -1024,13 +1037,40 @@
     if (st.view === 'tree') p.set('view', 'tree');
     if (st.group && st.group !== 'col') p.set('group', st.group);
     if (st.sort) p.set('sort', st.sort);
+    if (st.chat) p.set('chat', st.chat);
     /* Prototype affordance, carried so a forced state survives a filter change
        and the degraded case can actually be driven rather than just looked at. */
     if (forcedState) p.set('state', forcedState);
     /* Commas and colons are left unencoded. A filter URL is meant to be read, pasted and
        written by hand as well as by an agent, and `type=article,ticket` is
        legible in a way `type=article%2Cticket` is not. Both parse identically. */
-    const qs = p.toString().replace(/%2C/g, ',').replace(/%3A/g, ':');
+    return p.toString().replace(/%2C/g, ',').replace(/%3A/g, ':');
+  }
+
+  /* Set only while a conversation is being restored — see the `[data-chat]`
+     handler. Module-level rather than an argument because `writeURL` is called
+     from everywhere and only one caller has anything to say about this. */
+  let restoring = false;
+
+  function writeURL(st, opt) {
+    /* ── The canvas gets out of the way of its own results ──
+
+       Anything that changes the page while the canvas is open was clicked IN
+       the canvas — it is a full overlay, so nothing behind it is reachable —
+       and the point of clicking it was to see what it did. This used to be ten
+       scattered `canvas.close()` calls at ten call sites, which meant every new
+       action arrived not closing it until somebody noticed.
+
+       One rule at the funnel every URL change already goes through. `ask()`
+       does not write the URL, so a follow-up answer still opens normally.
+
+       AND ONE EXCEPTION. Switching conversations is the only URL change made
+       in order to STAY in the canvas: it moves the surface underneath on
+       purpose, because the surface is half of what a session is. Closing over
+       the thread you just asked for would throw away the reason for the
+       click. */
+    if (!restoring && canvas && canvas.open) canvas.close();
+    const qs = serialize(st);
     const url = location.pathname + (qs ? '?' + qs : '');
     if (opt && opt.replace) history.replaceState(null, '', url);
     else history.pushState(null, '', url);
@@ -5511,6 +5551,364 @@
 
 
   /* ═══════════════════════════════════════════════
+     CONVERSATIONS — a thread is a place you were, not a transcript
+
+     The canvas held exactly one conversation and it existed only as DOM: turns
+     were appended and nothing recorded them, so there was no second thread to
+     go back to and no first one to come back FROM. Doctrine §2.2 stage 4 asks
+     for "page position, filters, selected scope, conversation history" on
+     return, and only the first three were ever kept.
+
+     EACH SESSION CARRIES ITS SURFACE. `state` is the query string the
+     conversation was had on, and the switch handler lays it back over the URL
+     — so picking a conversation moves the page behind it to what that
+     conversation was about. That is the whole claim: a session is not a
+     transcript, it is a place you were.
+
+     Ported from AiMY Sales, which is where this was first built.
+  ═══════════════════════════════════════════════ */
+
+  /* Turns, by thread key. A turn is `{ who, html, id? }` where `html` is a
+     string or — for a LIVE answer — a function returning one, which is what
+     `canvas.repaint()` re-runs. Memory panels are turns too (`who: 'memory'`),
+     because a thread you return to has to come back whole. */
+  const THREADS    = Object.create(null);
+  /* Free-standing conversations: `{ title, at, state, blank? }`. */
+  const SESSIONS   = Object.create(null);
+  /* When each thread was last touched, for the column's order. */
+  const THREAD_AT  = Object.create(null);
+  /* Whether the "carried from an earlier thread" panel has been shown in this
+     thread. This was one flag on the canvas, set once and never reset, so it
+     fired for the first conversation and never again for any other. */
+  const THREAD_MEM = Object.create(null);
+  let sessSeq = 0, threadSeq = 0;
+
+  /* Flat sessions: a conversation belongs to itself. `surface` is where a
+     question asked with nothing open goes, and it always exists.
+
+     A `?chat=` naming a conversation that is not here resolves to the
+     surface rather than to itself. Nothing in this prototype survives a
+     reload except the seeded threads, so a link kept from a previous visit
+     points at a conversation that no longer exists — and honouring it would
+     conjure an empty thread into the column with the raw key for a title.
+     A conversation you cannot return to is one you land beside, not one the
+     product invents a stub for. */
+  const threadKey = () => {
+    const k = readURL().chat;
+    return (k && (SESSIONS[k] || THREADS[k])) ? k : 'surface';
+  };
+
+  /* READING A THREAD IS NOT TOUCHING IT.
+
+     The stamp lived in this accessor, on the reasoning that every write comes
+     through here first so a stamp nobody has to remember cannot be missed.
+     The cost was worse than the bug it prevented: `paintThread` reads too, so
+     merely OPENING a conversation re-sorted the column — the row you had just
+     clicked jumped to the top and every other row moved under the cursor. A
+     list that reorders itself as a result of being read cannot be used twice
+     in a row, and switching between two conversations is the thing this column
+     exists to make easy.
+
+     So the accessor is a pure read, and the stamp is explicit at the two
+     moments a conversation actually gains something: when it is created, and
+     when a turn lands in it. */
+  const thread$ = () => {
+    const k = threadKey();
+    return THREADS[k] || (THREADS[k] = []);
+  };
+
+  /* Takes a key, because a conversation is stamped at the moment it is made —
+     before the URL has been told about it. */
+  const touchThread = (key) => { THREAD_AT[key || threadKey()] = ++threadSeq; };
+
+  /* What a thread is called in the column. */
+  function threadName(key) {
+    if (SESSIONS[key]) return SESSIONS[key].title;
+    return key === 'surface' ? 'Across the corpus' : key;
+  }
+
+  /* The surface a conversation was had on, as the string a pasted link would
+     carry. `chat` is stripped: a session pointing at itself is a fact the key
+     already carries, and leaving it in would let a stale one override the
+     conversation actually being opened. */
+  function snapshot() {
+    const st = readURL();
+    st.chat = '';
+    return serialize(st);
+  }
+
+  /* The title is the question, trimmed — the same rule every thread list uses,
+     and the only one that does not require a person to name things. */
+  const sessTitle = (q) => {
+    const t = String(q == null ? '' : q).trim().replace(/\s+/g, ' ');
+    return t.length > 42 ? t.slice(0, 41) + '…' : t;
+  };
+
+  function startSession(question) {
+    const key = 'sess-' + (++sessSeq);
+    SESSIONS[key] = { title: sessTitle(question), at: iso(TODAY), state: snapshot() };
+    THREADS[key] = [];
+    touchThread(key);
+    return key;
+  }
+
+  /* THE SESSION FOLLOWS YOU. Ask something, narrow the surface, ask again —
+     coming back should land where the conversation ENDED rather than where it
+     started, because that is the state the last answer is about. */
+  function stampSession() {
+    const sess = SESSIONS[threadKey()];
+    if (sess) sess.state = snapshot();
+  }
+
+  /* What the search box holds. Deliberately NOT URL state: it narrows a list
+     of conversations rather than the surface, and a pasted link carrying
+     somebody's half-typed search would restore a filtered column nobody asked
+     for. */
+  let CHAT_Q = '';
+
+  /* What a turn SAYS, as words. Turns here hold rendered HTML rather than
+     Sales' plain text, so a raw substring search would match tag names, class
+     names and every id inside an answer — looking for "article" would hit
+     `data-open-doc="article-refund"` in a conversation that never mentions
+     one. Stripped to text, and cached except on live turns, whose text is a
+     function of a model that moves. */
+  function turnText(t) {
+    const live = typeof t.html === 'function';
+    if (!live && t._text != null) return t._text;
+    let raw;
+    if (t.who === 'memory') raw = (t.cue.lines || []).map((l) => l.join(' ')).join(' ');
+    else raw = live ? t.html() : t.html;
+    const box = document.createElement('div');
+    box.innerHTML = String(raw == null ? '' : raw);
+    const out = (box.textContent || '').replace(/\s+/g, ' ').trim();
+    if (!live) t._text = out;
+    return out;
+  }
+
+  /* The three openers. Rendered rather than written into the markup: static
+     chips could only ever be hidden, and a thread you switch away from and
+     come back to empty has to show them again. */
+  const OPENERS = [
+    'Can EU customers get a refund after activating?',
+    'What does the corpus say about data residency?',
+    'Which articles contradict each other on refunds?',
+  ];
+  const openersHtml = () =>
+    '<div class="overlay-suggestions" id="overlaySuggestions">' +
+    OPENERS.map((q) => `<button class="overlay-sugg-chip">${esc(q)}</button>`).join('') +
+    '</div>';
+
+  const memoryHtml = (cue) =>
+    `<div class="mem-head">${ICO.clock.replace('<svg', '<svg width="11" height="11"')}Carried from an earlier thread
+       <span class="mem-age">${esc(cue.age)}</span></div>
+     <div class="mem-thread">${cue.lines.map((l) =>
+       `<div class="mem-line"><span class="mem-who">${esc(l[0])}</span><span class="mem-what">${esc(l[1])}</span></div>`).join('')}</div>
+     <div class="mem-foot"><button class="btn btn-ghost btn-sm" data-mem-drop>Answer without it</button></div>`;
+
+  /* One turn, one element. Both the live append and the rebuild go through
+     here, so a restored conversation is the one you left rather than a second
+     rendering of it that drifts. */
+  function turnEl(turn, entering) {
+    if (turn.who === 'memory') {
+      const el = document.createElement('div');
+      el.className = 'memory-panel' + (entering ? ' k-enter' : '');
+      el.innerHTML = memoryHtml(turn.cue);
+      return el;
+    }
+    const wrap = document.createElement('div');
+    const isUser = turn.who === 'user';
+    const live = typeof turn.html === 'function';
+    wrap.className = 'chat-msg ' + (isUser ? 'user' : 'aimy');
+    wrap.innerHTML =
+      (isUser
+        ? `<div class="msg-avatar">${esc(USER.initials)}</div>`
+        : '<div class="msg-avatar aimy-av"><svg width="15" height="17" viewBox="0 0 18 20"><use href="#aimy-logo-small"/></svg></div>') +
+      `<div class="msg-bubble"${turn.id ? ` id="${turn.id}"` : ''}${live ? ' data-live="1"' : ''}>${live ? turn.html() : turn.html}</div>`;
+    /* Re-attached on every build, not only the first, or `repaint()` would stop
+       finding the closure the moment a thread was rebuilt. */
+    if (live) { const b = wrap.querySelector('.msg-bubble'); if (b) b._live = turn.html; }
+    return wrap;
+  }
+
+  /* The thread pane, rebuilt from the thread that is current. Called when the
+     canvas opens and when you switch conversations — appends still go through
+     `canvas.push`, which is cheaper and keeps the scroll behaviour it argues
+     for. */
+  function paintThread() {
+    const th = $('#overlayThread');
+    if (!th) return;
+    const turns = thread$();
+    th.innerHTML = turns.length ? '' : openersHtml();
+    turns.forEach((t) => th.appendChild(turnEl(t)));
+    th.scrollTop = th.scrollHeight;
+    canvas.syncEdge();
+    paintChats();
+  }
+
+  function paintChats() {
+    const host = $('#overlayChats');
+    if (!host) return;
+    const here = threadKey();
+    /* A THREAD YOU CANNOT FIND MAY AS WELL NOT HAVE PERSISTED — and a title
+       taken from the first question is a poor handle on the twentieth. So it
+       searches the TURNS as well: the word you remember is usually one from
+       inside the conversation rather than from whatever you opened with. */
+    const q = CHAT_Q.trim().toLowerCase();
+    const hits = (key) => {
+      if (!q) return true;
+      if (threadName(key).toLowerCase().indexOf(q) > -1) return true;
+      return (THREADS[key] || []).some((t) => turnText(t).toLowerCase().indexOf(q) > -1);
+    };
+
+    /* What is in the list: everything with something in it, plus whatever is
+       open now — an empty thread you are standing in is still where the next
+       thing goes, and hiding it until it has content would make the column
+       change shape as you talk. */
+    const keys = new Set();
+    Object.keys(THREADS).forEach((k) => { if ((THREADS[k] || []).length) keys.add(k); });
+    Object.keys(SESSIONS).forEach((k) => keys.add(k));
+    if ((THREADS.surface && THREADS.surface.length) || here === 'surface') keys.add('surface');
+    keys.add(here);
+    /* Most recently SPOKEN IN first — not most recently opened, so the order
+       holds still while you move between conversations. A seeded one that has
+       never been added to keeps its own age and sorts below anything said this
+       visit. */
+    const at = (k) => THREAD_AT[k] || (SESSIONS[k] ? -1 : -2);
+    const recent = Array.from(keys).sort((a, b) => at(b) - at(a));
+
+    const row = (key) => `<button class="ov-chat${key === here ? ' is-here' : ''}" type="button"
+        data-chat="${esc(key)}" ${key === here ? 'aria-current="true"' : ''}>
+        <span class="ov-chat-name">${esc(threadName(key))}</span>
+        ${(THREADS[key] || []).length ? `<span class="ov-chat-n">${(THREADS[key] || []).length}</span>` : ''}
+      </button>`;
+
+    /* WHAT YOU HAVE OPEN IS NEVER FILTERED OUT. A search that could hide the
+       conversation in front of you would be answering a different question
+       from the one being asked. */
+    const found = recent.filter((k) => k === here || hits(k));
+    /* … WHICH IS WHY THE MISS IS COUNTED WITHOUT IT. `found` can never be
+       empty — the thread you are in is always in it — so keying the empty
+       state off `found.length` left a search that matched nothing looking
+       exactly like a search that matched one thing, with no line saying so.
+       What the reader wants to know is whether anything ELSE matched. */
+    const others = found.filter((k) => k !== here);
+
+    host.innerHTML = `
+      <button class="btn btn-brand btn-sm ov-chat-new" type="button" data-newchat>${ICO.plus}New conversation</button>
+      <label class="ov-chat-find">
+        <span class="k-sr">Find a conversation</span>
+        <input class="ov-chat-input" type="search" id="chatFind" placeholder="Find a conversation…"
+          spellcheck="false" autocomplete="off" value="${esc(CHAT_Q)}" />
+      </label>
+      ${found.length ? `<div class="ov-chat-group">
+        <div class="ov-chat-cap">${q ? 'Found' : 'Recent'}</div>
+        ${found.map(row).join('')}
+      </div>` : ''}
+      ${q && !others.length
+        ? `<p class="ov-chat-none">Nothing else matches “${esc(CHAT_Q)}” — in a title or in anything said.</p>`
+        : ''}`;
+    /* The caret goes back where it was: repainting the column on every
+       keystroke would otherwise send it to the end of the word. */
+    const box = $('#chatFind');
+    if (box && document.activeElement !== box && CHAT_Q) { box.focus(); box.setSelectionRange(CHAT_Q.length, CHAT_Q.length); }
+  }
+
+  /* ══ CONVERSATIONS THAT ALREADY EXIST ══════════════════════════════════
+
+     The column could only ever show what you had asked in this tab, so it
+     opened empty on every load — and the one thing it exists for, going back
+     to a conversation, could be neither demonstrated nor used. A workbench
+     somebody has been working in has a history behind it; starting from none
+     is the state a product is in for its first five minutes and never again.
+
+     EACH ONE CARRIES ITS SURFACE, and every `state` is built by the product's
+     own serializer from objects the corpus actually holds — never written out
+     by hand. A fixture cannot then outlive the document it names, drift from
+     the URL format, or land you on a filter that matches nothing.
+
+     The five between them cover what a restore has to put back: a filter set,
+     an open document, a view and its grouping, a query with a date window, and
+     a flag. If switching conversations only restored some of that, one of
+     these would show it.
+  ═══════════════════════════════════════════════════════════════════════ */
+  function seedSessions() {
+    /* Through `serialize`, so a seeded surface is byte-identical to one the
+       address bar would produce for the same state. */
+    const stateOf = (over) => {
+      const st = parseParams(new URLSearchParams(''));
+      Object.keys(over).forEach((k) => { st[k] = over[k]; });
+      return serialize(st);
+    };
+    const seed = (key, title, ago, state, turns) => {
+      SESSIONS[key] = { title: title, at: iso(new Date(TODAY.getTime() - ago * 864e5)), state: state };
+      THREADS[key] = turns;
+      /* Ordered by their own age, and all of them below anything touched this
+         visit — `threadSeq` only ever counts up from 1. */
+      THREAD_AT[key] = -ago;
+    };
+    const said = (you, aimy) => [{ who: 'user', html: esc(you) }, { who: 'aimy', html: esc(aimy) }];
+    const one = (fn) => LIVE.filter(fn)[0];
+
+    /* ── A filter set, and nothing open ── */
+    const clash = one((o) => o.status === 'conflicting');
+    if (clash) {
+      seed('s-seed-1', 'Which articles contradict each other on refunds?', 2,
+        stateOf({ type: ['article'], status: ['conflicting'] }),
+        said('Which articles contradict each other on refunds?',
+             'Two, and they are the two support reads most. The EU policy gives a 30-day '
+             + 'window provided the item has not been activated; the Returns FAQ says '
+             + 'activation ends eligibility outright and sends the rest to warranty. Neither '
+             + 'is marked as the one to follow, so whoever answers first decides.'));
+    }
+
+    /* ── A document open. The refund topic is the one the canvas has a real
+          answer for, so a follow-up here demonstrates rather than apologises. ── */
+    const refund = byId('article-refund');
+    if (refund && !refund.arch) {
+      seed('s-seed-2', 'Can EU customers get a refund after activating?', 5,
+        stateOf({ doc: refund.id }),
+        said('Can EU customers get a refund after activating?',
+             'Not under this article — the window is conditional on the item not having '
+             + 'been activated. The Returns FAQ agrees on that much and then disagrees about '
+             + 'what happens next, so treat the post-activation clause as contested rather '
+             + 'than settled until the policy owner rules on it.'));
+    }
+
+    /* ── A view and the edge it walks ── */
+    seed('s-seed-3', 'Where is the corpus thinnest by client?', 9,
+      stateOf({ view: 'tree', group: 'client' }),
+      said('Where is the corpus thinnest by client?',
+           'Grouped by client, most of what we hold is not about a client at all — it is '
+           + 'policy and product material that applies to everyone. The named clients each '
+           + 'have a handful of tickets and little else, so anything you want to say about '
+           + 'one of them comes from the general material rather than from their own.'));
+
+    /* ── A query and a date window ── */
+    const residency = byId('article-residency');
+    if (residency && !residency.arch) {
+      seed('s-seed-4', 'What does the corpus say about data residency?', 14,
+        stateOf({ q: 'residency', updated: '90d' }),
+        said('What does the corpus say about data residency?',
+             'The article is the answer and it is the one carrying a recommendation: it '
+             + 'covers EU and APAC across all tiers. The marketing post says the same thing '
+             + 'in looser words and is read forty times as often, which is the risk — the '
+             + 'version most people see is not the version that is maintained.'));
+    }
+
+    /* ── A flag, and what it is for ── */
+    const mine = one((o) => responsible(o) === USER.owner && o.status !== 'current');
+    if (mine) {
+      seed('s-seed-5', 'What of mine still needs a decision?', 21,
+        stateOf({ mine: true }),
+        said('What of mine still needs a decision?',
+             'Everything filed to you that is not simply current. Some of it is waiting on '
+             + 'an upstream that moved and some on a judgement only you can make, and the '
+             + 'surface does not distinguish them — the status says what is true of the '
+             + 'document, not what is being asked of you.'));
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
      THE CANVAS
 
      Kept, and narrowed. It opens for open-ended questions and generative work.
@@ -5519,13 +5917,12 @@
      what the previous build failed.
   ═══════════════════════════════════════════════ */
   const canvas = {
-    overlay: null, thread: null, sugg: null, input: null, floatBar: null, open: false, memoryShown: false,
+    overlay: null, thread: null, input: null, floatBar: null, open: false,
 
     init() {
       this.overlay = $('#aimyOverlay');
       if (!this.overlay) return;
       this.thread   = $('#overlayThread', this.overlay);
-      this.sugg     = $('#overlaySuggestions', this.overlay);
       this.input    = $('#overlayInput', this.overlay);
       this.floatBar = $('#aimyFloatBar');
 
@@ -5546,7 +5943,13 @@
         if (proto.open) { proto.toggle(false); return; }
         if (this.open) this.close();
       });
-      this.overlay.addEventListener('click', (e) => { if (e.target === this.overlay) this.close(); });
+      /* Click-off to close. The overlay used to BE the backdrop; the column
+         and the thread now cover it entirely, so the empty space either side
+         of the thread belongs to `.overlay-main` and the identity check alone
+         would never match again. Both count as the backdrop. */
+      this.overlay.addEventListener('click', (e) => {
+        if (e.target === this.overlay || e.target.classList.contains('overlay-main')) this.close();
+      });
       if (this.thread) {
         this.thread.addEventListener('scroll', () => this.syncEdge(), { passive: true });
         this.syncEdge();
@@ -5560,6 +5963,11 @@
         this.overlay.classList.add('open');
         if (this.floatBar) this.floatBar.classList.add('hidden');
         this.open = true;
+        /* The thread is built from the conversation the URL names, not left
+           as whatever was last appended — reopening on `?chat=` has to land
+           in that conversation and not in the previous one. Only on the open
+           transition: an `ask()` mid-conversation appends. */
+        paintThread();
         setTimeout(() => { if (this.input) this.input.focus(); }, 220);
       }
       const tags = $('#overlayContextTags');
@@ -5599,18 +6007,18 @@
     },
 
     memory(cue) {
-      if (!cue || this.memoryShown || !this.thread) return;
-      this.memoryShown = true;
-      const el = document.createElement('div');
-      el.className = 'memory-panel k-enter';
-      el.innerHTML =
-        `<div class="mem-head">${ICO.clock.replace('<svg', '<svg width="11" height="11"')}Carried from an earlier thread
-           <span class="mem-age">${esc(cue.age)}</span></div>
-         <div class="mem-thread">${cue.lines.map((l) =>
-           `<div class="mem-line"><span class="mem-who">${esc(l[0])}</span><span class="mem-what">${esc(l[1])}</span></div>`).join('')}</div>
-         <div class="mem-foot"><button class="btn btn-ghost btn-sm" data-mem-drop>Answer without it</button></div>`;
+      /* Once per THREAD, not once per page load. One flag on the canvas meant
+         the panel fired for the first conversation and never again for any
+         other — and vanished from the first the moment you came back to it. */
+      const key = threadKey();
+      if (!cue || THREAD_MEM[key] || !this.thread) return;
+      THREAD_MEM[key] = true;
+      const turn = { who: 'memory', cue: cue };
+      thread$().push(turn);
+      const el = turnEl(turn, true);
       this.thread.appendChild(el);
       this.reveal(el);
+      paintChats();
     },
 
     stage(text, basis) {
@@ -5633,7 +6041,39 @@
        dead — Sync now, Reconnect, schedule, retention and grounding all wrote
        correctly and left the conversation showing the old numbers. */
     ask(text, basis, answer, opt) {
+      /* ══ EVERY QUESTION BELONGS TO A CONVERSATION ════════════════════
+         Asked outside one, a question starts one, titled with itself — the
+         same rule every thread list uses and the only one that does not ask
+         a person to name things before they have said anything.
+
+         `replace`, not push: starting a conversation is not a place in the
+         history to go Back to, it is the same place with a thread attached.
+
+         Here rather than in `submit`, because `submit` is one of six ways a
+         question reaches the canvas — a citation's "what supports this", a
+         comparison, a keep-or-drop and the bell's "what should I do first"
+         all arrive straight here, and each of them names a thread perfectly
+         well. */
+      const open = SESSIONS[threadKey()];
+      let started = false;
+      if (!open) {
+        const key = startSession(text);
+        restoring = true;
+        patch({ chat: key }, { replace: true });
+        restoring = false;
+        started = true;
+      } else if (open.blank) {
+        /* The blank one the column started. It has been waiting for
+           something to name it. */
+        open.title = sessTitle(text);
+        open.blank = false;
+        open.state = snapshot();
+      }
       this.show(basis);
+      /* `show` only rebuilds on the OPEN transition, so a conversation begun
+         while the canvas was already up would otherwise append its first turn
+         underneath the previous conversation's thread. */
+      if (started) paintThread();
       const bar = $('.overlay-input-bar', this.overlay);
       if (bar) bar.classList.remove('is-staged');
       if (/refund|activat|contradict/i.test(text)) {
@@ -5643,13 +6083,18 @@
           ['You', 'left it open pending the policy owner']
         ]});
       }
-      if (this.sugg) this.sugg.classList.add('k-hidden');
       this.push('user', esc(text));
       const id = 'a' + Date.now();
-      this.push('aimy',
+      const turn = this.push('aimy',
         '<span class="ai-thinking"><span class="dots"><span></span><span></span><span></span></span>' +
         '<span class="ai-thinking-label">Searching the corpus…</span></span>', id);
       setTimeout(() => {
+        /* THE TURN IS UPDATED BEFORE THE ELEMENT, and whether or not the
+           element is still there. Switching conversations mid-answer removes
+           the bubble from the DOM, and returning to that conversation rebuilds
+           it from the turn — so an early return here would leave the thread
+           holding the thinking dots for the rest of the session. */
+        if (turn) turn.html = answer;
         const el = document.getElementById(id);
         if (!el) return;
         if (typeof answer === 'function') { el._live = answer; el.dataset.live = '1'; }
@@ -5662,21 +6107,31 @@
       }, 900);
     },
 
+    /* Appends, and RECORDS. The turn is what a conversation is made of — the
+       element is only how it looks right now — so the array is written first
+       and the DOM follows from it, through the same `turnEl` a rebuild uses.
+
+       Returns the turn, so `ask` can write its answer back when it resolves. */
     push(who, html, id) {
-      if (!this.thread) return;
-      const wrap = document.createElement('div');
-      const isUser = who === 'user';
-      const live = typeof html === 'function';
-      wrap.className = 'chat-msg ' + (isUser ? 'user' : 'aimy');
-      wrap.innerHTML =
-        (isUser
-          ? `<div class="msg-avatar">${esc(USER.initials)}</div>`
-          : '<div class="msg-avatar aimy-av"><svg width="15" height="17" viewBox="0 0 18 20"><use href="#aimy-logo-small"/></svg></div>') +
-        `<div class="msg-bubble"${id ? ` id="${id}"` : ''}${live ? ' data-live="1"' : ''}>${live ? html() : html}</div>`;
-      if (live) { const b = wrap.querySelector('.msg-bubble'); if (b) b._live = html; }
+      if (!this.thread) return null;
+      const turns = thread$();
+      touchThread();
+      /* The openers were the whole content of an empty thread; the first turn
+         replaces them rather than landing underneath. */
+      if (!turns.length) this.thread.innerHTML = '';
+      const turn = { who: who, html: html, id: id };
+      turns.push(turn);
+      /* THE SESSION FOLLOWS YOU: the surface is re-snapshotted on every turn,
+         so coming back lands where the conversation ended rather than where it
+         started. */
+      stampSession();
+      const wrap = turnEl(turn);
       this.thread.appendChild(wrap);
       this.thread.scrollTop = this.thread.scrollHeight;
       this.syncEdge();
+      /* The column carries a turn count and an order, and both just moved. */
+      paintChats();
+      return turn;
     },
 
     /* Re-run every live answer in the thread. Called from render(), so a
@@ -6741,6 +7196,9 @@
 
     /* The thread is part of the surface, not a transcript beside it. */
     canvas.repaint();
+    /* And so is the list of them: which conversation is current, and how many
+       turns it holds, both move with the URL. */
+    paintChats();
   }
 
   /* ═══════════════════════════════════════════════
@@ -7257,6 +7715,10 @@
     };
 
     document.addEventListener('input', (e) => {
+      /* Finding a conversation. Delegated at the document, which is what lets
+         the repaint destroy `#chatFind` on every keystroke without taking the
+         listener with it. */
+      if (e.target && e.target.id === 'chatFind') { CHAT_Q = e.target.value; paintChats(); return; }
       const t = e.target;
       if (t.hasAttribute && t.hasAttribute('data-typed')) {
         gateRun(t.value.trim().toLowerCase() !== t.getAttribute('data-typed').toLowerCase());
@@ -8377,8 +8839,74 @@
 
       /* ── canvas ── */
       if (t.closest('[data-overlay-close]')) { canvas.close(); return; }
-      if (t.closest('[data-mem-drop]')) { const m = t.closest('.memory-panel'); if (m) m.remove(); return; }
+      if (t.closest('[data-mem-drop]')) {
+        /* Dropped from the thread as well as from the screen: a panel that
+           comes back when you return to the conversation was not dismissed. */
+        const m = t.closest('.memory-panel');
+        if (m) m.remove();
+        const turns = thread$();
+        const i = turns.findIndex((x) => x.who === 'memory');
+        if (i > -1) turns.splice(i, 1);
+        return;
+      }
       if ((el = t.closest('.overlay-sugg-chip'))) { submit(el.textContent.trim()); return; }
+
+      /* ══ STARTING A CONVERSATION ══════════════════════════════════════
+         The column listed conversations and switched between them, and there
+         was no way to START one: a session was created only as a side effect
+         of asking a question, so once you were inside a thread everything you
+         typed went into that thread. The one thing a list of conversations
+         has to offer was the one thing missing.
+
+         A BLANK SESSION, NAMED WHEN IT HAS SOMETHING TO NAME IT. `submit`
+         renames it on the first question. The surface stays exactly where it
+         is — a new conversation is a new subject, not a new place. */
+      if (t.closest('[data-newchat]')) {
+        const key = 'sess-' + (++sessSeq);
+        SESSIONS[key] = { title: 'New conversation', at: iso(TODAY), state: snapshot(), blank: true };
+        THREADS[key] = [];
+        /* Stamped on creation, or a brand-new conversation would sort below
+           every one you had already spoken in — including at the moment it is
+           the one you are standing in. */
+        touchThread(key);
+        restoring = true;
+        patch({ chat: key });
+        restoring = false;
+        canvas.show();
+        paintThread();
+        if (canvas.input) canvas.input.focus();
+        return;
+      }
+
+      /* ══ SWITCHING TO ONE ═════════════════════════════════════════════
+         BOTH, FROM ONE CLICK: the thread, and the surface it was had on.
+         Restoring one without the other is the half that was already there —
+         the conversation, without the thing it was about.
+
+         The stored state is laid over the URL through `writeURL` rather than
+         `patch`, because `patch` drops the open document whenever a filter
+         changes — which is right for a filter click and exactly wrong here,
+         where the filters and the document are being restored together. And
+         `parseParams` fills every key, so this is a reset rather than a merge:
+         filters that were set a moment ago do not survive underneath. */
+      if ((el = t.closest('[data-chat]'))) {
+        const ck = el.getAttribute('data-chat');
+        const sess = SESSIONS[ck];
+        restoring = true;
+        if (sess && sess.state) {
+          const st = parseParams(new URLSearchParams(String(sess.state).replace(/^\?/, '')));
+          st.chat = ck;
+          writeURL(st);
+        } else {
+          /* A thread with no stored surface — `surface` itself — keeps the
+             one you are on. There is nothing of its own to go back to. */
+          patch({ chat: ck === 'surface' ? '' : ck });
+        }
+        restoring = false;
+        canvas.show();
+        paintThread();
+        return;
+      }
 
       /* The whole card opens the document. LAST in the delegate on purpose:
          the title, the action, the tags and everything else interactive inside
@@ -8402,7 +8930,19 @@
      build a URL from scratch without hand-writing every key. */
   function readURL0() {
     const cur = readURL();
-    const st = { doc: '', settings: '', view: cur.view, group: cur.group, sort: cur.sort, q: '', prop: '' };
+    /* WHAT SURVIVES A CLEAR. The view, the grouping and the ordering do,
+       because they are how you are looking rather than what you are looking
+       at — and so does the open conversation, for the same reason.
+
+       It did not, and every path through here dropped it: typing a sentence
+       that carried both a filter and a question applied the filter, lost the
+       thread, and answered in a NEW one — so the follow-up and the question
+       it followed ended up in two conversations. `Show these on the surface`
+       had the same fault, and that one is a button INSIDE the thread it was
+       ending. A conversation is not a filter and clearing the filters is not
+       a way to end it. */
+    const st = { doc: '', settings: '', chat: cur.chat,
+                 view: cur.view, group: cur.group, sort: cur.sort, q: '', prop: '' };
     LIST_KEYS.forEach((k) => { st[k] = []; });
     DATE_KEYS.forEach((k) => { st[k] = ''; });
     FLAG_KEYS.forEach((k) => { st[k] = false; });
@@ -9210,6 +9750,9 @@
   ═══════════════════════════════════════════════ */
   function init() {
     canvas.init();
+    /* Before the first render, so the column has something in it the moment the
+       canvas can be opened. */
+    seedSessions();
     bell.init();
     setModal.init();
     wire();

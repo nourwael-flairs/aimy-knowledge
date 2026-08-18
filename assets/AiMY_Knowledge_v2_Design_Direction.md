@@ -125,6 +125,21 @@ Five items, two tiers.
 
 **The workbench uses the shared canvas overlay. There is no persistent chat panel and no split column.**
 
+> **Amended.** The prohibition stands for the workbench SHELL, and the canvas now
+> carries a conversations column inside itself. The distinction is the one this
+> section already turns on: a log of conversations is not navigation, so it does
+> not belong in the rail or the IA — but it is navigation *inside* a
+> conversation, which is a different thing and has to live somewhere.
+>
+> §5.1's first argument has also reversed. It rejects a chat column because it
+> "forks the interaction contract at its most visible layer", and because "the
+> value of one contract across the ecosystem exceeds the value of a locally
+> optimal variant". AiMY Sales has since shipped this column. Declining it here
+> is now what forks the contract, and adopting it is what keeps it — the
+> reasoning is unchanged, the ecosystem moved. §5.1's other two arguments are
+> untouched: the working set still delivers responsive canvas content, and AI
+> still belongs to objects rather than to a region.
+
 ### 5.1 Why
 
 A workbench with a chat column beside a content canvas is a plausible design, and it is the wrong one here. Three reasons.
