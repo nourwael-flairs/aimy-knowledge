@@ -183,6 +183,18 @@
     current:     ['direct',      'Open',           'open']
   };
 
+  /* ── An AI action looks like one (README §"An AI action looks like one") ──
+
+     Keyed on the ACTION, not the entry mode, because the two are orthogonal and
+     both directions have a live counter-example: `triage` is a REVIEW that opens
+     an answer, and picking a successor is an INVESTIGATE that only navigates.
+     MODE_ICO cannot express that, and hanging the mark on `investigate` would
+     have drawn AiMY over a patch({doc}).
+
+     `compare` is what made it visible: the card said Compare, drew a magnifying
+     glass, and opened an AiMY answer. */
+  const AI_EXIT = { compare: 1, findsuccessor: 1, triage: 1, ground: 1, connect: 1 };
+
   /* Work state stays in the data and on the attribute, because §2.3 requires
      every surfaced item to declare what AiMY has done with it. It stopped being
      a second badge: Draft, Conflicting and Out of date now say the same things
@@ -674,7 +686,15 @@
 
   /* Status is derived, so it is derived again after anything that could change
      it — an edit, an archive, a restore, a re-sync. One call, everywhere. */
-  function recompute() { CORPUS.forEach((o) => { o.status = statusOf(o); }); }
+  /* Findings are derived from status, so whatever moves status invalidates
+     them. Declared up here rather than beside the helpers that use them:
+     recompute() runs inside the boot normalisation pass, and a `const` arrow
+     declared 4,000 lines further down is in its temporal dead zone by then. */
+  let insAll = null;
+  let insBy  = null;
+  function dropInsights() { insAll = null; insBy = null; }
+
+  function recompute() { CORPUS.forEach((o) => { o.status = statusOf(o); }); dropInsights(); }
 
   /* `used` counts days since the last citation, so 0 means "today" — except
      when nothing has ever cited it, where 0 is the absence of a date rather
@@ -1071,6 +1091,13 @@
        click. */
     if (!restoring && canvas && canvas.open) canvas.close();
     const qs = serialize(st);
+    /* Recorded here rather than in rememberFilter, because the two want
+       opposite ends of the same move: `lastFilter` is where you were, so it
+       reads the URL before it changes, and a recent is a set you actually
+       looked at, so it has to be the one being written. Hooking the funnel also
+       means every path gets it — a typed phrase, a chip, a card's tag link and
+       an insight's figure all land here. */
+    if (!restoring) keepRecent(st);
     const url = location.pathname + (qs ? '?' + qs : '');
     if (opt && opt.replace) history.replaceState(null, '', url);
     else history.pushState(null, '', url);
@@ -1308,7 +1335,13 @@
      reaches everything else. It opens the sheet with the change STAGED rather
      than applied — you see what it will do to the control before it does it,
      which is the same courtesy the commit surfaces pay for bigger changes. */
-  const SETTINGS_WORD = /\b(setting|settings|schedule|sync|retention|archiv\w*|grounding|connect|reconnect)\b/i;
+  /* `archiv\w*` matched the past participle as well as the gerund, so typing
+     "archived" — which the lexicon reads as a FILTER, and which is now the only
+     way to reach archived documents since that dropdown left the row — opened
+     the retention sheet instead. "Archiving" is the setting; "archived" is a
+     state a document is in. The sheet is still one click away in the rail, and
+     "archive the old ICPs" is a WRITE, which parseIntent checks first. */
+  const SETTINGS_WORD = /\b(setting|settings|schedule|sync|retention|archiving|archival|grounding|connect|reconnect)\b/i;
   const CADENCE_WORD = [
     [/\bevery 15\b|\bquarter[- ]?hour|\b15 min/i, 'Every 15 minutes'],
     [/\bhourly\b|\bevery hour\b/i, 'Every hour'],
@@ -1459,8 +1492,20 @@
 
   /* Chips carry only what a dropdown cannot say. Everything a control can show,
      the control shows — a chip and a dropdown never state the same fact. */
-  const DD_KEYS = ['type', 'status', 'source', 'updated', 'collection', 'product',
-                   'client', 'region', 'service', 'audience'];
+/* The axes that still have a control of their own. A chip is suppressed for
+   these while they hold ONE value, because the dropdown beside it is already
+   showing that value and two statements of one fact is one too many.
+
+   It has to track the filter row exactly. Eleven axes left that row and kept
+   their place on this list for as long as it took to notice: with no control
+   to show them, `status=unowned` narrowed the set to two documents and put
+   nothing on screen to say why, and the only way back was the browser's own
+   back button. A filter with neither a control nor a chip is a filter that has
+   silently taken something away.
+
+   Lazy, because PRIMARY_FILTERS is declared further down the file and a const
+   that read it up here would be evaluated in its temporal dead zone. */
+  const ddKeys = () => PRIMARY_FILTERS.map((c) => c.key).concat(DATE_KEYS);
 
   function activeChips(st) {
     const out = [];
@@ -1469,7 +1514,7 @@
       if (k === 'ids') return;
       /* One value on a dropdown axis is already on screen. Two or more is not —
          the control is single-select and can only show the first. */
-      if (DD_KEYS.indexOf(k) > -1 && st[k].length < 2) return;
+      if (ddKeys().indexOf(k) > -1 && st[k].length < 2) return;
       (st[k] || []).forEach((v) => out.push(chip(k, v, valueLabel(k, v))));
     });
     /* One date axis is on the control. If a link or an agent set more than one,
@@ -1510,24 +1555,33 @@
   ═══════════════════════════════════════════════ */
   const opts = (obj, order) => (order || Object.keys(obj)).map((k) => [k, typeof obj[k] === 'string' ? obj[k] : obj[k].label]);
 
-  /* The order is a hierarchy, not a list: where a document lives, who it is
-     for, which product it serves — then what it is and what state it is in.
-     Type and Status were leading, which put the system's vocabulary in front of
-     the reader's. */
+  /* ── Three, and the reason the other eleven left ──
+
+     There were fourteen controls: five here, six behind a *More* disclosure,
+     plus the date range, *Mine* and *More* itself. Measured, their intrinsic
+     width came to 1146px in 991px of row — it had never fitted, which is what
+     the disclosure was for.
+
+     A filter can leave the row without leaving the product, because the input
+     already speaks all of it. Checked against LEX before removing anything:
+     status all seven, type all nine, source all five, client all four, product
+     all three, region, service and audience complete, the date windows, `mine`
+     and `archived`. Every key being removed is typeable today. The only gap is
+     `collection` — policies, support and marketing are in the lexicon and sales
+     and legal are not — and collection is one of the three staying, so nothing
+     loses reach.
+
+     What stays is what you narrow by before you know what you are looking for:
+     where it lives, what it is, and when it moved. Everything else is a
+     question about the set, and a question belongs in the thing that answers
+     questions.
+
+     `work` is not migrated because it never worked: the key is absent from
+     LIST_KEYS, so serialize never wrote it and parseParams never read it, and
+     applyFilters has never mentioned it. Six options that filtered nothing. */
   const PRIMARY_FILTERS = [
     { key: 'collection', label: 'Collection', list: () => opts(COLLECTIONS) },
-    { key: 'client',     label: 'Client',     list: () => opts(CLIENTS) },
-    { key: 'product',    label: 'Product',    list: () => opts(PRODUCTS) },
-    { key: 'type',       label: 'Type',       list: () => opts(TYPES) },
-    { key: 'status',     label: 'Status',     list: () => opts(STATUS) }
-  ];
-  const MORE_FILTERS = [
-    { key: 'source',   label: 'Source',     list: () => opts(SRC) },
-    { key: 'region',   label: 'Region',     list: () => opts(REGIONS) },
-    { key: 'service',  label: 'Service',    list: () => opts(SERVICES) },
-    { key: 'audience', label: 'Audience',   list: () => opts(AUDIENCE) },
-    { key: 'work',     label: 'Work state', list: () => opts(WORK_LABEL) },
-    { key: 'archived', label: 'Archive',    list: () => [['1', 'Archived']] }
+    { key: 'type',       label: 'Type',       list: () => opts(TYPES) }
   ];
 
   /* The current value of an axis, whatever shape it is stored in. */
@@ -1733,29 +1787,20 @@
     </div>`;
   }
 
-  let moreOpen = false;
 
   function renderFilters(st) {
     const host = $('#filterBar');
     if (!host) return;
-    const anyMore = MORE_FILTERS.some((c) => filterValue(st, c.key));
-    const open = moreOpen || anyMore;
     const dirty = !isComposed(st);
 
     host.innerHTML = `
       <div class="filter-row">
         ${PRIMARY_FILTERS.map((c) => dropdown(c, st)).join('')}
         ${dateFilter(st)}
-        <button class="k-toggle${st.mine ? ' is-on' : ''}" data-toggle-mine
-                aria-pressed="${st.mine ? 'true' : 'false'}">Mine</button>
-        <button class="k-more${open ? ' is-open' : ''}" data-more aria-expanded="${open}">
-          More${anyMore ? ` <span class="k-more-n">${MORE_FILTERS.filter((c) => filterValue(st, c.key)).length}</span>` : ''}
-        </button>
         <span class="filter-row-end">
           ${dirty ? '<button class="k-clear" data-clear-all>Clear</button>' : ''}
         </span>
-      </div>
-      ${open ? `<div class="filter-row is-more">${MORE_FILTERS.map((c) => dropdown(c, st)).join('')}</div>` : ''}`;
+      </div>`;
   }
 
   /* ═══════════════════════════════════════════════
@@ -1906,8 +1951,22 @@
         </div>`).join('')}</div>`;
       })()}
 
-      ${lastFilter && isComposed(st)
-        ? `<button class="brief-resume" data-resume>Resume your last filter</button>` : ''}
+      <!-- Eleven filters left the row because the input already speaks them,
+           which makes re-narrowing cheap to type and free to forget. This is
+           the other half: the last five sets you looked at, named after what
+           you filtered by, one click from being that set again.
+
+           Nothing is saved and nothing is named — the list keeps itself, a
+           repeat moves to the top rather than taking a second slot, and the
+           sixth pushes the first out. It replaces "Resume your last filter",
+           which was this with one slot. -->
+      ${recentFilters.length && isComposed(st) ? `
+        <div class="brief-section-label">Recent filters</div>
+        <div class="brief-recents">
+          ${recentFilters.map((qs) => `<button class="brief-recent" data-recent="${esc(qs)}">
+            <span class="brief-recent-t">${esc(recentLabel(qs))}</span>
+          </button>`).join('')}
+        </div>` : ''}
 
       <!-- Where the settings are. Not a destination: each row opens the
            conversation that already carries the controls, which is what stopped
@@ -1962,9 +2021,23 @@
      a question goes to the canvas. That is the same four-route contract the
      input bar honours, so the panel is not a fifth way to do things.
   ═══════════════════════════════════════════════ */
-  function needsYou() {
+  /* ── Scoped, so the same eight findings can describe a filtered set ──
+
+     This computed the whole corpus and only ever rendered into the bell and
+     the briefing rail. The workbench — the surface somebody is actually
+     looking at while they decide what to do — carried two bare counts and no
+     interpretation of either, which is the "lonely insight" doctrine §1.1
+     forbids, sitting on the busiest surface in the product.
+
+     One argument fixes that. Called with a list, every finding is computed
+     over THAT list, so the band above the grid re-derives as you filter and is
+     about the set in front of you rather than about the corpus in general.
+     Called with nothing it behaves exactly as before, which is what the bell
+     and the briefing still do. */
+  function needsYou(scope) {
     const out = [];
-    const withStatus = (s) => LIVE.filter((o) => o.status === s);
+    const SET = scope || LIVE;
+    const withStatus = (s) => SET.filter((o) => o.status === s);
     /* Counts here are the corpus's, not a fixture's, so every one of them can
        legitimately be 1 — and a row reading "1 documents" is a row nobody
        believes the rest of. */
@@ -1974,12 +2047,15 @@
     /* A dead source leads whether or not it has cost a document yet: it is the
        only entry here that keeps getting worse while you read the others. */
     const failing = Object.keys(SRC).filter((k) => SRC[k].health === 'failed');
-    if (failing.length) {
+    if (failing.length && (!scope || SET.some((o) => failing.indexOf(o.src) > -1))) {
       const names = failing.map((k) => SRC[k].label);
-      const starved = LIVE.filter((o) => failing.indexOf(o.src) > -1);
+      const starved = SET.filter((o) => failing.indexOf(o.src) > -1);
       out.push({
         id: 'source', sev: 'p1', type: 'Sync blocked',
         when: failing.length === 1 ? SRC[failing[0]].last + 'd down' : failing.length + ' sources',
+        n: starved.length,
+        clause: is(starved.length, 'has not updated since its source stopped syncing',
+                                   'have not updated since their source stopped syncing'),
         body: names.join(' and ') + ' stopped syncing. ' + (starved.length
           ? docs(starved.length) + ' ' + is(starved.length, 'has', 'have') + ' not updated since.'
           : 'Nothing here is drawn from them yet.'),
@@ -1992,12 +2068,14 @@
 
     /* The one entry a PERSON put here. Everything else is derived, which is
        exactly why this cannot be left to sort itself out. */
-    const reported = LIVE.filter((o) => openProblems(o));
+    const reported = SET.filter((o) => openProblems(o));
     if (reported.length) {
       const n = reported.reduce((a, o) => a + openProblems(o), 0);
       out.push({
         id: 'reported', sev: 'p1', type: 'Reported',
         when: n + ' open',
+        n: reported.length,
+        clause: is(reported.length, 'has a problem somebody reported', 'have a problem somebody reported'),
         body: n === 1
           ? 'Somebody reported a problem with ' + reported[0].title + ', and nobody has answered it.'
           : n + ' reported problems across ' + docs(reported.length) + ' are unanswered.',
@@ -2015,6 +2093,8 @@
       out.push({
         id: 'conflicting', sev: 'p1', type: 'Conflict',
         when: docs(conflicting.length),
+        n: conflicting.length,
+        clause: is(conflicting.length, 'disagrees with another', 'disagree with each other'),
         body: docs(conflicting.length) + ' ' + is(conflicting.length, 'disagrees', 'disagree')
           + ' with another document, and answers still stand on both sides.',
         why: 'Two answers to one question is worse than none, because both look confident.',
@@ -2029,6 +2109,8 @@
       out.push({
         id: 'outdated', sev: 'p2', type: 'Behind source',
         when: docs(outdated.length),
+        n: outdated.length,
+        clause: is(outdated.length, 'is behind its source', 'are behind their source'),
         body: docs(outdated.length) + ' ' + is(outdated.length, 'is', 'are')
           + ' behind their source. Answers still cite them, and say so.',
         why: 'Wrong, but not getting wronger — and a blocked source is why some of it is.',
@@ -2043,6 +2125,8 @@
       out.push({
         id: 'drafts', sev: 'p2', type: 'Not live',
         when: drafted.length + ' drafted',
+        n: drafted.length,
+        clause: is(drafted.length, 'I drafted is still unpublished', 'I drafted are still unpublished'),
         body: 'AiMY drafted ' + docs(drafted.length) + '. ' + is(drafted.length,
           'It answers nothing until you publish it.',
           'None of them answers anything until you publish them.'),
@@ -2060,6 +2144,8 @@
       out.push({
         id: 'unowned', sev: 'p2', type: 'Unowned',
         when: docs(unowned.length),
+        n: unowned.length,
+        clause: is(unowned.length, 'has nobody accountable', 'have nobody accountable'),
         body: docs(unowned.length) + ' ' + is(unowned.length, 'has', 'have')
           + ' nobody accountable for ' + is(unowned.length, 'it', 'them') + '.',
         why: 'Every other line on this list needs somebody to send it to.',
@@ -2071,12 +2157,15 @@
 
     /* A gap is the absence of a document, so there is nothing to filter to and
        the row stages a write rather than running one. */
-    if (ASKED.length && LIVE.length) {
+    if (!scope && ASKED.length && LIVE.length) {
       const asked = ASKED.reduce((s, a) => s + a.n, 0);
       const lead = ASKED.slice().sort((a, b) => b.n - a.n)[0];
       out.push({
         id: 'gap', sev: 'p3', type: 'Coverage gap',
         when: asked + ' asked',
+        /* Counts questions, not documents, so it supplies its own noun. */
+        n: asked, clause: is(asked, 'question came in that nothing here answers',
+                                    'questions came in that nothing here answers'),
         body: asked + ' question' + (asked === 1 ? '' : 's') + ' came in that nothing here answers. '
           + lead.topic + ' leads.',
         why: 'Nothing on the surface would ever have said so — an absence has no card.',
@@ -2091,6 +2180,8 @@
       out.push({
         id: 'unused', sev: 'p3', type: 'Unused',
         when: 'no citations',
+        n: unused.length,
+        clause: is(unused.length, 'has not been cited in three months', 'have not been cited in three months'),
         body: docs(unused.length) + ' ' + is(unused.length, 'has', 'have')
           + ' not been cited or opened in three months.',
         why: 'Either dead weight or a gap in how people find things, and both are worth a look.',
@@ -2204,7 +2295,7 @@
         const li = document.createElement('li');
         li.className = 'ntf-row' + (this.read[t.id] ? ' is-read' : '');
         li.innerHTML =
-          `<span class="ntf-sev ${t.sev}" aria-hidden="true"></span>
+          `
            <div class="ntf-row-main">
              <div class="ntf-row-head">
                <span class="ntf-row-type">${esc(t.type)}</span>
@@ -2254,11 +2345,65 @@
      prototype does not have. */
   let lastFilter = null;
   try { lastFilter = sessionStorage.getItem('aimy-k-last') || null; } catch (e) {}
+  /* ── Where you were, and how you work ──
+
+     `lastFilter` was already here: one slot, in sessionStorage, restored by a
+     "Resume your last filter" button in the rail. It is one of these with N=1,
+     and the seven places that already call rememberFilter() are every place a
+     filter changes — so widening it needs no new hook anywhere.
+
+     Two stores on purpose, because they have two lifetimes. `lastFilter` is
+     WHERE I JUST WAS and should die with the tab, which is what sessionStorage
+     means. Recents are HOW I WORK — the whole point is not retyping a
+     combination you use every week — so they outlive the tab, which is what
+     localStorage means. The theme already lives there for the same reason.
+
+     None of this is a second source of truth. The URL still decides everything
+     on screen; a recent is a remembered URL, and restoring one is a navigation.
+     The README's claim that the URL is the state survives intact. */
+  const RECENT_MAX = 5;
+  let recentFilters = [];
+  try { recentFilters = JSON.parse(localStorage.getItem('aimy-k-recent') || '[]'); } catch (e) {}
+
   function rememberFilter() {
     const s = location.search;
     if (!s) return;
     lastFilter = s;
     try { sessionStorage.setItem('aimy-k-last', s); } catch (e) {}
+
+  }
+
+  /* An open document is not a filter. `?doc=…` rides along in the query string,
+     so storing a state verbatim would remember "the set I was looking at, and
+     the one I had open" and restore you into a document you never asked to
+     reopen. The document is dropped and the set is kept. */
+  function keepRecent(st) {
+    if (isComposed(st)) return;          /* nothing narrowed — nothing to remember */
+    const clean = serialize(Object.assign({}, st, { doc: '' }));
+    if (!clean) return;
+    /* Newest first, and a repeat moves rather than duplicates: running the same
+       filter twice should not cost two of the five slots. */
+    recentFilters = [clean].concat(recentFilters.filter((r) => r !== clean)).slice(0, RECENT_MAX);
+    try { localStorage.setItem('aimy-k-recent', JSON.stringify(recentFilters)); } catch (e) {}
+  }
+
+  /* A recent names itself. parseParams turns the stored string back into state
+     — it was split out of readURL precisely so a stored conversation could be
+     re-read by the code that reads the address bar — and valueLabel already
+     writes the words the chip bar uses. So a saved filter can never drift from
+     what the surface would call it, because it is the same function. */
+  function recentLabel(qs) {
+    const st = parseParams(new URLSearchParams(String(qs).replace(/^\?/, '')));
+    const parts = [];
+    LIST_KEYS.forEach((k) => {
+      if (k === 'ids') return;
+      (st[k] || []).forEach((v) => parts.push(valueLabel(k, v)));
+    });
+    DATE_KEYS.forEach((k) => { if (st[k]) parts.push(valueLabel(k, st[k])); });
+    if (st.mine) parts.push('Mine');
+    if (st.archived) parts.push('Archived');
+    if (st.q) parts.push('“' + st.q + '”');
+    return parts.slice(0, 3).join(' · ') + (parts.length > 3 ? ' +' + (parts.length - 3) : '');
   }
 
   /* ═══════════════════════════════════════════════
@@ -2559,9 +2704,9 @@
   function typeCard(o, compact) {
     const t = TYPES[o.t];
     const act = cardAction(o);
+    const ins = compact ? null : cardInsight(o);
     const meta = [
       statusInk(o),
-      `<span class="tc-kind">${t.ico}${esc(t.label)}</span>`,
       /* Some documents carry an ingestion marker in the owner field rather than
          a person — "Ingested · Zendesk" — which on a middot-separated line reads
          as two more items and pointed the peek at an owner that does not exist.
@@ -2591,7 +2736,14 @@
          edit. Saying "edited" of all three was one word doing three jobs and
          getting two of them wrong. */
       compact ? '' : `<span>${noUpstream(o) ? 'edited' : o.t === 'webpage' ? 'crawled' : 'ingested'} ${esc(fmtDate(o.upd))}</span>`,
-      compact ? '' : `<span>${neverCited(o) ? 'never used' : 'used ' + esc(usedLabel(o).toLowerCase())}</span>`
+      compact ? '' : `<span>${neverCited(o) ? 'never used' : 'used ' + esc(usedLabel(o).toLowerCase())}</span>`,
+      /* ── The type left this line ──
+
+         It is a chip above the title on a full card, so the meta line must not
+         say it a second time. Compact renders no chip — a one-line row inside
+         an answer does not get a tag row — so the glyph stays there, and only
+         there, and the type is stated exactly once in both modes. */
+      compact ? `<span class="tc-kind" title="${esc(t.label)}">${t.ico}<span class="k-sr">${esc(t.label)}</span></span>` : ''
     ].filter(Boolean);
     /* The whole card opens the document. The title stays a real button so the
        keyboard has one focusable target that announces which document it is —
@@ -2599,11 +2751,14 @@
        and nested buttons are invalid besides. */
     return `<div class="type-card${compact ? ' is-compact' : ''}" data-obj="${o.id}" data-status="${o.status}"
          data-work-state="${o.work}" data-card-open="${o.id}">
+      ${compact ? '' : `<p class="tc-type">${t.ico}${esc(t.label)}</p>`}
       <button class="tc-title-btn" data-open-doc="${o.id}"><span class="tc-title">${esc(o.title)}</span></button>
       ${compact ? '' : typeBody(o)}
       <p class="tc-meta">${meta.join('<i class="tc-sep">·</i>')}</p>
       ${compact ? '' : `<div class="tc-foot">
-        <span class="tc-foot-act">${entryAction(act[0], act[1], `data-card-act="${o.id}"`)}</span>
+        ${ins ? `<p class="tc-ins">${AIMY_MARK(13, 15)}<span class="tc-ins-t">${esc(ins.long)}</span></p>` : ''}
+        <span class="tc-foot-act">${entryAction(act[0], act[1], `data-card-act="${o.id}"`,
+          AI_EXIT[act[2]] ? AIMY_MARK(12, 14) : null)}</span>
       </div>`}
     </div>`;
   }
@@ -2629,7 +2784,7 @@
     return { key: named[0], value: st[named[0]][0] };
   }
 
-  /* ── Eight kinds, and one line each on what it is for ──
+  /* ── Nine kinds, and one line each on what it is for ──
 
      The button made whatever the filter happened to be pointing at —
      `newDocument(readURL().type[0])`, which on the unfiltered library is an
@@ -2678,8 +2833,6 @@
   }
 
   function resultMeta(st, list, composed) {
-    const excluded = list.filter((o) => STATUS[o.status].excluded).length;
-    const unowned  = list.filter((o) => responsible(o) === 'Unassigned').length;
     const axis = talkativeAxis(st);
     const axisLabel = axis && (axis.key === 'collection' ? COLLECTIONS[axis.value] : SRC[axis.value].label);
     return `<div class="rm">
@@ -2721,13 +2874,110 @@
              works on this page and says what it will do. -->
         ${newDocMenu(entryAction('direct', 'New document', 'data-new-menu="1" aria-haspopup="true" aria-expanded="false"', ICO.plus))}
       </div>
-      ${excluded || unowned ? `<div class="rm-disclosure">
-        ${excluded ? `<span class="rm-flag is-err">${ICO.slash.replace('<svg', '<svg width="12" height="12"')}
-          <strong>${excluded}</strong> not used in answers</span>` : ''}
-        ${unowned ? `<span class="rm-flag is-warn">${ICO.question.replace('<svg', '<svg width="12" height="12"')}
-          <strong>${unowned}</strong> unowned</span>` : ''}
-      </div>` : ''}
     </div>`;
+  }
+
+  /* ══ WHAT AiMY NOTICED ABOUT THIS SET ══════════════════════════
+
+     What stood here first was `.rm-disclosure`: two numbers, *4 not used in
+     answers* and *3 unowned*, with no interpretation, no severity and nothing
+     to click. Doctrine §1.1 has a name for that shape — "a metric without an
+     interpretation is merely a number wearing office clothes". It became three
+     stacked rows, which fixed the interpretation and the action but still read
+     as a panel the product had rather than as something AiMY said.
+
+     This is AiMY QA/Sales' `Since your last visit` block, ported. The form is
+     the argument: ONE first-person paragraph with the figures pressable inside
+     it. "I looked at 12 documents. Two things need you: 3 disagree with each
+     other, and 2 are behind their source." A list of findings is a report; a
+     sentence in the first person is somebody telling you what they found, and
+     the second is what AiMY is.
+
+     Provenance is carried the way Sales carries it — the mark first in the
+     head, the accent wash on the panel, first-person voice, and an accent
+     underline on every figure. No badge and no "AI" wordmark: a thing that has
+     to label itself AI is a thing that does not read as AI.
+
+     A figure lands on exactly the set it counts. That is Sales' rule for
+     `.slv-n` and it is the whole reason the numbers are pressable rather than
+     bold — each one runs the finding's own `go()`, which is already one of the
+     four endings §1.2 allows.
+
+     Nothing here is a new finding. `needsYou()` has computed all eight since
+     the bell was built; they were simply never shown over the corpus. Passing
+     it the filtered list is the mechanism: filter to Conflicting and the
+     paragraph narrows to the conflict, because it describes what you filtered
+     to rather than announcing the corpus at you.
+
+     THREE, hard. §5.1 asks for "a small, prioritised set of insights rather
+     than an inventory", and the inventory is directly underneath — it is the
+     grid. p1 before p2 before p3, which is the order needsYou() returns.
+
+     Nothing to say renders nothing. There is no all-clear state, because a
+     line that says everything is fine is a line you learn to skip, and then
+     you skip the line that was not fine. */
+  const INS_MAX = 3;
+  const INS_COUNT = ['', 'One', 'Two', 'Three'];
+
+  /* A pressable figure. Sales' rule for `.slv-n` is that what you press is the
+     SIZE OF THE SET YOU LAND ON, and the first cut broke it: pressing 6 ran the
+     finding's go(), which for a dead source asks the canvas a question — a
+     number that opens a conversation is not a number you pressed.
+
+     So the figure and the action card divide the work. The figure filters to
+     exactly the documents it counted; the card underneath is where the AI
+     answer lives. Show me them, then do something about them.
+
+     A finding with no ids counts something that is not a document — a coverage
+     gap counts questions nobody could answer — so there is nothing to filter to
+     and the figure is not a control at all. */
+  const insN = (t) => (t.ids && t.ids.length
+    ? `<button class="ins-n" type="button" data-ins-n="${esc(t.id)}">${esc(String(t.n))}</button>`
+    : `<span class="ins-n is-flat">${esc(String(t.n))}</span>`);
+
+  function insightBand(list) {
+    const found = needsYou(list).slice(0, INS_MAX);
+    if (!found.length) return '';
+    /* The noun goes on the FIRST figure only. Every finding here counts the
+       same thing, so repeating "documents" three times in one sentence is the
+       list-of-rows this form exists to stop being. Established once, the
+       figures after it inherit it. `gap` counts questions, not documents, and
+       brings its own noun. */
+    const clauses = found.map((t, i) =>
+      `<span class="ins-clause">` +
+      insN(t) + (i === 0 && t.id !== 'gap' ? ' document' + (t.n === 1 ? '' : 's') : '') +
+      ' ' + esc(t.clause) + `</span>`);
+    const joined = clauses.length === 1 ? clauses[0]
+      : clauses.slice(0, -1).join(', ') + ' and ' + clauses[clauses.length - 1];
+    /* The result line directly above already reads "12 documents of 36", so the
+       opener says what AiMY's relationship to them IS rather than counting them
+       again — which is the first-person move, and it only works if it is not
+       also a statistic. The scope is named only when you filtered to something,
+       where naming it is the useful half. */
+    const scoped = !isComposed(readURL());
+    return `<section class="ins-band" aria-label="What AiMY noticed">
+      <div class="ins-head">
+        <!-- The attributes are a floor. .ins-head sizes the mark in em so it
+             scales with the title rather than sitting pinned beside it, which
+             is Sales' move and is why the head reads as one object. -->
+        ${AIMY_MARK(12, 14)}
+        <h2 class="ins-title">AiMY noticed</h2>
+        ${scoped ? `<span class="ins-scope">in what you filtered to</span>` : ''}
+      </div>
+      <div class="ins-body">
+        <p class="ins-line">These are what I answer from.
+          <strong>${esc(INS_COUNT[found.length] || String(found.length))} thing${found.length === 1 ? '' : 's'} need${found.length === 1 ? 's' : ''} you</strong>: ${joined}.</p>
+      </div>
+      <!-- The actions, and nothing framing them. This was a captioned section
+           of three ghost cards under an accent rule — 134px of a 279px block,
+           half the panel spent on chrome around three verbs. The reason each
+           card carried is not lost: INSIGHT_MINE says the per-document version
+           of it on the card and in the rail, which is where a reason is worth
+           reading, beside the one document it is about. -->
+      <div class="ins-acts" role="group" aria-label="What AiMY would do">
+        ${found.map((t) => `<button class="ins-act" type="button" data-ins="${esc(t.id)}">${esc(t.cta)}</button>`).join('')}
+      </div>
+    </section>`;
   }
 
   /* ═══════════════════════════════════════════════
@@ -2901,7 +3151,10 @@
 
     if (!list.length) { stage.innerHTML = emptyResult(st); return; }
 
-    stage.innerHTML = resultMeta(st, list, composed) +
+    /* The band is a washed, bordered section, so it cannot be a flex child of
+       the result row. It sits BELOW the count and above the set: the count line
+       says what you are looking at, the band says what AiMY noticed about it. */
+    stage.innerHTML = resultMeta(st, list, composed) + insightBand(list) +
       (st.view === 'tree' ? renderTree(st, list)
                           : `<div class="ws-grid">${list.map((o) => typeCard(o)).join('')}</div>`);
   }
@@ -4004,8 +4257,8 @@
            the document. But the question a version answers is the one the
            byline already raises: how current is this? So the date and its
            history are one control, in the line that states the date. -->
-      ${VERSIONS(o).length ? `<details class="doc-versions doc-by-ver" id="docVersions">
-        <summary>Updated ${esc(fmtDate(o.upd))}
+      ${VERSIONS(o).length ? `<details class="doc-versions doc-by-ver" id="docVersions"${previewVer !== null ? ' open' : ''}>
+        <summary><span class="doc-by-vd">Updated ${esc(fmtDate(o.upd))}</span>
           <span class="doc-by-vn">${VERSIONS(o).length} version${VERSIONS(o).length === 1 ? '' : 's'}</span></summary>
         <div class="doc-versions-panel">
           ${versionList(o, true)}
@@ -4355,6 +4608,101 @@
   const previewBody = (o) => `<div class="dv-body" spellcheck="false" id="editBody" data-drop-body
        data-placeholder="Write here, drop a file, or use Draft with AiMY above."
      ><p>${esc(VERSION_BODY(o, previewVer))}</p></div>`;
+
+  /* ── What AiMY noticed, about ONE document ──
+
+     needsYou() attaches the ids it is talking about to every finding, so asking
+     "which of these is about THIS document" is a filter, not a second analysis —
+     and the answer cannot drift from the band over the grid or the queue under
+     the bell, because all three read one computation.
+
+     The band upstairs counts: "3 documents disagree with each other". Beside a
+     document a count is the wrong shape — you are looking at one of the three,
+     and what you want is which other one and why. INSIGHT_MINE is that: one
+     first-person sentence per finding, about this object. The card uses the
+     same map, so the three surfaces say one thing in one voice.
+
+     It sits ABOVE the three blocks and outside them, because it is the only
+     thing in the column that is not a description of the document: it is what
+     AiMY thinks about the description. The rail's rule is "describes, and only
+     describes", and this keeps it — the row states a finding and its action
+     leaves for the canvas or the set. Nothing is done in the rail.
+
+     A document with nothing wrong with it renders nothing, which is the common
+     case and should cost no height. */
+  const INSIGHT_MINE = {
+    conflicting: (o) => {
+      const c = (RELATED[o.id] || {}).contradicts || [];
+      const other = c.length ? byId(c[0]) : null;
+      return other ? 'It disagrees with ' + other.title + ', and I am answering from both.'
+                   : 'It disagrees with another document, and I am answering from both.';
+    },
+    outdated: (o) => SRC[o.src].label + ' changed it ' + Math.max(1, o.upd - o.xu) + ' days after our copy.',
+    /* The meta line already says *no owner*. What it does not say is that I am
+       answering out of it anyway, which is the reason this needs a person. */
+    unowned:  (o) => o.uses ? 'I have answered from it ' + o.uses + ' times with nobody accountable.'
+                            : 'Nobody answers for it, and nothing has cited it.',
+    drafts:   () => 'I drafted it and nobody published it, so I cannot cite it.',
+    /* And the meta line already says *used 4 months ago*. The peer number is
+       the one that decides whether that is neglect or just a quiet corner. */
+    unused:   (o) => { const peers = LIVE.filter((x) => x.col === o.col);
+                       const avg = Math.round(peers.reduce((a, x) => a + x.uses, 0) / Math.max(1, peers.length));
+                       return 'I cite it ' + o.uses + ' times against ' + avg + ' across ' + COLLECTIONS[o.col] + '.'; },
+    reported: (o) => openProblems(o) + ' reported problem' + (openProblems(o) === 1 ? '' : 's') +
+                     ' nobody has answered.',
+    source:   (o) => SRC[o.src].label + ' has been down ' + SRC[o.src].last + ' days, so this copy is frozen.'
+    /* `gap` is the absence of a document. It has no ids and cannot appear here. */
+  };
+  const insightMine = (t, o) => (INSIGHT_MINE[t.id] ? INSIGHT_MINE[t.id](o) : t.why);
+
+  /* ── One corpus computation per paint ──
+
+     needsYou() makes eight passes over LIVE. renderGrid maps typeCard over the
+     list, so asking each card for its own finding is eight passes PER CARD —
+     twelve cards on the landing set before a filter is touched. It is the same
+     answer every time, because the corpus cannot move between two cards in one
+     paint.
+
+     Module-level and nulled, the way railOpen / openProp / previewVer /
+     previewVer already are: view-derived state that must not outlive the paint it
+     was computed for. Two invalidation points, and both are load-bearing —
+
+       render()     every URL-driven paint, before anything reads it;
+       recompute()  the only thing that moves o.status, which is what six of the
+                    eight findings key on, and it runs on paths that end in
+                    repaintEditor() rather than render().
+
+     First writer wins, and that IS the severity rule: needsYou returns
+     p1 → p2 → p3 by construction, so no sort is needed to give a card its
+     worst finding. */
+  function corpusFindings() { return insAll || (insAll = needsYou()); }
+
+  function cardInsight(o) {
+    if (!insBy) {
+      insBy = {};
+      corpusFindings().forEach((t) => {
+        t.ids.forEach((id) => { if (!insBy[id]) insBy[id] = t; });
+      });
+    }
+    const t = insBy[o.id];
+    /* `gap` counts questions nobody could answer, so it has no ids and can
+       never land here. Anything else without a phrase falls back to the
+       finding's own reason rather than rendering an empty row. */
+    return t ? { sev: t.sev, long: insightMine(t, o) } : null;
+  }
+
+  function docInsights(o) {
+    const found = corpusFindings().filter((t) => t.ids.indexOf(o.id) > -1).slice(0, 2);
+    if (!found.length) return '';
+    return `<div class="ins-band">
+      <p class="ins-rail-lead">${AIMY_MARK(12, 14)}<span>AiMY noticed</span></p>
+      ${found.map((t) => `<div class="ins-row">
+        <p class="ins-row-text">${esc(insightMine(t, o))}</p>
+        <button class="ins-row-act" type="button" data-ins="${esc(t.id)}">${esc(t.cta)}</button>
+      </div>`).join('')}
+    </div>`;
+  }
+
 
   const RAIL_BLOCK = {
     what: (o, open) => railBlock('What it is', open, propsPanel(o)),
@@ -4919,6 +5267,7 @@
         </div>
 
         <aside class="doc-rail" aria-label="About this document">
+          ${docInsights(o)}
           <!-- What it is opens; the other two wait to be asked.
 
                All three used to be closed, on the argument that three open
@@ -7167,6 +7516,10 @@
   ═══════════════════════════════════════════════ */
   function render() {
     const st = readURL();
+    /* Before anything reads them. The corpus cannot move during a paint, so the
+       findings are computed once and every card, the rail and the bell read the
+       same answer. */
+    dropInsights();
     renderBrief(st);
     /* The bell is derived state like the rail, so it repaints with it rather
        than being told by whoever happened to change the corpus. */
@@ -7304,6 +7657,49 @@
     return o ? o.id : '';
   }
 
+  /* ── Filtering, now that the row is three ──
+
+     Eleven axes left the filter row on the argument that the input already
+     speaks them. That argument is invisible until somebody types one, and the
+     people reviewing this prototype are exactly the people who do not know the
+     vocabulary yet — so the examples are here, where the rest of the
+     hard-to-reach conditions are.
+
+     Each one is a phrase that reaches axes with NO control left: status,
+     source, client, product, region, service, audience. Running one fills the
+     input; pressing Enter narrows the set and puts the axes on the chip bar,
+     which is the whole route in one move. Run two or three and the rail starts
+     listing them under Recent filters.
+
+     Self-checking, because the panel's rule is that a link which cannot resolve
+     is not rendered. A phrase is offered only if it still PARSES and still
+     MATCHES something: three of the eight I first wrote parsed perfectly and
+     returned an empty grid, which demonstrates the parser and teaches nothing.
+     If a fixture changes underneath one, it stops being offered rather than
+     becoming a demo of the empty state — there is already one of those. */
+  const FILTER_DEMOS = [
+    'unowned documents from zendesk',
+    'quality assurance in emea',
+    'stakeholder success stories in apac',
+    'blogs updated last month',
+    'client-facing articles for nordwind',
+    'conflicting tickets from zendesk',
+    'copilot presentations',
+    'archived'
+  ];
+
+  function protoFilters() {
+    return FILTER_DEMOS.filter((phrase) => {
+      const f = parseFilters(phrase);
+      if (!f.matched) return false;
+      /* Applied against a state built the way readURL builds one, so what is
+         counted here is exactly what pressing Enter would show. */
+      const st = parseParams(new URLSearchParams(''));
+      Object.keys(f.set).forEach((k) => { st[k] = f.set[k]; });
+      return applyFilters(st).length > 0;
+    }).slice(0, 5).map((phrase) => [phrase, 'fill:' + phrase]);
+  }
+
   function protoGroups() {
     const deadSrc = Object.keys(SRC).find((k) => k !== 'upload' && SRC[k].health !== 'ok');
     const superseded = protoFirst((o) => !o.arch && o.status === 'superseded' && !(RELATED[o.id] || {}).supersededBy);
@@ -7315,6 +7711,8 @@
         ['a question', 'demo:question'], ['a write', 'demo:write'],
         ['settings', 'demo:settings']
       ]],
+      ['Filtering without the controls', 'Fills the input. Press Enter. Two or three of these and the rail starts listing them.',
+        protoFilters()],
       ['A document in each state', 'Opens one that really is in that state.', [
         ['out of date', 'doc:' + protoFirst((o) => !o.arch && o.status === 'outdated')],
         ['conflicting', 'doc:' + protoFirst((o) => !o.arch && o.status === 'conflicting')],
@@ -7398,6 +7796,10 @@
     const fb = $('#floatInput');
 
     if (kind === 'demo') { if (fb) { fb.value = DEMO[arg]; fb.focus(); } return; }
+    /* Same as `demo:`, minus the lookup: a filter example IS its phrase, so
+       keeping it in a DEMO table would mean maintaining the same string twice
+       and letting the two drift. */
+    if (kind === 'fill') { if (fb) { fb.value = arg; fb.focus(); } return; }
     if (kind === 'doc')  { patch({ doc: arg }); return; }
     if (kind === 'edit') { patch({ doc: arg }); return; }
     if (kind === 'arch') { patch({ archived: true, doc: arg }); return; }
@@ -8232,6 +8634,36 @@
         return;
       }
       if ((el = t.closest('[data-view]'))) { patch({ view: el.getAttribute('data-view') }); return; }
+      /* An insight's action belongs to the insight. needsYou() attaches a go()
+         to every finding it returns, and each one already terminates in one of
+         the four places §1.2 allows — a filter, a document, a canvas question,
+         or a staged write. Re-deciding that here would be a second opinion
+         about a thing that has one. Scope matters: the row was computed over
+         the filtered list, so it must be looked up in that same list or the
+         action will act on a finding the row is not showing. */
+      /* The figure shows you the set it counted. Recomputed over the same
+         scope the row was written from, so what you land on is what you read. */
+      if ((el = t.closest('[data-ins-n]'))) {
+        const id = el.getAttribute('data-ins-n');
+        const st0 = readURL();
+        const comp0 = isComposed(st0);
+        const set0 = comp0 ? composedSet(orderOf(st0, comp0))
+                           : sortSet(applyFilters(st0), orderOf(st0, comp0));
+        const hit = needsYou(set0).filter((x) => x.id === id)[0];
+        if (hit && hit.ids.length) patch({ ids: hit.ids });
+        return;
+      }
+      if ((el = t.closest('[data-ins]'))) {
+        const id = el.getAttribute('data-ins');
+        const st0 = readURL();
+        const comp = isComposed(st0);
+        const set = comp ? composedSet(orderOf(st0, comp))
+                         : sortSet(applyFilters(st0), orderOf(st0, comp));
+        const found = needsYou(el.closest('.doc-rail') ? undefined : set)
+          .filter((x) => x.id === id)[0];
+        if (found) found.go();
+        return;
+      }
       if ((el = t.closest('[data-sort-attention]'))) {
         /* Write the state you are turning ON, not the absence of the other —
            an absent key means "this surface's default", and on the composed
@@ -8242,8 +8674,9 @@
         return;
       }
       if (t.closest('[data-toggle-mine]')) { const s = readURL(); s.mine = !s.mine; s.doc = ''; rememberFilter(); writeURL(s); return; }
-      if (t.closest('[data-more]'))        { moreOpen = !moreOpen; renderFilters(readURL()); return; }
-      if (t.closest('[data-resume]')) { location.search = lastFilter; return; }
+      /* The same restore path the one-slot version used: a recent is a URL, so
+         going back to it is a navigation and not a state assignment. */
+      if ((el = t.closest('[data-recent]'))) { location.search = el.getAttribute('data-recent'); return; }
       if (t.closest('[data-retry]'))  { location.href = location.pathname; return; }
 
       /* ── briefing ── */
@@ -8280,6 +8713,14 @@
       if (t.closest('[data-doc-close]')) { previewVer = null; patch({ doc: '' }); return; }
 
       /* ── editor: tabs, versions, properties ── */
+      /* renderDoc replaces the stage's innerHTML, which destroys this very
+         <details> — so picking v2 closed the picker, and picking v3 meant
+         opening it again. The markup re-opens it whenever previewVer is set,
+         which is exactly the case where you are still choosing. Every OTHER
+         repaint still closes it, because you did not ask for it then.
+
+         knowledge.css's "an open <details> survives a repaint with no state of
+         ours" is true of the rail's blocks and was never true of this one. */
       if ((el = t.closest('[data-open-ver]'))) { previewVer = +el.getAttribute('data-open-ver'); renderDoc(readURL()); return; }
       if (t.closest('[data-close-ver]')) { previewVer = null; renderDoc(readURL()); return; }
       if ((el = t.closest('[data-tag-drop]'))) {

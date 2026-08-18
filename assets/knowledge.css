@@ -22,6 +22,163 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════
+   THE INK SCALE — corrected, and then named
+
+   GAPS.md §1.8 carries a contrast table headed "measured directly against the
+   real surfaces, dark theme". Every cell in it is the LIGHT theme's number.
+   Measured again, in dark, against the three surfaces this product actually
+   paints on:
+
+     token    --card-bg   --card-bg-raised   --body-bg
+     --d600     2.49           2.20            2.51
+     --d500     3.51           3.10            3.54
+     --d400     6.02           5.33            6.08
+     --d300     8.99           7.95            9.07
+
+   The section concluded that --d500 "passes AA on every surface at a
+   difference the eye does not register" and moved five label classes onto it.
+   In the default theme it is 3.10 and fails, which is why the muted text in
+   this product could not be read. It also says --d600 is safe for borders
+   because the 3:1 non-text threshold applies; at 2.20 it fails that too.
+
+   Two rungs are corrected here rather than in the library, because 85 rules
+   in aimy-ds.css use them as a text colour and the library is extracted, not
+   authored. An unscoped :root is deliberate: aimy-ds.css declares
+   :root[data-theme="light"] at higher specificity, so light — which already
+   passes at 4.56 and 3.89 — keeps its own values and only dark moves.
+
+   Above the ramp sits a role layer, because a rule should say what a colour
+   MEANS. Each role names a RUNG rather than a hex, and the ramp already
+   inverts between themes, so one definition serves both and there is no
+   per-theme mapping to drift — drift being exactly what §1.8 is.
+
+     role              dark      worst    light      worst
+     --ink-primary     #eef2f6   13.63    #10151b    16.94
+     --ink-secondary   #c8d2dc   10.01    #2a3540    11.53
+     --ink-quiet       #b0bcca    7.95    #3a4653     8.89
+     --ink-faint       #8b9aaa    5.33    #566472     5.60   ← the floor
+     --ink-action      #a478f7    4.83    #7a34e8     5.57
+
+   CONTRAST IS NOT THE ONLY CONSTRAINT. A first cut put --ink-faint on the
+   raised --d500 (#84929f) because it cleared AA at 4.82. It does, and it was
+   still wrong: --ink-quiet was --d400 #8b9aaa, and
+
+     ΔE(CIE76) --ink-quiet vs --ink-faint = 3.47, against a JND of ~2.3
+
+   — two of the five ranks the same colour at 12px, while every other adjacent
+   pair sat at 12–20. Raising a rung to fix its contrast necessarily moves it
+   into its neighbour, which is how you fix a legibility bug by deleting a
+   rank. The four rungs below are evenly spaced instead:
+
+     dark  ΔE 12.19 / 8.33 / 12.93      light  ΔE 15.49 / 7.62 / 12.55
+
+   --d100 and --d200 were sitting unused. The fifth rank was already paid for.
+
+   --ink-action exists because --accent is two things at once: #8b4ff4 is a
+   legitimate fill and an illegible text colour — 3.73 dark, 4.29 light, so it
+   failed in BOTH themes. GAPS §26 names the confusion; this separates them.
+   The fill keeps --accent and does not move.
+═══════════════════════════════════════════════ */
+:root {
+  /* Neither of these is a product text role — the five --ink-* roles below
+     are. They are raised because 85 rules in aimy-ds.css use them as a text
+     colour, and a library component the product has not individually
+     re-stepped should not render at 3.10:1 while it waits. A floor under the
+     parts of the system this product does not own. */
+  --d500: #84929f;   /* 5.44 / 4.82 / 5.49 — was #637280 at 3.51 / 3.10 / 3.54 */
+  --d600: #6b7b8b;   /* 3.99 / 3.53 / 4.02 — non-text; was 2.49 / 2.20 / 2.51 */
+
+  --ink-primary:   var(--d50);    /* identity — the thing's name, a committed value */
+  --ink-secondary: var(--d200);   /* substance — prose, the document's own words    */
+  --ink-quiet:     var(--d300);   /* attribution — who, when, where                 */
+  --ink-faint:     var(--d400);   /* ambient — separators, counts, timestamps       */
+  --ink-action:    #a478f7;       /* accent AS TEXT. The fill stays --accent.       */
+  --ink-rule:      var(--d600);   /* NON-TEXT — hairlines, dotted underlines, dots  */
+
+  /* Status AS TEXT. Same split as --ink-action, for the same reason: a hue is
+     a fill and a text colour at once, and the two want different values.
+
+     Measured on the surface each one actually paints on, which for a status
+     word is its OWN 12-14% tint — not the card. That is the measurement that
+     had never been taken, and it changes the answer: in dark only --err fails,
+     but in LIGHT all four do, because the library darkened the hues one step
+     for "text/icons on white" and a tint is not white.
+
+       light, worst surface     ok 3.22 · warn 3.74 · err 3.73 · info 3.61
+
+     Four words — Conflicting, Out of date, Unowned, No issues — every one of
+     them the reason a document is in front of you, and in the light theme not
+     one of them cleared AA. The tints, borders, dots and card edges keep the
+     original hues and do not move; only text does. */
+  --ink-ok:   var(--ok);          /* dark 6.28 / 5.56 / 5.28 / 4.62 — already clear */
+  --ink-warn: var(--warn);        /* dark 7.38 / 6.53 / 6.13 / 5.37                 */
+  --ink-info: var(--info);        /* dark 6.25 / 5.53 / 5.21 / 4.62                 */
+  --ink-err:  #f4736a;            /* dark 6.19 / 5.48 / 5.56 / 4.90 — was 4.08      */
+}
+:root[data-theme="light"] {
+  --ink-ok:   #0a6d41;   /* 6.41 / 6.08 / 5.92 / 5.57 / 5.18 — was 3.22 */
+  --ink-warn: #9c5504;   /* 5.65 / 5.36 / 5.22 / 5.01 / 4.68 — was 3.74 */
+  --ink-err:  #b81f14;   /* 6.47 / 6.14 / 5.98 / 5.39 / 5.00 — was 3.73 */
+  --ink-info: #056ba7;   /* 5.73 / 5.43 / 5.29 / 4.96 / 4.64 — was 3.61 */
+}
+:root[data-theme="light"] { --ink-action: #7a34e8; }
+
+/* ═══════════════════════════════════════════════
+   THE DENSITY TYPE SCALE
+
+   GAPS §19 asked for this by name: "worth taking upstream as a documented
+   density scale, the way spacing has --sp-*". The library has --fs-2xs
+   through --fs-5xl and then never uses it — 265 literal sizes in aimy-ds.css,
+   55% of them off its own scale, clustered at the small end (8, 8.5, 9, 9.5,
+   10.5, 11.5, 12.5). Twenty-six distinct sizes existed across this repo.
+
+   Five steps, and a floor. The floor is the part that matters: --fs-2xs will
+   hand you 10px without comment, and 10px in a 320px column is decoration
+   wearing the clothes of information.
+
+   A 320px rail and a 900px canvas are not the same problem, which is the
+   other half of §19. Rather than a second scale, panels re-point the top two
+   steps one notch down — same vocabulary, denser setting. The bottom two do
+   not move, because a floor that bends is not a floor.
+
+   Hierarchy is carried by step AND weight AND ink together, never by size
+   alone. Size alone is what produced a six-run card where nothing led.
+═══════════════════════════════════════════════ */
+:root {
+  --ty-display: clamp(22px, 2.4vw, 28px);  /* the document title, and nothing else */
+  --ty-title:   17px;                      /* card title, region head              */
+  --ty-body:    15px;                      /* prose, snippet, a value you read for */
+  --ty-meta:    13px;                      /* block title, label, attribution      */
+  --ty-micro:   12px;                      /* FLOOR — separator, count, timestamp  */
+}
+.doc-rail, .app-sidebar, .peek, .props {
+  --ty-title: 15px;   /* block title, region head */
+  --ty-body:  14px;   /* value, lead-in           */
+  --ty-meta:  13px;   /* attribution, phrase      */
+  /* --ty-micro does not move. A floor that bends is not a floor.
+
+     --ty-meta is re-pointed to its own value on purpose. Without this line the
+     top two steps move down and --ty-meta stays where it is, which put
+     .rail-block-title at 13px over .rail-facts p at 14px — a heading one pixel
+     SMALLER than the prose it heads. Four steps for five roles in a 320px
+     column: 15 / 14 / 13 / 12, with the fifth separated by weight. */
+}
+
+/* The five ranks. Every text run on a product surface is one of these, and a
+   rank differs from its neighbour in at least two of {step, weight, ink} —
+   one axis of difference is what "22 type styles, none more than 4.5px apart"
+   looks like from the inside.
+
+     L1 identity      what the thing IS
+     L2 substance     what you are reading FOR
+     L3 structure     names a group or a field
+     L4 attribution   who · when · where
+     L5 ambient       separators, counts, stamps
+
+   Colour beyond the ramp is spent on exactly two things: status, which also
+   tints the card's own border, and actions. Nothing else earns a hue. */
+
+/* ═══════════════════════════════════════════════
    FORM-CONTROL RESET
 
    The design system's base has no reset for form controls, and most of its
@@ -118,17 +275,17 @@ button {
 ═══════════════════════════════════════════════ */
 .copy-btn {
   display: inline-flex; align-items: center; gap: 4px;
-  font-family: var(--font-sans); font-size: 10px; font-weight: var(--fw-bold);
+  font-family: var(--font-sans); font-size: var(--ty-micro); font-weight: var(--fw-bold);
   line-height: 14px; padding: 4px 8px; border-radius: var(--r-sm);
   background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
   color: var(--d400); cursor: pointer; white-space: nowrap;
   transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
 }
 .copy-btn:hover { background: rgba(255,255,255,0.1); color: var(--d100); border-color: rgba(255,255,255,0.18); }
-.copy-btn.copied { background: var(--ok-bg); border-color: rgba(23,178,106,0.3); color: var(--ok); }
+.copy-btn.copied { background: var(--ok-bg); border-color: rgba(23,178,106,0.3); color: var(--ink-ok); }
 .copy-btn svg { width: 11px; height: 11px; flex-shrink: 0; }
 :root[data-theme="light"] .copy-btn {
-  background: rgba(16,24,40,0.05); border-color: rgba(16,24,40,0.12); color: var(--d500);
+  background: rgba(16,24,40,0.05); border-color: rgba(16,24,40,0.12); color: var(--ink-faint);
 }
 :root[data-theme="light"] .copy-btn:hover { background: rgba(16,24,40,0.10); color: var(--d100); }
 
@@ -211,7 +368,7 @@ button {
   margin-top: 8px; padding-top: 12px;
   border-top: 1px solid var(--hairline);
 }
-.cov-key { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); }
+.cov-key { display: inline-flex; align-items: center; gap: 6px; font-size: var(--ty-meta); }
 .cov-swatch { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
 .cov-key-label { color: var(--d400); }
 .cov-key-val { color: var(--d100); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
@@ -226,9 +383,9 @@ button {
 ═══════════════════════════════════════════════ */
 .set-section { margin-bottom: 24px; }
 .set-section-title {
-  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
   letter-spacing: var(--ls-wider); text-transform: uppercase;
-  color: var(--d500); margin-bottom: 8px;
+  color: var(--ink-faint); margin-bottom: 8px;
 }
 .set-list { max-width: 720px; }
 .set-list .settings-row { gap: 12px; }
@@ -661,7 +818,7 @@ body {
   font-family: inherit;
 }
 .topnav-tab:hover { background: rgba(255, 255, 255, 0.05); color: var(--d200); }
-.topnav-tab.active { color: var(--accent); }
+.topnav-tab.active { color: var(--ink-action); }
 .topnav-tab svg { width: 13px; height: 14px; flex-shrink: 0; }
 .topnav-tab:active { transform: scale(0.97); }
 .topnav-tab:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
@@ -789,12 +946,12 @@ body {
    Same component as QA's, on this file's tokens — QA's --wash-6 is what
    --glass-border already is here, and the focus ring follows .topnav-tab. */
 .ver-link {
-  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
-  padding: 4px 10px; border-radius: var(--r-pill);
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  padding: 4px 12px; border-radius: var(--r-pill);
   font-family: var(--font-sans);
-  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
   letter-spacing: var(--ls-wide); line-height: var(--lh-snug);
-  color: var(--d500); text-decoration: none;
+  color: var(--ink-faint); text-decoration: none;
   border: 1px solid var(--glass-border);
   transition: background-color var(--t-fast), color var(--t-fast), border-color var(--t-fast);
 }
@@ -842,22 +999,22 @@ body {
 :root[data-theme="light"] .ntf-panel { scrollbar-color: rgba(16,24,40,0.12) transparent; }
 :root[data-theme="light"] .ntf-panel::-webkit-scrollbar-thumb { background: rgba(16,24,40,0.12); }
 
-.ntf-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 10px; }
+.ntf-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px 12px; }
 .ntf-head b {
-  font-family: var(--font-display); font-size: var(--fs-sm);
+  font-family: var(--font-display); font-size: var(--ty-meta);
   font-weight: var(--fw-bold); color: var(--d50);
 }
 .ntf-count {
-  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
-  padding: 1px 7px; border-radius: var(--r-pill);
-  background: var(--accent-dim); color: var(--accent);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  padding: 2px 8px; border-radius: var(--r-pill);
+  background: var(--accent-dim); color: var(--ink-action);
   font-variant-numeric: tabular-nums;
 }
 .ntf-count[hidden] { display: none; }
 .ntf-clear {
   margin-left: auto; background: none; border: 0; padding: 2px 4px; cursor: pointer;
-  font-family: inherit; font-size: var(--fs-2xs); font-weight: var(--fw-semibold);
-  color: var(--d500); border-radius: var(--r-xs);
+  font-family: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-faint); border-radius: var(--r-xs);
   transition: color var(--t-fast);
 }
 .ntf-clear:hover { color: var(--d100); }
@@ -865,7 +1022,7 @@ body {
 
 .ntf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .ntf-row {
-  display: flex; gap: 9px; padding: 10px; border-radius: var(--r-md);
+  display: flex; gap: 8px; padding: 12px; border-radius: var(--r-md);
   transition: background-color var(--t-fast), opacity var(--t-fast);
 }
 .ntf-row:hover { background: rgba(255,255,255,0.04); }
@@ -875,22 +1032,17 @@ body {
 .ntf-row.is-read { opacity: 0.45; }
 /* Tone on one leading dot, same as .brief-text — the rail and the bell are
    two views of one model and they should not look like two components. */
-.ntf-sev {
-  width: 5px; height: 5px; border-radius: 50%;
-  margin-top: 7px; flex-shrink: 0; background: var(--d500);
-}
-.ntf-sev.p1 { background: var(--err); }
-.ntf-sev.p2 { background: var(--warn); }
-.ntf-sev.p3 { background: var(--brand); }
+/* The bell's rows lost their dots with the band's, and for the same reason:
+   needsYou() returns them worst-first, so the order already says it. */
 .ntf-row-main { flex: 1; min-width: 0; }
-.ntf-row-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
-.ntf-row-type { font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--d50); }
-.ntf-row-when { margin-left: auto; font-size: var(--fs-2xs); color: var(--d500); flex-shrink: 0; }
-.ntf-row-body { margin: 0 0 7px; font-size: var(--fs-xs); line-height: var(--lh-base); color: var(--d300); }
+.ntf-row-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.ntf-row-type { font-size: var(--ty-meta); font-weight: var(--fw-bold); color: var(--d50); }
+.ntf-row-when { margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint); flex-shrink: 0; }
+.ntf-row-body { margin: 0 0 8px; font-size: var(--ty-meta); line-height: var(--lh-base); color: var(--ink-secondary); }
 .ntf-row-cta {
-  font-family: inherit; font-size: var(--fs-2xs); font-weight: var(--fw-bold); cursor: pointer;
-  padding: 4px 10px; border-radius: var(--r-pill);
-  background: var(--accent-dim); color: var(--accent);
+  font-family: inherit; font-size: var(--ty-micro); font-weight: var(--fw-bold); cursor: pointer;
+  padding: 4px 12px; border-radius: var(--r-pill);
+  background: var(--accent-dim); color: var(--ink-action);
   border: 1px solid rgba(var(--accent-rgb), 0.26);
   transition: background-color var(--t-fast), border-color var(--t-fast);
 }
@@ -900,7 +1052,7 @@ body {
 .ntf-foot { padding: 8px 4px 4px; margin-top: 6px; border-top: 1px solid var(--hairline); }
 .ntf-foot-btn {
   width: 100%; padding: 8px; cursor: pointer; font-family: inherit;
-  font-size: var(--fs-xs); font-weight: var(--fw-bold);
+  font-size: var(--ty-meta); font-weight: var(--fw-bold);
   border-radius: var(--r-md); color: var(--d300);
   background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
   transition: background-color var(--t-fast), color var(--t-fast);
@@ -911,7 +1063,7 @@ body {
 :root[data-theme="light"] .ntf-foot-btn:hover { background: rgba(16,24,40,0.07); }
 /* Nothing waiting is a real state and the best one this panel can report.
    It was unreachable while the dot was written into the markup. */
-.ntf-empty { padding: 22px 12px; text-align: center; font-size: var(--fs-xs); color: var(--d500); }
+.ntf-empty { padding: 24px 12px; text-align: center; font-size: var(--ty-meta); color: var(--ink-quiet); }
 
 /* The bell sits ~90px in from the window edge, so a 360px card anchored to it
    runs off the LEFT of the screen before the viewport is narrow enough for
@@ -964,7 +1116,12 @@ body {
    It drives the rail and nothing else now: the canvas is fixed to the window
    and the float bar is centred on it, so neither reads this token — see THE
    CANVAS TAKES THE WINDOW. */
-:root { --sidebar-width: 220px; }
+/* The library's default is 240 and this product had overridden it DOWN. The
+   briefing carries 183px of content in 188px of usable width once its 16px
+   gutters are taken, and two of its runs already overflowed. It also now holds
+   the recent filters, which are labelled with the same chips the filter bar
+   uses and are the widest thing in the column. */
+:root { --sidebar-width: 268px; }
 .sidebar-nav .nav-item { padding: 12px 16px; gap: 12px; }
 
 /* No border and no background. The sidebar sits directly on the ambient
@@ -986,9 +1143,9 @@ body {
 :root[data-theme="light"] .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(16,24,40,0.12); }
 .sidebar-nav .nav-item { max-width: none; }
 .sidebar-section-label {
-  font-size: 10px; font-weight: 700;
+  font-size: var(--ty-micro); font-weight: 700;
   letter-spacing: 0.12em; text-transform: uppercase;   /* QA's tracking */
-  color: var(--d500);
+  color: var(--ink-faint);
   /* 16px matches .nav-item's padding above, so "PRIMARY" and "CONFIGURE"
      line up with the nav icons beneath them. Moves with nav-item. */
   padding: 4px 16px 6px; margin-top: 16px;
@@ -1018,14 +1175,14 @@ body {
 .page-head-row { display: flex; align-items: flex-start; gap: 16px; }
 .page-title {
   font-family: var(--font-display);
-  font-size: var(--fs-2xl); font-weight: var(--fw-extrabold);
+  font-size: var(--ty-display); font-weight: var(--fw-extrabold);
   letter-spacing: var(--ls-tight); color: var(--d50);
   line-height: var(--lh-tight);
 }
 .page-head-end { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .page-stamp {
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  color: var(--d500);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
+  color: var(--ink-faint);
 }
 
 /* ═══════════════════════════════════════════════
@@ -1050,7 +1207,7 @@ body {
    specimen in the design system overrides it inline. Grid owns width here. */
 .briefing-grid .bcard { max-width: none; padding: 16px; }
 .briefing-grid .bcard-meta { flex-wrap: wrap; }
-.briefing-grid .bcard-title { font-size: var(--fs-base); line-height: var(--lh-base); }
+.briefing-grid .bcard-title { font-size: var(--ty-meta); line-height: var(--lh-base); }
 
 /* Full-bleed rule above the action zone */
 .k-rule { height: 1px; background: var(--hairline); margin: 12px -16px; }
@@ -1062,7 +1219,7 @@ body {
 .k-action-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .k-action-note {
   flex: 1; min-width: 200px;
-  font-size: var(--fs-xs); color: var(--d500);
+  font-size: var(--ty-meta); color: var(--ink-faint);
   line-height: var(--lh-snug);
 }
 .briefing-grid > .is-wide { grid-column: 1 / -1; }
@@ -1075,9 +1232,9 @@ body {
 .briefing-tail-label {
   grid-column: 1 / -1;
   display: flex; align-items: center; gap: 8px;
-  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
   letter-spacing: var(--ls-wider); text-transform: uppercase;
-  color: var(--d500); margin-top: 6px;
+  color: var(--ink-faint); margin-top: 6px;
 }
 .briefing-tail-label::after {
   content: ""; flex: 1; height: 1px; background: var(--hairline);
@@ -1165,11 +1322,11 @@ body {
 }
 .wb-blank-title {
   font-family: var(--font-display);
-  font-size: var(--fs-xl); font-weight: var(--fw-bold);
+  font-size: var(--ty-title); font-weight: var(--fw-bold);
   color: var(--d200); letter-spacing: var(--ls-tight);
 }
 .wb-blank-body {
-  font-size: var(--fs-base); color: var(--d500);
+  font-size: var(--ty-meta); color: var(--ink-faint);
   margin-top: 8px; max-width: 46ch; line-height: var(--lh-base);
 }
 
@@ -1179,11 +1336,11 @@ body {
   margin-bottom: 12px; flex-wrap: wrap;
 }
 .ws-head-title {
-  font-size: var(--fs-md); font-weight: var(--fw-bold);
+  font-size: var(--ty-body); font-weight: var(--fw-bold);
   color: var(--d50); letter-spacing: var(--ls-tight);
 }
 .ws-head-count {
-  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--d500);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-faint);
 }
 .ws-head-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
@@ -1200,7 +1357,7 @@ body {
 
 .wb-back {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: var(--fs-sm); font-weight: var(--fw-semibold);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
   color: var(--d400); background: none; border: 0; cursor: pointer;
   padding: 4px 0; margin-bottom: 12px;
   transition: color var(--t-fast);
@@ -1224,8 +1381,8 @@ body {
    everything else — so the only thing left from the old page is the
    customer-facing marker, which the commit form still needs. */
 .gov-ext {
-  display: block; font-size: 8.5px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide); color: var(--warn);
+  display: block; font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); color: var(--ink-warn);
   text-transform: uppercase; margin-top: 2px;
 }
 
@@ -1237,7 +1394,7 @@ body {
 .modal-footer .gov-cr-audit-note {
   margin-right: auto;
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 10px; color: var(--d500);
+  font-size: var(--ty-micro); color: var(--ink-faint);
 }
 
 /* ═══════════════════════════════════════════════
@@ -1248,11 +1405,11 @@ body {
   margin-bottom: 8px;
 }
 .rs-label {
-  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
   letter-spacing: var(--ls-wider); text-transform: uppercase;
-  color: var(--d500);
+  color: var(--ink-faint);
 }
-.rs-note { font-size: var(--fs-xs); color: var(--d500); }
+.rs-note { font-size: var(--ty-meta); color: var(--ink-faint); }
 .rs-list { display: flex; flex-direction: column; gap: 8px; }
 
 /* ═══════════════════════════════════════════════
@@ -1300,7 +1457,7 @@ body {
   flex: 1 1 auto; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.source-item .tc-kind { flex-shrink: 0; color: var(--d500); font-weight: var(--fw-medium); }
+.source-item .tc-kind { flex-shrink: 0; color: var(--ink-faint); font-weight: var(--fw-medium); }
 .source-item .tc-kind svg { width: 12px; height: 12px; }
 .source-item .source-domain { margin-left: 0; }
 .cp-src .tc-kind { display: inline-flex; align-items: center; gap: 4px; }
@@ -1318,11 +1475,11 @@ body {
 
 .set-panel { display: flex; flex-direction: column; gap: 16px; }
 
-.set-lead { font-size: var(--fs-sm); color: var(--d200); line-height: var(--lh-normal); margin: 0; }
+.set-lead { font-size: var(--ty-meta); color: var(--d200); line-height: var(--lh-base); margin: 0; }
 .set-lead strong { color: var(--d50); }
 
 .set-sub {
-  font-size: var(--fs-2xs); color: var(--d500);
+  font-size: var(--ty-micro); color: var(--ink-faint);
   text-transform: uppercase; letter-spacing: var(--ls-wide);
 }
 
@@ -1335,12 +1492,12 @@ body {
    under the row, where it reads as a footnote to both. */
 .set-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; align-items: start; }
 .set-label {
-  font-size: var(--fs-xs); color: var(--d400); padding-top: 8px;
+  font-size: var(--ty-meta); color: var(--d400); padding-top: 8px;
   overflow: hidden; text-overflow: ellipsis;
 }
 .set-control { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .set-control .v2-dropdown { width: 100%; max-width: 260px; }
-.set-note { font-size: var(--fs-2xs); color: var(--d500); line-height: var(--lh-snug); }
+.set-note { font-size: var(--ty-micro); color: var(--ink-faint); line-height: var(--lh-snug); }
 .set-note strong { color: var(--d300); }
 
 .set-checks { display: flex; flex-direction: column; gap: 2px; }
@@ -1356,7 +1513,7 @@ body {
   padding: 12px 12px; border-radius: var(--r-md);
   background: var(--accent-dim); border: 1px solid rgba(139,79,244,0.28);
 }
-.set-staged-text { flex: 1; min-width: 180px; font-size: var(--fs-xs); color: var(--d200); }
+.set-staged-text { flex: 1; min-width: 180px; font-size: var(--ty-meta); color: var(--d200); }
 .set-staged-text strong { color: var(--d50); }
 .set-staged-end { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 
@@ -1379,7 +1536,7 @@ body {
 .rail-set-row {
   display: flex; align-items: center; gap: 8px; width: 100%;
   padding: 6px 8px; border-radius: var(--r-sm);
-  font-size: var(--fs-xs); color: var(--d300);
+  font-size: var(--ty-body); color: var(--ink-secondary);
 }
 .rail-set-row:hover { background: rgba(255,255,255,0.04); }
 :root[data-theme="light"] .rail-set-row:hover { background: rgba(16,24,40,0.04); }
@@ -1387,16 +1544,16 @@ body {
 .rail-set-name {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   background: none; border: 0; padding: 0; cursor: pointer; text-align: left;
-  font-family: var(--font-sans); font-size: var(--fs-xs); color: inherit;
+  font-family: var(--font-sans); font-size: inherit; color: inherit;
 }
-.rail-set-name:hover { color: var(--d50); }
+.rail-set-name:hover { color: var(--ink-primary); }
 .rail-set-name:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
-.rail-set-note { font-size: var(--fs-2xs); color: var(--d500); flex-shrink: 0; }
+.rail-set-note { font-size: var(--ty-micro); color: var(--ink-faint); flex-shrink: 0; }
 .rail-set-do {
   flex-shrink: 0; cursor: pointer;
-  font-family: var(--font-sans); font-size: 10px; font-weight: var(--fw-bold);
+  font-family: var(--font-sans); font-size: var(--ty-micro); font-weight: var(--fw-bold);
   padding: 4px 8px; border-radius: var(--r-pill);
-  background: var(--err-bg); border: 1px solid rgba(240,68,56,0.28); color: var(--err);
+  background: var(--err-bg); border: 1px solid rgba(240,68,56,0.28); color: var(--ink-err);
 }
 .rail-set-do:hover { background: rgba(240,68,56,0.2); }
 .rail-set-do:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
@@ -1405,7 +1562,7 @@ body {
    nothing about the text your caret is in. */
 .toolbar .icon-btn.is-on {
   background: var(--accent-dim);
-  color: var(--accent);
+  color: var(--ink-action);
   border-color: rgba(139,79,244,0.35);
 }
 
@@ -1468,13 +1625,13 @@ body {
 .wb-editor-split .ver-list { padding: 0 8px; }
 .ws-grid .type-card { max-width: none; }
 .answer-body {
-  font-size: var(--fs-md); color: var(--d100);
+  font-size: var(--ty-body); color: var(--d100);
   line-height: var(--lh-base);
 }
 .answer-body p + p { margin-top: 8px; }
 .answer-scope {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  font-size: var(--fs-xs); color: var(--d500);
+  font-size: var(--ty-meta); color: var(--ink-faint);
 }
 
 /* ═══════════════════════════════════════════════
@@ -1531,7 +1688,7 @@ body.is-doc .page-inner { max-width: none; }
 .doc-back {
   display: inline-flex; align-items: center; gap: 6px;
   background: none; border: 0; cursor: pointer;
-  font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  font-family: var(--font-sans); font-size: var(--ty-meta); font-weight: var(--fw-semibold);
   color: var(--d400); padding: 4px 0;
 }
 .doc-back:hover { color: var(--d50); }
@@ -1577,13 +1734,13 @@ body.is-doc .page-inner { max-width: none; }
 .blk-tools .blk-ai {
   display: inline-flex; align-items: center; gap: 6px;
   height: 28px; padding: 0 8px; border-radius: var(--r-sm);
-  background: none; border: 0; color: var(--accent); cursor: pointer;
-  font-family: var(--font-sans); font-size: var(--fs-2xs); font-weight: var(--fw-semibold);
+  background: none; border: 0; color: var(--ink-action); cursor: pointer;
+  font-family: var(--font-sans); font-size: var(--ty-micro); font-weight: var(--fw-semibold);
 }
 .blk-tools .blk-ai:hover { background: rgba(var(--accent-rgb), 0.14); }
 .blk-tools .blk-ai:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .blk-tools .blk-ai svg { flex-shrink: 0; }
-.blk-add { font-size: 16px; line-height: 1; }
+.blk-add { font-size: var(--ty-title); line-height: 1; }
 
 /* ── The block list ──
 
@@ -1601,7 +1758,7 @@ body.is-doc .page-inner { max-width: none; }
   display: flex; align-items: center; gap: 12px; width: 100%;
   padding: 6px 8px; border-radius: var(--r-sm);
   background: none; border: 0; cursor: pointer; text-align: left;
-  font-family: var(--font-sans); font-size: 12.5px; color: var(--d100);
+  font-family: var(--font-sans); font-size: var(--ty-meta); color: var(--d100);
 }
 .blk-menu-item:hover { background: rgba(255,255,255,0.06); }
 :root[data-theme="light"] .blk-menu-item:hover { background: rgba(16,24,40,0.05); }
@@ -1610,7 +1767,7 @@ body.is-doc .page-inner { max-width: none; }
   flex-shrink: 0; width: 24px; height: 24px; border-radius: var(--r-xs);
   display: flex; align-items: center; justify-content: center;
   background: rgba(255,255,255,0.05); color: var(--d400);
-  font-size: 11px; font-weight: var(--fw-bold);
+  font-size: var(--ty-meta); font-weight: var(--fw-bold);
 }
 :root[data-theme="light"] .blk-menu-ico { background: rgba(16,24,40,0.05); }
 
@@ -1619,11 +1776,11 @@ body.is-doc .page-inner { max-width: none; }
   margin: 0 0 16px; padding: 12px 16px; max-width: 80ch;
   background: rgba(255,255,255,0.04); border: 1px solid var(--hairline);
   border-radius: var(--r-md);
-  font-family: var(--font-mono); font-size: 13px; line-height: 1.6; color: var(--d150, var(--d200));
+  font-family: var(--font-mono); font-size: var(--ty-meta); line-height: 1.6; color: var(--ink-secondary);
   overflow-x: auto; white-space: pre;
 }
 :root[data-theme="light"] .doc-page #editBody > .doc-code { background: rgba(16,24,40,0.04); }
-.doc-code code:empty::before { content: "Type or paste code"; color: var(--d500); }
+.doc-code code:empty::before { content: "Type or paste code"; color: var(--ink-faint); }
 .doc-page #editBody > .doc-figure { margin: 0 0 16px; }
 /* A button, not a hint. It used to read "Drop an image on the document to fill
    this", which asked for the gesture the workbench had already claimed — the
@@ -1634,14 +1791,14 @@ body.is-doc .page-inner { max-width: none; }
   width: 100%; min-height: 120px; padding: 24px;
   background: rgba(255,255,255,0.03); border: 1px dashed var(--card-border);
   border-radius: var(--r-md); cursor: pointer;
-  font-family: var(--font-sans); font-size: 12.5px; color: var(--d400); text-align: center;
+  font-family: var(--font-sans); font-size: var(--ty-meta); color: var(--d400); text-align: center;
 }
 .doc-figure-ph:hover { border-color: var(--card-border-hover); color: var(--d100); }
 .doc-figure-ph:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .doc-figure-img { display: block; max-width: 100%; border-radius: var(--r-md); }
 :root[data-theme="light"] .doc-figure-ph { background: rgba(16,24,40,0.03); }
 .doc-page #editBody > .doc-figure figcaption {
-  margin-top: 8px; font-size: 12px; color: var(--d500);
+  margin-top: 8px; font-size: var(--ty-meta); color: var(--ink-faint);
 }
 .doc-figure figcaption:empty::before { content: "Describe it"; opacity: 0.6; }
 .doc-page #editBody > .doc-hr {
@@ -1650,7 +1807,7 @@ body.is-doc .page-inner { max-width: none; }
 
 .doc-title {
   font-family: var(--font-display);
-  font-size: clamp(24px, 3vw, 32px); font-weight: var(--fw-extrabold);
+  font-size: var(--ty-display); font-weight: var(--fw-extrabold);
   line-height: 1.14; letter-spacing: -0.022em; color: var(--d50);
   margin: 0 0 12px; text-wrap: balance;
   border-radius: var(--r-sm); padding: 2px 6px; margin-left: -6px;
@@ -1685,10 +1842,15 @@ body.is-doc .page-inner { max-width: none; }
 .doc-head .doc-note { margin: 0; }
 .doc-byline {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  font-size: var(--fs-xs); color: var(--d400);
+  font-size: var(--ty-meta); color: var(--ink-quiet);
   margin: 0;
 }
-.doc-by-sep { color: var(--d600); }
+/* The same problem the card's meta line had, on the line above the title:
+   type, source, collection, owner and date all at one rank, so the two that
+   can put the document in somebody's queue read no louder than the two that
+   never change. The line is L4; the type glyph and the separators are L5. */
+.doc-by-sep { color: var(--ink-faint); }
+.doc-by-kind { color: var(--ink-faint); }
 /* Not a button: every other entity on this line opens a peek, and there is no
    peek for a type — the filter for it is the grid's own dropdown. So it reads
    as a fact rather than advertising a target that does not exist. */
@@ -1696,23 +1858,86 @@ body.is-doc .page-inner { max-width: none; }
 .doc-by-kind svg { width: 12px; height: 12px; }
 .doc-by-ent {
   background: none; border: 0; padding: 0; cursor: pointer;
-  font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--d400);
-  border-bottom: 1px dotted var(--d600);
+  font-family: var(--font-sans); font-size: var(--ty-meta); color: var(--ink-quiet);
+  border-bottom: 1px dotted var(--ink-faint);
 }
-.doc-by-ent:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.doc-by-ent:hover { color: var(--ink-action); border-bottom-color: var(--ink-action); }
 .doc-by-ent:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
-.doc-note { font-size: var(--fs-xs); color: var(--warn); margin: 0 0 16px; }
+.doc-note { font-size: var(--ty-meta); color: var(--ink-warn); margin: 0 0 16px; }
 
 /* The measure sits on the TEXT, not on the container. Capping the block would
    cage everything inside it; capping the paragraphs keeps the line at the
    length an eye can track back while a table, a quote or a drafted suggestion
    uses the width the page actually has. */
 .doc-page #editBody {
-  font-size: 16px; line-height: 1.72; color: var(--d150, var(--d200));
+  font-size: var(--ty-title); line-height: 1.72; color: var(--ink-secondary);
   padding: 8px; margin: 0 0 0 -8px;
   border-radius: var(--r-sm); border: 1px solid transparent;
   min-height: 160px;
 }
+
+/* ── The block under the pointer is the block you would write in ──
+
+   Second attempt. The first put a 2px rule in a 20px gutter beside every block,
+   at rest — which answered "is this editable" and answered it in a vocabulary
+   nothing else in the product speaks, in a column of its own, permanently.
+
+   What every block editor does instead: the block itself responds. The
+   paragraph under the pointer takes a soft background, so the surface reads as
+   a set of things you can act on rather than as a page with a margin of marks
+   beside it. Nothing at rest, and nothing in a gutter.
+
+   The affordance is per BLOCK, and that is the whole difference from what was
+   here before round two. `#editBody:hover` already drew a 1px border — around
+   the entire body, one target the size of the page, which tells you the page is
+   a thing and nothing about its parts. A paragraph that lights as you cross it
+   tells you the parts are the things.
+
+   Pure CSS, and it has to be. #editBody is contenteditable and writeBody writes
+   its innerHTML back to o.html on EVERY KEYSTROKE, so anything added inside it
+   becomes the document's stored content — an element, and equally a class on a
+   paragraph, which would serialise as <p class="…"> and survive into a restored
+   version. A :hover rule adds nothing to the DOM at all. */
+/* The tint reaches past the glyphs by a box-shadow spread rather than by
+   padding, and that is a deliberate third attempt at this one line.
+
+   Padding on the block would have to be repaid with a negative margin, and the
+   block rules below set `margin` as a shorthand — so the side margins would be
+   silently overwritten further down the file, on paragraphs only. A pseudo-
+   element inset outside the block needs `z-index: -1` to sit behind the text,
+   which puts it behind any background its ancestors take — and `.is-writing`
+   gives #editBody one, so the tint would vanish at exactly the moment the body
+   is armed. A spread shadow has neither problem: it paints outside the border
+   box, follows the border-radius, and touches no layout and no stacking.
+
+   6px of spread against a 16px block gap, so two adjacent tints never meet. */
+.doc-page #editBody > * {
+  border-radius: var(--r-sm);
+  transition: background-color var(--t-fast), box-shadow var(--t-fast);
+}
+.doc-page #editBody > *:hover {
+  background: rgba(255,255,255,0.04);
+  box-shadow: 0 0 0 6px rgba(255,255,255,0.04);
+}
+:root[data-theme="light"] .doc-page #editBody > *:hover {
+  background: rgba(16,24,40,0.04);
+  box-shadow: 0 0 0 6px rgba(16,24,40,0.04);
+}
+
+/* ── Armed is not the same as hovered ──
+
+   .is-writing is added to .doc-page by armEditable and removed by
+   disarmEditable, and had no rule anywhere in either stylesheet until round
+   two. Once the body is genuinely armed the whole surface says so, so the
+   hover stops being the only thing that distinguishes "you could write here"
+   from "you are writing here". */
+.doc-page.is-writing #editBody { border-color: var(--card-border-hover); background: rgba(255,255,255,0.02); }
+:root[data-theme="light"] .doc-page.is-writing #editBody { background: rgba(16,24,40,0.02); }
+
+/* Reading history is not editing it. armEditable returns early while a
+   .ver-preview is on the page, so the affordance has to agree with it — one
+   that lies about what the surface will do is worse than none. */
+.doc-paper:has(.ver-preview) #editBody > *:hover { background: none; box-shadow: none; }
 .doc-page #editBody > p,
 .doc-page #editBody > ul,
 .doc-page #editBody > ol,
@@ -1720,10 +1945,10 @@ body.is-doc .page-inner { max-width: none; }
 .doc-page #editBody > h4 { max-width: 80ch; }
 .doc-page #editBody p { margin: 0 0 16px; }
 .doc-page #editBody h3 {
-  font-family: var(--font-display); font-size: 18px; font-weight: var(--fw-bold);
+  font-family: var(--font-display); font-size: var(--ty-title); font-weight: var(--fw-bold);
   color: var(--d50); margin: 24px 0 8px; letter-spacing: -0.01em;
 }
-.doc-page #editBody h4 { font-size: 15px; margin: 20px 0 6px; }
+.doc-page #editBody h4 { font-size: var(--ty-body); margin: 20px 0 6px; }
 .doc-page #editBody ul, .doc-page #editBody ol { margin: 0 0 16px; padding-left: 24px; }
 .doc-page #editBody li { margin-bottom: 6px; }
 .doc-page #editBody blockquote {
@@ -1741,17 +1966,28 @@ body.is-doc .page-inner { max-width: none; }
    Nothing led, because nothing was meaningfully bigger than anything else.
    That is what "no hierarchy" is when you measure it.
 
-   Five roles now, and nothing below 11px — an 8.5px caption in a column this
-   narrow is decoration, not information:
+   The five roles were right. Two of the five numbers were not: --d500 measures
+   3.10:1 on a raised surface in the default theme, not the 4.69 GAPS §1.8
+   reported, so *phrase* and *supporting* — the relationship and its author —
+   were the two least readable runs in a column whose whole job is to be read.
+   And 11px was a floor set against a scale that had 8.5px in it; against a
+   product it is still small.
 
-     block title   12px   / 700 / --d100
-     value         12.5px / 600 / --d100    what you are reading for
-     lead-in       12.5px / 400 / --d400
-     phrase        11px   / 600 / --d500    the relationship
-     supporting    11px   / 400 / --d500    why, author, date, count
+   Same five roles, on the density scale, at the rail's setting (--ty-title and
+   --ty-body step down one notch here; the floor does not move):
 
-   One accent, spent only on actions. Spacing runs 4 / 8 / 12 / 16 / 24 and
-   nothing else.
+     block title   13px / 700 / --ink-primary      L3 structure
+     value         14px / 600 / --ink-primary      L2 what you are reading for
+     lead-in       14px / 400 / --ink-secondary    L2
+     phrase        13px / 600 / --ink-quiet        L4 the relationship
+     supporting    12px / 400 / --ink-faint        L5 why, author, date, count
+
+   Nothing below 12px. Cost of the increase, measured with all three blocks
+   open: 926px → 1005px. They are <details> and closed by default, so nothing
+   had to move to pay for it.
+
+   One accent, spent only on actions, and it is --ink-action rather than
+   --accent — the fill colour was 3.73:1 as text.
 ══════════════════════════════════════════════════ */
 .doc-rail {
   overflow-y: auto; min-height: 0;
@@ -1765,20 +2001,20 @@ body.is-doc .page-inner { max-width: none; }
   padding: 12px 4px;
 }
 .rail-block > summary::-webkit-details-marker { display: none; }
-.rail-block > summary:hover .rail-block-title { color: var(--d50); }
+.rail-block > summary:hover .rail-block-title { color: var(--ink-action); }
 .rail-block > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .rail-block[open] > summary .tree-chev { transform: rotate(90deg); }
-.rail-block .tree-chev { color: var(--d500); transition: transform var(--t-base) var(--ease-out); }
-.rail-block-title { flex: 1; font-size: 12px; font-weight: var(--fw-bold); color: var(--d100); }
+.rail-block .tree-chev { color: var(--ink-faint); transition: transform var(--t-base) var(--ease-out); }
+.rail-block-title { flex: 1; font-size: var(--ty-title); font-weight: var(--fw-bold); color: var(--ink-primary); }
 .rail-block-n {
-  font-size: 11px; font-weight: var(--fw-semibold); color: var(--d500);
+  font-size: var(--ty-micro); font-weight: var(--fw-medium); color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 .rail-block-body { padding: 0 4px 16px; }
 
 .rail-facts { display: flex; flex-direction: column; gap: 4px; }
-.rail-facts p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--d400); }
-.rail-facts p.is-overdue { color: var(--err); }
+.rail-facts p { margin: 0; font-size: var(--ty-body); line-height: 1.5; color: var(--ink-secondary); }
+.rail-facts p.is-overdue { color: var(--ink-err); }
 /* ── The rail has no primary action ──
 
    `em-direct` renders filled in brand blue, so *Re-sync from Confluence* sat in
@@ -1789,11 +2025,11 @@ body.is-doc .page-inner { max-width: none; }
 .rail-act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .rail-act .entry-action {
   height: 28px; padding: 0 12px; border-radius: var(--r-md);
-  background: none; border: 1px solid var(--card-border); color: var(--d300);
-  font-size: var(--fs-2xs);
+  background: none; border: 1px solid var(--card-border); color: var(--ink-action);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
 }
-.rail-act .entry-action:hover { background: none; border-color: var(--card-border-hover); color: var(--d50); }
-.rail-empty { margin: 0; font-size: 12.5px; color: var(--d400); line-height: 1.5; }
+.rail-act .entry-action:hover { background: none; border-color: var(--card-border-hover); color: var(--ink-primary); }
+.rail-empty { margin: 0; font-size: var(--ty-body); color: var(--ink-secondary); line-height: 1.5; }
 /* One row. Two short buttons stacked wasted a line each and read as a list of
    two unrelated things; side by side they read as what they are — the actions
    that belong to the whole document. Delete joins them when it exists. */
@@ -1803,21 +2039,25 @@ body.is-doc .page-inner { max-width: none; }
 }
 
 /* Connections read as sentences: the relationship, the thing, and who said so. */
-.rail-conn { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
+.rail-conn { display: flex; flex-direction: column; gap: 2px; margin-bottom: 16px; }
 .rail-conn:last-child { margin-bottom: 0; }
-.rail-conn-phrase { font-size: 11px; font-weight: var(--fw-semibold); color: var(--d500); }
+/* A count and a relationship phrase were byte-identical — same step, same
+   weight, same ink. That is the defect README's card pass named ("the two fact
+   lines were byte-identical") reproduced in the rail one pass later. A count is
+   ambient; a phrase names the group beneath it, so they separate on all three. */
+.rail-conn-phrase { font-size: var(--ty-meta); font-weight: var(--fw-bold); color: var(--ink-quiet); margin-bottom: 4px; }
 .rail-conn-item {
   display: flex; align-items: baseline; gap: 8px; width: 100%;
   padding: 4px 8px; margin-left: -8px; border-radius: var(--r-sm);
   background: none; border: 0; cursor: pointer; text-align: left;
-  font-family: var(--font-sans); font-size: 12.5px; font-weight: var(--fw-semibold); color: var(--d100);
+  font-family: var(--font-sans); font-size: var(--ty-body); font-weight: var(--fw-semibold); color: var(--ink-primary);
 }
 .rail-conn-item:hover { background: rgba(255,255,255,0.05); }
 :root[data-theme="light"] .rail-conn-item:hover { background: rgba(16,24,40,0.04); }
 .rail-conn-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .rail-conn-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Who asserted it, and when. An implicit edge has no author, so it shows none. */
-.rail-conn-by { font-size: 11px; font-weight: 400; color: var(--d500); flex-shrink: 0; }
+.rail-conn-by { font-size: var(--ty-micro); font-weight: 400; color: var(--ink-faint); flex-shrink: 0; }
 
 /* ── Version history, in the line that states the date ──
 
@@ -1833,23 +2073,44 @@ body.is-doc .page-inner { max-width: none; }
 .doc-versions > summary {
   list-style: none; cursor: pointer;
   padding: 4px 8px; border-radius: var(--r-sm);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--d400);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-quiet);
   white-space: nowrap;
 }
 /* In the byline it is one phrase among peers, so it carries their weight and
    colour, and the count is the part that is new. */
 .doc-by-ver { margin: 0 -8px; }
 .doc-by-ver > summary { font-weight: var(--fw-regular); }
+/* ── The one control on this line that did not look like one ──
+
+   Every other pressable run in the byline is a `.doc-by-ent` and carries a
+   dotted underline at rest. This one carried a cursor and a chevron at half
+   opacity, and the rule above had deliberately stripped its weight to make it
+   match the plain FACTS beside it — so the only thing in the line that opens a
+   panel was styled as the things that open nothing.
+
+   On the phrase, not on the summary: the summary is padded and also holds the
+   count pill and the chevron, so a border there would underline a block. */
+.doc-by-vd { border-bottom: 1px dotted var(--ink-faint); }
+.doc-by-ver > summary:hover .doc-by-vd { color: var(--ink-action); border-bottom-color: var(--ink-action); }
 .doc-by-vn {
   margin-left: 4px; padding: 0 6px; border-radius: 20px;
-  background: rgba(255,255,255,0.07); color: var(--d300);
-  font-size: 10px; font-weight: var(--fw-semibold);
+  background: rgba(255,255,255,0.07); color: var(--ink-secondary);
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
 }
 :root[data-theme="light"] .doc-by-vn { background: rgba(16,24,40,0.07); }
-.doc-by-ver > summary:hover .doc-by-vn { color: var(--accent); }
+.doc-by-ver > summary:hover .doc-by-vn { color: var(--ink-action); }
 .doc-by-ver .doc-versions-panel { right: auto; left: 0; }
 .doc-versions > summary::-webkit-details-marker { display: none; }
-.doc-versions > summary::after { content: " ▾"; opacity: 0.5; }
+/* No opacity. A rendered glyph at 0.5 is a run below the floor through a
+   channel no colour token can see — the same finding this file already records
+   about `.tag-token`. It is ambient, so it is coloured ambient. */
+.doc-versions > summary::after { content: " ▾"; color: var(--ink-faint); }
+/* There was no [open] rule anywhere, so the one control in the byline with two
+   states looked identical in both of them and the chevron never turned. */
+.doc-versions[open] > summary::after { content: " ▴"; }
+.doc-versions[open] > summary { background: rgba(255,255,255,0.05); }
+.doc-versions[open] > summary .doc-by-vd { border-bottom-style: solid; border-bottom-color: var(--ink-action); }
+:root[data-theme="light"] .doc-versions[open] > summary { background: rgba(16,24,40,0.05); }
 .doc-versions > summary:hover { background: rgba(255,255,255,0.05); color: var(--d100); }
 :root[data-theme="light"] .doc-versions > summary:hover { background: rgba(16,24,40,0.05); }
 .doc-versions > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
@@ -1881,14 +2142,14 @@ body.is-doc .page-inner { max-width: none; }
   display: inline-flex; align-items: center; gap: 6px;
   height: 32px; padding: 0 12px; border-radius: var(--r-md);
   cursor: pointer; white-space: nowrap;
-  font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  font-family: var(--font-sans); font-size: var(--ty-meta); font-weight: var(--fw-semibold);
   transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
 }
 /* The assistant is the one thing here that is neither reading nor writing by
    hand, so it is the only one that takes the accent. */
 .doc-ai {
   background: rgba(var(--accent-rgb), 0.12); border: 1px solid rgba(var(--accent-rgb), 0.35);
-  color: var(--accent);
+  color: var(--ink-action);
 }
 .doc-ai:hover { background: rgba(var(--accent-rgb), 0.2); border-color: var(--accent); }
 .doc-start-act {
@@ -1900,18 +2161,18 @@ body.is-doc .page-inner { max-width: none; }
 /* Naming the gesture and what it takes. The drop layer only ever appears once
    you are already dragging, which is no use to somebody wondering whether they
    can. */
-.doc-start-fine { margin: -8px 0 16px; font-size: 11px; color: var(--d500); }
+.doc-start-fine { margin: -8px 0 16px; font-size: var(--ty-meta); color: var(--ink-faint); }
 
 .doc-comments { margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--hairline); }
 .doc-comments-head {
   margin: 0 0 12px;
-  font-family: var(--font-display); font-size: 14px; font-weight: var(--fw-bold);
+  font-family: var(--font-display); font-size: var(--ty-body); font-weight: var(--fw-bold);
   color: var(--d200);
 }
 .doc-page .comment-thread { margin: 0; padding: 0; border: 0; background: none; }
 .doc-page .comment-thread-head { display: none; }
 .doc-page .comment { max-width: 80ch; }
-.doc-page .comment-text { font-size: 13px; }
+.doc-page .comment-text { font-size: var(--ty-meta); }
 .doc-page .comment-compose { max-width: 80ch; }
 .doc-page .props { gap: 12px; }
 /* `.prop-facts` stood here: the type's fields, read aloud as phrases above the
@@ -1989,10 +2250,10 @@ body.is-doc .page-inner { max-width: none; }
 /* The lead-in sits above the control rather than jammed against its left edge,
    so the three rows of this form share one left margin instead of three. */
 .cx-as { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-.cx-as-lead { font-size: var(--fs-2xs); font-weight: var(--fw-semibold); color: var(--d500); }
+.cx-as-lead { font-size: var(--ty-micro); font-weight: var(--fw-semibold); color: var(--ink-faint); }
 .cx-seg { padding: 2px; }
-.cx-seg .seg-btn { height: 28px; padding: 0 12px; font-size: var(--fs-2xs); }
-.cx-q { height: 32px; padding: 0 12px; font-size: var(--fs-xs); }
+.cx-seg .seg-btn { height: 28px; padding: 0 12px; font-size: var(--ty-micro); }
+.cx-q { height: 32px; padding: 0 12px; font-size: var(--ty-meta); }
 /* Chrome draws its own clear button inside a `type=search` field: a grey ✕
    belonging to the browser, sitting in a field wearing the product's own
    class. Same defect as the number stepper, different chrome. Scoped to
@@ -2014,12 +2275,12 @@ body.is-doc .page-inner { max-width: none; }
 :root[data-theme="light"] .cx-row:hover { background: rgba(16,24,40,0.04); }
 .cx-row[hidden] { display: none; }
 .cx-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.cx-row-title { font-size: 12.5px; color: var(--d100); }
+.cx-row-title { font-size: var(--ty-meta); color: var(--d100); }
 /* Why AiMY would have suggested it — a caption, not a section. A guess and a
    claim still never render alike; the guess is just no longer given its own
    real estate. */
-.cx-row-why { font-size: 11px; color: var(--d500); }
-.cx-none { margin: 8px 0 0; font-size: 11px; color: var(--d500); }
+.cx-row-why { font-size: var(--ty-meta); color: var(--ink-faint); }
+.cx-none { margin: 8px 0 0; font-size: var(--ty-meta); color: var(--ink-faint); }
 .cx-none[hidden] { display: none; }
 
 
@@ -2066,18 +2327,18 @@ body.is-doc .page-inner { max-width: none; }
 :root[data-theme="light"] .peek-close:hover { background: rgba(16,24,40,0.06); }
 .peek-back:focus-visible, .peek-close:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .peek-title {
-  font-family: var(--font-display); font-size: 14px; font-weight: var(--fw-bold);
+  font-family: var(--font-display); font-size: var(--ty-body); font-weight: var(--fw-bold);
   color: var(--d50); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* What kind of thing this is — the one place a bare noun earns its keep,
    because "Client" is the answer to a question the title cannot answer. */
 .peek-kind {
-  font-size: 9px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
   flex-shrink: 0;
 }
 .peek-facts {
-  margin: 0 0 12px; font-size: 12px; line-height: 1.55; color: var(--d300);
+  margin: 0 0 12px; font-size: var(--ty-meta); line-height: 1.55; color: var(--d300);
 }
 
 .peek-head, .peek-facts, .peek-foot { flex-shrink: 0; }
@@ -2091,20 +2352,20 @@ body.is-doc .page-inner { max-width: none; }
 }
 .peek-body:empty { display: none; }
 .peek-group { display: flex; flex-direction: column; gap: 2px; }
-.peek-phrase { font-size: 11px; color: var(--d500); }
+.peek-phrase { font-size: var(--ty-meta); color: var(--ink-faint); }
 .peek-items { display: flex; flex-direction: column; gap: 2px; }
 .peek-item {
   display: flex; align-items: baseline; gap: 8px; width: 100%;
   padding: 4px 6px; margin-left: -6px; border-radius: var(--r-sm);
   background: none; border: 0; cursor: pointer; text-align: left;
-  font-family: var(--font-sans); font-size: 12.5px; color: var(--d100);
+  font-family: var(--font-sans); font-size: var(--ty-meta); color: var(--d100);
 }
-.peek-item svg { color: var(--d500); flex-shrink: 0; align-self: center; }
+.peek-item svg { color: var(--ink-faint); flex-shrink: 0; align-self: center; }
 .peek-item:hover { background: rgba(255,255,255,0.06); }
 :root[data-theme="light"] .peek-item:hover { background: rgba(16,24,40,0.05); }
 .peek-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .peek-item-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.peek-by { font-size: 10px; color: var(--d600); flex-shrink: 0; }
+.peek-by { font-size: var(--ty-micro); color: var(--ink-faint); flex-shrink: 0; }
 
 /* Above the body, not below it — this is the "what you can do" zone and it is
    the one thing that must never need scrolling to find. */
@@ -2113,11 +2374,11 @@ body.is-doc .page-inner { max-width: none; }
 
 .peek-act {
   cursor: pointer; font-family: var(--font-sans);
-  font-size: 11px; font-weight: var(--fw-semibold);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
   padding: 4px 12px; border-radius: var(--r-pill);
   background: none; border: 1px solid var(--card-border); color: var(--d200);
 }
-.peek-act:hover { border-color: var(--accent); color: var(--accent); }
+.peek-act:hover { border-color: var(--accent); color: var(--ink-action); }
 .peek-act:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /* ═══════════════════════════════════════════════
@@ -2138,9 +2399,9 @@ body.is-doc .page-inner { max-width: none; }
 }
 
 .ws-tree summary { padding: 8px 12px; gap: 8px; }
-.ws-tree .ws-tree-col > summary { font-size: 13px; color: var(--d100); }
-.ws-tree .ws-tree-type > summary { font-size: 12px; font-weight: var(--fw-semibold); color: var(--d300); }
-.ws-tree summary svg { color: var(--d500); }
+.ws-tree .ws-tree-col > summary { font-size: var(--ty-meta); color: var(--d100); }
+.ws-tree .ws-tree-type > summary { font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--d300); }
+.ws-tree summary svg { color: var(--ink-faint); }
 .ws-tree summary:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 .ws-tree-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2148,15 +2409,15 @@ body.is-doc .page-inner { max-width: none; }
 /* How many, and how many of those want something from you. The count is
    neutral; the second number is not, so it does not pretend to be. */
 .ws-tree-n {
-  font-size: 10px; font-weight: var(--fw-bold);
-  color: var(--d500); font-variant-numeric: tabular-nums;
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  color: var(--ink-faint); font-variant-numeric: tabular-nums;
   background: rgba(255,255,255,0.05); border-radius: var(--r-pill);
   padding: 2px 8px; flex-shrink: 0;
 }
 :root[data-theme="light"] .ws-tree-n { background: rgba(16,24,40,0.05); }
 .ws-tree-needs {
-  font-size: 10px; font-weight: var(--fw-bold);
-  color: var(--warn); background: var(--warn-bg);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  color: var(--ink-warn); background: var(--warn-bg);
   border-radius: var(--r-pill); padding: 2px 8px; flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
@@ -2166,14 +2427,14 @@ body.is-doc .page-inner { max-width: none; }
    keyboard. */
 .ws-tree-only {
   flex-shrink: 0; cursor: pointer; opacity: 0;
-  font-family: var(--font-sans); font-size: 10px; font-weight: var(--fw-bold);
+  font-family: var(--font-sans); font-size: var(--ty-micro); font-weight: var(--fw-bold);
   padding: 2px 8px; border-radius: var(--r-pill);
   background: none; border: 1px solid var(--card-border); color: var(--d400);
   transition: opacity var(--t-fast), color var(--t-fast);
 }
 .ws-tree summary:hover .ws-tree-only,
 .ws-tree-only:focus-visible { opacity: 1; }
-.ws-tree-only:hover { color: var(--accent); border-color: var(--accent); }
+.ws-tree-only:hover { color: var(--ink-action); border-color: var(--accent); }
 .ws-tree-only:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 
 .ws-tree .tree-children { padding-left: 20px; border-left: 1px solid var(--hairline); margin-left: 16px; }
@@ -2182,14 +2443,14 @@ body.is-doc .page-inner { max-width: none; }
   display: flex; align-items: center; gap: 8px; width: 100%;
   padding: 8px 12px; border-radius: var(--r-sm);
   background: none; border: 0; cursor: pointer; text-align: left;
-  font-family: var(--font-sans); font-size: 12.5px; color: var(--d200);
+  font-family: var(--font-sans); font-size: var(--ty-meta); color: var(--d200);
 }
 .ws-tree-doc:hover { background: rgba(255,255,255,0.045); color: var(--d50); }
 :root[data-theme="light"] .ws-tree-doc:hover { background: rgba(16,24,40,0.04); }
 .ws-tree-doc:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .ws-tree-doc-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-tree-doc-who {
-  font-size: 11px; color: var(--d500); flex-shrink: 0;
+  font-size: var(--ty-meta); color: var(--ink-faint); flex-shrink: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px;
 }
 .ws-tree-doc .trust-state { flex-shrink: 0; }
@@ -2207,14 +2468,14 @@ body.is-doc .page-inner { max-width: none; }
 }
 .ws-tree-edge {
   background: none; border: 0; padding: 0; cursor: pointer;
-  font-family: var(--font-sans); font-size: 11px; color: var(--d500);
+  font-family: var(--font-sans); font-size: var(--ty-meta); color: var(--ink-faint);
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* The relationship word IS the row's content — "Answers", "Replaces". `--d600`
    is the separator grey, and at 2.49:1 the naming half of the phrase was
    quieter than the line it sat on. */
-.ws-tree-edge em { font-style: normal; color: var(--d500); }
-.ws-tree-edge:hover, .ws-tree-edge:hover em { color: var(--accent); }
+.ws-tree-edge em { font-style: normal; color: var(--ink-faint); }
+.ws-tree-edge:hover, .ws-tree-edge:hover em { color: var(--ink-action); }
 .ws-tree-edge:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
 
 /* A group header is a thing, not a heading — its name opens what else touches
@@ -2224,10 +2485,10 @@ body.is-doc .page-inner { max-width: none; }
   font-family: inherit; font-size: inherit; font-weight: inherit; color: inherit;
   border-bottom: 1px dotted transparent;
 }
-.ws-tree-name.is-ent:hover { color: var(--accent); border-bottom-color: var(--accent); }
+.ws-tree-name.is-ent:hover { color: var(--ink-action); border-bottom-color: var(--accent); }
 .ws-tree-name.is-ent:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
 /* The documents an axis says nothing about are a finding, so they read as one. */
-.ws-tree-name.is-none { color: var(--d500); font-style: italic; }
+.ws-tree-name.is-none { color: var(--ink-faint); font-style: italic; }
 
 .k-group .v2-dropdown-panel { min-width: 150px; }
 
@@ -2260,8 +2521,8 @@ body.is-doc .page-inner { max-width: none; }
 .rm-sort {
   display: inline-flex; align-items: center; gap: 6px;
   height: 32px; padding: 0 12px; border-radius: var(--r-pill);
-  background: none; border: 1px solid var(--card-border); color: var(--d400);
-  font-family: var(--font-sans); font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  background: none; border: 1px solid var(--card-border); color: var(--ink-quiet);
+  font-family: var(--font-sans); font-size: var(--ty-meta); font-weight: var(--fw-semibold);
   cursor: pointer; white-space: nowrap;
   transition: color var(--t-fast), background-color var(--t-fast), border-color var(--t-fast);
 }
@@ -2276,7 +2537,7 @@ body.is-doc .page-inner { max-width: none; }
   display: inline-flex; align-items: center; gap: 6px;
   height: 32px; padding: 0 8px; border-radius: var(--r-md);
   background: none; box-shadow: none; color: var(--d400);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
 }
 .rm-views .seg-btn svg { opacity: 0.6; }
 
@@ -2285,7 +2546,7 @@ body.is-doc .page-inner { max-width: none; }
 .rm-end .k-filter .v2-dropdown-btn {
   height: 32px; padding: 0 8px; border-radius: var(--r-md);
   background: none; border: 0; color: var(--d400);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
 }
 
 /* One resting state, one hover, one active — shared by every utility here, so
@@ -2310,7 +2571,7 @@ body.is-doc .page-inner { max-width: none; }
 .rm-views .seg-btn:focus-visible,
 .rm-end .v2-dropdown-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
-.rm-end .entry-action { height: 32px; padding: 0 16px; border-radius: var(--r-md); font-size: var(--fs-xs); }
+.rm-end .entry-action { height: 32px; padding: 0 16px; border-radius: var(--r-md); font-size: var(--ty-meta); }
 
 @media (max-width: 720px) {
   .ws-tree-doc-who { display: none; }
@@ -2327,11 +2588,19 @@ body.is-doc .page-inner { max-width: none; }
    the same column with no rule between them, so there was no way to tell where
    the document ended. Both are the same defect — no contrast — in two places.
 
-   The scale here is 26 / 15 / 12 / 10, and the body gets a measure and a line
-   height that let it read as prose rather than as a field value.
+   The scale is the product's density scale now, so the document reads on the
+   same ladder as the card and the rail rather than on a fourth private one:
+   --ty-display / --ty-body / --ty-meta / --ty-micro. The body keeps its measure
+   and its line height, which are what let it read as prose rather than as a
+   field value.
+
+   The 9px and 10px runs below are gone. They were the apparatus AROUND the
+   document — governance labels, section heads — and stepping apparatus down is
+   right, but 9px at --d500 is not a step down, it is a step out. They step down
+   by weight, tracking and ink instead, at the floor.
 ═══════════════════════════════════════════════ */
 .doc-scroll .dv-title {
-  font-size: clamp(21px, 2.4vw, 26px);
+  font-size: var(--ty-display);
   font-weight: var(--fw-extrabold);
   line-height: 1.18;
   letter-spacing: -0.02em;
@@ -2340,38 +2609,38 @@ body.is-doc .page-inner { max-width: none; }
 }
 
 .doc-scroll .dv-body {
-  font-size: 15px;
+  font-size: var(--ty-body);
   line-height: 1.72;
-  color: var(--d150, var(--d200));
+  color: var(--ink-secondary);
   /* Prose wants a measure. At 620px and 13px the body ran to ~95 characters,
      which is where the eye starts losing the line it is on. */
   max-width: 66ch;
 }
 .doc-scroll .dv-body p { margin: 0 0 16px; }
-.doc-scroll .dv-body p:first-child { color: var(--d50); font-size: 16px; line-height: 1.66; }
+.doc-scroll .dv-body p:first-child { color: var(--ink-primary); font-size: var(--ty-title); line-height: 1.5; }
 .doc-scroll .dv-body h3 {
   font-family: var(--font-display);
-  font-size: 16px; font-weight: var(--fw-bold); color: var(--d50);
+  font-size: var(--ty-title); font-weight: var(--fw-bold); color: var(--ink-primary);
   letter-spacing: -0.008em;
   margin: 24px 0 8px;
 }
 .doc-scroll .dv-body h3:first-child { margin-top: 0; }
-.doc-scroll .dv-body h4 { font-size: 13.5px; margin: 20px 0 6px; }
+.doc-scroll .dv-body h4 { font-size: var(--ty-body); font-weight: var(--fw-bold); margin: 20px 0 6px; }
 .doc-scroll .dv-body ul, .doc-scroll .dv-body ol { margin: 0 0 16px; padding-left: 24px; }
 .doc-scroll .dv-body li { margin-bottom: 6px; }
 .doc-scroll .dv-body blockquote {
   margin: 0 0 16px; padding-left: 16px;
   border-left: 2px solid var(--accent);
-  color: var(--d300); font-style: italic;
+  color: var(--ink-secondary); font-style: italic;
 }
-.doc-scroll .dv-body strong { color: var(--d50); font-weight: var(--fw-bold); }
+.doc-scroll .dv-body strong { color: var(--ink-primary); font-weight: var(--fw-bold); }
 
 /* The governance strip and the detail block are apparatus around the document,
    so they step down rather than competing with it. */
-.doc-scroll .dv-gov-label { font-size: 9px; letter-spacing: 0.09em; }
-.doc-scroll .dv-gov-val   { font-size: 12px; }
+.doc-scroll .dv-gov-label { font-size: var(--ty-micro); letter-spacing: var(--ls-wide); color: var(--ink-faint); }
+.doc-scroll .dv-gov-val   { font-size: var(--ty-meta); color: var(--ink-quiet); }
 .doc-scroll .dv-section-label {
-  font-size: 10px; letter-spacing: 0.1em;
+  font-size: var(--ty-meta); letter-spacing: var(--ls-wide); color: var(--ink-quiet);
   padding-bottom: 8px; border-bottom: 1px solid var(--hairline); margin-bottom: 12px;
 }
 .doc-scroll .dv-section { margin-top: 24px; }
@@ -2394,17 +2663,17 @@ body.is-doc .page-inner { max-width: none; }
    cannot hold two things or be read out in order by a screen reader. */
 .comment-thread-head { display: flex; align-items: center; gap: 8px; }
 .comment-thread-label {
-  font-size: 10px; font-weight: var(--fw-bold);
-  letter-spacing: 0.1em; text-transform: uppercase; color: var(--d500);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint);
 }
 .comment-thread-n {
-  font-size: 10px; font-weight: var(--fw-bold);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
   color: var(--d400); font-variant-numeric: tabular-nums;
   background: rgba(255,255,255,0.06); border-radius: var(--r-pill); padding: 2px 8px;
 }
 :root[data-theme="light"] .comment-thread-n { background: rgba(16,24,40,0.06); }
 .comment-empty {
-  margin: 0; font-size: 12px; line-height: 1.6; color: var(--d500);
+  margin: 0; font-size: var(--ty-meta); line-height: 1.6; color: var(--ink-faint);
   max-width: 52ch;
 }
 
@@ -2419,14 +2688,14 @@ body.is-doc .page-inner { max-width: none; }
 }
 .comment-flag {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 10px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--err);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-err);
 }
 .comment-flag svg { flex-shrink: 0; }
 .comment-resolve {
   margin-top: 8px; padding: 4px 12px; border-radius: var(--r-md);
   background: none; border: 1px solid var(--card-border); color: var(--d300);
-  font-family: var(--font-sans); font-size: var(--fs-2xs); cursor: pointer;
+  font-family: var(--font-sans); font-size: var(--ty-micro); cursor: pointer;
 }
 .comment-resolve:hover { border-color: var(--card-border-hover); color: var(--d50); }
 .comment-resolve:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
@@ -2435,22 +2704,22 @@ body.is-doc .page-inner { max-width: none; }
 .comment.is-problem.is-done {
   background: none; border-color: var(--hairline);
 }
-.comment.is-done .comment-flag { color: var(--d500); }
+.comment.is-done .comment-flag { color: var(--ink-faint); }
 .comment.is-done .comment-text { text-decoration: line-through; opacity: 0.7; }
 
 /* The report's own form, in the commit surface. */
 .rp-form { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
-.rp-what { min-height: 72px; padding: 8px 12px; resize: vertical; line-height: var(--lh-normal); }
-.rp-hint { margin: 0; font-size: 11px; color: var(--d500); }
-.doc-scroll .comment-text { font-size: 13px; line-height: 1.6; color: var(--d300); }
-.doc-scroll .comment-author { font-size: 12px; }
+.rp-what { min-height: 72px; padding: 8px 12px; resize: vertical; line-height: var(--lh-base); }
+.rp-hint { margin: 0; font-size: var(--ty-meta); color: var(--ink-faint); }
+.doc-scroll .comment-text { font-size: var(--ty-meta); line-height: 1.6; color: var(--d300); }
+.doc-scroll .comment-author { font-size: var(--ty-meta); }
 .doc-scroll .comment { max-width: none; }
 
 /* The editor's body is the same document, so it reads the same. Its own
    affordances — the contenteditable outline, the placeholder — sit on top. */
-.wb-editor-split .dv-body { font-size: 15px; line-height: 1.72; max-width: 66ch; }
-.wb-editor-split .dv-body p:first-child { font-size: 15px; color: inherit; }
-.wb-editor-split .dv-title { font-size: clamp(19px, 2vw, 23px); }
+.wb-editor-split .dv-body { font-size: var(--ty-body); line-height: 1.72; max-width: 66ch; }
+.wb-editor-split .dv-body p:first-child { font-size: var(--ty-body); color: inherit; }
+.wb-editor-split .dv-title { font-size: var(--ty-display); }
 /* Editing needs to look like editing: the body carries a faint frame so its
    edge is visible before you click into it. */
 #editBody {
@@ -2481,16 +2750,16 @@ body.is-doc .page-inner { max-width: none; }
   position: sticky; top: -2px; z-index: 1;
   background: var(--panel-bg, var(--card-bg));
 }
-.dd-search svg { color: var(--d500); flex-shrink: 0; }
+.dd-search svg { color: var(--ink-faint); flex-shrink: 0; }
 .dd-search input {
   flex: 1; min-width: 0;
   background: none; border: 0; outline: none;
-  font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--d50);
+  font-family: var(--font-sans); font-size: var(--ty-meta); color: var(--d50);
 }
-.dd-search input::placeholder { color: var(--d600); }
+.dd-search input::placeholder { color: var(--ink-faint); }
 .dd-none {
   padding: 12px;
-  font-size: var(--fs-xs); color: var(--d500); font-style: italic;
+  font-size: var(--ty-meta); color: var(--ink-faint); font-style: italic;
 }
 
 /* ═══════════════════════════════════════════════
@@ -2513,11 +2782,11 @@ body.is-doc .page-inner { max-width: none; }
   border-bottom: 1px solid var(--hairline);
 }
 .k-date-field-label {
-  font-size: 10px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
 }
 .k-date-field .seg { width: 100%; }
-.k-date-field .seg-btn { flex: 1; padding: 6px 8px; font-size: 11px; }
+.k-date-field .seg-btn { flex: 1; padding: 6px 8px; font-size: var(--ty-meta); }
 .k-date-body { display: flex; gap: 8px; }
 
 .k-date { position: relative; }
@@ -2528,14 +2797,14 @@ body.is-doc .page-inner { max-width: none; }
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.09);
   border-radius: var(--r-sm); padding: 4px 8px 4px 12px;
-  font-family: var(--font-sans); font-size: 11px; font-weight: 600;
+  font-family: var(--font-sans); font-size: var(--ty-meta); font-weight: 600;
   color: var(--d200); cursor: pointer; white-space: nowrap;
   transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
 }
 /* The filter row's own treatment: chrome until it carries a value. */
 .filter-row .k-date-btn {
   height: 30px; padding: 0 12px; border-radius: var(--r-md);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
   background: none; border-color: var(--card-border); color: var(--d400);
 }
 .filter-row .k-date-btn:hover { border-color: var(--card-border-hover); color: var(--d100); }
@@ -2544,7 +2813,7 @@ body.is-doc .page-inner { max-width: none; }
 .k-date-btn svg:last-child { width: 8px; height: 5px; flex-shrink: 0; opacity: 0.7; }
 :root[data-theme="light"] .k-date-btn { background: rgba(16,24,40,0.03); border-color: rgba(16,24,40,0.1); }
 :root[data-theme="light"] .k-date-btn:hover { background: rgba(16,24,40,0.06); }
-.k-date-ico { color: var(--d500); flex-shrink: 0; }
+.k-date-ico { color: var(--ink-faint); flex-shrink: 0; }
 /* Same lit state the dropdowns get, from the same values — the DS scopes it to
    .v2-dropdown-btn.active-filter, which this deliberately is not. */
 .k-date-btn.active-filter,
@@ -2576,13 +2845,13 @@ body.is-doc .page-inner { max-width: none; }
 }
 .k-date-q {
   text-align: left; cursor: pointer;
-  font-family: var(--font-sans); font-size: var(--fs-xs);
+  font-family: var(--font-sans); font-size: var(--ty-meta);
   padding: 6px 8px; border-radius: var(--r-sm);
   background: none; border: 0; color: var(--d300);
 }
 .k-date-q:hover { background: rgba(255,255,255,0.06); color: var(--d50); }
 :root[data-theme="light"] .k-date-q:hover { background: rgba(16,24,40,0.05); }
-.k-date-q.is-on { background: var(--accent-dim); color: var(--accent); font-weight: var(--fw-bold); }
+.k-date-q.is-on { background: var(--accent-dim); color: var(--ink-action); font-weight: var(--fw-bold); }
 .k-date-q:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 /* The library's day is a <div>. A range needs to be operable, so it is a
@@ -2614,7 +2883,7 @@ body.is-doc .page-inner { max-width: none; }
 .cal-hint {
   margin-top: 8px; padding-top: 8px;
   border-top: 1px solid var(--hairline);
-  font-size: var(--fs-2xs); color: var(--d500);
+  font-size: var(--ty-micro); color: var(--ink-faint);
 }
 
 @media (max-width: 720px) {
@@ -2693,6 +2962,15 @@ body.is-doc .page-inner { max-width: none; }
 
    The rail is no longer navigation, so .sidebar-nav's metrics do not apply.
    What it holds is a composed briefing whose every item is a filter link.
+
+   Measured before this pass: SIX type styles, and every one of them was 10px
+   or 11px. A 1px range across a whole surface is not a compressed hierarchy,
+   it is the absence of one — the panel whose only job is to say what to do
+   first had no way to say which of six things came first. Three of the six
+   also failed AA, the section label worst at 3.54:1.
+
+   It gets the full five ranks now, at the panel's density setting. The rail is
+   268px, so --ty-title and --ty-body step down with the rest of the panels. */
 ═══════════════════════════════════════════════ */
 :root { --sidebar-width: 268px; }
 
@@ -2709,27 +2987,27 @@ body.is-doc .page-inner { max-width: none; }
 
 
 .brief-scope {
-  font-size: var(--fs-2xs); color: var(--d500); line-height: var(--lh-snug);
+  font-size: var(--ty-micro); color: var(--ink-faint); line-height: var(--lh-snug);
   padding-bottom: 12px; border-bottom: 1px solid var(--hairline);
 }
 .brief-scope-more { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
 .brief-scope-link {
   background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
-  font-size: inherit; color: var(--d400); border-bottom: 1px dotted var(--d600);
+  font-size: inherit; color: var(--ink-quiet); border-bottom: 1px dotted var(--ink-faint);
 }
-.brief-scope-link:hover { color: var(--accent); }
-.brief-withheld { color: var(--warn); font-weight: var(--fw-semibold); }
+.brief-scope-link:hover { color: var(--ink-action); }
+.brief-withheld { color: var(--ink-warn); font-weight: var(--fw-semibold); }
 
 .brief-section-label {
-  font-size: 10px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wider); text-transform: uppercase;
-  color: var(--d500); margin-top: 6px;
+  font-size: var(--ty-meta); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--ink-primary); margin-top: 8px;
 }
 /* A bare shelf takes two ways in, and the second one needs naming: the file
    route existed as a drag gesture and nothing else, which is invisible until
    you are already doing it. */
 .empty-state-fine {
-  margin: 12px 0 0; font-size: 11px; color: var(--d500);
+  margin: 12px 0 0; font-size: var(--ty-meta); color: var(--ink-quiet);
   max-width: 320px; line-height: var(--lh-snug);
 }
 .brief-list { display: flex; flex-direction: column; gap: 8px; }
@@ -2737,7 +3015,7 @@ body.is-doc .page-inner { max-width: none; }
    Quiet, because nothing needing you is not an event. */
 .brief-quiet {
   margin: 0; padding: 12px 0;
-  font-size: 12.5px; line-height: 1.5; color: var(--d400);
+  font-size: var(--ty-body); line-height: 1.5; color: var(--ink-secondary);
 }
 
 /* A briefing item states what changed, why it matters, its work state and one
@@ -2752,13 +3030,13 @@ body.is-doc .page-inner { max-width: none; }
 }
 .brief-entry:last-child { border-bottom: 0; }
 .brief-text {
-  font-size: var(--fs-xs); line-height: var(--lh-base); color: var(--d200);
+  font-size: var(--ty-body); line-height: var(--lh-base); color: var(--ink-secondary);
   /* Tone lives on one leading dot, not on a stripe or a tinted panel. */
   padding-left: 12px; position: relative;
 }
 .brief-text::before {
   content: ""; position: absolute; left: 0; top: 7px;
-  width: 5px; height: 5px; border-radius: 50%; background: var(--d500);
+  width: 5px; height: 5px; border-radius: 50%; background: var(--ink-faint);
 }
 .brief-entry.is-err  .brief-text::before { background: var(--err); }
 .brief-entry.is-warn .brief-text::before { background: var(--warn); }
@@ -2766,17 +3044,34 @@ body.is-doc .page-inner { max-width: none; }
 .brief-go {
   margin-left: 12px;
   background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
-  font-size: var(--fs-2xs); font-weight: var(--fw-bold); color: var(--accent);
+  font-size: var(--ty-meta); font-weight: var(--fw-bold); color: var(--ink-action);
   transition: opacity var(--t-fast);
 }
 .brief-go:hover { opacity: 0.75; }
 .brief-go:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
-.brief-resume {
-  margin-top: 12px; align-self: flex-start;
-  background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
-  font-size: var(--fs-2xs); color: var(--d500); border-bottom: 1px dotted var(--d600);
+/* ── The last five sets you looked at ──
+
+   What stood here was one button, "Resume your last filter", over a single
+   slot in sessionStorage. Eleven filters left the row above on the argument
+   that the input already speaks them; this is the other half of that trade —
+   typing a combination once is cheap, and typing it every Monday is not.
+
+   Rows rather than chips. A chip is a value you can remove, which is what the
+   chip bar above the grid is for; these are whole sets you go back to, and a
+   row that spans the column can carry three of their labels instead of
+   clipping one. */
+.brief-recents { display: flex; flex-direction: column; gap: 2px; }
+.brief-recent {
+  display: flex; align-items: center; width: 100%;
+  padding: 6px 8px; margin-left: -8px; border-radius: var(--r-sm);
+  background: none; border: 0; cursor: pointer; text-align: left;
+  font-family: var(--font-sans); font-size: var(--ty-meta); color: var(--ink-quiet);
+  transition: background-color var(--t-fast), color var(--t-fast);
 }
-.brief-resume:hover { color: var(--d200); }
+.brief-recent:hover { background: rgba(255,255,255,0.05); color: var(--ink-primary); }
+:root[data-theme="light"] .brief-recent:hover { background: rgba(16,24,40,0.05); }
+.brief-recent:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.brief-recent-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ═══════════════════════════════════════════════
    THE PAGE — greeting, filters, chips
@@ -2794,37 +3089,37 @@ body.is-doc .page-inner { max-width: none; }
    default and the component's own .active-filter does the lighting up. */
 .k-filter .v2-dropdown-btn {
   height: 30px; padding: 0 12px; border-radius: var(--r-md);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  background: none; border-color: var(--card-border); color: var(--d400);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
+  background: none; border-color: var(--card-border); color: var(--ink-quiet);
 }
-.k-filter .v2-dropdown-btn:hover { border-color: var(--card-border-hover); color: var(--d100); }
+.k-filter .v2-dropdown-btn:hover { border-color: var(--card-border-hover); color: var(--ink-primary); }
 .k-filter .v2-dropdown-btn svg { width: 9px; height: 6px; opacity: 0.7; }
 .k-filter .v2-dropdown-panel { min-width: 170px; }
 
 .k-toggle, .k-more, .k-clear {
   height: 30px; padding: 0 12px; border-radius: var(--r-md);
   border: 1px solid var(--card-border); background: none; cursor: pointer;
-  font-family: inherit; font-size: var(--fs-xs); font-weight: var(--fw-semibold);
-  color: var(--d400);
+  font-family: inherit; font-size: var(--ty-meta); font-weight: var(--fw-semibold);
+  color: var(--ink-quiet);
   display: inline-flex; align-items: center; gap: 6px;
   transition: border-color var(--t-fast), color var(--t-fast), background-color var(--t-fast),
               transform var(--t-press) var(--ease-out);
 }
-.k-toggle:hover, .k-more:hover, .k-clear:hover { border-color: var(--card-border-hover); color: var(--d50); }
+.k-toggle:hover, .k-more:hover, .k-clear:hover { border-color: var(--card-border-hover); color: var(--ink-primary); }
 .k-toggle:active, .k-more:active, .k-clear:active { transform: scale(0.97); }
 .k-toggle:focus-visible, .k-more:focus-visible, .k-clear:focus-visible {
   outline: 2px solid var(--brand); outline-offset: 2px;
 }
 .k-toggle.is-on {
-  background: var(--accent-dim); border-color: rgba(var(--accent-rgb), 0.4); color: var(--accent);
+  background: var(--accent-dim); border-color: rgba(var(--accent-rgb), 0.4); color: var(--ink-action);
 }
-.k-more.is-open { color: var(--d50); border-color: var(--card-border-hover); }
+.k-more.is-open { color: var(--ink-primary); border-color: var(--card-border-hover); }
 .k-more-n {
-  font-size: 9px; font-weight: var(--fw-bold); font-variant-numeric: tabular-nums;
-  background: var(--accent-dim); color: var(--accent);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums;
+  background: var(--accent-dim); color: var(--ink-action);
   border-radius: var(--r-pill); padding: 2px 6px;
 }
-.k-clear { border-color: transparent; color: var(--d500); }
+.k-clear { border-color: transparent; color: var(--ink-quiet); }
 
 /* ═══════════════════════════════════════════════
    THE CHIP BAR — only what a dropdown cannot say
@@ -2834,10 +3129,38 @@ body.is-doc .page-inner { max-width: none; }
   margin-bottom: 12px;
 }
 .chip-bar .ctx-chips { flex: 1; min-width: 0; }
+/* The library draws the chip at 11px, below this product's floor. It had never
+   shown here at that size because a chip was suppressed while its dropdown was
+   on screen, and eleven of those dropdowns have now left the row — so the axes
+   that used to be shown by a control are shown by a chip instead, and the
+   component came out from under the exemption it was living in.
+
+   Eighth component re-stepped for the same reason (GAPS §27). */
+.ctx-chip { font-size: var(--ty-micro); }
+
+/* And the confidence badge on an ICP card, at 10px with `opacity: 0.75` on top
+   — 3.61 dark and 3.06 light, which is the opacity channel defeating the ink
+   scale exactly as `.tag-token` did. It renders on two of the nine types, so no
+   sweep of the landing set had ever surfaced it; it took filtering to a set
+   that happened to contain an ICP.
+
+   Ninth component re-stepped (GAPS §27), and the second found this way. A
+   component can be off-scale and invisible for as long as something else keeps
+   it off screen, which is the argument for measuring rendered pages rather than
+   auditing the stylesheet. */
+.conf-badge { font-size: var(--ty-micro); letter-spacing: normal; }
+.conf-badge .conf-val { font-size: var(--ty-micro); opacity: 1; }
+/* The badge tints itself by confidence, and it does it with the FILL hues — the
+   same conflation §1.8.1 records for every other status word in the product.
+   On its own 12% tint --err measured 4.13 in dark. The tints, the meter bars
+   and the borders keep the original hues; only the word moves. */
+.conf-high   { color: var(--ink-ok); }
+.conf-medium { color: var(--ink-warn); }
+.conf-low    { color: var(--ink-err); }
 .ctx-chip .ctx-key {
-  font-size: 9px; font-weight: var(--fw-bold);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
   letter-spacing: var(--ls-wide); text-transform: uppercase;
-  color: var(--d500); margin-right: 2px;
+  color: var(--ink-faint); margin-right: 2px;
 }
 
 /* ═══════════════════════════════════════════════
@@ -2854,11 +3177,11 @@ body.is-doc .page-inner { max-width: none; }
    on the left and "what you can do" on the right. */
 .rm-main { flex-basis: 100%; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .rm-count {
-  font-family: var(--font-display); font-size: var(--fs-xl); font-weight: var(--fw-extrabold);
-  color: var(--d50); letter-spacing: var(--ls-tight); font-variant-numeric: tabular-nums;
+  font-family: var(--font-display); font-size: var(--ty-title); font-weight: var(--fw-extrabold);
+  color: var(--ink-primary); letter-spacing: var(--ls-tight); font-variant-numeric: tabular-nums;
 }
-.rm-word { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--d200); }
-.rm-note { font-size: var(--fs-xs); color: var(--d500); }
+.rm-word { font-size: var(--ty-body); font-weight: var(--fw-semibold); color: var(--ink-secondary); }
+.rm-note { font-size: var(--ty-meta); color: var(--ink-quiet); }
 /* -8px pulls the borderless utilities back to the count's left edge: their
    padding is now the only thing between the text and the margin. */
 .rm-end {
@@ -2866,21 +3189,143 @@ body.is-doc .page-inner { max-width: none; }
   gap: 4px; margin-left: -8px;
 }
 .rm-end .entry-action { margin-left: auto; }
-.rm-disclosure {
-  flex-basis: 100%; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+/* ══ WHAT AiMY NOTICED ABOUT THIS SET ═══════════════════════════════
+
+   AiMY QA/Sales' `Since your last visit` block (`.slv`), ported. Not restyled —
+   ported, because the form is the argument: ONE first-person paragraph with the
+   figures pressable inside it, under a marked head, over a ruled strip of what
+   AiMY would do about it.
+
+   The values are NOT Sales'. `sales.css` re-declares the whole type scale on
+   :root and drops Poppins, so its `--fs-3xl` is 32px where this product's is
+   28px and its `--fs-base` is 14px where this product's is 13px. Copying the
+   tokens across would have rendered a different block. Every step is mapped
+   onto this product's `--ty-*` scale instead, and the head is sized in em so
+   the mark scales with the title the way Sales' does.
+
+   AI provenance is five things and NO badge and NO wordmark: the mark first in
+   the head, the accent wash on the panel, the first-person voice in the prose,
+   the accent underline on every figure, and the `--aimy-mark` hook. A thing
+   that has to write "AI" on itself is a thing that does not read as AI.
+
+   Measured over --body-bg at both ends of the gradient, both themes: every ink
+   role and every semantic text hue clears AA on it — worst is --ink-action at
+   5.03 dark / 4.90 light. --brand measures 3.51 / 3.71 and is therefore the p3
+   DOT and never text; 3:1 is the applicable threshold for a dot. */
+.ins-band {
+  background: linear-gradient(120deg, rgba(var(--accent-rgb), 0.10), rgba(0, 102, 255, 0.04));
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  border-radius: var(--r-lg);
+  padding: 20px;
+  margin-bottom: 20px;
 }
-.rm-flag {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: var(--fs-xs); color: var(--d400); font-variant-numeric: tabular-nums;
+/* The head sets the size and the mark takes it in em, so the two scale as one
+   object. Pinning the mark to a px value is what makes a logo look pasted on. */
+.ins-head {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+  font-size: var(--ty-title);
 }
-.rm-flag.is-err  { color: var(--err); }
-.rm-flag.is-warn { color: var(--warn); }
-.rm-flag strong { color: inherit; }
+.ins-head svg { width: 0.9em; height: 1em; flex-shrink: 0; align-self: center; }
+.ins-title {
+  margin: 0;
+  font-family: var(--font-display); font-size: inherit; font-weight: var(--fw-extrabold);
+  color: var(--ink-primary); letter-spacing: var(--ls-tight); line-height: var(--lh-tight);
+}
+/* Named only when the set is one you chose. On the landing set the result line
+   directly above already reads "12 documents of 36". */
+.ins-scope { margin-left: auto; font-size: var(--ty-meta); color: var(--ink-quiet); }
+.ins-body { min-width: 0; max-width: 72ch; }
+/* Full ink. The figures were the only runs in the paragraph at --ink-primary,
+   so the sentence read as grey packaging around three numbers — and the
+   sentence is the insight. The figures keep their accent underline, which is
+   what marks them as controls; they stop being the only thing you can see. */
+.ins-line { margin: 0; font-size: var(--ty-body); line-height: var(--lh-base); color: var(--ink-primary); }
+/* The hinge is DEMOTED, which is the part of Sales' design that is easy to get
+   wrong. "Two things need you" is the only emphasis in the sentence that is not
+   pressable, so at --ink-primary/800 it outweighed the several things that are.
+   Weight only, and one rung down. */
+.ins-line strong { color: var(--ink-secondary); font-weight: var(--fw-semibold); }
+.ins-clause { display: inline; }
+/* ── No priority dots ──
+
+   There was one per clause here, in err / warn / brand. Sales' block is
+   deliberately single-tone and carries urgency by CLAUSE ORDER instead, and
+   dropping the dots makes this a more faithful port rather than a looser one:
+   needsYou() returns p1 → p2 → p3 by construction, so the worst thing is
+   already the first thing you read.
+
+   What the dots were adding on top of that was three hues inside one sentence,
+   which is the alarm fatigue doctrine §5.6 warns about in the same breath as it
+   asks for urgency to be distinguishable. Order distinguishes it. */
+/* The figure is the control. What you press is the size of the set you land on,
+   which is why these are numbers and not adjectives: 3 runs the finding's own
+   go(), and go() filters to exactly those three. An underline rather than a
+   colour, because five coloured phrases in one sentence is not a sentence. */
+.ins-n {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: inherit;
+  font-weight: var(--fw-bold); color: var(--ink-primary);
+  font-variant-numeric: tabular-nums;
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--accent-rgb), 0.45);
+  text-underline-offset: 3px; text-decoration-thickness: 1px;
+  transition: color var(--t-fast), text-decoration-color var(--t-fast);
+}
+.ins-n:hover { color: var(--ink-action); text-decoration-color: rgba(var(--accent-rgb), 0.9); }
+/* A figure with nothing to filter to is a figure, not a control. It keeps the
+   tabular weight so the sentence still scans, and loses the underline and the
+   pointer so it does not advertise a target that is not there. */
+.ins-n.is-flat { text-decoration: none; cursor: default; }
+.ins-n:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+
+/* The actions, inline, with nothing framing them. What stood here was a
+   captioned strip of three ghost cards under an accent rule: 134px of a 279px
+   block, so half the panel was chrome around three verbs.
+
+   They are text, not buttons with edges, for the reason the rail states about
+   itself — the page's one filled control is New document, and a block that
+   reports is not a block that commands. */
+.ins-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin-top: 12px; }
+.ins-act {
+  background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap;
+  font-family: inherit; font-size: var(--ty-meta); font-weight: var(--fw-bold);
+  color: var(--ink-action);
+  transition: opacity var(--t-fast);
+}
+.ins-act:hover { opacity: 0.75; }
+.ins-act:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+
+/* Beside a document rather than above a set. The rail is 320px, so the block
+   loses its wash and its action strip and keeps the marked rows — the panel it
+   sits in already says whose findings these are. */
+.doc-rail .ins-band {
+  background: none; border: 0; border-radius: 0;
+  padding: 0; margin-bottom: 16px;
+}
+.ins-rail-lead {
+  display: flex; align-items: center; gap: 6px; margin: 0 0 8px;
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-quiet);
+}
+.ins-rail-lead svg { flex-shrink: 0; }
+.ins-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 12px; }
+.ins-row:last-child { margin-bottom: 0; }
+.ins-row-text { margin: 0; font-size: var(--ty-body); line-height: var(--lh-snug); color: var(--ink-secondary); }
+/* A text action, not a card: the rail's rule is that no filled control lives in
+   it, and at 320px three ghost cards would be the column. */
+.ins-row-act {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: var(--ty-meta); font-weight: var(--fw-bold);
+  color: var(--ink-action);
+  transition: opacity var(--t-fast);
+}
+.ins-row-act:hover { opacity: 0.75; }
+.ins-row-act:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
 
 /* ── The kind menu on New document ──
 
    The design system's `.menu`, with two lines per item instead of one: the
-   name, and what that kind is for. Eight labels alone would ask somebody to
+   name, and what that kind is for. Nine labels alone would ask somebody to
    already know the difference between a Campaign and a Marketing Asset, which
    is exactly the knowledge a person creating their first one does not have.
 
@@ -2894,16 +3339,112 @@ body.is-doc .page-inner { max-width: none; }
 .rm-end .menu-anchor { margin-left: auto; }
 .rm-end .menu-anchor .entry-action { margin-left: 0; }
 .rm-end .new-menu { left: auto; right: 0; }
-.new-menu { min-width: 280px; }
+/* ── Four kinds, and enough of the fifth to know there are more ──
+
+   Measured: nine items, 625px tall, bottom edge at 819px in an 800px window,
+   `max-height: none` and `overflow-y: visible` — it ran off the screen and
+   could not be scrolled to. Both sibling menus already cap: `.blk-menu` at
+   320px and `.doc-versions-panel` at 60vh. This one was the exception.
+
+   280px was also the reason the rows were not uniform: five of the nine
+   descriptions wrapped to a second line, so the list was 55px and 74px rows
+   mixed, and no cap could land anywhere predictable. 368px is the width the
+   longest of them — "A customer outcome, with a quote cleared to use." — needs
+   on one line, and a menu whose rows are two different heights scans worse
+   anyway.
+
+   Then 272 = 6 panel padding + 24 label + 4 × 55 + 22, and the 22 is the whole
+   point: it is the fifth row's padding plus most of its name, so the cut falls
+   THROUGH a row rather than between two. A list that ends flush reads as a list
+   that ended; a name sliced through its x-height reads as a list that goes on.
+   That is the only thing that makes the scroll discoverable before you try it. */
+.new-menu {
+  min-width: 368px; max-height: 272px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.06) transparent;
+}
+.new-menu::-webkit-scrollbar { width: 4px; }
+.new-menu::-webkit-scrollbar-track { background: transparent; }
+.new-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 2px; }
+:root[data-theme="light"] .new-menu { scrollbar-color: rgba(16,24,40,0.12) transparent; }
+:root[data-theme="light"] .new-menu::-webkit-scrollbar-thumb { background: rgba(16,24,40,0.12); }
+/* Pinned rather than scrolled away, so a panel that moves keeps saying what it
+   is. -6px cancels the panel's own padding so it sticks flush, the same way
+   `.dd-search` does inside the filter dropdowns. */
+.new-menu .menu-label { position: sticky; top: -6px; z-index: 1; background: var(--panel-bg); }
 /* The item is two stacked lines, so it stops centring on one. */
 .new-menu .menu-item { align-items: flex-start; padding: 8px; width: 100%; text-align: left; }
 .new-menu .menu-item svg { margin-top: 2px; }
 .new-menu-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.new-menu-name { font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--d100); }
-/* 11px, the same step the card's meta line and the rail's supporting run use.
-   This is the quietest of the three, and it is still a sentence somebody
-   reads — `--d500` measures 3.51:1, which is where that ramp stops. */
-.new-menu-for { font-size: 11px; color: var(--d500); line-height: 1.45; }
+.new-menu-name { font-size: var(--ty-body); font-weight: var(--fw-semibold); color: var(--ink-primary); }
+/* The same step the card's meta line and the rail's supporting run use. This
+   is the quietest of the three, and it is still a sentence somebody reads —
+   at 11px on --d500 it measured 3.51:1, which is where that ramp stopped. */
+.new-menu-for { font-size: var(--ty-meta); color: var(--ink-quiet); line-height: 1.45; }
+
+/* ── Two library components that arrive below the floor ──
+
+   `.tag` is 10px/700 uppercase and `.menu-label` is 10px/700 uppercase on
+   --d500, which measured 3.83:1. Both are specimen sizes — the same finding as
+   GAPS §27 for `.tc-*` and the version list, now for the third and fourth
+   component. Re-stepped to the floor here rather than in the library, which is
+   extracted, not authored, and given back their tracking: uppercase at 12px
+   needs less letter-spacing than uppercase at 10px, not the same amount. */
+.tag { font-size: var(--ty-micro); letter-spacing: var(--ls-wide); }
+.menu-label { font-size: var(--ty-micro); letter-spacing: var(--ls-wide); color: var(--ink-quiet); }
+/* Nine keyboard-reachable buttons with no focus ring anywhere in either
+   stylesheet. `.blk-menu-item` has one; this was an omission, not a decision.
+   Inset, because a positive offset is clipped by the panel's own padding the
+   moment it scrolls.
+
+   And they were reachable while the panel was INVISIBLE: the library's `.menu`
+   is opacity:0 + pointer-events:none with no `visibility`, so Tab walked nine
+   buttons inside an empty box and a ring on them would have been a ring in
+   mid-air. The delayed visibility keeps the close transition the library
+   wrote. */
+.menu-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.menu { visibility: hidden; transition: opacity var(--t-fast), transform var(--t-fast), visibility 0s linear var(--t-fast); }
+.menu-anchor.open .menu { visibility: visible; transition-delay: 0s; }
+/* The rest of the same finding, measured on the page rather than guessed at:
+
+     .v2-dropdown-option   11px    every option in every filter and field
+     .trust-state           9px    the word that says a document is CONFLICTING
+     .ver-mark              9px    which version you are looking at
+     .ver-author          10.5px   who saved it and why
+     .cite-action          10px    Report a problem · Archive · Delete
+
+   Five components, and the two smallest carry the two most consequential
+   facts in the product. This is the fourth and last re-step in this pass; all
+   of them are recorded in GAPS §27, which is now a pattern rather than an
+   incident: the library draws for a 320px specimen column and states no width
+   it assumes, so every consumer discovers the mismatch by rendering it. */
+.v2-dropdown-option { font-size: var(--ty-meta); }
+.trust-state { font-size: var(--ty-micro); letter-spacing: var(--ls-wide); }
+/* The library sets these from the raw hue, which is a fill colour. On its own
+   12% tint --err measures 4.13 — the word CONFLICTING, at the smallest size in
+   the byline, in the one state that most needs reading. */
+.ts-expired { color: var(--ink-err); }
+.ts-due     { color: var(--ink-warn); }
+.ts-verified{ color: var(--ink-ok); }
+:root[data-theme="light"] .ts-expired  { color: var(--ink-err); }
+:root[data-theme="light"] .ts-due      { color: var(--ink-warn); }
+:root[data-theme="light"] .ts-verified { color: var(--ink-ok); }
+
+/* ── opacity is not a rank ──
+
+   `.tag-token button` is --ink-faint at `opacity: 0.65`, which lands it at
+   3.09:1 — below the floor by a channel no colour token can see and no audit
+   of `color:` will ever catch. That is the whole argument for the ink scale
+   having a bottom: if a rule wants something quieter than the quietest rank,
+   the answer is to remove it, not to fade it. This one keeps its rank and
+   loses the fade; it is already the smallest, lightest thing in the row. */
+.props .tag-token button { opacity: 1; }
+.ver-mark   { font-size: var(--ty-micro); }
+.ver-author { font-size: var(--ty-micro); color: var(--ink-quiet); }
+.cite-action { font-size: var(--ty-meta); }
+/* .conv-* is the canvas's vocabulary and stays at its own scale there, but the
+   settings sheet reuses it — two 10px labels on a surface that is entirely in
+   scope. Scoped so the exclusion still holds where it was meant to. */
+#setSheet .conv-label { font-size: var(--ty-micro); }
 
 /* ═══════════════════════════════════════════════
    TYPE CARD — product-owned bits only
@@ -2921,9 +3462,9 @@ body.is-doc .page-inner { max-width: none; }
   border: 0; cursor: pointer; font-family: inherit;
   transition: color var(--t-fast), background-color var(--t-fast);
 }
-.tc-tag:hover { color: var(--d50); }
+.tc-tag:hover { color: var(--ink-primary); }
 .tc-tag:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
-.tc-mono { font-family: var(--font-mono); font-size: var(--fs-2xs); }
+.tc-mono { font-family: var(--font-mono); font-size: var(--ty-micro); }
 .tc-gov { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .ws-grid .type-card { max-width: none; }
 
@@ -2973,16 +3514,64 @@ body.is-doc .page-inner { max-width: none; }
 /* ── Three tiers ──
 
    Title, then the document's own words, then everything else on one dim line.
-   The steps are 15 → 13 → 11 with colour moving --d50 → --d300 → --d500 in
-   step, so no two adjacent runs share both size and colour and the order they
-   arrive in is the order they matter in. Nothing above the title. */
-.tc-title-btn { padding: 12px 16px 0; }
+   The steps are 17 → 15 → 13, ink moving --ink-primary → --ink-secondary →
+   --ink-quiet in step, so no two adjacent runs share both size and colour and
+   the order they arrive in is the order they matter in. Nothing above the title.
+
+   The previous ramp was 15 → 13 → 11 on --d50 → --d300 → --d500, and the
+   bottom rung measured 3.51:1 — sixty runs of it on one screenful. The tiers
+   were right; two of the three numbers were not.
+
+   Rank now continues INSIDE the meta line rather than becoming a second row.
+   A second row is what the three-tier pass removed, and re-adding one to get
+   hierarchy would trade the same defect back. The line carries L4; the type
+   glyph and the separators drop to L5 within it. */
+/* ── The type, above the title, as a chip ──
+
+   The library's own component (aimy-ds.css §TYPE CARD, .tc-head/.tc-type) at
+   the library's own specimen values: 9.5px / 700 / uppercase / 0.07em. Those
+   are the two uppercase runs a previous pass removed for outranking the title,
+   and the diagnosis was right — but the remedy was to delete the fact rather
+   than to fix its treatment, and the round after that deleted the word too and
+   left a glyph at the end of a middot line. The type is what the thing IS. It
+   goes back on top.
+
+   It does not outrank .tc-title, because it differs from it on all three type
+   channels at once: 12 against 17, 500 against 800, --ink-faint against
+   --ink-primary. What carries identification instead is the SHELL — a hairline
+   pill is an object, and an object at L5 reads as a label ON the card rather
+   than as a line OF it — a non-type channel doing
+   the work so the scale does not have to invent a sixth rank.
+
+   No uppercase and no tracking. `.tag` was the other candidate and is wrong
+   here for a reason that only shows on two of the nine types: axisTags already
+   renders `.tag` for region and services, so an ICP card would carry a type
+   chip and two axis chips in one identical pill and the type would be
+   indistinguishable from a value.
+
+   Not a button. .doc-by-kind states the reason for the same fact in the byline
+   — "there is no peek for a type" — and the whole card is already one target.
+
+   align-self is load-bearing: .type-card is a column flex container, inline-flex
+   blockifies on a flex item, and the default `stretch` would run the pill's
+   border the full width of the card. That is the banner-above-the-title failure
+   arriving through a layout default instead of a type choice. */
+.type-card .tc-type {
+  align-self: flex-start;
+  margin: 12px 16px 0; padding: 2px 8px; gap: 4px;
+  border: 1px solid var(--hairline); border-radius: var(--r-pill);
+  font-size: var(--ty-micro); font-weight: var(--fw-medium);
+  letter-spacing: normal; text-transform: none;
+  color: var(--ink-faint);
+}
+.type-card .tc-type svg { width: 12px; height: 12px; }
+.tc-title-btn { padding: 6px 16px 0; }
 .tc-title {
   padding: 0;
   font-family: var(--font-display);
-  font-size: 15px; font-weight: var(--fw-bold);
-  line-height: 1.34; letter-spacing: -0.012em;
-  color: var(--d50);
+  font-size: var(--ty-title); font-weight: var(--fw-extrabold);
+  line-height: 1.28; letter-spacing: -0.014em;
+  color: var(--ink-primary);
   /* Two lines, then ellipsis: a long title must not push the facts off the
      bottom of a card whose height is shared with eleven others. */
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -2997,14 +3586,14 @@ body.is-doc .page-inner { max-width: none; }
 
    Nothing here changes what a library component looks like. It sets the
    product's own gutter (16px, matching .tc-meta) and the product's own type
-   ramp (13px / --d300 — tier two, declared above), and it sets the height
+   ramp (--ty-body / --ink-secondary — tier two, declared above), and it sets the height
    budget, which is a property of a stretched grid rather than of a component.
    Filed in GAPS.md: the library's .tc-* scale is a 320px specimen scale and
    this is the second time the product has had to re-step it. */
 .type-card .tc-body { padding: 0 16px; margin-top: 6px; gap: 4px; }
 .type-card .tc-summary {
   padding: 0;
-  font-size: 13px; line-height: 1.45; color: var(--d300);
+  font-size: var(--ty-body); line-height: 1.45; color: var(--ink-secondary);
   display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden;
   -webkit-line-clamp: 1;
 }
@@ -3018,22 +3607,41 @@ body.is-doc .page-inner { max-width: none; }
   -webkit-line-clamp: 1;
 }
 .type-card .tc-mono {
-  margin: 0; font-size: 13px; color: var(--d300);
+  margin: 0; font-size: var(--ty-body); color: var(--ink-secondary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .tc-meta {
-  margin: 8px 0 12px; padding: 0 16px;
+  margin: 12px 0 12px; padding: 0 16px;
   display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px;
-  font-size: 11px; font-weight: var(--fw-medium); line-height: 1.4; color: var(--d500);
+  font-size: var(--ty-meta); font-weight: var(--fw-medium); line-height: 1.4;
+  color: var(--ink-quiet);
 }
-.tc-sep { font-style: normal; color: var(--d600); }
+/* Punctuation, so it sits a rank below the facts it divides — but it is still
+   a rendered glyph and --d600 gave it 2.49:1, which is below even the non-text
+   floor. Ambient is not invisible. */
+.tc-sep { font-style: normal; color: var(--ink-faint); }
+/* ── The type is a glyph, not a fact ──
+
+   It was an icon PLUS its label, in the same treatment as the status, the
+   owner, the source and both dates — six runs, one rank, so the type competed
+   with the one thing on the line that can put the document in a queue. The
+   type is the least actionable fact the card carries: it never changes, it is
+   already legible from the card's own body shape, and nine of them are the
+   whole corpus. The glyph keeps it available; the name goes to the tooltip and
+   to assistive tech, and the line gets seven characters shorter. */
 .tc-kind { display: inline-flex; align-items: center; gap: 4px; }
+/* Scoped to the card: typeMark() reuses .tc-kind inside canvas citations, where
+   the label is still the point and the run is not competing with five others. */
+.type-card .tc-kind {
+  font-size: var(--ty-micro); font-weight: var(--fw-regular); color: var(--ink-faint);
+}
 /* No opacity. The glyph is the strongest type cue the meta line has, and it
    was dimmed for no stated reason on top of an 11px --d500 run that already
-   measures 3.51:1. It stays the same size and colour as its neighbours, so
-   un-dimming does not make it outrank the status beside it — status is the
-   only COLOURED run on the card, and colour is what wins here. */
+   measures 3.51:1. Dropping the label is the de-emphasis instead, which costs
+   the glyph nothing — status is still the only COLOURED run on the card, and
+   colour is what wins here. */
 .tc-kind svg { width: 11px; height: 11px; }
+.type-card .tc-kind svg { width: 12px; height: 12px; }
 /* The one coloured thing on the card, and it is four characters wide. */
 .tc-st {
   display: inline-flex; align-items: center; gap: 4px;
@@ -3049,8 +3657,8 @@ body.is-doc .page-inner { max-width: none; }
    reason the card is in a needs-a-person set — and at 2.49:1 on a dark card it
    was quieter than the dot between the facts beside it. The italic already
    carries "this is an absence"; the colour does not have to as well. */
-.tc-who.is-none { max-width: none; font-style: italic; color: var(--d500); }
-.tc-who:hover { color: var(--accent); }
+.tc-who.is-none { max-width: none; font-style: italic; color: var(--ink-quiet); }
+.tc-who:hover { color: var(--ink-action); }
 .tc-who:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
 /* Same entity treatment as the owner beside it — both open a peek, so both
    have to look like they do. No max-width: a connector name is two words and
@@ -3060,7 +3668,7 @@ body.is-doc .page-inner { max-width: none; }
   font-family: var(--font-sans); font-size: inherit; font-weight: inherit; color: inherit;
   white-space: nowrap;
 }
-.tc-src:hover { color: var(--accent); }
+.tc-src:hover { color: var(--ink-action); }
 .tc-src:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
 /* Compact cards live inside answers and connection groups, where the row is
    the point and the action belongs to the panel around it. */
@@ -3071,10 +3679,51 @@ body.is-doc .page-inner { max-width: none; }
    of cards ends on one line whatever each of them had to say. */
 .tc-foot {
   display: flex; align-items: center; gap: 8px;
-  margin-top: auto; padding: 4px 16px 8px;
-  font-size: 11px; color: var(--d500);
+  margin-top: auto; padding: 12px 16px 12px;
+  border-top: 1px solid var(--hairline);
+  font-size: var(--ty-micro); color: var(--ink-faint);
+  /* Two rows now, and the order matters: the finding, then the way out of it.
+     The action is the LAST child either way, so it stays pinned to the bottom
+     of a stretched card and a row of actions still lands on one line — which is
+     the contract, and it is about where the card ends, not where the footer
+     starts. */
+  flex-direction: column; align-items: stretch; gap: 8px;
 }
 .tc-foot-act { margin-left: auto; flex-shrink: 0; }
+/* ── What AiMY noticed about THIS one ──
+
+   It was a run of footer chrome: the same 12px, the same --ink-faint, the same
+   weight as the timestamp beside it, told apart from it by a dot. The one thing
+   on the card the document did not say about itself was styled as the thing it
+   sits in.
+
+   THE MARK, NOT A DOT. Severity does not go missing with it — .type-card
+   already tints its own border per status, and the status word is in the meta
+   line, so on a card the dot was a fact's third statement. What the mark says
+   instead is whose sentence this is, which nothing else on the card was saying.
+
+   One step and one ink rung up from the footer it sits in, and the same accent
+   wash the band upstairs uses, so the three surfaces that carry a finding — the
+   band, the card, the rail — read as one voice in three places rather than as
+   three components that happen to agree.
+
+   Full width and two lines. At 115px, which is what the footer's left half
+   comes to on a 322px card once the action has taken its share, every one of
+   the nine findings ellipsised, and a truncated insight costs a line to deliver
+   half a fact. */
+.tc-foot .tc-ins {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0 0 4px; min-width: 0;
+  padding: 8px 12px; border-radius: var(--r-md);
+  background: linear-gradient(120deg, rgba(var(--accent-rgb), 0.10), rgba(0, 102, 255, 0.04));
+  border: 1px solid rgba(var(--accent-rgb), 0.18);
+  font-size: var(--ty-meta); font-weight: var(--fw-regular); line-height: var(--lh-snug);
+  color: var(--ink-secondary);
+}
+.tc-foot .tc-ins svg { flex-shrink: 0; margin-top: 2px; }
+.tc-ins-t {
+  min-width: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 /* A text action, not a filled bar — the card is a result, not a form. The
    entry-mode icon stays: with it hidden, colour alone would be carrying which
    mode the action is, which §13 forbids. */
@@ -3088,8 +3737,8 @@ body.is-doc .page-inner { max-width: none; }
    from a rule whose border is commented out: a variant's parts are not
    separable, so a rule that drops one of them owns the rest. */
 .tc-foot-act .entry-action {
-  background: none; border-color: transparent; padding: 4px 0;
-  color: var(--accent);
+  background: none; border-color: transparent; padding: 0;
+  font-size: var(--ty-meta); color: var(--ink-action);
 }
 .tc-foot-act .entry-action:hover { background: none; opacity: 0.75; }
 .ws-grid {
@@ -3116,18 +3765,18 @@ body.is-doc .page-inner { max-width: none; }
 }
 .dv-prov-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dv-prov-label {
-  font-size: 10px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
 }
 .dv-prov-val {
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--d200);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--d200);
   font-variant-numeric: tabular-nums;
 }
-.dv-prov-val.is-overdue { color: var(--warn); }
+.dv-prov-val.is-overdue { color: var(--ink-warn); }
 .dv-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-top: 12px; }
 .dv-tags-label {
-  font-size: 10px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
   margin-right: 2px;
 }
 /* ── The document's type slot ──
@@ -3148,12 +3797,12 @@ body.is-doc .page-inner { max-width: none; }
 .dv-typed .tc-body { padding: 0; margin: 0; gap: 8px; }
 /* Tier two at the document's scale, matching .dv-body's own 15px prose rather
    than the card's 13px — one ramp per surface, not one ramp everywhere. */
-.dv-typed .tc-summary { margin: 0; padding: 0; font-size: 15px; line-height: 1.6; color: var(--d200); }
-.dv-typed .tc-mono { margin: 0; font-size: 13px; color: var(--d300); word-break: break-all; }
+.dv-typed .tc-summary { margin: 0; padding: 0; font-size: var(--ty-body); line-height: 1.6; color: var(--d200); }
+.dv-typed .tc-mono { margin: 0; font-size: var(--ty-meta); color: var(--d300); word-break: break-all; }
 .dv-typed .tc-tags { gap: 6px; }
 /* `--d600` measures 2.49:1 on a dark card — the marker would be quieter than
    the criterion it marks. `--d500` is the step this ramp uses for punctuation. */
-.tc-list li::before { color: var(--d500); }
+.tc-list li::before { color: var(--ink-faint); }
 
 /* ═══════════════════════════════════════════════
    THE EIGHT VIEWS — layout only
@@ -3175,8 +3824,8 @@ body.is-doc .page-inner { max-width: none; }
    headings are the ones inside the body. */
 .dv-run-label {
   margin: 0 0 8px;
-  font-size: 12px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--d500);
+  font-size: var(--ty-meta); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
 }
 
 /* ── The type's record, in the document ──
@@ -3195,7 +3844,7 @@ body.is-doc .page-inner { max-width: none; }
   align-items: baseline; gap: 8px;
 }
 /* The rail truncates because it has 320px. The document does not have to. */
-.dv-record .prop-kv-val { white-space: normal; font-size: 14px; }
+.dv-record .prop-kv-val { white-space: normal; font-size: var(--ty-body); }
 .dv-record .prop-why { margin: 0; }
 
 /* A case record is a register: state, who raised it, how it closed. A tighter
@@ -3211,12 +3860,12 @@ body.is-doc .page-inner { max-width: none; }
 .dv-record[data-type="icp"] .prop-rows > .prop-kv { grid-column: 1 / -1; }
 
 /* Somebody else's words, at the document's scale rather than the card's. */
-.dv-record[data-type="story"] .prop-kv-val .tc-quote { margin: 0; font-size: 15px; }
+.dv-record[data-type="story"] .prop-kv-val .tc-quote { margin: 0; font-size: var(--ty-body); }
 
 /* ── The subject: the file, or the live page ── */
 .dv-subject { display: flex; flex-direction: column; gap: 8px; max-width: 80ch; margin: 0 0 24px; }
-.dv-subject .tc-mono { margin: 0; font-size: 14px; word-break: break-all; }
-.dv-subject-state { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--d400); }
+.dv-subject .tc-mono { margin: 0; font-size: var(--ty-body); word-break: break-all; }
+.dv-subject-state { margin: 0; font-size: var(--ty-meta); line-height: 1.5; color: var(--d400); }
 .dv-subject .rail-act { margin-top: 0; }
 
 /* ── Linked documents as content, not as description ──
@@ -3238,9 +3887,9 @@ body.is-doc .page-inner { max-width: none; }
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding-top: 12px; border-top: 1px solid var(--hairline);
 }
-.answer-apply-note { font-size: var(--fs-2xs); color: var(--d500); flex: 1; min-width: 180px; }
+.answer-apply-note { font-size: var(--ty-micro); color: var(--ink-faint); flex: 1; min-width: 180px; }
 .answer-apply-note code {
-  font-family: var(--font-mono); font-size: 10px;
+  font-family: var(--font-mono); font-size: var(--ty-micro);
   background: rgba(255,255,255,0.06); border-radius: var(--r-xs); padding: 2px 4px;
 }
 :root[data-theme="light"] .answer-apply-note code { background: rgba(16,24,40,0.06); }
@@ -3312,10 +3961,10 @@ body.is-doc .page-inner { max-width: none; }
 }
 .doc-bar-crumb {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--d400);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--d400);
 }
 .doc-bar-crumb svg { flex-shrink: 0; }
-.doc-bar-sep { color: var(--d600); }
+.doc-bar-sep { color: var(--ink-faint); }
 .doc-bar-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .doc-close {
   width: 30px; height: 30px; border-radius: var(--r-md);
@@ -3342,16 +3991,16 @@ body.is-doc .page-inner { max-width: none; }
 .dv-section { margin-top: 16px; }
 .dv-section-label,
 .ver-panel-label {
-  font-size: 10px; font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wider); text-transform: uppercase;
-  color: var(--d500); margin-bottom: 8px;
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--ink-quiet); margin-bottom: 8px;
 }
 .dv-aud {
   background: none; border: 0; padding: 0 6px 0 0; cursor: pointer; font-family: inherit;
   font-size: inherit; font-weight: inherit; color: inherit;
-  border-bottom: 1px dotted var(--d600);
+  border-bottom: 1px dotted var(--ink-faint);
 }
-.dv-aud:hover { color: var(--accent); }
+.dv-aud:hover { color: var(--ink-action); }
 
 /* Grounding — governance, stated on the document it governs */
 .dv-grounding {
@@ -3363,20 +4012,20 @@ body.is-doc .page-inner { max-width: none; }
 .dv-ground {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 4px 8px; border-radius: var(--r-pill);
-  font-size: var(--fs-2xs); font-weight: var(--fw-semibold);
-  border: 1px solid var(--card-border); color: var(--d500);
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  border: 1px solid var(--card-border); color: var(--ink-faint);
 }
-.dv-ground.is-on { background: var(--ok-bg); border-color: rgba(23,178,106,0.28); color: var(--ok); }
-.dv-ground.is-on.is-external { background: var(--warn-bg); border-color: rgba(247,144,9,0.3); color: var(--warn); }
+.dv-ground.is-on { background: var(--ok-bg); border-color: rgba(23,178,106,0.28); color: var(--ink-ok); }
+.dv-ground.is-on.is-external { background: var(--warn-bg); border-color: rgba(247,144,9,0.3); color: var(--ink-warn); }
 .dv-ground-edit {
   margin-left: auto; background: none; border: 0; cursor: pointer; font-family: inherit;
-  font-size: var(--fs-2xs); font-weight: var(--fw-semibold); color: var(--d400);
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold); color: var(--d400);
   transition: color var(--t-fast);
 }
-.dv-ground-edit:hover { color: var(--accent); }
+.dv-ground-edit:hover { color: var(--ink-action); }
 
 .dv-prov-act { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 4px; }
-.dv-prov-note { font-size: var(--fs-2xs); color: var(--warn); }
+.dv-prov-note { font-size: var(--ty-micro); color: var(--ink-warn); }
 .dv-prov-val .status-dot { margin-right: 4px; }
 
 .dv-props { padding: 12px 0; border-top: 1px solid var(--hairline); }
@@ -3388,18 +4037,18 @@ body.is-doc .page-inner { max-width: none; }
   transition: border-color var(--t-fast);
 }
 .dv-prop:hover { border-color: var(--card-border-hover); }
-.dv-prop-k { padding: 4px 8px; font-size: 10px; color: var(--d500); background: rgba(255,255,255,0.04); }
-.dv-prop-v { padding: 4px 8px; font-size: 10px; color: var(--d200); }
+.dv-prop-k { padding: 4px 8px; font-size: var(--ty-micro); color: var(--ink-faint); background: rgba(255,255,255,0.04); }
+.dv-prop-v { padding: 4px 8px; font-size: var(--ty-micro); color: var(--d200); }
 :root[data-theme="light"] .dv-prop-k { background: rgba(16,24,40,0.04); }
 
 .dv-versions { margin-top: 16px; border-top: 1px solid var(--hairline); padding-top: 12px; }
 .dv-versions-head {
   cursor: pointer; list-style: none;
-  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-wider); text-transform: uppercase; color: var(--d500);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-wider); text-transform: uppercase; color: var(--ink-faint);
 }
 .dv-versions-head::-webkit-details-marker { display: none; }
-.dv-versions-head::before { content: "▸ "; color: var(--d600); }
+.dv-versions-head::before { content: "▸ "; color: var(--ink-faint); }
 .dv-versions[open] .dv-versions-head::before { content: "▾ "; }
 .dv-versions-n {
   margin-left: 4px; padding: 2px 6px; border-radius: var(--r-pill);
@@ -3418,10 +4067,10 @@ body.is-doc .page-inner { max-width: none; }
   position: absolute; right: 4px;
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; border-radius: var(--r-sm);
-  background: none; border: 0; color: var(--d500); cursor: pointer;
+  background: none; border: 0; color: var(--ink-faint); cursor: pointer;
   transition: color var(--t-fast), background-color var(--t-fast);
 }
-.comment-send:hover { color: var(--accent); background: rgba(255,255,255,0.06); }
+.comment-send:hover { color: var(--ink-action); background: rgba(255,255,255,0.06); }
 :root[data-theme="light"] .comment-send:hover { background: rgba(16,24,40,0.05); }
 .comment-send:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .icon-btn.is-ai svg { display: block; }
@@ -3443,9 +4092,9 @@ body.is-doc .page-inner { max-width: none; }
 .ai-menu .ai-menu-fmt {
   justify-content: center;
   min-width: 24px; padding-left: 0; padding-right: 0;
-  font-size: 12px; font-weight: var(--fw-semibold);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
 }
-.ai-menu .ai-menu-fmt.is-on { background: var(--card-bg-raised); color: var(--accent); }
+.ai-menu .ai-menu-fmt.is-on { background: var(--card-bg-raised); color: var(--ink-action); }
 
 /* ═══════════════════════════════════════════════
    THE EDITOR — properties, versions, placeholder
@@ -3469,28 +4118,41 @@ body.is-doc .page-inner { max-width: none; }
 .prop-row {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px;
   padding: 6px 8px; margin-left: -8px;
-  font-size: 12.5px; line-height: 1.5; color: var(--d400);
+  font-size: var(--ty-body); line-height: 1.5; color: var(--ink-secondary);
 }
 /* The half of the fact the control cannot say for itself. Quiet, because the
-   value is what you are reading for. */
-.prop-lead { color: var(--d400); flex-shrink: 0; }
-.prop-also { margin: 0 0 4px; font-size: 12.5px; color: var(--d400); }
+   value is what you are reading for — but quiet is --ink-secondary, not the
+   3.10:1 the old --d400/--d500 pairing collapsed to in a raised panel. */
+.prop-lead { color: var(--ink-secondary); flex-shrink: 0; }
+.prop-also { margin: 0 0 4px; font-size: var(--ty-body); color: var(--ink-secondary); }
 /* The control and its explanation stack, so the sentence reads as belonging to
    the field above it rather than to the row beside it. */
 .prop-status { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.prop-why { font-size: 11px; color: var(--d500); line-height: 1.45; }
+.prop-why { font-size: var(--ty-micro); color: var(--ink-faint); line-height: 1.45; }
 /* A remove control should not be the brightest ink in the column. The library's
    token inherits the accent at 13px, which made every × louder than the value
    it removes. */
-.props .tag-token button { font-size: 11px; color: var(--d500); }
-.props .tag-token button:hover { color: var(--err); }
+/* ── A value is not an action ──
+
+   The library's `.tag-token` is an accent fill, an accent border and accent
+   text. Two tag fields put up to ten filled purple pills into a 320px column —
+   the loudest thing in a rail whose own rule is "no filled control lives in it"
+   and "the accent is spent only on actions". They are tags. The chip shape
+   stays, because it is what says these are separable values; the colour goes
+   back to the ink scale. */
+.props .tag-token {
+  background: var(--card-bg-raised); border-color: var(--card-border);
+  color: var(--ink-primary); font-size: var(--ty-meta);
+}
+.props .tag-token button { font-size: var(--ty-micro); color: var(--ink-faint); }
+.props .tag-token button:hover { color: var(--ink-err); }
 
 /* Property dropdowns read as fields, not as the filter row's buttons. */
 .k-prop { width: 100%; }
 .k-prop .v2-dropdown-btn {
   width: 100%; justify-content: space-between;
   height: 30px; padding: 0 8px; border-radius: var(--r-sm);
-  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
   background: var(--card-bg-raised); border-color: var(--card-border); color: var(--d100);
 }
 .k-prop .v2-dropdown-btn:hover { border-color: var(--card-border-hover); }
@@ -3523,7 +4185,7 @@ body.is-doc .page-inner { max-width: none; }
   height: auto; justify-content: flex-start; gap: 6px;
   padding: 6px 8px; margin-left: -8px; border-radius: var(--r-sm);
   background: none; border: 0;
-  font-size: 12.5px; font-weight: 400; line-height: 1.5; text-align: left;
+  font-size: var(--ty-meta); font-weight: 400; line-height: 1.5; text-align: left;
   color: var(--d400);
 }
 .k-prop.k-row .v2-dropdown-btn .dd-label-text {
@@ -3532,7 +4194,7 @@ body.is-doc .page-inner { max-width: none; }
 }
 .k-prop.k-row .v2-dropdown-btn:hover { background: rgba(255,255,255,0.05); }
 :root[data-theme="light"] .k-prop.k-row .v2-dropdown-btn:hover { background: rgba(16,24,40,0.04); }
-.k-prop.k-row .v2-dropdown-btn:hover .dd-label-text { color: var(--accent); }
+.k-prop.k-row .v2-dropdown-btn:hover .dd-label-text { color: var(--ink-action); }
 .k-prop.k-row .v2-dropdown-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .k-prop.k-row .v2-dropdown-btn svg {
   width: 9px; height: 6px; flex-shrink: 0; opacity: 0; transition: opacity var(--t-fast);
@@ -3548,7 +4210,7 @@ body.is-doc .page-inner { max-width: none; }
   vertical-align: baseline; padding: 0; gap: 4px;
   background: none; border: 0;
 }
-.props .tag-input input { font-size: var(--fs-xs); width: 6ch; min-width: 6ch; }
+.props .tag-input input { font-size: var(--ty-meta); width: 6ch; min-width: 6ch; }
 /* Empty, the placeholder is the answer to the sentence, so it needs the room
    to say it: "It touches nothing yet". */
 .props .tag-input.is-empty input { width: 12ch; min-width: 12ch; }
@@ -3568,7 +4230,7 @@ body.is-doc .page-inner { max-width: none; }
 /* The checkbox carries the state, so its word is a lead-in, not a value. The
    weight has to be stated too — `.ds-choice` sets 500 on its label, which is a
    sixth style differing from the fifth by nothing a reader can name. */
-.prop-check-label { font-size: 12.5px; font-weight: 400; color: var(--d400); }
+.prop-check-label { font-size: var(--ty-body); font-weight: 400; color: var(--ink-secondary); }
 .prop-row .ds-choice { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; }
 
 /* ── Anything the fixed fields cannot hold ──
@@ -3580,7 +4242,7 @@ body.is-doc .page-inner { max-width: none; }
 .prop-custom { display: flex; flex-direction: column; gap: 2px; }
 .prop-also { margin: 0 0 2px; }
 .prop-kv { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 24px; gap: 4px; align-items: center; }
-.prop-kv .field-input { height: 28px; padding: 0 8px; font-size: var(--fs-xs); }
+.prop-kv .field-input { height: 28px; padding: 0 8px; font-size: var(--ty-meta); }
 /* Closed: the read row spans the whole grid and the inputs are not rendered. */
 .prop-kv:not(.is-open) { grid-template-columns: minmax(0, 1fr) 24px; }
 /* A type field has no delete control and no key to rename — the key belongs to
@@ -3592,13 +4254,13 @@ body.is-doc .page-inner { max-width: none; }
 /* ── The long-text surface ──
    Which document you are editing, because the modal covers the title that
    would otherwise say so. */
-.xm-of { margin: 0 0 12px; font-size: var(--fs-xs); color: var(--d400); }
+.xm-of { margin: 0 0 12px; font-size: var(--ty-meta); color: var(--d400); }
 .xm-of strong { color: var(--d100); font-weight: var(--fw-semibold); }
 /* A sentence needs the measure and the wrap a rail input cannot give it.
    Resize stays vertical: horizontal would drag it out of the modal. */
 .xm-text {
   width: 100%; min-height: 96px; resize: vertical;
-  padding: 8px; font-family: var(--font-sans); font-size: 13px; line-height: 1.6;
+  padding: 8px; font-family: var(--font-sans); font-size: var(--ty-meta); line-height: 1.6;
 }
 .prop-kv:not(.is-open) .field-input { display: none; }
 /* ── The number field's editing control ──
@@ -3613,8 +4275,8 @@ body.is-doc .page-inner { max-width: none; }
    `.field-input`, and bring it down to the 28px this panel's fields use from
    the 34px a standalone stepper is. */
 .prop-kv:not(.is-open) .stepper { display: none; }
-.prop-kv .stepper button { width: 28px; height: 28px; font-size: 15px; }
-.prop-kv .stepper input { width: 44px; height: 28px; font-size: var(--fs-xs); }
+.prop-kv .stepper button { width: 28px; height: 28px; font-size: var(--ty-body); }
+.prop-kv .stepper input { width: 44px; height: 28px; font-size: var(--ty-meta); }
 .prop-kv .stepper button:focus-visible,
 .prop-kv .stepper input:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .prop-kv.is-open .prop-kv-read { display: none; }
@@ -3622,28 +4284,28 @@ body.is-doc .page-inner { max-width: none; }
   display: flex; align-items: baseline; gap: 6px; min-width: 0;
   padding: 6px 8px; margin-left: -8px; border-radius: var(--r-sm);
   background: none; border: 0; cursor: pointer; text-align: left;
-  font-family: var(--font-sans); font-size: 12.5px; line-height: 1.5; color: var(--d400);
+  font-family: var(--font-sans); font-size: var(--ty-body); line-height: 1.5; color: var(--ink-secondary);
 }
 .prop-kv-read:hover { background: rgba(255,255,255,0.05); }
 :root[data-theme="light"] .prop-kv-read:hover { background: rgba(16,24,40,0.04); }
 .prop-kv-read:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .prop-kv-val {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-weight: var(--fw-semibold); color: var(--d100);
+  font-weight: var(--fw-semibold); color: var(--ink-primary);
 }
-.prop-kv-read:hover .prop-kv-val { color: var(--accent); }
+.prop-kv-read:hover .prop-kv-val { color: var(--ink-action); }
 .prop-kv-x {
   display: inline-flex; align-items: center; justify-content: center;
   width: 24px; height: 24px; border: 0; border-radius: var(--r-sm);
-  background: none; color: var(--d500); cursor: pointer;
+  background: none; color: var(--ink-faint); cursor: pointer;
   transition: color var(--t-fast), background-color var(--t-fast);
 }
-.prop-kv-x:hover { color: var(--err); background: var(--err-bg); }
+.prop-kv-x:hover { color: var(--ink-err); background: var(--err-bg); }
 .prop-add {
   align-self: flex-start; background: none; border: 0; padding: 4px 0; cursor: pointer;
-  font-family: inherit; font-size: 11px; font-weight: var(--fw-semibold); color: var(--accent);
+  font-family: inherit; font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-quiet);
 }
-.prop-add:hover { opacity: 0.75; }
+.prop-add:hover { opacity: 1; color: var(--ink-action); }
 .prop-add:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
 
 /* Versions are pressable in the editor, and the one you opened says so. */
@@ -3656,16 +4318,28 @@ body.is-doc .page-inner { max-width: none; }
 :root[data-theme="light"] .ver-item.is-pickable:hover { background: rgba(16,24,40,0.05); }
 .ver-item.is-pickable:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .ver-item.is-viewing { background: var(--accent-dim); }
-.ver-hint { font-size: 10px; color: var(--d500); margin-top: 8px; line-height: var(--lh-snug); }
+.ver-hint { font-size: var(--ty-micro); color: var(--ink-faint); margin-top: 8px; line-height: var(--lh-snug); }
+/* ── The library's version list is drawn at specimen sizes ──
+
+   `.ver-time` is 10px and `.ver-tag` is 8.5px — the smallest run in the whole
+   system, on a stamp that says which version you are looking at. Measured at
+   3.83:1 and 4.08:1 respectively. Same finding as GAPS §27 for `.tc-*`: these
+   are specimen steps, and a consumer at application scale has to re-step them.
+   Re-stepped here rather than in the library, which is extracted, not authored. */
+.ver-time { font-size: var(--ty-micro); color: var(--ink-quiet); }
+.ver-tag {
+  font-size: var(--ty-micro); letter-spacing: var(--ls-wide);
+  color: var(--ink-action); border-color: rgba(var(--accent-rgb), 0.32);
+}
 
 .ver-preview {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding: 8px 12px; margin-bottom: 12px;
   border-radius: var(--r-md);
   background: var(--accent-dim); border: 1px solid rgba(var(--accent-rgb), 0.3);
-  font-size: var(--fs-xs); color: var(--d100);
+  font-size: var(--ty-meta); color: var(--d100);
 }
-.ver-preview svg { flex-shrink: 0; color: var(--accent); }
+.ver-preview svg { flex-shrink: 0; color: var(--ink-action); }
 .ver-preview-end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
 /* A placeholder, not content. It was a <p> inside the contenteditable, which
@@ -3675,7 +4349,7 @@ body.is-doc .page-inner { max-width: none; }
    from the template, and :empty counts those as content. */
 .dv-body.is-blank[data-placeholder]::before {
   content: attr(data-placeholder);
-  color: var(--d500); font-style: italic; pointer-events: none;
+  color: var(--ink-faint); font-style: italic; pointer-events: none;
 }
 
 /* Overridden status carries a marker wherever it shows. */
@@ -3686,8 +4360,8 @@ body.is-doc .page-inner { max-width: none; }
 }
 
 .commit-typed { margin-top: 12px; }
-.cite-action.is-danger { color: var(--err); }
-.cite-action.is-danger:hover { color: var(--err); opacity: 0.8; }
+.cite-action.is-danger { color: var(--ink-err); }
+.cite-action.is-danger:hover { color: var(--ink-err); opacity: 0.8; }
 .skeleton-line { height: 11px; border-radius: var(--r-xs); }
 
 /* ═══════════════════════════════════════════════
@@ -3704,21 +4378,21 @@ body.is-doc .page-inner { max-width: none; }
 }
 .conflict-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .conflict-title {
-  font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--d50);
+  font-size: var(--ty-meta); font-weight: var(--fw-bold); color: var(--d50);
   line-height: var(--lh-snug);
 }
-.conflict-body { font-size: var(--fs-xs); color: var(--d300); line-height: var(--lh-base); }
-.conflict-meta { font-size: 10px; color: var(--d500); margin-top: auto; }
+.conflict-body { font-size: var(--ty-meta); color: var(--d300); line-height: var(--lh-base); }
+.conflict-meta { font-size: var(--ty-micro); color: var(--ink-faint); margin-top: auto; }
 .conflict-side .entry-action { align-self: flex-start; }
 
 /* What you did with a proposal, written into the message it belongs to. */
 .ai-outcome {
   display: flex; align-items: center; gap: 6px; margin-top: 8px;
   padding-top: 8px; border-top: 1px solid var(--hairline);
-  font-size: var(--fs-2xs); font-weight: var(--fw-semibold);
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
 }
-.ai-outcome.is-accept { color: var(--ok); }
-.ai-outcome.is-reject { color: var(--d500); }
+.ai-outcome.is-accept { color: var(--ink-ok); }
+.ai-outcome.is-reject { color: var(--ink-faint); }
 .ai-suggestion ins.is-editing {
   outline: 2px solid var(--brand); outline-offset: 2px;
   border-radius: var(--r-xs);
@@ -3746,11 +4420,11 @@ body.is-doc .page-inner { max-width: none; }
   padding: 32px 48px; border-radius: var(--r-xl);
   background: var(--card-bg-raised);
   border: 2px dashed rgba(var(--accent-rgb), 0.5);
-  color: var(--accent); text-align: center;
+  color: var(--ink-action); text-align: center;
 }
-.drop-title { font-size: var(--fs-md); font-weight: var(--fw-bold); color: var(--d50); }
-.drop-sub { font-size: var(--fs-xs); color: var(--d500); max-width: 34ch; }
-.drop-hint { color: var(--d500); font-style: italic; }
+.drop-title { font-size: var(--ty-body); font-weight: var(--fw-bold); color: var(--d50); }
+.drop-sub { font-size: var(--ty-meta); color: var(--ink-faint); max-width: 34ch; }
+.drop-hint { color: var(--ink-faint); font-style: italic; }
 
 /* ═══════════════════════════════════════════════
    CONVERSATION BLOCKS
@@ -3770,7 +4444,7 @@ body.is-doc .page-inner { max-width: none; }
   font-variant-numeric: tabular-nums;
 }
 .conv-fact-l { font-size: 10px; color: var(--d500); }
-.conv-code { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--err); }
+.conv-code { font-family: var(--font-mono); font-size: var(--fs-2xs); color: var(--ink-err); }
 
 .conv-label {
   font-size: 10px; font-weight: var(--fw-bold);
@@ -3793,7 +4467,7 @@ body.is-doc .page-inner { max-width: none; }
   font-family: inherit; font-size: inherit; font-weight: inherit; color: inherit;
   border-bottom: 1px dotted currentColor;
 }
-.ctx-ask:hover { color: var(--accent); }
+.ctx-ask:hover { color: var(--ink-action); }
 .ctx-ask:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /* The way into a collection's or a source's conversation, on the one line that
@@ -3801,7 +4475,7 @@ body.is-doc .page-inner { max-width: none; }
 .rm-ask {
   background: none; border: 0; padding: 0; cursor: pointer;
   font-family: inherit; font-size: inherit; font-weight: var(--fw-semibold);
-  color: var(--accent); border-bottom: 1px dotted currentColor;
+  color: var(--ink-action); border-bottom: 1px dotted currentColor;
 }
 .rm-ask:hover { opacity: 0.75; }
 .rm-ask:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
@@ -3810,17 +4484,17 @@ body.is-doc .page-inner { max-width: none; }
    that used to open them; the panel is gone and the forms are not. */
 .commit-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .commit-choice { display: flex; align-items: center; gap: 8px; }
-.commit-choice-label { font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--d100); }
+.commit-choice-label { font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--d100); }
 .commit-choice-label .gov-ext { display: inline; margin-left: 6px; }
-.retain-note { font-size: var(--fs-xs); color: var(--d500); margin-top: 12px; line-height: var(--lh-base); }
+.retain-note { font-size: var(--ty-meta); color: var(--ink-faint); margin-top: 12px; line-height: var(--lh-base); }
 
 /* Nothing to save, so this is a state and not a button. */
 .doc-saved {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: var(--fs-2xs); font-weight: var(--fw-semibold); color: var(--d500);
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold); color: var(--ink-faint);
   margin-right: 2px;
 }
-.doc-saved svg { color: var(--ok); }
+.doc-saved svg { color: var(--ink-ok); }
 
 /* ═══════════════════════════════════════════════
    UTILITIES
