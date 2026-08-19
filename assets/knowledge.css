@@ -1030,8 +1030,6 @@ body {
 /* Read, not gone. What is outstanding stays outstanding until the corpus
    changes; the count under the bell is the thing marking clears. */
 .ntf-row.is-read { opacity: 0.45; }
-/* Tone on one leading dot, same as .brief-text — the rail and the bell are
-   two views of one model and they should not look like two components. */
 /* The bell's rows lost their dots with the band's, and for the same reason:
    needsYou() returns them worst-first, so the order already says it. */
 .ntf-row-main { flex: 1; min-width: 0; }
@@ -3010,45 +3008,14 @@ body.is-doc .page-inner { max-width: none; }
   margin: 12px 0 0; font-size: var(--ty-meta); color: var(--ink-quiet);
   max-width: 320px; line-height: var(--lh-snug);
 }
-.brief-list { display: flex; flex-direction: column; gap: 8px; }
-/* The best news this panel can carry, and the one state it could not report.
-   Quiet, because nothing needing you is not an event. */
-.brief-quiet {
-  margin: 0; padding: 12px 0;
-  font-size: var(--ty-body); line-height: 1.5; color: var(--ink-secondary);
-}
-
-/* A briefing item states what changed, why it matters, its work state and one
-   classified next step. Tone is carried by the icon's colour, not by a stripe. */
-/* ═══════════════════════════════════════════════
-   THE BRIEFING — what changed since you were last here
-═══════════════════════════════════════════════ */
-.brief-entry {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--hairline);
-  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
-}
-.brief-entry:last-child { border-bottom: 0; }
-.brief-text {
-  font-size: var(--ty-body); line-height: var(--lh-base); color: var(--ink-secondary);
-  /* Tone lives on one leading dot, not on a stripe or a tinted panel. */
-  padding-left: 12px; position: relative;
-}
-.brief-text::before {
-  content: ""; position: absolute; left: 0; top: 7px;
-  width: 5px; height: 5px; border-radius: 50%; background: var(--ink-faint);
-}
-.brief-entry.is-err  .brief-text::before { background: var(--err); }
-.brief-entry.is-warn .brief-text::before { background: var(--warn); }
-.brief-entry.is-ok   .brief-text::before { background: var(--ok); }
-.brief-go {
-  margin-left: 12px;
-  background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit;
-  font-size: var(--ty-meta); font-weight: var(--fw-bold); color: var(--ink-action);
-  transition: opacity var(--t-fast);
-}
-.brief-go:hover { opacity: 0.75; }
-.brief-go:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+/* The rail's *Since Thursday* findings block and every rule it needed —
+   .brief-list, .brief-quiet, .brief-entry, .brief-text and .brief-go — have
+   been removed. The findings themselves were never this panel's: needsYou()
+   computes them and `AiMY noticed` states them above the grid, against the set
+   you filtered to rather than at the whole corpus. Two panels rendering one
+   model on one screen is the same news twice, and this was the weaker telling
+   in the more valuable column. .brief-section-label stays: the two sections
+   that are only here still need naming. */
 /* ── The last five sets you looked at ──
 
    What stood here was one button, "Resume your last filter", over a single
@@ -3245,7 +3212,55 @@ body.is-doc .page-inner { max-width: none; }
    pressable, so at --ink-primary/800 it outweighed the several things that are.
    Weight only, and one rung down. */
 .ins-line strong { color: var(--ink-secondary); font-weight: var(--fw-semibold); }
+/* ── The clause is the button ──
+
+   This was `display: inline` on a span wrapped around a pressable digit — one
+   glyph, about 8px wide, carrying the only route from a finding to the
+   documents it is about. Inline so that it WRAPS: a clause is a run of words
+   inside a paragraph and has to break across lines like one, which is why this
+   is not `inline-block`. It is also why it is a SPAN carrying the button role
+   rather than a `<button>`: form controls ignore `display: inline` and stay
+   atomic, which at 260px dropped the whole clause onto its own line instead of
+   letting it continue the sentence. */
 .ins-clause { display: inline; }
+/* ── The underline is the size of the target ──
+
+   It was on the FIGURE while the whole clause was the control, which is the
+   worst of both: an affordance drawn around 8px of a run you can press 300px
+   of. A reader can only conclude that the digit does something and the words
+   do not, and the one thing a rest state has to get right is where the target
+   ends.
+
+   So the rule moves out to the clause. Same underline — accent-tinted, 1px,
+   3px clear of the baseline — drawn under exactly what answers the mouse, and
+   it breaks with the text across line boxes because the clause is an inline
+   run rather than a block.
+
+   It is not "heavy" to underline the whole thing: what is heavy is a paragraph
+   claiming three targets and marking three digits. A sentence with pressable
+   phrases in it is a sentence with underlined phrases in it, and that has been
+   the convention since the first hypertext. The figure keeps its weight and
+   its tabular numerals, which is what makes it scan as a figure — it just
+   stops being the only underlined thing in a clause it does not own. */
+.ins-clause[role="button"] {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--accent-rgb), 0.45);
+  text-underline-offset: 3px; text-decoration-thickness: 1px;
+  transition: color var(--t-fast), text-decoration-color var(--t-fast);
+}
+/* One gesture. The clause and its figure cannot light separately, because they
+   were never two targets. */
+.ins-clause[role="button"]:hover {
+  color: var(--ink-action); text-decoration-color: rgba(var(--accent-rgb), 0.9);
+}
+.ins-clause[role="button"]:hover .ins-n { color: var(--ink-action); }
+/* The outline follows the text across a line break, which is the other half of
+   the argument for an inline box: a focus ring around an atomic block would
+   have enclosed whitespace the clause does not occupy. */
+.ins-clause[role="button"]:focus-visible {
+  outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs);
+}
 /* ── No priority dots ──
 
    There was one per clause here, in err / warn / brand. Sales' block is
@@ -3257,26 +3272,23 @@ body.is-doc .page-inner { max-width: none; }
    What the dots were adding on top of that was three hues inside one sentence,
    which is the alarm fatigue doctrine §5.6 warns about in the same breath as it
    asks for urgency to be distinguishable. Order distinguishes it. */
-/* The figure is the control. What you press is the size of the set you land on,
-   which is why these are numbers and not adjectives: 3 runs the finding's own
-   go(), and go() filters to exactly those three. An underline rather than a
-   colour, because five coloured phrases in one sentence is not a sentence. */
+/* What you press is the SIZE OF THE SET YOU LAND ON, which is why the clause
+   leads with a number and not an adjective: 3 lands on exactly those three.
+   The figure carries weight and tabular numerals so it scans out of the
+   sentence at a glance; the underline that marks the target belongs to the
+   clause above, because the clause is the target.
+
+   An underline rather than a colour, there and here, because five coloured
+   phrases in one sentence is not a sentence. */
 .ins-n {
-  background: none; border: 0; padding: 0; cursor: pointer;
-  font-family: inherit; font-size: inherit;
   font-weight: var(--fw-bold); color: var(--ink-primary);
   font-variant-numeric: tabular-nums;
-  text-decoration: underline;
-  text-decoration-color: rgba(var(--accent-rgb), 0.45);
-  text-underline-offset: 3px; text-decoration-thickness: 1px;
-  transition: color var(--t-fast), text-decoration-color var(--t-fast);
+  transition: color var(--t-fast);
 }
-.ins-n:hover { color: var(--ink-action); text-decoration-color: rgba(var(--accent-rgb), 0.9); }
-/* A figure with nothing to filter to is a figure, not a control. It keeps the
-   tabular weight so the sentence still scans, and loses the underline and the
-   pointer so it does not advertise a target that is not there. */
-.ins-n.is-flat { text-decoration: none; cursor: default; }
-.ins-n:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--r-xs); }
+/* A clause with nothing to land on — a coverage gap counts questions, not
+   documents — gets no underline at all, from the [role="button"] rule it does
+   not match. The figure inside it keeps the tabular weight so the sentence
+   still scans. Nothing further to say here: the absence IS the rule. */
 
 /* The actions, inline, with nothing framing them. What stood here was a
    captioned strip of three ghost cards under an accent rule: 134px of a 279px
@@ -4124,6 +4136,19 @@ body.is-doc .page-inner { max-width: none; }
    value is what you are reading for — but quiet is --ink-secondary, not the
    3.10:1 the old --d400/--d500 pairing collapsed to in a raised panel. */
 .prop-lead { color: var(--ink-secondary); flex-shrink: 0; }
+/* ── The colon belongs to the pattern, not to the copy ──
+
+   The panel names its fields now — *Client: Nordwind GmbH* — rather than
+   narrating them, and a label that runs straight into its value reads as two
+   values. Set here and not in nine strings, because it is punctuation the
+   pattern owns: every row gets it, including a custom fact whose name is
+   whatever somebody typed, and none of them can forget it.
+
+   Scoped to .props deliberately. The document's own record uses .prop-lead for
+   the type's fields, where the leads are still phrases — *Raised by*, *Closed
+   with*, *Fits when* — and a colon after a phrase is a colon in the wrong
+   place. Same primitive, two readings, one selector between them. */
+.props .prop-lead::after { content: ":"; }
 .prop-also { margin: 0 0 4px; font-size: var(--ty-body); color: var(--ink-secondary); }
 /* The control and its explanation stack, so the sentence reads as belonging to
    the field above it rather than to the row beside it. */
@@ -4226,12 +4251,85 @@ body.is-doc .page-inner { max-width: none; }
 }
 .props .tag-input.is-prose input,
 .props .tag-input.is-prose.is-empty input { width: 100%; min-width: 0; }
-.prop-checks { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; }
-/* The checkbox carries the state, so its word is a lead-in, not a value. The
-   weight has to be stated too — `.ds-choice` sets 500 on its label, which is a
-   sixth style differing from the fifth by nothing a reader can name. */
-.prop-check-label { font-size: var(--ty-body); font-weight: 400; color: var(--ink-secondary); }
-.prop-row .ds-choice { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; }
+/* ── A set, behind the same trigger as a choice ──
+
+   Groups and Audience stood open as seven checkboxes in the column, which is a
+   third of a nine-fact panel spent on two fields and two rows that looked
+   nothing like the seven above them. They are `.k-multi` now: the trigger and
+   the panel geometry of `.k-prop.k-row`, with checkboxes inside.
+
+   Every rule below is the dropdown's rule, restated rather than inherited. It
+   cannot BE a `.v2-dropdown`: aimy-ds.js binds that class and its `choose()`
+   is single-select, so a second tick would clear the first. Same conclusion
+   `.k-date` reached, same remedy, recorded in GAPS.md.
+
+   The 8px bleed is load-bearing. Three row shapes share this column and all
+   three hang their hover 8px left of the text with `margin-left: -8px` against
+   `padding-left: 8px`; a flex item pulled left that way leaves free space in
+   the line unless it is widened by exactly the margin, which is what the
+   `calc` and the `flex: 0 0 auto` are for. Getting it wrong here would put one
+   lead 8px off a column of nine. */
+.k-multi { position: relative; width: 100%; }
+.k-multi-btn {
+  display: flex; align-items: center; gap: 6px;
+  width: calc(100% + 8px); flex: 0 0 auto;
+  padding: 6px 8px; margin-left: -8px; border-radius: var(--r-sm);
+  background: none; border: 0; cursor: pointer;
+  font-family: var(--font-sans); font-size: var(--ty-meta); font-weight: 400;
+  line-height: 1.5; text-align: left; color: var(--d400);
+}
+.k-multi-btn .dd-label-text {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-weight: var(--fw-semibold); color: var(--d100);
+}
+.k-multi-btn:hover { background: rgba(255,255,255,0.05); }
+:root[data-theme="light"] .k-multi-btn:hover { background: rgba(16,24,40,0.04); }
+.k-multi-btn:hover .dd-label-text { color: var(--ink-action); }
+.k-multi-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+/* The chevron arrives under the pointer, like the dropdowns' — at rest the
+   row is a fact, not a control with furniture on it. */
+.k-multi-btn svg {
+  width: 9px; height: 6px; flex-shrink: 0; opacity: 0;
+  transition: opacity var(--t-fast), transform var(--t-fast);
+}
+.k-multi-btn:hover svg,
+.k-multi-btn:focus-visible svg,
+.k-multi.is-open .k-multi-btn svg { opacity: 0.6; }
+.k-multi.is-open .k-multi-btn svg { transform: rotate(180deg); }
+
+/* `.v2-dropdown-panel`'s geometry and glass, from the same values. */
+.k-multi-panel {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 200;
+  min-width: 100%; padding: 4px;
+  background: var(--d800); border: 1px solid rgba(255,255,255,0.10);
+  border-radius: var(--r-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+  max-height: 260px; overflow-y: auto;
+}
+:root[data-theme="light"] .k-multi-panel {
+  background: #ffffff; border-color: rgba(16,24,40,0.12);
+  box-shadow: 0 8px 32px rgba(16,24,40,0.16);
+}
+/* A row, not a chip. The whole row is the label, so the pointer never has to
+   find an 18px box — and the box is a real checkbox, so Tab reaches it and
+   Space ticks it without a keyboard model of our own. */
+.k-multi-opt {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 6px 8px; border-radius: var(--r-sm);
+  transition: background-color var(--t-fast), color var(--t-fast);
+}
+.k-multi-opt:hover { background: rgba(255,255,255,0.06); }
+:root[data-theme="light"] .k-multi-opt:hover { background: rgba(16,24,40,0.05); }
+.k-multi-opt input { width: 15px; height: 15px; }
+.k-multi-opt input[type="checkbox"]:checked::after {
+  left: 50%; top: 50%; width: 4px; height: 7.5px;
+  transform: translate(-50%, calc(-50% - 1.2px)) rotate(45deg);
+}
+.k-multi-text {
+  font-size: var(--ty-meta); font-weight: 400; color: var(--d100);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.k-multi-opt input:checked ~ .k-multi-text { font-weight: var(--fw-semibold); }
 
 /* ── The tick, centred in its box ──
 

@@ -286,6 +286,31 @@
                      cx: 'CX consulting', analytics: 'Analytics' };
   const AUDIENCE = { clients: 'Clients', admins: 'Admins', stakeholders: 'Stakeholders' };
 
+  /* ── The tenancy, above the content ──
+
+     `client` names the account a document is ABOUT. `org` names whose tenancy
+     it lives IN, which is the level above it: FlairsTech runs the desk, and
+     CXS, Upland and MedFar log in to their own. Two axes because they answer
+     two questions — a FlairsTech playbook can be about Nordwind, and a
+     document sitting in MedFar's tenancy is not ours to rewrite.
+
+     Derivable, so it is derived. A client belongs to exactly one organisation,
+     which is what "above it in the tree" means, and a field re-stated on
+     forty-two records is a field that will disagree with itself by Friday. */
+  const ORGS = { flairs: 'FlairsTech', cxs: 'CXS', upland: 'Upland', medfar: 'MedFar' };
+  const ORG_OF_CLIENT = { nordwind: 'cxs', tavola: 'cxs', meridian: 'medfar', orbit: 'upland' };
+
+  /* Who works with it. A SET, not a choice — a residency policy is read by the
+     reviewers who check it and the managers who quote it, and a control that
+     makes you pick one of those is a control that will be answered wrongly. */
+  const GROUPS = { qa: 'QA Reviewers', leads: 'Support Leads',
+                   am: 'Account Managers', se: 'Solution Engineers' };
+  /* Seeded from the collection for the same reason region is seeded from the
+     tags: the answer is already in the record, and an axis nobody fills is an
+     axis that is empty everywhere and therefore says nothing. */
+  const GROUPS_OF_COL = { policies: ['qa', 'leads'], support: ['leads', 'qa'],
+                          sales: ['am', 'se'], marketing: ['am'], legal: ['qa'] };
+
   /* Collection-level governance. Ownership, retention and per-agent grounding
      are properties of a collection, so they are stated wherever a collection is
      — on the axis panel when you filter to one, and on every document that
@@ -671,6 +696,11 @@
         : (o.tags.indexOf('eu') > -1 || o.tags.indexOf('emea') > -1) ? 'emea' : 'global';
     }
     o.services = o.services || [];
+    /* The organisation follows the client, and everything with no client is
+       ours. Overridable in EXTRA where a document sits in a tenancy its
+       subject does not — a FlairsTech runbook about Nordwind stays ours. */
+    o.org = o.org || ORG_OF_CLIENT[o.client] || 'flairs';
+    o.groups = o.groups || (GROUPS_OF_COL[o.col] || []).slice();
     o.props = o.props || {};
     o.arch = !!o.arch;
     o.aud = o.aud || (o.col === 'legal' ? ['admins']
@@ -751,7 +781,9 @@
     owner:      { kind: 'Person or team', filter: 'ids',       label: (id) => id },
     collection: { kind: 'Collection',    filter: 'collection', label: (id) => COLLECTIONS[id] || id },
     source:     { kind: 'Source',        filter: 'source',     label: (id) => (SRC[id] || {}).label || id },
+    org:        { kind: 'Organisation',  filter: 'org',        label: (id) => ORGS[id] || id },
     client:     { kind: 'Client',        filter: 'client',     label: (id) => CLIENTS[id] || id },
+    group:      { kind: 'Group',         filter: 'group',      label: (id) => GROUPS[id] || id },
     product:    { kind: 'Product',       filter: 'product',    label: (id) => PRODUCTS[id] || id },
     region:     { kind: 'Region',        filter: 'region',     label: (id) => REGIONS[id] || id },
     service:    { kind: 'Service',       filter: 'service',    label: (id) => SERVICES[id] || id },
@@ -766,7 +798,9 @@
     { type: 'ownedBy',   to: 'owner',      phrase: 'Owned by',      get: (o) => responsible(o) ? [responsible(o)] : [] },
     { type: 'in',        to: 'collection', phrase: 'Filed in',      get: (o) => [o.col] },
     { type: 'from',      to: 'source',     phrase: 'Came from',     get: (o) => [o.src] },
+    { type: 'within',    to: 'org',        phrase: 'Belongs to',    get: (o) => o.org ? [o.org] : [] },
     { type: 'about',     to: 'client',     phrase: 'About',         get: (o) => o.client ? [o.client] : [] },
+    { type: 'sharedWith',to: 'group',      phrase: 'Shared with',   get: (o) => o.groups || [] },
     { type: 'serves',    to: 'product',    phrase: 'Answers for',   get: (o) => o.prod ? [o.prod] : [] },
     { type: 'covers',    to: 'region',     phrase: 'Covers',        get: (o) => o.region ? [o.region] : [] },
     { type: 'uses',      to: 'service',    phrase: 'Part of',       get: (o) => o.services || [] },
@@ -975,8 +1009,8 @@
      is what makes the surface drivable by an agent: to change what a person
      is looking at, write a URL.
   ═══════════════════════════════════════════════ */
-  const LIST_KEYS = ['type', 'tag', 'source', 'client', 'product', 'collection', 'status',
-                     'region', 'service', 'audience', 'ids'];
+  const LIST_KEYS = ['type', 'tag', 'source', 'org', 'client', 'group', 'product', 'collection',
+                     'status', 'region', 'service', 'audience', 'ids'];
   const DATE_KEYS = ['updated', 'ingested', 'extCreated', 'extUpdated'];
   const FLAG_KEYS = ['mine', 'archived'];
   const ALL_KEYS  = LIST_KEYS.concat(DATE_KEYS, FLAG_KEYS, ['q', 'prop']);
@@ -1005,8 +1039,12 @@
                  view: p.get('view') === 'tree' ? 'tree' : 'grid',
                  /* Which edge the tree walks. Every axis in the folder view is
                     an implicit edge type, so grouping by client IS traversing
-                    the `about` edge — and like everything else, it is a link. */
-                 group: GROUPS[p.get('group')] ? p.get('group') : 'col',
+                    the `about` edge — and like everything else, it is a link.
+
+                    `by`, not `group`: Group is now an axis of its own — the
+                    people a document is shared with — and one word cannot name
+                    both a filter value and the thing being filtered on. */
+                 by: AXES[p.get('by')] ? p.get('by') : 'col',
                  /* One named ordering, not a sort menu. It answers "what needs
                     a person first", which is the only ordering question this
                     surface has ever been asked.
@@ -1055,7 +1093,7 @@
     if (st.doc) p.set('doc', st.doc);
     if (st.settings) p.set('settings', st.settings);
     if (st.view === 'tree') p.set('view', 'tree');
-    if (st.group && st.group !== 'col') p.set('group', st.group);
+    if (st.by && st.by !== 'col') p.set('by', st.by);
     if (st.sort) p.set('sort', st.sort);
     if (st.chat) p.set('chat', st.chat);
     /* Prototype affordance, carried so a forced state survives a filter change
@@ -1129,10 +1167,10 @@
      FILTERING
   ═══════════════════════════════════════════════ */
   /* Scalar axes — one value per object. */
-  const FIELD_OF = { type: 't', source: 'src', client: 'client', product: 'prod', collection: 'col',
-                     status: 'status', region: 'region' };
+  const FIELD_OF = { type: 't', source: 'src', org: 'org', client: 'client', product: 'prod',
+                     collection: 'col', status: 'status', region: 'region' };
   /* Multi-value axes — a set per object, matched on any overlap. */
-  const MULTI_OF = { tag: 'tags', service: 'services', audience: 'aud' };
+  const MULTI_OF = { tag: 'tags', service: 'services', audience: 'aud', group: 'groups' };
   const DATE_FIELD = { updated: 'upd', ingested: 'ing', extCreated: 'xc', extUpdated: 'xu' };
 
   /* Entitlement is a hard filter and must be visibly true: a briefing or a
@@ -1294,6 +1332,18 @@
     [/\btavola\b/i,                       { client: 'tavola' }],
     [/\bmeridian\b/i,                     { client: 'meridian' }],
     [/\borbit\b/i,                        { client: 'orbit' }],
+    // organisations — the tenancy above the client
+    [/\bflairstech\b|\bflairs\b/i,        { org: 'flairs' }],
+    [/\bcxs\b/i,                          { org: 'cxs' }],
+    [/\bupland\b/i,                       { org: 'upland' }],
+    [/\bmedfar\b/i,                        { org: 'medfar' }],
+    /* Named in full, and read BEFORE the collections below — the lexicon eats
+       what it matches, so "support leads" has to be spent as a group before
+       the bare word support is spent as a collection. */
+    [/\bqa reviewers?\b/i,                 { group: 'qa' }],
+    [/\bsupport leads?\b/i,                { group: 'leads' }],
+    [/\baccount managers?\b/i,             { group: 'am' }],
+    [/\bsolution engineers?\b/i,           { group: 'se' }],
     // collections
     [/\bpolic(?:y|ies)\b/i,               { collection: 'policies' }],
     [/\bsupport\b/i,                      { collection: 'support' }],
@@ -1456,7 +1506,7 @@
        tissue around them. Left in, they become a free-text filter for a word
        nothing contains, and an empty result reads as an empty corpus. */
     const leftover = rest.replace(
-      /\b(?:show|find|get|list|give|all|any|every|everything|anything|the|a|an|me|my|our|we|us|from|with|for|in|on|at|to|by|and|or|of|that|about|regarding|concerning|is|are|was|were|be|been|has|have|only|just|please|documents?|docs?|objects?|items?|content|stuff|services?|regions?|audiences?|updated?|changed?|ingested?|created?|modified|edited|synced?|review(?:ed)?|last|past|recent(?:ly)?|since|before|after|days?|weeks?|months?|years?|quarters?)\b/gi, ' ')
+      /\b(?:show|find|get|list|give|all|any|every|everything|anything|the|a|an|me|my|our|we|us|from|with|for|in|on|at|to|by|and|or|of|that|about|regarding|concerning|is|are|was|were|be|been|has|have|only|just|please|shared?|documents?|docs?|objects?|items?|content|stuff|services?|regions?|audiences?|updated?|changed?|ingested?|created?|modified|edited|synced?|review(?:ed)?|last|past|recent(?:ly)?|since|before|after|days?|weeks?|months?|years?|quarters?)\b/gi, ' ')
                          .replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim();
     if (leftover.length > 2) set.q = leftover;
     return { set: set, matched: Object.keys(set).length > 0 };
@@ -1468,6 +1518,7 @@
   const READ_LABEL = {
     type: 'Type', tag: 'Tag', source: 'Source', client: 'Client', product: 'Product',
     collection: 'Collection', trust: 'Trust', work: 'Work state', q: 'Text',
+    org: 'Organisation', group: 'Group',
     region: 'Region', service: 'Service', audience: 'Audience', prop: 'Property',
     updated: 'Updated', ingested: 'Ingested', extCreated: 'Created at source',
     extUpdated: 'Changed at source', mine: 'Owner', ids: 'Documents',
@@ -1476,7 +1527,9 @@
   const VALUE_LABEL = {
     type: (v) => TYPES[v] ? TYPES[v].label : v,
     source: (v) => SRC[v] ? SRC[v].label : v,
+    org: (v) => ORGS[v] || v,
     client: (v) => CLIENTS[v] || v,
+    group: (v) => GROUPS[v] || v,
     product: (v) => PRODUCTS[v] || v,
     collection: (v) => COLLECTIONS[v] || v,
     status: (v) => STATUS[v] ? STATUS[v].label : v,
@@ -1831,22 +1884,33 @@
   }
 
   /* ═══════════════════════════════════════════════
-     THE BRIEFING
+     THE RAIL — and where the briefing went
 
-     What changed since you were last here, in sentences. Not a count of the
-     current state — the Status filter shows that, and repeating it in the rail
-     would be the same fact twice. Not a timestamped log either: a list of
-     events is work to read, and the point of a briefing is that it has already
-     been read for you.
+     There was a *Since Thursday* block at the top of this rail: five findings
+     in severity order, each with an action. It has been removed, and nothing
+     it said has been lost.
 
-     Each entry is one thing that happened and one thing to do about it.
+     The reason is that it was the SECOND place saying it. `AiMY noticed` sits
+     directly above the grid, reads the same needsYou() model, and says the
+     same findings better in three respects — it is in the first person, its
+     figures land on the sets they count, and it re-derives against whatever
+     you have filtered to instead of announcing the whole corpus at you. Two
+     panels computing one model on one screen is not redundancy the reader can
+     use: it is the same news twice, and the rail's copy was the weaker of the
+     two while occupying the more valuable column.
+
+     One entry was NOT in needsYou(): *You were last reading X*. That is not a
+     finding, it is a bookmark — it belongs with the recents below rather than
+     at the head of a list of problems, and USER.recent already carries it.
+
+     What is left in the rail is what is only here: the filters you have
+     already composed, and the state of the sources feeding the corpus.
   ═══════════════════════════════════════════════ */
-  const LAST_VISIT = 4;                     // days ago; a session fixture
-  const VISIT_LABEL = dateOf(LAST_VISIT).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
-
   /* Questions that arrived and found nothing. Rows rather than a sentence, so
-     the briefing can report that there are none — which is a real condition and
-     was an unreachable one while the count was written into the copy. */
+     the count is derived and a corpus with no gap can say so — a real condition
+     and an unreachable one while the number was written into the copy.
+
+     Read by needsYou(), which is the only thing that reads it now. */
   const ASKED = [
     { topic: 'Data residency in APAC', n: 3,
       prompt: 'Draft an article covering data residency for APAC enterprise contracts' },
@@ -1854,129 +1918,15 @@
       prompt: 'Draft an article covering refunds on annual plans' }
   ];
 
-  function sinceLastVisit() {
-    const out = [];
-    const since = (o) => o.upd <= LAST_VISIT;
-
-    const failing = Object.keys(SRC).filter((k) => SRC[k].health === 'failed');
-    const stale = failing.length ? LIVE.filter((o) => failing.indexOf(o.src) > -1).length : 0;
-    /* Only when it has cost something. With nothing drawn from a dead source
-       this read "Zendesk stopped syncing. 0 documents have not updated since.
-       Show them" over a filter that matches nothing — a briefing entry whose
-       action is a dead end. The Sources block below states every source's
-       health and carries Reconnect; the briefing is for consequences. */
-    if (stale) {
-      out.push({
-        id: 'source', tone: 'err',
-        text: `${failing.map((k) => SRC[k].label).join(' and ')} stopped syncing. ${stale} document${stale === 1 ? ' has' : 's have'} not updated since.`,
-        action: 'Show them', mode: 'direct', href: { source: failing }, ask: ['source', failing[0]]
-      });
-    }
-
-    /* Somebody said a document is wrong — the only entry here a PERSON put
-       there rather than the system deriving it. It sits with the rest in
-       severity order, below a source that has stopped feeding eleven documents
-       and above what is merely stale. Without it a report went into a comment
-       thread nobody had a reason to open, which is the same as nowhere. */
-    const reported = LIVE.filter((o) => openProblems(o));
-    if (reported.length) {
-      const n = reported.reduce((s, o) => s + openProblems(o), 0);
-      out.push({
-        id: 'reported', tone: 'err',
-        text: n === 1
-          ? `Somebody reported a problem with ${reported[0].title}.`
-          : `${n} reported problems across ${reported.length} document${reported.length === 1 ? '' : 's'}.`,
-        action: reported.length === 1 ? 'Open it' : 'Show them', mode: 'review',
-        doc: reported.length === 1 ? reported[0].id : null,
-        href: reported.length === 1 ? null : { ids: reported.map((o) => o.id) }
-      });
-    }
-
-    const outdated = LIVE.filter((o) => o.status === 'outdated');
-    if (outdated.length) {
-      out.push({
-        id: 'outdated', tone: 'err',
-        text: `${outdated.length} documents are behind their source. Answers still use them.`,
-        action: 'Show them', mode: 'direct', href: { status: ['outdated'] }
-      });
-    }
-
-    /* The point of the whole model: a document nobody has used in three months
-       is either dead weight or a gap in how people find things. Either way it
-       is worth a look, and nothing else on the surface would have said so. */
-    const unused = LIVE.filter((o) => o.status === 'unused');
-    if (unused.length) {
-      out.push({
-        id: 'unused', tone: 'warn',
-        text: `${unused.length} documents have not been used in three months.`,
-        action: 'Show them', mode: 'direct', href: { status: ['unused'] }
-      });
-    }
-
-    const drafted = LIVE.filter((o) => o.status === 'draft');
-    if (drafted.length) {
-      out.push({
-        id: 'drafts', tone: 'warn',
-        text: `AiMY drafted ${drafted.length} documents. None of them is live.`,
-        action: 'Open them', mode: 'review', href: { status: ['draft'] }
-      });
-    }
-
-    /* This was one hard-coded sentence, pushed unconditionally — which made a
-       briefing with nothing in it impossible, and the empty state below it
-       unreachable. A count that is always three is not a count. */
-    if (ASKED.length && LIVE.length) {
-      const asked = ASKED.reduce((s, a) => s + a.n, 0);
-      const lead = ASKED.slice().sort((a, b) => b.n - a.n)[0];
-      out.push({
-        id: 'gap', tone: 'warn',
-        text: `${asked} question${asked === 1 ? '' : 's'} came in that nothing here answers. ${lead.topic} leads.`,
-        /* No filter target: a gap is the absence of a document. */
-        action: 'Draft one', mode: 'prompt', prompt: lead.prompt
-      });
-    }
-
-    const last = byId(USER.recent[0]);
-    if (last) {
-      out.push({
-        id: 'resume', tone: 'ok',
-        text: `You were last reading ${last.title}.`,
-        action: 'Reopen', mode: 'direct', doc: last.id
-      });
-    }
-    return out;
-  }
-
   function renderBrief(st) {
     const host = $('#brief');
     if (!host) return;
 
     host.innerHTML = `
-      <!-- No identity block. Who you are is in the topnav, and the counts are
-           what the Status filter is for — the rail is what changed since you
-           were last here, and nothing else. -->
-      <div class="brief-section-label">Since ${esc(VISIT_LABEL)}</div>
-      <!-- Capped. A briefing that lists everything is a log, and a log is work
-           to read — which is the thing a briefing exists to have done for you.
-
-           And a briefing with nothing in it still has something to say. The
-           heading over an empty list read as a rail that had failed to load;
-           "nothing needs you" is the best news this panel can carry and it was
-           the one state it could not report. -->
-      ${(() => {
-        const news = sinceLastVisit();
-        if (!news.length) {
-          return `<p class="brief-quiet">Nothing changed and nothing needs a person.
-            The library is as you left it.</p>`;
-        }
-        return `<div class="brief-list">${news.slice(0, 5).map((b) => `
-        <div class="brief-entry is-${b.tone}">
-          <p class="brief-text">${esc(b.text)}</p>
-          <button class="brief-go" data-entry-mode="${b.mode}" ${b.doc
-            ? `data-open-doc="${esc(b.doc)}"`
-            : b.href ? `data-brief-filter="${esc(b.id)}"` : `data-brief-prompt="${esc(b.prompt)}"`}>${esc(b.action)}</button>
-        </div>`).join('')}</div>`;
-      })()}
+      <!-- No identity block and no findings block. Who you are is in the
+           topnav; what needs a person is in AiMY noticed, one column to the
+           right and against the set you filtered to. This rail carries the two
+           things that are only here. -->
 
       <!-- Eleven filters left the row because the input already speaks them,
            which makes re-narrowing cheap to type and free to forget. This is
@@ -2946,21 +2896,51 @@
   const INS_MAX = 3;
   const INS_COUNT = ['', 'One', 'Two', 'Three'];
 
-  /* A pressable figure. Sales' rule for `.slv-n` is that what you press is the
-     SIZE OF THE SET YOU LAND ON, and the first cut broke it: pressing 6 ran the
-     finding's go(), which for a dead source asks the canvas a question — a
-     number that opens a conversation is not a number you pressed.
+  /* ── The finding is the target, not the digit ──
 
-     So the figure and the action card divide the work. The figure filters to
-     exactly the documents it counted; the card underneath is where the AI
-     answer lives. Show me them, then do something about them.
+     Sales' rule for `.slv-n` is that what you press is the SIZE OF THE SET YOU
+     LAND ON, and that rule is kept. What was wrong was the HIT AREA it was
+     implemented with: one glyph, about 8px wide, carrying the only route from
+     a finding to the documents it is about. Everything else in the clause —
+     the noun, the verb, the whole statement of what is wrong — was inert text
+     you could click straight through. A target that small also cannot be seen
+     as a target across a paragraph; the underline reads as emphasis until you
+     happen to be over it.
+
+     The whole clause is the control now. *6 documents have not updated since
+     their source stopped syncing* is one target that lands on those six, and
+     the underline is drawn under all of it rather than under the digit: an
+     affordance around 8px of a run you can press 300px of tells the reader the
+     words are inert, which was the remaining half of the same defect. The
+     figure keeps its weight and its tabular numerals, which is what makes it
+     scan as a figure; it stops being the only marked thing in a clause it does
+     not own.
+
+     The division of labour is unchanged: the clause filters to exactly the
+     documents it counted, and the action underneath is where the AI answer
+     lives. Show me them, then do something about them.
 
      A finding with no ids counts something that is not a document — a coverage
-     gap counts questions nobody could answer — so there is nothing to filter to
-     and the figure is not a control at all. */
-  const insN = (t) => (t.ids && t.ids.length
-    ? `<button class="ins-n" type="button" data-ins-n="${esc(t.id)}">${esc(String(t.n))}</button>`
-    : `<span class="ins-n is-flat">${esc(String(t.n))}</span>`);
+     gap counts questions nobody could answer — so there is nothing to land on
+     and the clause is not a control at all.
+
+     ── Why a span and not a button ──
+
+     A clause is a run of words in the middle of a sentence and has to break
+     across lines like one. A `<button>` cannot: `display: inline` is not
+     honoured on form controls, the box stays atomic, and the paragraph treats
+     the whole clause as one unbreakable object. Measured at 260px — the text
+     before it ended at x=469 and the clause started at the paragraph's left
+     edge 21px lower, so *Three things need you:* sat alone on its own line
+     with the clause dropped underneath it. Invisible at desktop width, wrong
+     at every width below it, and the rail renders this band at 320px.
+
+     So it is a span carrying the button role, with `tabindex` and an
+     Enter/Space handler doing what the element would have done for free. That
+     is the deal `role="button"` always is: you take the semantics and you owe
+     the keyboard. Paid below, next to the click router that already routes
+     `data-ins-n`. */
+  const insFigure = (t) => `<span class="ins-n">${esc(String(t.n))}</span>`;
 
   function insightBand(list) {
     const found = needsYou(list).slice(0, INS_MAX);
@@ -2970,10 +2950,15 @@
        list-of-rows this form exists to stop being. Established once, the
        figures after it inherit it. `gap` counts questions, not documents, and
        brings its own noun. */
-    const clauses = found.map((t, i) =>
-      `<span class="ins-clause">` +
-      insN(t) + (i === 0 && t.id !== 'gap' ? ' document' + (t.n === 1 ? '' : 's') : '') +
-      ' ' + esc(t.clause) + `</span>`);
+    const clauses = found.map((t, i) => {
+      const body = insFigure(t)
+        + (i === 0 && t.id !== 'gap' ? ' document' + (t.n === 1 ? '' : 's') : '')
+        + ' ' + esc(t.clause);
+      return t.ids && t.ids.length
+        ? `<span class="ins-clause" role="button" tabindex="0" data-ins-n="${esc(t.id)}"
+             aria-label="Show the ${esc(String(t.n))} ${esc(t.clause)}">${body}</span>`
+        : `<span class="ins-clause is-flat">${body}</span>`;
+    });
     const joined = clauses.length === 1 ? clauses[0]
       : clauses.slice(0, -1).join(', ') + ' and ' + clauses[clauses.length - 1];
     /* The result line directly above already reads "12 documents of 36", so the
@@ -3015,11 +3000,12 @@
      changes only the shape of what you are looking at.
 
      The hierarchy used to be hard-coded Collection → Type → document, which is
-     one traversal of a graph that has eight axes, frozen. It is a **grouping**
+     one traversal of a graph that has ten implicit edge types, frozen. It is a
+     **grouping**
      now, and every axis in the list is an implicit edge type: grouping by
      client is walking the `about` edge, grouping by owner is walking `ownedBy`.
      A folder view over a knowledge graph is not a filing cabinet, it is a
-     choice of which relationship to see the corpus through, and `?group=` is
+     choice of which relationship to see the corpus through, and `?by=` is
      where that choice lives.
 
      Three things make it a graph rather than a re-sort. The group headers are
@@ -3032,9 +3018,10 @@
      Built on the library's `.tree`, which is native <details>, so it needs no
      state of its own and survives a re-render open.
   ═══════════════════════════════════════════════ */
-  const GROUPS = {
+  const AXES = {
     col:    { label: 'Collection', kind: 'collection', of: (o) => o.col,
               none: 'Not filed anywhere', order: () => USER.collections },
+    org:    { label: 'Organisation', kind: 'org',      of: (o) => o.org,    none: 'In no organisation' },
     client: { label: 'Client',     kind: 'client',     of: (o) => o.client, none: 'Not about any client' },
     prod:   { label: 'Product',    kind: 'product',    of: (o) => o.prod,   none: 'Answers for no product' },
     owner:  { label: 'Owner',      kind: 'owner',      of: (o) => responsible(o),  none: 'Nobody owns it' },
@@ -3048,8 +3035,8 @@
      says nothing. */
   const subGroup = (g) => (g === 't' ? 'col' : 't');
 
-  const groupName = (g, id) => !id ? GROUPS[g].none
-    : GROUPS[g].kind ? entityLabel(GROUPS[g].kind, id)
+  const groupName = (g, id) => !id ? AXES[g].none
+    : AXES[g].kind ? entityLabel(AXES[g].kind, id)
     : (TYPES[id] || {}).label || id;
 
   /* Narrowing the surface to a group. Most axes are filter keys; owner is not
@@ -3057,7 +3044,7 @@
      which is the same result reached the only way the model allows. */
   function groupFilterAttr(g, id, docs) {
     if (!id) return '';
-    const f = GROUPS[g].kind && ENTITY[GROUPS[g].kind].filter;
+    const f = AXES[g].kind && ENTITY[AXES[g].kind].filter;
     if (g === 't') return `data-open-axis="type:${esc(id)}"`;
     if (!f || f === 'ids') return `data-apply-ids="${docs.map((d) => d.id).join(',')}"`;
     return `data-open-axis="${f}:${esc(id)}"`;
@@ -3083,8 +3070,8 @@
 
   function bucket(docs, g) {
     const by = {};
-    docs.forEach((o) => { (by[GROUPS[g].of(o) || ''] = by[GROUPS[g].of(o) || ''] || []).push(o); });
-    const pref = (GROUPS[g].order ? GROUPS[g].order() : []).filter((k) => by[k]);
+    docs.forEach((o) => { (by[AXES[g].of(o) || ''] = by[AXES[g].of(o) || ''] || []).push(o); });
+    const pref = (AXES[g].order ? AXES[g].order() : []).filter((k) => by[k]);
     /* Preferred order first, then whatever else the filter dragged in, and the
        group with no value last — it is a finding, not a heading, and it belongs
        at the end where a finding goes. */
@@ -3096,7 +3083,7 @@
   }
 
   function renderTree(st, list) {
-    const g = GROUPS[st.group] ? st.group : 'col';
+    const g = AXES[st.by] ? st.by : 'col';
     const sub = subGroup(g);
     const top = bucket(list, g);
 
@@ -3109,8 +3096,8 @@
             <svg class="tree-chev" width="12" height="12" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
             ${ICO.folder ? ICO.folder.replace('<svg', '<svg width="13" height="13"') : ''}
-            ${id && GROUPS[g].kind
-              ? `<button class="ws-tree-name is-ent" data-peek="${GROUPS[g].kind}:${esc(id)}"
+            ${id && AXES[g].kind
+              ? `<button class="ws-tree-name is-ent" data-peek="${AXES[g].kind}:${esc(id)}"
                    title="What else touches ${esc(name)}">${esc(name)}</button>`
               : `<span class="ws-tree-name${id ? '' : ' is-none'}">${esc(name)}</span>`}
             <span class="ws-tree-n">${docs.length}</span>
@@ -3147,18 +3134,18 @@
   /* The grouping control. It is a dropdown rather than a segmented control
      because seven axes in a row would be a menu bar pretending to be a switch. */
   function groupPicker(st) {
-    const cur = GROUPS[st.group] ? st.group : 'col';
-    return `<div class="v2-dropdown k-filter k-group" data-group-key>
+    const cur = AXES[st.by] ? st.by : 'col';
+    return `<div class="v2-dropdown k-filter k-group" data-axis-key>
       <button class="v2-dropdown-btn" type="button" aria-haspopup="listbox" aria-expanded="false"
               aria-label="Group the tree by">
-        <span class="dd-label-text">Grouped by ${esc(GROUPS[cur].label.toLowerCase())}</span>
+        <span class="dd-label-text">Grouped by ${esc(AXES[cur].label.toLowerCase())}</span>
         <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
              stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
       </button>
       <div class="v2-dropdown-panel" role="listbox">
-        ${Object.keys(GROUPS).map((k) => `<div class="v2-dropdown-option${k === cur ? ' selected' : ''}"
-          role="option" aria-selected="${k === cur}" data-value="${esc(GROUPS[k].label)}"
-          data-slug="${k}">${esc(GROUPS[k].label)}</div>`).join('')}
+        ${Object.keys(AXES).map((k) => `<div class="v2-dropdown-option${k === cur ? ' selected' : ''}"
+          role="option" aria-selected="${k === cur}" data-value="${esc(AXES[k].label)}"
+          data-slug="${k}">${esc(AXES[k].label)}</div>`).join('')}
       </div>
     </div>`;
   }
@@ -3747,6 +3734,10 @@
   /* Which custom property is open for editing. View state, like the rest of
      this — nobody wants to link to a document with one field unfolded. */
   let openProp = null;
+  /* Which set-valued field has its panel open, by key. One at a time, for the
+     same reason the dropdowns are one at a time: two panels over a 320px rail
+     cover the rows they belong to. */
+  let openMulti = null;
 
   const OWNERS = ['N. Wael', 'A. Mahfouz', 'O. Said', 'Sales Ops', 'Marketing', 'Brand', 'Legal', 'Unassigned'];
 
@@ -3754,19 +3745,42 @@
      Status is shown and not set: it is derived, and a field you could type into
      would be the attestation model coming back through a side door.
 
-     `lead` is the half of the fact the control cannot say for itself, and it
-     lives INSIDE the trigger, so the whole row is one target. `blank` completes
-     the same phrase when there is no value — *About no client*, never *None*,
-     because a document with no client is a fact and a dash is a shrug. */
+     ── The field is NAMED, not narrated ──
+
+     This panel used to read as sentences — *Owned by N. Wael*, *Filed in
+     Support*, *About no client*, *It is an Article*. The argument was that a
+     phrase says what a label cannot. In a 320px column of nine facts it does
+     the opposite: every row opens with a different function word, so the left
+     edge no longer aligns on anything a reader can scan, and the eye has to
+     parse a preposition before it reaches the fact. *About* is also the
+     weakest word in the product — it is a preposition, an editing verb and a
+     rail heading, and none of the three tells you the row holds a client.
+
+     So the lead is the field's NAME and the value is the value: *Client:
+     Nordwind GmbH*. Nine rows that start with a noun, one colon, no grammar to
+     agree with. The sentence reading is not lost — it moves to where a
+     sentence earns its keep, which is the graph: an edge still reads *Belongs
+     to CXS* in the connections rail, because there the phrase IS the
+     relationship rather than a label wearing one.
+
+     Consequently `blank` is *None* and not *no client*: a sentence-completion
+     under a label reads as a value called "no client". The colon comes from
+     `.props .prop-lead::after`, so it is punctuation in the stylesheet rather
+     than nine copies of it in the copy. */
   const artic = (s) => (/^[aeiou]/i.test(s) ? 'an ' : 'a ') + s;
 
+  /* Ordered as the tenancy is: whose it is, who owns it, what it is, then the
+     tree above the content — Organisation, then the client inside it — then
+     the filing. `lead` is gone; a field whose lead is its own name does not
+     need to say it twice. */
   const PROP_FIELDS = [
-    { key: 'owner',  label: 'Owner',      lead: 'Owned by',      map: () => OWNERS.map((x) => [x, x]) },
-    { key: 't',      label: 'Type',       lead: 'It is',         map: () => opts(TYPES), disp: artic },
-    { key: 'col',    label: 'Collection', lead: 'Filed in',      map: () => opts(COLLECTIONS), blank: 'nowhere' },
-    { key: 'prod',   label: 'Product',    lead: 'Answering for', map: () => opts(PRODUCTS), blank: 'no product' },
-    { key: 'client', label: 'Client',     lead: 'About',         map: () => opts(CLIENTS), blank: 'no client' },
-    { key: 'region', label: 'Region',     lead: 'Covering',      map: () => opts(REGIONS), blank: 'no region' }
+    { key: 'owner',  label: 'Owner',        map: () => OWNERS.map((x) => [x, x]) },
+    { key: 't',      label: 'Type',         map: () => opts(TYPES) },
+    { key: 'org',    label: 'Organisation', map: () => opts(ORGS),        blank: 'None' },
+    { key: 'client', label: 'Client',       map: () => opts(CLIENTS),     blank: 'None' },
+    { key: 'col',    label: 'Collection',   map: () => opts(COLLECTIONS), blank: 'None' },
+    { key: 'prod',   label: 'Product',      map: () => opts(PRODUCTS),    blank: 'None' },
+    { key: 'region', label: 'Region',       map: () => opts(REGIONS),     blank: 'None' }
   ];
 
   /* `row` puts the lead inside the trigger and lets it fill the line. The
@@ -3787,7 +3801,7 @@
     return `<div class="v2-dropdown k-prop${row ? ' k-row' : ''}" data-prop-key="${f.key}">
       <button class="v2-dropdown-btn" type="button" aria-haspopup="listbox" aria-expanded="false"
               aria-label="${esc(f.label)}">
-        ${row && f.lead ? `<span class="prop-lead">${esc(f.lead)}</span>` : ''}
+        ${row && (f.lead || f.label) ? `<span class="prop-lead">${esc(f.lead || f.label)}</span>` : ''}
         <span class="dd-label-text">${esc(label)}</span>
         <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
              stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
@@ -4054,10 +4068,63 @@
     return `<div class="tag-input${vals.length ? '' : ' is-empty'}" data-tag-field="${key}">
       ${vals.map((v) => `<span class="tag-token">${esc(lookup ? lookup[v] || v : v)}
         <button type="button" data-tag-drop="${esc(v)}" aria-label="Remove ${esc(v)}">&times;</button></span>`).join('')}
-      <input type="text" placeholder="${vals.length ? 'add…' : 'nothing yet'}"
+      <input type="text" placeholder="${vals.length ? 'add…' : 'none — add one'}"
              aria-label="Add ${esc(label)}" data-tag-add="${key}">
     </div>`;
   };
+
+  /* ── A closed set that takes more than one answer ──
+
+     Groups and Audience are the two fields here a document can hold several of.
+     They were four and three checkboxes standing open in the rail, which was
+     honest about being multi-select and wrong about everything else: seven
+     always-visible rows in a column of nine facts, so two fields took a third
+     of the panel, and neither read like the seven fields above it. A rail of
+     rows should be a rail of rows.
+
+     So: the same trigger, the same panel position, the same lead-and-value
+     shape as every dropdown on this panel — with checkboxes inside instead of
+     options, because the answer is a set.
+
+     It cannot BE a `.v2-dropdown`. That class is behaviour, not looks:
+     aimy-ds.js binds every `.v2-dropdown-btn` and every `.v2-dropdown-option`
+     on the page, and `choose()` is strictly single-select — it clears every
+     other selection, writes one label and closes the panel. A second tick
+     would undo the first. `.k-date` reached the same conclusion for the
+     calendar and is the precedent this follows: own classes, own open state,
+     visual rule mirrored from the same tokens, recorded in GAPS.md.
+
+     What that buys, besides not fighting the library: the rows are real
+     `<input type="checkbox">` in real `<label>`s, so Tab walks them and Space
+     ticks them without a keyboard model of our own.
+
+     The trigger NAMES rather than counts. "2 selected" is a control describing
+     itself; "QA Reviewers +1" says one true thing and how much more there is.
+     Empty is *None* — the same word the dropdowns use, because a field with
+     nothing in it is a fact and a dash is a shrug. */
+  function multiField(o, key, label, vocab) {
+    const on = o[key] || [];
+    const keys = Object.keys(vocab);
+    const open = openMulti === key;
+    const first = keys.find((k) => on.indexOf(k) > -1);
+    const text = !on.length ? 'None'
+      : on.length === 1 ? vocab[first]
+      : vocab[first] + ' +' + (on.length - 1);
+    return `<div class="k-multi k-row${open ? ' is-open' : ''}" data-multi-key="${esc(key)}">
+      <button class="k-multi-btn" type="button" aria-haspopup="true" aria-expanded="${open}"
+              aria-label="${esc(label)}">
+        <span class="prop-lead">${esc(label)}</span>
+        <span class="dd-label-text">${esc(text)}</span>
+        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+      </button>
+      ${open ? `<div class="k-multi-panel" role="group" aria-label="${esc(label)}">
+        ${keys.map((k) => `<label class="ds-choice k-multi-opt">
+          <input type="checkbox" data-multi-opt="${esc(k)}"${on.indexOf(k) > -1 ? ' checked' : ''}>
+          <span></span><span class="k-multi-text">${esc(vocab[k])}</span></label>`).join('')}
+      </div>` : ''}
+    </div>`;
+  }
 
   /* ── The details are rows ──
 
@@ -4179,7 +4246,7 @@
            The reason still travels with it. That is why it is a block and not
            another row. -->
       <div class="prop-status">
-        ${propDropdown({ key: 'statusSet', label: 'Status', lead: 'Status is', blank: 'Automatic',
+        ${propDropdown({ key: 'statusSet', label: 'Status', blank: 'Automatic',
           map: () => Object.keys(STATUS).map((k) => [k, STATUS[k].label]) }, o, true)}
         <span class="prop-why">${o.statusSet
           ? 'Set by ' + esc(o.statusBy || USER.owner) + '. Choose Automatic to compute it again.'
@@ -4199,14 +4266,22 @@
            rendering on the document. -->
       <div class="prop-rows">
         ${PROP_FIELDS.map((f) => propDropdown(f, o, true)).join('')}
-        ${propRow('Tagged', tagField(o, 'tags', 'Tagged'))}
-        <!-- "Touches" said nothing. The field holds which of our service lines
-             the document belongs to — Support delivery, Voice operations — and
-             "Part of Support delivery" says that without a glossary. -->
-        ${propRow('Part of', tagField(o, 'services', 'Part of', SERVICES))}
-        ${propRow('Visible to', `<div class="prop-checks">${Object.keys(AUDIENCE).map((a) => `
-          <label class="ds-choice"><input type="checkbox" data-aud="${a}"${o.aud.indexOf(a) > -1 ? ' checked' : ''}>
-            <span></span><span class="prop-check-label">${esc(AUDIENCE[a])}</span></label>`).join('')}</div>`)}
+        <!-- ── The closed sets sit with the closed choices ──
+
+             Groups and Audience are the same KIND of fact as the seven rows
+             above them — a value out of a vocabulary the product owns — and
+             differ only in taking more than one. Tags and Services are the
+             other kind: open vocabularies you type into. Splitting the panel
+             on that line puts every control that opens a panel together and
+             every control that takes a caret together, which is one boundary
+             instead of two interleaved ones. -->
+        ${multiField(o, 'groups', 'Groups', GROUPS)}
+        ${multiField(o, 'aud', 'Audience', AUDIENCE)}
+        ${propRow('Tags', tagField(o, 'tags', 'Tags'))}
+        <!-- "Touches" said nothing and "Part of" said it as grammar. The field
+             holds which of our service lines the document belongs to — Support
+             delivery, Voice operations — so the row is called Services. -->
+        ${propRow('Services', tagField(o, 'services', 'Services', SERVICES))}
       </div>
 
       <!-- ── Anything the fixed fields cannot hold ──
@@ -4217,7 +4292,7 @@
            inputs and a sentence fragment, which is exactly as much as it
            explained.
 
-           It reads as a fact now — "tier is enterprise" — and becomes the two
+           It reads as a fact now — "tier: enterprise" — and becomes the two
            inputs when you click it, which is the same rule as the title, the
            body and every other row on this page. A new one arrives already
            open, with the placeholders doing the naming the labels used to fail
@@ -4226,7 +4301,7 @@
         ${custom.length ? '<p class="prop-also">Other facts about it</p>' : ''}
         ${custom.map((k) => `<div class="prop-kv${k === openProp ? ' is-open' : ''}" data-prop-pair="${esc(k)}">
           <button class="prop-kv-read" data-prop-open="${esc(k)}">
-            <span class="prop-lead">${esc(k)}</span> is
+            <span class="prop-lead">${esc(k)}</span>
             <span class="prop-kv-val">${esc(o.props[k]) || '—'}</span>
           </button>
           <input class="field-input" value="${esc(k)}" data-prop-k="${esc(k)}"
@@ -5668,7 +5743,12 @@
 
   const focusKeyOf = (el) => el && el.getAttribute
     ? (el.hasAttribute('data-x-add') ? ['data-x-add', el.getAttribute('data-x-add')]
-      : el.hasAttribute('data-x-val') ? ['data-x-val', el.getAttribute('data-x-val')] : null)
+      : el.hasAttribute('data-x-val') ? ['data-x-val', el.getAttribute('data-x-val')]
+      /* Ticking a box repaints, which detaches the box that was ticked. Without
+         this, choosing three groups is three clicks back into the panel — the
+         same defect the list fields above were fixed for. Unambiguous because
+         only one multi panel is ever open. */
+      : el.hasAttribute('data-multi-opt') ? ['data-multi-opt', el.getAttribute('data-multi-opt')] : null)
     : null;
 
   /* ── One writer per field, called rather than fired ──
@@ -6261,7 +6341,7 @@
 
     /* ── A view and the edge it walks ── */
     seed('s-seed-3', 'Where is the corpus thinnest by client?', 9,
-      stateOf({ view: 'tree', group: 'client' }),
+      stateOf({ view: 'tree', by: 'client' }),
       said('Where is the corpus thinnest by client?',
            'Grouped by client, most of what we hold is not about a client at all — it is '
            + 'policy and product material that applies to everyone. The named clients each '
@@ -6325,6 +6405,7 @@
         if (bell.open) { bell.close(true); return; }
         if (peekStack.length) { closePeek(); return; }
         if (calOpen) { calOpen = null; calPick = null; renderFilters(readURL()); return; }
+        if (openMulti) { openMulti = null; renderDoc(readURL()); return; }
         if (proto.open) { proto.toggle(false); return; }
         if (this.open) this.close();
       });
@@ -6806,6 +6887,7 @@
         const v = axes[k];
         return k === 'tag' ? v.some((x) => o.tags.indexOf(x) > -1)
           : k === 'service' ? v.some((x) => o.services.indexOf(x) > -1)
+          : k === 'group' ? v.some((x) => o.groups.indexOf(x) > -1)
           : k === 'type' ? v.indexOf(o.t) > -1
           : k === 'collection' ? v.indexOf(o.col) > -1
           : k === 'source' ? v.indexOf(o.src) > -1
@@ -7836,7 +7918,7 @@
         ['no results', 'url:?q=zzzzzz'],
         ['no folders', 'url:?q=zzzzzz&view=tree'],
         ['nothing archived', 'mt:archive'],
-        ['a quiet briefing', 'mt:brief'],
+        ['nothing needs a person', 'mt:brief'],
         ['nothing left to connect', 'mt:connected'],
         ['no connections', 'mt:noedges'],
         ['no comments', 'mt:nocomments'],
@@ -7941,10 +8023,10 @@
         return;
       }
       if (arg === 'brief') {
-        /* The briefing reports failing sources, out-of-date and unused
-           documents, AiMY's drafts, unanswered questions and where you left
-           off. All six have to be false at once, which is a rare morning and a
-           perfectly ordinary one. */
+        /* needsYou() reports failing sources, out-of-date and unused documents,
+           AiMY's drafts, conflicts and unanswered questions. All of them have to
+           be false at once for the band and the bell to have nothing to say,
+           which is a rare morning and a perfectly ordinary one. */
         CORPUS.forEach((o) => { o.statusSet = 'current'; o.statusBy = USER.owner; });
         Object.keys(SRC).forEach((k) => { SRC[k].health = 'ok'; });
         USER.recent = [];
@@ -8085,11 +8167,11 @@
     /* Which edge the tree walks. Same shape as every other state change here:
        it goes in the URL, so a grouped tree is a link somebody can send. */
     document.addEventListener('dd:change', (e) => {
-      const dd = e.target.closest('.v2-dropdown[data-group-key]');
+      const dd = e.target.closest('.v2-dropdown[data-axis-key]');
       if (!dd) return;
       const opt = dd.querySelector('.v2-dropdown-option[aria-selected="true"]');
       const val = opt ? (opt.dataset.slug || 'col') : 'col';
-      if (val !== readURL().group) patch({ group: val });
+      if (val !== readURL().by) patch({ by: val });
     });
 
     document.addEventListener('dd:change', (e) => {
@@ -8216,10 +8298,17 @@
       const t = e.target;
       const o = byId(readURL().doc);
       if (!o || !t.hasAttribute) return;
-      if (t.hasAttribute('data-aud')) {
-        const a = t.getAttribute('data-aud');
-        o.aud = t.checked ? o.aud.concat([a]).filter((x, i, arr) => arr.indexOf(x) === i)
-                          : o.aud.filter((x) => x !== a);
+      /* One writer for every set-valued field — the field names itself on the
+         container, so Groups and Audience do not need a branch each, and the
+         next one will not need a third. A set-valued field writes the whole
+         set, which is why it has no add and no remove. */
+      if (t.hasAttribute('data-multi-opt')) {
+        const box = t.closest('[data-multi-key]');
+        const key = box && box.getAttribute('data-multi-key');
+        const v = t.getAttribute('data-multi-opt');
+        if (!key || !o[key]) return;
+        o[key] = t.checked ? o[key].concat([v]).filter((x, i, arr) => arr.indexOf(x) === i)
+                           : o[key].filter((x) => x !== v);
         repaintEditor();
       }
     });
@@ -8580,6 +8669,30 @@
       }
     });
 
+    /* The keyboard half of `role="button"`. A span does not activate on Enter
+       or Space, so the two keys are handed to the click router the element is
+       already wired to — one route in, whichever way you arrive at it. */
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = e.target.closest && e.target.closest('.ins-clause[role="button"]');
+      if (!el) return;
+      e.preventDefault();
+      el.click();
+    });
+
+    /* Click-off closes an open set panel. Its own listener rather than a line
+       in the router above: the router re-renders and returns from most of its
+       branches, so a close placed inside it would either be unreachable or be
+       reached with the page already replaced underneath it. Registered after
+       the router, so a press on the trigger is handled as a toggle first and
+       read as an outside click never. */
+    document.addEventListener('click', (e) => {
+      if (!openMulti) return;
+      if (e.target.closest && e.target.closest('.k-multi')) return;
+      openMulti = null;
+      renderDoc(readURL());
+    });
+
     /* Tag entry. Enter commits a token, Backspace on an empty field removes the
        last one — the two things every tag field is expected to do. */
     document.addEventListener('keydown', (e) => {
@@ -8763,24 +8876,6 @@
       if ((el = t.closest('[data-recent]'))) { location.search = el.getAttribute('data-recent'); return; }
       if (t.closest('[data-retry]'))  { location.href = location.pathname; return; }
 
-      /* ── briefing ── */
-      if ((el = t.closest('[data-brief-filter]'))) {
-        const b = sinceLastVisit().find((x) => x.id === el.getAttribute('data-brief-filter'));
-        if (!b || !b.href) return;
-        const next = readURL0();
-        Object.keys(b.href).forEach((k) => { next[k] = b.href[k]; });
-        rememberFilter();
-        writeURL(next);
-        /* Filters AND explains — the finding and its detail in one click. */
-        if (b.ask) patch({ settings: b.ask[0] + ':' + b.ask[1] });
-        return;
-      }
-      if ((el = t.closest('[data-brief-prompt]'))) {
-        canvas.stage(el.getAttribute('data-brief-prompt'),
-          ['Coverage gap', '3 unanswered questions', 'Nothing to filter to']);
-        return;
-      }
-
       /* ── documents ── */
       if ((el = t.closest('[data-open-doc]'))) {
         /* A document reference opens the document. If the reference was inside
@@ -8807,6 +8902,15 @@
          ours" is true of the rail's blocks and was never true of this one. */
       if ((el = t.closest('[data-open-ver]'))) { previewVer = +el.getAttribute('data-open-ver'); renderDoc(readURL()); return; }
       if (t.closest('[data-close-ver]')) { previewVer = null; renderDoc(readURL()); return; }
+      /* The panel opens under its own row and shuts on the second press — the
+         library's dropdowns behave this way and this one has to match, because
+         it is sitting in the same column pretending to be one of them. */
+      if ((el = t.closest('.k-multi-btn'))) {
+        const key = el.closest('[data-multi-key]').getAttribute('data-multi-key');
+        openMulti = openMulti === key ? null : key;
+        renderDoc(readURL());
+        return;
+      }
       if ((el = t.closest('[data-tag-drop]'))) {
         const o = byId(readURL().doc);
         const key = el.closest('[data-tag-field]').getAttribute('data-tag-field');
@@ -9467,7 +9571,7 @@
        ending. A conversation is not a filter and clearing the filters is not
        a way to end it. */
     const st = { doc: '', settings: '', chat: cur.chat,
-                 view: cur.view, group: cur.group, sort: cur.sort, q: '', prop: '' };
+                 view: cur.view, by: cur.by, sort: cur.sort, q: '', prop: '' };
     LIST_KEYS.forEach((k) => { st[k] = []; });
     DATE_KEYS.forEach((k) => { st[k] = ''; });
     FLAG_KEYS.forEach((k) => { st[k] = false; });
