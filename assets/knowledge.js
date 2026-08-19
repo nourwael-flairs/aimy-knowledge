@@ -519,28 +519,28 @@
       title:'Nordwind — 31% faster resolution', col:'marketing', src:'hubspot', prod:'sales', client:'nordwind',
       tags:['qa','emea','proof'], upd:39, ing:120, xc:130, xu:39,
       sum:'Eight hundred seats, three months, measured against their own baseline.',
-      x:{ customer:'Nordwind GmbH · 800 seats', outcome:'31% faster first resolution',
+      x:{ size:'800 seats', outcome:'31% faster first resolution',
           quote:'We stopped guessing which conversations to review.', approval:'pending' } },
 
     { id:'story-meridian', t:'story', work:'completed', owner:'Marketing',
       title:'Meridian Health — audit-ready in six weeks', col:'marketing', src:'hubspot', prod:'copilot', client:'meridian',
       tags:['security','eu','proof'], upd:54, ing:140, xc:150, xu:54,
       sum:'A regulated provider reaching audit readiness without adding headcount.',
-      x:{ customer:'Meridian Health · 240 seats', outcome:'Audit readiness in 6 weeks',
+      x:{ size:'240 seats', outcome:'Audit readiness in 6 weeks',
           quote:'The evidence was already there. We just could not find it.', approval:'approved' } },
 
     { id:'story-tavola', t:'story', work:'recommended', owner:'Marketing',
       title:'Tavola Retail — peak season without extra headcount', col:'marketing', src:'hubspot', prod:'voice', client:'tavola',
       tags:['voice','proof'], upd:104, ing:180, xc:190, xu:104,
       sum:'Seasonal volume absorbed by voice deflection rather than temporary staff.',
-      x:{ customer:'Tavola Retail · 410 seats', outcome:'Peak absorbed with 0 temporary hires',
+      x:{ size:'410 seats', outcome:'Peak absorbed with 0 temporary hires',
           quote:'December stopped being the month we dread.', approval:'approved' } },
 
     { id:'story-orbit', t:'story', work:'drafted', owner:'Unassigned',
       title:'Orbit BPO — multi-client QA in one view', col:'marketing', src:'upload', prod:'sales', client:'orbit',
       tags:['qa','proof'], upd:3, ing:3, xc:3, xu:3,
       sum:'Drafted by AiMY from the account notes. No customer sign-off, no owner.',
-      x:{ customer:'Orbit BPO · 1,200 seats', outcome:'One QA view across 9 client programmes',
+      x:{ size:'1,200 seats', outcome:'One QA view across 9 client programmes',
           quote:'Awaiting approval — do not quote externally.', approval:'pending' } },
 
     { id:'blog-quality-scale', t:'blog', work:'completed', owner:'Marketing',
@@ -1145,6 +1145,33 @@
      counted as though they were. */
   const LIVE = ENTITLED.filter((o) => !o.arch);
 
+  /* ── What a search actually searches ──
+
+     Title and CONTENT, which is what the research says and what anybody typing
+     a phrase assumes. It was title + summary + tags, and the summary is not the
+     content: `o.sum` is the first paragraph, and `o.html` is the document — so
+     searching for a phrase that appears three paragraphs down returned nothing
+     and read as an empty corpus rather than as a search that never looked.
+
+     The type record goes in too. A ticket's resolution, an ICP's segment, a
+     story's outcome and a blog's author are the most searchable text those
+     types have, and none of it is in the prose: `sum` on a ticket is the
+     customer's question, not how it was closed.
+
+     Tags stay. They are what somebody filed it under, which is a legitimate
+     thing to search by even though `tag=` can also filter by it exactly. */
+  const haystack = (o) => [
+    o.title,
+    o.sum,
+    stripTags(o.html),
+    o.tags.join(' '),
+    Object.keys(o.x || {}).map((k) => {
+      const v = o.x[k];
+      return Array.isArray(v) ? v.join(' ') : String(v == null ? '' : v);
+    }).join(' '),
+    Object.keys(o.props || {}).map((k) => k + ' ' + o.props[k]).join(' ')
+  ].join(' ').toLowerCase();
+
   function applyFilters(st) {
     /* `ids` is exclusive by design. It is how an answer puts its own sources on
        the surface, and mixing it with the filters that were active beforehand
@@ -1177,7 +1204,7 @@
     }
     if (st.q) {
       const q = st.q.toLowerCase();
-      out = out.filter((o) => (o.title + ' ' + o.sum + ' ' + o.tags.join(' ')).toLowerCase().indexOf(q) > -1);
+      out = out.filter((o) => haystack(o).indexOf(q) > -1);
     }
     return out;
   }
@@ -3830,7 +3857,16 @@
                ['presented', 'Last presented', 'text'],
                ['usage', 'Shown', 'pick', ['External — customer-facing', 'External — under NDA', 'Internal only']],
                ['approval', 'Approval', 'pick', [['approved', 'Cleared to present'], ['pending', 'Not cleared']]]],
-    story:    [['customer', 'Customer', 'text'],
+    /* No `customer` row. The research draws a Success Story's customer as an
+       edge to CLIENT, and this document already has one: `o.client` is the
+       filterable relation, it is what the card prints, and it is what
+       `?client=nordwind` narrows by. A second free-text field saying the same
+       name is a fact the surface cannot use and the two can disagree.
+
+       What that field carried and the relation does not is the SIZE of the
+       engagement — "800 seats" — so the scale keeps a row of its own and the
+       name keeps the edge. */
+    story:    [['size', 'Size', 'text'],
                ['outcome', 'Outcome', 'text'],
                ['quote', 'They said', 'long'],
                ['approval', 'Approval', 'pick', [['approved', 'Cleared to quote'], ['pending', 'Not cleared']]]],
@@ -7700,6 +7736,52 @@
     }).slice(0, 5).map((phrase) => [phrase, 'fill:' + phrase]);
   }
 
+  /* ── One button per filter the model declares ──
+
+     The five phrases above teach the input. These are the other question a
+     review asks: does every axis in the data model actually FILTER, and can I
+     see it doing it? Eleven of them have no control on the surface any more,
+     and two of the ones that did turned out never to have worked at all —
+     `work` and `trust` moved a URL parameter nothing consumed, for as long as
+     anybody had been clicking them.
+
+     So each of these goes straight to a URL rather than through the input: the
+     phrase route is demonstrated above, and what is being demonstrated here is
+     the KEY. Every one carries a live value taken from the corpus, so a button
+     cannot outlive the fixture it was written against.
+
+     `ids` is the one nothing else can reach. It is how an answer puts its own
+     sources on the surface — AiMY retrieves, then the set becomes what it
+     retrieved — and it is exclusive by design, so it is worth being able to
+     look at without asking a question first. */
+  function protoAxes() {
+    const first = (list) => (list && list.length ? list[0] : '');
+    const someTag = first((ENTITLED.find((o) => !o.arch && o.tags.length) || {}).tags);
+    const someSvc = first((ENTITLED.find((o) => !o.arch && o.services.length) || {}).services);
+    const anIcp   = ENTITLED.find((o) => !o.arch && o.t === 'icp');
+    const aStory  = ENTITLED.find((o) => !o.arch && o.t === 'story' && o.client);
+    const answer  = ENTITLED.filter((o) => !o.arch).slice(0, 3).map((o) => o.id);
+
+    return [
+      ['type', 'url:?type=icp'],
+      ['tags', someTag ? 'url:?tag=' + encodeURIComponent(someTag) : ''],
+      ['source', 'url:?source=zendesk'],
+      ['client', aStory ? 'url:?client=' + aStory.client : ''],
+      ['product', 'url:?product=copilot'],
+      ['region', anIcp ? 'url:?region=' + anIcp.region : ''],
+      ['service', someSvc ? 'url:?service=' + encodeURIComponent(someSvc) : ''],
+      ['updated at', 'url:?updated=30d'],
+      ['ingested at', 'url:?ingested=90d'],
+      ['external updated at', 'url:?extUpdated=90d'],
+      ['external created at', 'url:?extCreated=1y'],
+      /* Title and content, one word each, so the two halves of the research's
+         Search node are visibly separate things. */
+      ['search — a title', 'url:?q=' + encodeURIComponent('proration')],
+      ['search — inside the content', 'url:?q=' + encodeURIComponent('goodwill credit')],
+      ['by document ids', answer.length ? 'url:?ids=' + answer.join(',') : '']
+    ];
+  }
+
   function protoGroups() {
     const deadSrc = Object.keys(SRC).find((k) => k !== 'upload' && SRC[k].health !== 'ok');
     const superseded = protoFirst((o) => !o.arch && o.status === 'superseded' && !(RELATED[o.id] || {}).supersededBy);
@@ -7713,6 +7795,8 @@
       ]],
       ['Filtering without the controls', 'Fills the input. Press Enter. Two or three of these and the rail starts listing them.',
         protoFilters()],
+      ['Every filter the model has', 'Goes straight there. One per axis, on a value taken from the corpus.',
+        protoAxes()],
       ['A document in each state', 'Opens one that really is in that state.', [
         ['out of date', 'doc:' + protoFirst((o) => !o.arch && o.status === 'outdated')],
         ['conflicting', 'doc:' + protoFirst((o) => !o.arch && o.status === 'conflicting')],
@@ -10172,7 +10256,7 @@
        number, and 0 is what "no deck yet" honestly is. TYPE_BODY tests it as
        falsy so a deck with no file states no slide count at all. */
     pptx:     { slides: 0, presented: '—', usage: 'Internal only', approval: 'pending' },
-    story:    { customer: '—', outcome: '—', quote: '', approval: 'pending' },
+    story:    { size: '—', outcome: '—', quote: '', approval: 'pending' },
     blog:     { pub: 'Draft', canonical: '—', author: USER.owner },
     /* No crawl or change: both are derived from `upd` and `xu` now. */
     webpage:  { url: '—' }

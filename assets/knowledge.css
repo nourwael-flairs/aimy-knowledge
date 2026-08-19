@@ -4233,6 +4233,37 @@ body.is-doc .page-inner { max-width: none; }
 .prop-check-label { font-size: var(--ty-body); font-weight: 400; color: var(--ink-secondary); }
 .prop-row .ds-choice { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; }
 
+/* ── The tick, centred in its box ──
+
+   The library positions it with two fixed offsets — `left: 5px; top: 1.5px` on an
+   18px box — and neither survives contact with the box's own border. Measured on
+   the connect sheet: `box-sizing` is `border-box`, so the ::after's containing
+   block is the PADDING box, which is 18px minus two borders. The tick's own box
+   centre landed at (7.5, 6.0) where the padding box centre is (8.2, 8.2) — 2.2px
+   high and 0.7px left, and it moves again the moment a border width changes.
+
+   Two separate corrections, because there are two separate offsets:
+
+   FIRST, centre the box on the box. `left`/`top` at 50% with a -50% translate is
+   the version that cannot drift: it reads the container at render time, so a
+   border change moves the tick with it instead of leaving it behind.
+
+   SECOND, and this is the part a plain -50% gets wrong: the glyph is not centred
+   INSIDE its own element. It is drawn from the right and bottom borders of a 5×9
+   rectangle, so the ink sits in the bottom-right corner and the rest is empty.
+   Rotating 45° about the element's centre swings that ink DOWN — 1.4px at these
+   dimensions, computed from the two border strips' area centroid — so centring
+   the element leaves the visible tick low by exactly that much.
+
+   Hence the calc. It is an optical correction, which this file already keeps
+   apart from rhythm: it is a judgment about one glyph at one size, not a value
+   off a scale, and it is written as the number it is rather than folded into a
+   percentage that hides what it is compensating for. */
+.ds-choice input[type="checkbox"]:checked::after {
+  left: 50%; top: 50%;
+  transform: translate(-50%, calc(-50% - 1.4px)) rotate(45deg);
+}
+
 /* ── Anything the fixed fields cannot hold ──
 
    Two permanent text boxes named only by `aria-label` were the least legible
