@@ -3620,7 +3620,15 @@
      holds this document keeps holding this document. */
   let edits = { id: null, snap: null, dirty: false };
 
-  const snapOf = (o) => JSON.stringify(o);
+  /* Key ORDER is not a change. Renaming a custom property moves its key to the
+     end of the bag, re-typing a value that was never there adds one — a plain
+     stringify calls both of those a difference even when the document reads
+     identically, and this comparison is what decides whether the bar claims
+     there is something to save. */
+  const snapOf = (o) => JSON.stringify(o, (k, v) => (
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.keys(v).sort().reduce((a, kk) => { a[kk] = v[kk]; return a; }, {})
+      : v));
   const clearEdits = () => { edits = { id: null, snap: null, dirty: false }; };
 
   /* The last clean paint IS the baseline. Every path that changes the document
@@ -3636,6 +3644,67 @@
     edits = { id: o.id, snap: snapOf(o), dirty: false };
   }
 
+  /* ── The body as it was drawn ──
+
+     A document does not arrive as a page. Most of the corpus stores a summary
+     and no markup at all, and the editor renders that into paragraphs — so
+     writing an untouched body back to the object replaced a one-line summary
+     with the renderer's own output and set `html` on a document that never had
+     any. Nobody edited anything; the renderer caught up with itself. That was
+     invisible while it was autosaved the instant it happened. Offer a Save and
+     it stops being invisible: putting the pointer in the body and taking it
+     out again announced unsaved changes to a document nobody had touched.
+
+     So renderDoc records what it put in the body, and the body's writer
+     compares against THAT rather than against the object. Nothing moved,
+     nothing is written — which is also what stops `html` from collecting a
+     layer of the template's whitespace on every focus.
+
+     `bodyWritten` closes the one hole in that: once this round HAS written the
+     body, every later write has to go through, or a body edited and then
+     deleted back to the markup it was drawn with would leave the object
+     holding the edit. Only the untouched case is skipped. */
+  let bodyDrawn = null;
+  let bodyWritten = false;
+
+  /* A round typed back to where it started is not a round. The field surfaces
+     commit on blur, so a value restored with Escape — or typed out and typed
+     back — arrives here identical to the baseline, and the bar should say so
+     rather than holding a Save over nothing.
+
+     Only at commit points. Mid-keystroke the object has not caught up with the
+     field yet, and checking there would make the buttons flicker in and out
+     under the typing. */
+  function settle(o, quiet) {
+    if (!isDirty(o) || snapOf(o) !== edits.snap) return;
+    edits.dirty = false;
+    if (!quiet) paintTopEnd(o);
+  }
+
+  /* Marked, then settled: together these two ask the object whether anything
+     actually differs from the baseline, in both directions. Every commit point
+     runs it, so a change raises the Save and an edit undone by hand puts it
+     away again — without either of them needing to know what was touched. */
+  function recheck(o, quiet) { markDirty(o, quiet); settle(o, quiet); }
+
+  /* Whatever is under the caret right now, written down. The bar's buttons do
+     not take focus — they cannot, or the blur would repaint them out from
+     under the click — so the field they were clicked from is still open, and
+     what it holds is part of the round being saved. */
+  function commitLive() {
+    const t = document.activeElement;
+    if (!t || !t.closest || !t.closest('.doc-page') || !t.hasAttribute) return;
+    if (t.id === 'editBody') { writeBody(t); return; }
+    if (t.hasAttribute('data-edit-title')) {
+      const o = byId(readURL().doc);
+      const v = t.textContent.trim();
+      if (o && v) o.title = v;
+      return;
+    }
+    if (t.hasAttribute('data-x-val')) { commitXField(t); return; }
+    if (t.hasAttribute('data-prop-k') || t.hasAttribute('data-prop-v')) { commitProp(t); return; }
+  }
+
   const isDirty = (o) => !!(o && edits.dirty && edits.id === o.id);
   const dirtyDoc = () => (edits.dirty && edits.id ? byId(edits.id) : null);
 
@@ -3643,12 +3712,12 @@
      went through. The top bar is swapped in place rather than repainted with
      the page, because the body writes through on every keystroke and a repaint
      would take the caret with it. */
-  function markDirty(o) {
+  function markDirty(o, quiet) {
     if (!o) return;
     if (edits.id !== o.id) { edits = { id: o.id, snap: snapOf(o), dirty: false }; }
     if (edits.dirty) return;
     edits.dirty = true;
-    paintTopEnd(o);
+    if (!quiet) paintTopEnd(o);
   }
 
   function paintTopEnd(o) {
@@ -3694,6 +3763,7 @@
   /* Writing the round down. There is no new version and no new date: this is
      the save the editor never had, not the publish it already has. */
   function saveChanges(quiet) {
+    commitLive();
     const o = byId(readURL().doc);
     if (!isDirty(o)) return false;
     edits = { id: o.id, snap: snapOf(o), dirty: false };
@@ -5625,6 +5695,13 @@
     }
     else if (armed) { const el = $(armed); if (el) { armEditable(el); caretToEnd(el); } }
     else if (blank) { const t = $('[data-edit-title]'); if (t) setTimeout(() => armEditable(t), 80); }
+
+    /* Last, because it reads the body out of the page this function just put
+       there. See bodyDrawn: what the renderer made of a stored summary is the
+       starting state, not the first edit. */
+    const drawn = $('#editBody');
+    bodyDrawn = drawn ? drawn.innerHTML : null;
+    bodyWritten = false;
   }
 
   /* ── Read first, edit on touch ──
@@ -5875,8 +5952,18 @@
   function writeBody(el) {
     const o = byId(readURL().doc);
     if (!o || !el) return o;
-    o.sum = el.innerText.trim();
-    o.html = o.sum ? el.innerHTML : '';
+    /* Every way the body can change ends up here — typing, the formatting
+       toolbar, the block menu, an image landing in a figure, an AiMY draft —
+       so this is where the document finds out it has changed. But two callers
+       that are NOT edits reach it too: the blur that follows a click into the
+       body, and the blur that follows an Escape. Against the body as it was
+       drawn, both are visibly nothing, and nothing is what they write. */
+    if (bodyWritten || bodyDrawn === null || el.innerHTML !== bodyDrawn) {
+      bodyWritten = true;
+      o.sum = el.innerText.trim();
+      o.html = o.sum ? el.innerHTML : '';
+      markDirty(o);
+    }
     el.classList.toggle('is-blank', !o.sum);
     const b = $('.doc-page [data-publish]');
     if (b) {
@@ -5993,7 +6080,10 @@
   }
 
   function repaintEditor() {
-    markDirty(byId(readURL().doc));
+    /* After the write and before the paint is the one moment the question has
+       an exact answer, so it is asked in both directions: something moved, or
+       something moved back. Quietly — renderDoc is about to draw the bar. */
+    recheck(byId(readURL().doc), true);
     recompute();
     pendingFocus = focusKeyOf(document.activeElement);
     const st = readURL();
@@ -8645,7 +8735,13 @@
              commits and folds the row out from under the second click. */
           e.target.closest('[data-step]') ||
           e.target.closest('.dv-subject .entry-action') ||
-          e.target.closest('.dv-links .entry-action')) { e.preventDefault(); return; }
+          e.target.closest('.dv-links .entry-action') ||
+          /* Save and Discard are clicked FROM a field — that is the whole
+             point of them — and a button there that takes focus blurs the
+             field, which commits, which repaints, which detaches the button
+             the click was travelling to. Same defect, same fix; `commitLive`
+             is what then writes the field down instead of the blur. */
+          e.target.closest('.doc-topbar')) { e.preventDefault(); return; }
       /* Touching anything else puts the block list away. Choosing a block and
          pressing + again already close it; this is the third way out, which is
          the one you reach for without thinking. */
@@ -8679,6 +8775,37 @@
       else if ($('#blkMenu')) closeBlockMenu();
     }, true);
 
+    /* ── Anything typed into the document is a change to the document ──
+
+       The editor had exactly two funnels, and they were the two the autosave
+       used: the body, which writes through on every keystroke, and
+       repaintEditor, which every other field reaches on BLUR. That is enough
+       to record a save after the fact. It is not enough to offer one — a
+       title is being changed while it is being typed, and a bar that only
+       admits it once you click somewhere else is a bar saying "nothing to
+       save" over a document you are visibly changing.
+
+       So the signal is the keystroke, wherever it lands, and the commit stays
+       exactly where it was. The title writes through as it goes, the way the
+       body does: there is no repaint on this path, so there is no caret to
+       lose. Everything else is still written by the blur that already wrote
+       it, and `settle` is what takes the claim back if the blur turns out to
+       have committed nothing. */
+    document.addEventListener('input', (e) => {
+      const t = e.target;
+      if (!t || !t.closest || !t.hasAttribute) return;
+      if (!t.closest('.doc-page') || t.closest('.modal')) return;
+      /* The body has its own writer, which knows whether anything moved. */
+      if (t.id === 'editBody') return;
+      /* Not the document: a comment is a note ABOUT it, and a picker's filter
+         box is not content at all. */
+      if (t.hasAttribute('data-comment-input') || t.hasAttribute('data-pick-q')) return;
+      const o = byId(readURL().doc);
+      if (!o) return;
+      if (t.hasAttribute('data-edit-title')) { const v = t.textContent.trim(); if (v) o.title = v; }
+      markDirty(o);
+    });
+
     /* Property key/value edits are committed on blur rather than on every
        keystroke — repainting mid-word would take the caret with it. */
     document.addEventListener('focusout', (e) => {
@@ -8687,13 +8814,21 @@
       if (!o || !t.hasAttribute) return;
       if (t.hasAttribute('data-x-val')) {
         commitXField(t);
+        /* Every branch here ends in one of the two: a repaint, which settles
+           on the way through, or a settle of its own. A field that raised the
+           Save by being typed into has to be able to take it back by being
+           typed back — and the branch that commits without repainting was
+           leaving the claim standing over a document nothing had changed. */
         if (openXField !== null) { openXField = null; repaintEditor(); }
+        else settle(byId(readURL().doc));
         return;
       }
       if (t.hasAttribute('data-prop-k')) {
         if (commitProp(t)) repaintEditor();
+        else settle(byId(readURL().doc));
       } else if (t.hasAttribute('data-prop-v')) {
         commitProp(t);
+        settle(byId(readURL().doc));
         /* Leaving the pair folds it back to the phrase — but only if focus
            actually left the pair, not if it moved from the name to the value. */
         const pair = t.closest('.prop-kv');
@@ -8710,8 +8845,13 @@
         repaintEditor();
       } else if (t.hasAttribute('data-edit-title')) {
         disarmEditable(t);
+        /* The keystroke already wrote it — see the input handler above — so
+           this is the repaint, not the write. It runs either way rather than
+           on a difference that can no longer be detected here, and settle is
+           what decides whether anything actually moved. */
         const v = t.textContent.trim();
-        if (v && v !== o.title) { o.title = v; repaintEditor(); }
+        if (v) o.title = v;
+        repaintEditor();
       }
     }, true);
 
