@@ -1110,6 +1110,10 @@
      from everywhere and only one caller has anything to say about this. */
   let restoring = false;
 
+  /* Where the address bar currently points. The back button changes it before
+     it tells us, so blocking a navigation means putting this back. */
+  let hereURL = location.pathname + location.search;
+
   function writeURL(st, opt) {
     /* ── The canvas gets out of the way of its own results ──
 
@@ -1139,6 +1143,7 @@
     const url = location.pathname + (qs ? '?' + qs : '');
     if (opt && opt.replace) history.replaceState(null, '', url);
     else history.pushState(null, '', url);
+    hereURL = url;
     render();
   }
 
@@ -1146,11 +1151,27 @@
      surface goes through here, so there is exactly one writer. */
   function patch(changes, opt) {
     const st = readURL();
+    const from = st.doc;
     Object.keys(changes).forEach((k) => { st[k] = changes[k]; });
     /* Changing a filter drops the open document: you asked to look at the set
        again, and leaving one document open on top of a set you can no longer
        see is the classic lost-place bug. */
     if (Object.keys(changes).some((k) => ALL_KEYS.indexOf(k) > -1)) st.doc = '';
+    /* ── Nothing leaves a document with unsaved changes ──
+
+       Every way out of a document ends up here — the back button in the top
+       bar, a filter chip, a citation, a card, an answer that opens something
+       else — because this is the one writer of the URL. So this is the one
+       place the question has to be asked, and asking it here means no route
+       can be added later that forgets to.
+
+       The change is not thrown away while the question is open: it is replayed
+       verbatim once it has been answered, so whatever you clicked still
+       happens, and it happens to the document you decided about. */
+    if (!(opt && opt.pastGuard) && from && st.doc !== from && isDirty(byId(from))) {
+      guardLeave(() => patch(changes, Object.assign({}, opt, { pastGuard: true })));
+      return;
+    }
     /* The type-switch note describes a switch you JUST made. Leaving the
        document ends "just", so it does not wait on the object to be reopened
        days later and announce itself as news. */
@@ -3576,6 +3597,175 @@
   }
 
 
+  /* ── Unsaved changes ──
+
+     Editing used to be its own commit: every keystroke and every field wrote
+     through to the object, and the only thing the page said about it was a
+     grey "Saved just now". That is autosave, and autosave has no answer to the
+     two questions people actually ask of a document they are changing — "is
+     this written down yet" and "can I take that back". There was no back: the
+     write had already happened, in the corpus, under the search, in front of
+     everybody the collection is shared with.
+
+     So the writes still land on the object — the whole editor renders FROM the
+     object, and buffering every field would mean a second copy of the document
+     and two places for it to be wrong — but they are no longer a commit. The
+     state the document was in when the round of edits started is kept whole,
+     and the two ways out of a round are both offered, both explicit, and one
+     of them has to be taken before the document can be left.
+
+     `snap` is that state: a full clone, because a document is plain data and
+     there is nothing in it a clone cannot carry. Restoring assigns back INTO
+     the same object rather than swapping it, so every array in the corpus that
+     holds this document keeps holding this document. */
+  let edits = { id: null, snap: null, dirty: false };
+
+  const snapOf = (o) => JSON.stringify(o);
+  const clearEdits = () => { edits = { id: null, snap: null, dirty: false }; };
+
+  /* The last clean paint IS the baseline. Every path that changes the document
+     marks it dirty BEFORE it repaints, so a paint that arrives with nothing
+     pending is by definition a paint of the saved document — which is exactly
+     what a discard has to put back. It also means the actions that carry their
+     own commit surface and their own Undo — re-syncing, restoring a version,
+     recording a supersession — re-baseline through the render they already do,
+     rather than being swept up in the next Discard. */
+  function baseline(o) {
+    if (!o) return;
+    if (edits.dirty && edits.id === o.id) return;
+    edits = { id: o.id, snap: snapOf(o), dirty: false };
+  }
+
+  const isDirty = (o) => !!(o && edits.dirty && edits.id === o.id);
+  const dirtyDoc = () => (edits.dirty && edits.id ? byId(edits.id) : null);
+
+  /* Called where noteSave used to be — the same two funnels every edit already
+     went through. The top bar is swapped in place rather than repainted with
+     the page, because the body writes through on every keystroke and a repaint
+     would take the caret with it. */
+  function markDirty(o) {
+    if (!o) return;
+    if (edits.id !== o.id) { edits = { id: o.id, snap: snapOf(o), dirty: false }; }
+    if (edits.dirty) return;
+    edits.dirty = true;
+    paintTopEnd(o);
+  }
+
+  function paintTopEnd(o) {
+    const el = $('.doc-top-end');
+    if (el && byId(readURL().doc) === o) el.innerHTML = docTopEnd(o);
+  }
+
+  /* Publish is a way out of the document too, so it is closed while there is
+     something unwritten — but it does not SAY so. Every other reason the gate
+     is shut goes in the label, because nothing else on the bar is saying it;
+     this one is already said twice over by the words and the two buttons
+     immediately to its left, and a third copy of it is just width. */
+  const publishTitle = (o) => (isDirty(o)
+    ? 'Save or discard your changes first'
+    : publishGate(o) + ' — a document that does not say what it is cannot go live');
+
+  /* What sits at the end of the top bar. One function, because the bar is
+     drawn twice — once with the page, once in place on the keystroke that
+     makes the document dirty — and two copies would drift.
+
+     Discard says "Discard changes" and not "Discard", because the slot it
+     lands in already has a Discard: an untouched blank document offers to
+     throw ITSELF away, and the two are one word and one click apart. */
+  function docTopEnd(o) {
+    const pending = isDirty(o);
+    const gate = publishGate(o);
+    return `
+            ${pending
+              ? `<span class="doc-unsaved">${ICO.warn.replace('<svg', '<svg width="12" height="12"')}Unsaved changes</span>
+                 <button class="btn btn-ghost btn-sm" data-changes-discard>Discard changes</button>
+                 <button class="btn btn-brand btn-sm" data-changes-save>Save changes</button>`
+              : `${savedLabel(o)}
+                 ${isBlankDoc(o) ? `<button class="btn btn-ghost btn-sm" data-discard="${o.id}">Discard</button>` : ''}`}
+            ${o.status === 'draft'
+              ? `<button class="btn btn-brand btn-sm" data-act="publish" data-obj="${o.id}" data-publish
+                   ${gate || pending ? `disabled title="${esc(publishTitle(o))}"` : ''}
+                 >${gate || 'Publish'}</button>` : ''}
+            <button class="doc-rail-toggle" data-rail-toggle aria-expanded="${railOpen}"
+                    aria-label="${railOpen ? 'Hide details' : 'Show details'}">
+              ${ICO.sidebar ? ICO.sidebar.replace('<svg', '<svg width="15" height="15"') : ICO.eye.replace('<svg', '<svg width="15" height="15"')}</button>`;
+  }
+
+  /* Writing the round down. There is no new version and no new date: this is
+     the save the editor never had, not the publish it already has. */
+  function saveChanges(quiet) {
+    const o = byId(readURL().doc);
+    if (!isDirty(o)) return false;
+    edits = { id: o.id, snap: snapOf(o), dirty: false };
+    noteSave(o);
+    recompute();
+    render();
+    if (!quiet) toast('Changes saved', null, 'The document now says what you wrote');
+    return true;
+  }
+
+  /* And putting the round back. Own keys added since the baseline are removed
+     rather than left behind — a property invented during the round is part of
+     the round. */
+  function discardChanges(quiet) {
+    const o = byId(readURL().doc);
+    if (!isDirty(o) || !edits.snap) return false;
+    const was = JSON.parse(edits.snap);
+    Object.keys(o).forEach((k) => { if (!(k in was)) delete o[k]; });
+    Object.assign(o, was);
+    edits = { id: o.id, snap: snapOf(o), dirty: false };
+    /* Both of these point at a row that may not exist any more. */
+    openXField = null;
+    openProp = null;
+    recompute();
+    render();
+    if (!quiet) toast('Changes discarded', null, 'The document is back as it was');
+    return true;
+  }
+
+  /* ── The changes guard ──
+
+     One question, asked at the one place every way out of a document goes
+     through, with both answers on it and neither of them chosen for you.
+     Cancel is not a third answer — it is staying, which is what you were
+     already doing.
+
+     Deferred by a tick because a leave can be triggered from inside a commit
+     surface's own onRun, and the click handler tears that surface down the
+     moment onRun returns — including this one, if it opened synchronously. */
+  let guardNext = null;
+  function guardLeave(go) {
+    const o = dirtyDoc();
+    if (!o) { go(); return; }
+    guardNext = go;
+    setTimeout(() => {
+      if (!guardNext) return;
+      commit({
+        title: 'You have unsaved changes',
+        cancel: 'Keep editing',
+        confirm: 'Save and leave',
+        current: 'Unsaved edits',
+        proposed: 'Written to the document',
+        rationale: `<strong>${esc(o.title)}</strong> has changes that have not been written yet.
+          Leaving is fine — but the changes go one way or the other first, and which way is yours to say.`,
+        effects: [
+          ['ok', 'Saving writes them to the document, then leaves.'],
+          ['skip', 'Discarding puts the document back as it was, then leaves.']
+        ],
+        reversible: 'Nothing here is published. Publishing is still a separate decision.',
+        extra: '<button class="btn btn-ghost" data-guard-discard>Discard and leave</button>',
+        onRun: () => { saveChanges(true); runGuardNext(); return true; }
+      });
+    }, 0);
+  }
+
+  function runGuardNext() {
+    const go = guardNext;
+    guardNext = null;
+    if (go) go();
+  }
+
+
   /* ── Comments ──
 
      In the viewer, not the editor. Commenting on a document is something you do
@@ -5235,6 +5425,9 @@
   function renderDoc(st) {
     const o = byId(st.doc);
     if (!o) { patch({ doc: '' }, { replace: true }); return; }
+    /* Before anything is drawn from it: a paint with nothing pending is a
+       paint of the saved document, and that is what Discard restores. */
+    baseline(o);
     const stage = $('#wbStage');
     /* ── A document with no body is a document with no body ──
 
@@ -5267,8 +5460,6 @@
        carries a data-x attribute. */
     const xKeep = pendingFocus || focusKeyOf(live);
     pendingFocus = null;
-    /* Why Publish is closed, if it is. Empty means it is open. */
-    const why = publishGate(o);
     /* Which record this kind of thing is, and in what order it reads. */
     const view = viewFor(o);
     const regions = view.regions;
@@ -5295,16 +5486,7 @@
           <button class="doc-back" data-doc-close>
             ${ICO.arrow.replace('<svg', '<svg width="14" height="14" style="transform:rotate(180deg)"')}
             All documents</button>
-          <span class="doc-top-end">
-            ${savedLabel(o)}
-            ${blank ? `<button class="btn btn-ghost btn-sm" data-discard="${o.id}">Discard</button>` : ''}
-            ${o.status === 'draft'
-              ? `<button class="btn btn-brand btn-sm" data-act="publish" data-obj="${o.id}" data-publish
-                   ${why ? `disabled title="${esc(why)} — a document that does not say what it is cannot go live"` : ''}
-                 >${why || 'Publish'}</button>` : ''}
-            <button class="doc-rail-toggle" data-rail-toggle aria-expanded="${railOpen}"
-                    aria-label="${railOpen ? 'Hide details' : 'Show details'}">
-              ${ICO.sidebar ? ICO.sidebar.replace('<svg', '<svg width="15" height="15"') : ICO.eye.replace('<svg', '<svg width="15" height="15"')}</button>
+          <span class="doc-top-end">${docTopEnd(o)}
           </span>
         </div>
 
@@ -5698,11 +5880,15 @@
     el.classList.toggle('is-blank', !o.sum);
     const b = $('.doc-page [data-publish]');
     if (b) {
-      /* The same gate renderDoc drew the button with, so typing into the body
-         cannot leave the label saying something the gate no longer says. */
-      const why = publishGate(o);
-      b.disabled = !!why;
-      b.textContent = why || 'Publish';
+      /* The same two facts the top bar drew the button with, so typing into
+         the body cannot leave it saying something the gate no longer says, nor
+         re-open it over a round of edits that has not been written down. */
+      const gate = publishGate(o);
+      b.disabled = !!(gate || isDirty(o));
+      /* A button that is open has nothing to explain, so it carries no
+         tooltip either — the title is the reason it is shut. */
+      if (b.disabled) b.title = publishTitle(o); else b.removeAttribute('title');
+      b.textContent = gate || 'Publish';
     }
     return o;
   }
@@ -5807,7 +5993,7 @@
   }
 
   function repaintEditor() {
-    noteSave(byId(readURL().doc));
+    markDirty(byId(readURL().doc));
     recompute();
     pendingFocus = focusKeyOf(document.activeElement);
     const st = readURL();
@@ -7215,7 +7401,7 @@
             </div>` : ''}
           </div>
           <div class="modal-footer">
-            <button class="btn btn-ghost" data-commit-close>Cancel</button>
+            <button class="btn btn-ghost" data-commit-close>${esc(o.cancel || 'Cancel')}</button>
             ${o.extra || ''}
             <button class="btn ${o.danger ? 'btn-err' : 'btn-brand'}" id="commitRun"
                     ${o.typed ? 'disabled style="opacity:.45;cursor:not-allowed"' : ''}
@@ -8116,7 +8302,31 @@
       submit(v);
     });
 
-    window.addEventListener('popstate', render);
+    /* The browser's own back button is a way out of a document too, and it is
+       the one the guard cannot intercept before the fact: the address has
+       already changed by the time we hear about it. So it is put back, the
+       question is asked over the document still on screen, and the answer
+       replays the navigation. */
+    window.addEventListener('popstate', () => {
+      const target = location.pathname + location.search;
+      const o = dirtyDoc();
+      if (o && readURL().doc !== o.id) {
+        history.pushState(null, '', hereURL);
+        guardLeave(() => { hereURL = target; history.pushState(null, '', target); render(); });
+        return;
+      }
+      hereURL = target;
+      render();
+    });
+
+    /* Closing the tab is the one exit this page does not own. The browser's
+       own prompt is all there is, and it is worth having: the alternative is
+       a round of edits that vanishes without ever having been offered. */
+    window.addEventListener('beforeunload', (e) => {
+      if (!dirtyDoc()) return;
+      e.preventDefault();
+      e.returnValue = '';
+    });
 
     /* The filter controls. `dd:change` reports the label, so the machine value
        is read off the option the component marked selected. Choosing replaces
@@ -8454,13 +8664,14 @@
 
     /* The body writes through on every keystroke so the Publish gate is honest
        the instant there is something to publish. No repaint — that would take
-       the caret with it — just the one button that depends on it. */
+       the caret with it — just the one button that depends on it, and the top
+       bar, which is where the two ways out of the round now live. */
     document.addEventListener('input', (e) => {
       if (!e.target.id || e.target.id !== 'editBody') return;
       const o = byId(readURL().doc);
       if (!o) return;
       writeBody(e.target);
-      noteSave(o);
+      markDirty(o);
       /* A slash alone on a block asks for the block list — the shortcut every
          document tool has. Anything else typed closes it again. */
       const blk = caretBlock();
@@ -9014,6 +9225,10 @@
       if ((el = t.closest('[data-discard]'))) {
         const o = byId(el.getAttribute('data-discard'));
         [CORPUS, LIVE, ENTITLED].forEach((arr) => { const i = arr.indexOf(o); if (i > -1) arr.splice(i, 1); });
+        /* The document is gone, so there is nothing left to save it to and
+           nothing left to put back. Asking would be asking about a document
+           that no longer exists. */
+        clearEdits();
         patch({ doc: '' });
         markAfter('.rm-main');
         toast('Discarded', null, 'Nothing was saved');
@@ -9105,8 +9320,24 @@
       }
 
       /* ── set scope ── */
+      /* ── unsaved changes ── */
+      if (t.closest('[data-changes-save]')) { saveChanges(); return; }
+      if (t.closest('[data-changes-discard]')) { discardChanges(); return; }
+      /* The guard's second answer. It is a button in the commit footer rather
+         than a second commit surface, because "save or discard" is one
+         decision and splitting it over two dialogs would make the second one
+         look like a change of mind about the first. */
+      if (t.closest('[data-guard-discard]')) {
+        closeCommit();
+        discardChanges(true);
+        runGuardNext();
+        return;
+      }
       /* ── commit surfaces ── */
       if (t.closest('[data-commit-close]') || (t.hasAttribute && t.hasAttribute('data-hide-on-backdrop') && t === e.target && t.classList.contains('modal-backdrop'))) {
+        /* Cancelling the guard is staying on the document, so the navigation
+           it was holding is dropped rather than kept for later. */
+        guardNext = null;
         closeCommit(); return;
       }
       if ((el = t.closest('[data-commit-run]'))) {
@@ -9661,7 +9892,10 @@
           agents ? ['warn', `<strong>${agents} agent(s)</strong> ground on ${esc(COLLECTIONS[o.col])} and will stop citing it.`] : null,
           ['ok', 'Restorable from the archive with its history intact.']
         ].filter(Boolean),
-        onRun: () => { o.arch = true; patch({ doc: '' }); markAfter('.rm-main'); }
+        /* Archiving is a decision about the whole document, already confirmed
+           here. It keeps whatever was typed and closes the round rather than
+           stacking a second question on top of this one. */
+        onRun: () => { o.arch = true; clearEdits(); patch({ doc: '' }); markAfter('.rm-main'); }
       });
       return;
     }
@@ -9684,6 +9918,7 @@
         ],
         onRun: () => {
           [CORPUS, LIVE, ENTITLED].forEach((arr) => { const i = arr.indexOf(o); if (i > -1) arr.splice(i, 1); });
+          clearEdits();
           patch({ doc: '' });
           markAfter('.rm-main');
           toast('Deleted', null, 'Permanent · logged to the audit trail');
@@ -9704,7 +9939,7 @@
             ? ['skip', 'It is ' + STATUS[o.status].label.toLowerCase() + ', so it still will not be used in answers.']
             : ['ok', 'It becomes available to answers again immediately.']
         ],
-        onRun: () => { o.arch = false; patch({ doc: '' }); markCard(o.id); }
+        onRun: () => { o.arch = false; clearEdits(); patch({ doc: '' }); markCard(o.id); }
       });
       return;
     }

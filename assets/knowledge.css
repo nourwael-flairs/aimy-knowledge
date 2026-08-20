@@ -4625,6 +4625,17 @@ body.is-doc .page-inner { max-width: none; }
 }
 .doc-saved svg { color: var(--ink-ok); }
 
+/* And its opposite. Same slot, same weight, said in the colour the rest of the
+   product uses for "this is not settled yet" — loud enough to be the reason
+   you look at the two buttons beside it, quiet enough not to read as an error.
+   It is a label and not a button: the buttons are what you do about it. */
+.doc-unsaved {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold); color: var(--ink-warn);
+  margin-right: 2px;
+}
+.doc-unsaved svg { color: var(--ink-warn); }
+
 /* ═══════════════════════════════════════════════
    UTILITIES
 ═══════════════════════════════════════════════ */
