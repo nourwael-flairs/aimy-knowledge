@@ -7932,7 +7932,12 @@
        what changed on the workbench since your last visit; while you are
        reading one document it is 268px of something else, and the measure the
        body needs is worth more than it. */
-    document.body.classList.toggle('is-doc', !!(st.doc && byId(st.doc)));
+    const isDoc = !!(st.doc && byId(st.doc));
+    document.body.classList.toggle('is-doc', isDoc);
+    /* Opening a document hides the rail at every width, so a drawer still open
+       over it would be presenting a surface the layout has withdrawn — and its
+       toggle goes with it, leaving nothing on screen to close it with. */
+    if (isDoc && drawers.rail) drawers.rail.close();
     if (st.doc && byId(st.doc)) { renderDoc(st); }
     else { $('#wbStage').removeAttribute('data-doc'); renderGrid(st); }
 
@@ -8359,6 +8364,144 @@
       panel.hidden = !this.open;
       btn.setAttribute('aria-expanded', String(this.open));
       $('#proto').classList.toggle('is-open', this.open);
+    }
+  };
+
+  /* ══════════════════════════════════════════════════════════════
+     THE DRAWERS
+
+     Two surfaces used to be deleted on a narrow screen: the briefing rail
+     below 1040px, and the canvas's conversation column below 900px, both by
+     `display: none`. Neither is decoration — the rail IS this product's
+     information architecture, and the column is the only way to reach a
+     different conversation. A layout that cannot change size can only change
+     what it drops, and dropping those two is dropping the product's two
+     entry points.
+
+     They are drawers now. The CSS does the showing; this does the state, and
+     the four things a drawer owes you beyond opening:
+
+       · Escape closes it, and only it — the guard checks `open` first, so this
+         does not eat the Escape that closes the canvas or the block menu.
+       · Focus goes in on open and comes back to the button on close. A drawer
+         you can open from the keyboard and not read from it is worse than no
+         drawer.
+       · Acting on a row closes it. Every item in the briefing is a FILTER
+         LINK — it sets the surface's state rather than navigating — so leaving
+         the drawer covering the result you just asked for hides the answer.
+       · Widening past the breakpoint closes it. Otherwise `is-open` survives
+         into a layout where the rail is a column again and the scrim is still
+         over the page, with nothing left on screen to dismiss it.
+  ══════════════════════════════════════════════════════════════ */
+  function makeDrawer(cfg) {
+    const btn = $(cfg.btn);
+    const panel = $(cfg.panel);
+    if (!btn || !panel) return null;
+
+    /* Declared before `d` so `set()` can consult it on every open. */
+    const mq = window.matchMedia(cfg.media);
+
+    const d = {
+      open: false,
+      /* What had focus before the drawer took it. */
+      returnTo: null,
+      set(next) {
+        const want = next === undefined ? !this.open : !!next;
+        if (want === this.open) return;
+        /* A drawer cannot be opened at a width where it is not a drawer. The
+           listener below closes it on the way up, and this refuses to open it
+           on the way down — two guards, because the listener depends on the
+           browser firing a media-query change and this one does not. */
+        if (want && !mq.matches) return;
+        this.open = want;
+        cfg.apply(want);
+        btn.setAttribute('aria-expanded', String(want));
+        btn.setAttribute('aria-label', want ? cfg.labelClose : cfg.labelOpen);
+        if (want) {
+          /* Where focus goes back to. `document.activeElement` is <body> when
+             the drawer was opened by anything other than a real click on the
+             button — a keyboard shortcut, a programmatic open — and returning
+             focus to <body> is the same as dropping it. The button is always a
+             correct answer, so it is the fallback. */
+          const prev = document.activeElement;
+          this.returnTo = (prev && prev !== document.body) ? prev : btn;
+          /* A closed drawer is `visibility: hidden`, and a hidden element does
+             not take focus. The class has landed but the style has not been
+             recomputed yet, so force it — the same `void el.offsetWidth` this
+             file already uses to make a class change take effect immediately.
+             rAF would also work in a live tab and does NOT work in one that is
+             not compositing frames, which is a real state (a background tab)
+             and not only a test rig. */
+          void panel.offsetWidth;
+          const first = panel.querySelector('button, a[href], input, [tabindex]:not([tabindex="-1"])');
+          (first || panel).focus({ preventScroll: true });
+        } else if (this.returnTo && document.contains(this.returnTo)) {
+          this.returnTo.focus({ preventScroll: true });
+          this.returnTo = null;
+        }
+      },
+      close() { this.set(false); }
+    };
+
+    btn.addEventListener('click', (e) => { e.stopPropagation(); d.set(); });
+
+    /* Acting on a row is the end of the drawer's job. */
+    panel.addEventListener('click', (e) => {
+      if (e.target.closest('button, a[href]')) d.close();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && d.open) { e.stopPropagation(); d.close(); }
+    });
+
+    /* A drawer is a narrow-screen shape. Above the breakpoint it is a column
+       again, and an `is-open` left behind would leave the scrim over a page
+       with nothing on it to dismiss.
+
+       Above the breakpoint the CSS is already neutral — `.app-sidebar.is-open`
+       says nothing there and `.rail-scrim` is `display: none` — so a stale
+       class cannot leak visually even if this never runs. It runs to keep the
+       STATE honest: aria-expanded, and what the drawer does on the way back
+       down. */
+    const onChange = () => { if (!mq.matches) d.close(); };
+    if (mq.addEventListener) mq.addEventListener('change', onChange);
+    else mq.addListener(onChange);
+
+    return d;
+  }
+
+  const drawers = {
+    rail: null,
+    chats: null,
+    init() {
+      const scrim = $('#railScrim');
+      this.rail = makeDrawer({
+        btn: '#railToggle',
+        panel: '#appSidebar',
+        media: '(max-width: 1040px)',
+        labelOpen: 'Open the briefing',
+        labelClose: 'Close the briefing',
+        apply(on) {
+          $('#appSidebar').classList.toggle('is-open', on);
+          if (scrim) scrim.classList.toggle('is-open', on);
+        }
+      });
+      if (scrim && this.rail) scrim.addEventListener('click', () => drawers.rail.close());
+
+      this.chats = makeDrawer({
+        btn: '#ovChatsToggle',
+        panel: '#overlayChats',
+        media: '(max-width: 900px)',
+        labelOpen: 'Show conversations',
+        labelClose: 'Hide conversations',
+        apply(on) { $('#aimyOverlay').classList.toggle('chats-open', on); }
+      });
+    },
+    /* Opening a document hides the rail at every width, so a drawer left open
+       over it would be showing a surface the layout has already withdrawn. */
+    closeAll() {
+      if (this.rail) this.rail.close();
+      if (this.chats) this.chats.close();
     }
   };
 
@@ -10759,6 +10902,7 @@
     seedSessions();
     bell.init();
     setModal.init();
+    drawers.init();
     wire();
     wireDrop();
     renderAiState();
