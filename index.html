@@ -13,7 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Poppins:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="assets/aimy-ds.css" />
-  <link rel="stylesheet" href="assets/knowledge.css?v=113" />
+  <link rel="stylesheet" href="assets/knowledge.css?v=125" />
 
   <script>
     /* Apply saved theme before paint to avoid flash. Default = dark. */
@@ -140,13 +140,33 @@
       </div>
     </div>
 
-    <div class="topnav-user" role="button" tabindex="0">
-      <span class="topnav-avatar" id="userAvatar">NW</span>
-      <span class="topnav-user-info">
-        <span class="topnav-user-name" id="userName">Nour Wael</span>
-        <span class="topnav-user-role" id="userRole">Product Design</span>
-      </span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+    <!-- The pill carried a chevron and `role="button" tabindex="0"` with nothing
+         wired to it — focusable, announced as a button, and inert on activation,
+         which is worse than a plain <div> because it promises a menu that never
+         arrives. It is a real <button> now, and the chevron is true.
+
+         Anchored the same way the bell is: a zero-width `position: relative`
+         wrapper, so the panel hangs off the pill without widening the topnav.
+         The right cluster collides at 1114px and there is ~460px of slack at the
+         1536 reference, but only because nothing here is a new flex item. -->
+    <div class="user-anchor">
+      <button class="topnav-user" id="userPill" type="button"
+              aria-haspopup="menu" aria-expanded="false" aria-controls="userMenu">
+        <span class="topnav-avatar" id="userAvatar">NW</span>
+        <span class="topnav-user-info">
+          <span class="topnav-user-name" id="userName">Nour Wael</span>
+          <span class="topnav-user-role" id="userRole">Product Design</span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="menu user-menu" id="userMenu" role="menu" aria-label="Account" hidden>
+        <div class="menu-label">Settings</div>
+        <a class="menu-item" role="menuitem" href="settings.html?module=sources">Knowledge sources</a>
+        <a class="menu-item" role="menuitem" href="settings.html?module=instructions">AI instructions</a>
+        <a class="menu-item" role="menuitem" href="settings.html?module=access">Access and roles</a>
+        <div class="menu-sep"></div>
+        <a class="menu-item" role="menuitem" href="settings.html">All settings</a>
+      </div>
     </div>
   </div>
 </div>
@@ -215,7 +235,7 @@
     <div class="aimy-float-wrap" id="aimyFloatWrap">
       <!-- The row that teaches the input what it takes.
 
-           Eleven filters left the filter row because the input already speaks
+           Nine filters left the filter row because the input already speaks
            them, and a filter you can only reach by knowing the word is not a
            filter. Every chip here is a word the lexicon understands, so
            clicking one and typing it do the same thing — which is the whole
@@ -376,6 +396,6 @@
 
 
 <script src="assets/aimy-ds.js"></script>
-<script src="assets/knowledge.js?v=113"></script>
+<script src="assets/knowledge.js?v=125"></script>
 </body>
 </html>

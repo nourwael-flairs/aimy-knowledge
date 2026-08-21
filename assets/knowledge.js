@@ -274,8 +274,74 @@
                   history: [[1, 'ok', '1 document uploaded by N. Wael'], [5, 'ok', '1 document uploaded by N. Wael']] }
   };
 
-  const PRODUCTS    = { copilot: 'Copilot', sales: 'Sales', voice: 'Voice' };
-  const CLIENTS     = { nordwind: 'Nordwind GmbH', tavola: 'Tavola Retail', meridian: 'Meridian Health', orbit: 'Orbit BPO' };
+  /* ═══════════════════════════════
+     CLIENTS, AND THE PRODUCTS THEY OWN
+
+     Three kinds of product, which is why one flat list could not hold them:
+
+       OWNED       a client's own product line. InterFAX belongs to Upland and
+                   to nobody else, so choosing another client must take it off
+                   the list rather than leave it there reading zero.
+       STANDALONE  owned by no client. Always offered.
+       AiMY        Copilot, Sales and Voice — ours, not a client's. Always
+                   offered, always last, whichever client is chosen.
+
+     Ownership is DECLARED here because it is a fact about the world, not a
+     pattern in the corpus: InterFAX would still be Upland's if no document
+     mentioned it. That is the opposite of the client↔product COUNTS, which are
+     derived, and the two do different jobs — ownership decides which products
+     are on the list, counts say how much is behind each one.
+
+     Upland's fourteen are the real list from the console. The other five
+     clients' products are PLACEHOLDERS, named to the same convention, and
+     should be replaced when the real lists arrive.
+
+     Two oddities carried over from the console rather than tidied away: it
+     lists `valsoft` twice — one client, listed once here — and it has both a
+     client called Asteris and a standalone product called `asteris`. They are
+     different axes, so the slug collision is harmless, but it is the kind of
+     thing that is a data-entry artifact and worth confirming.
+  ═══════════════════════════════ */
+  const CLIENTS = {
+    asteris: 'Asteris', upland: 'Upland', valsoft: 'Valsoft',
+    connect: 'Connect', cxs: 'CXS', flighthub: 'FlightHub',
+    nordwind: 'Nordwind GmbH', tavola: 'Tavola Retail',
+    meridian: 'Meridian Health', orbit: 'Orbit BPO'
+  };
+
+  const CLIENT_PRODUCTS = {
+    upland: {
+      interfax: 'InterFAX Support', powersteering: 'PowerSteering Service & Support',
+      secondstreet: 'Second Street Support', kapost: 'Kapost Support', psa: 'PSA Support',
+      bainsight: 'BA Insight Support', filebound: 'FileBound Support',
+      ingenius: 'InGenius Support', roinnovation: 'RO Innovation Support',
+      ultriva: 'Ultriva Support', eclipse: 'Eclipse Support',
+      rightanswers: 'RightAnswers Support', panviva: 'Panviva Support',
+      qvidian: 'Qvidian Support'
+    },
+    /* ── placeholders below this line ── */
+    asteris:   { asterisImaging: 'Imaging Support', asterisVet: 'Vet Cloud Support' },
+    valsoft:   { aspire: 'Aspire Support', hark: 'Hark Support' },
+    connect:   { connectDesk: 'Connect Desk Support', connectVoice: 'Connect Voice Support' },
+    cxs:       { cxsQa: 'QA Support', cxsAnalytics: 'Analytics Support' },
+    flighthub: { fhBooking: 'Booking Support', fhCare: 'Care Support' }
+  };
+
+  const STANDALONE_PRODUCTS = { pov: 'POV', portableSupport: 'Portable Support', asterisProduct: 'Asteris' };
+  const AIMY_PRODUCTS = { copilot: 'Copilot', sales: 'Sales', voice: 'Voice' };
+
+  /* Which client owns a product, inverted once from the map above so the two
+     cannot disagree. A product missing from this is owned by nobody. */
+  const CLIENT_OF_PRODUCT = {};
+  Object.keys(CLIENT_PRODUCTS).forEach((c) => {
+    Object.keys(CLIENT_PRODUCTS[c]).forEach((prod) => { CLIENT_OF_PRODUCT[prod] = c; });
+  });
+
+  /* Every product, flat. This is what `VALUE_LABEL`, the chips and the document
+     property editor read — they need a label for a slug and do not care who
+     owns it. The filter list is built from the groups instead. */
+  const PRODUCTS = Object.assign({}, STANDALONE_PRODUCTS, AIMY_PRODUCTS);
+  Object.keys(CLIENT_PRODUCTS).forEach((c) => Object.assign(PRODUCTS, CLIENT_PRODUCTS[c]));
   const COLLECTIONS = { policies: 'Policies', support: 'Support', sales: 'Sales', marketing: 'Marketing', legal: 'Legal' };
 
   /* The mind map's own axes, which the first pass collapsed into generic tags.
@@ -298,7 +364,13 @@
      which is what "above it in the tree" means, and a field re-stated on
      forty-two records is a field that will disagree with itself by Friday. */
   const ORGS = { flairs: 'FlairsTech', cxs: 'CXS', upland: 'Upland', medfar: 'MedFar' };
-  const ORG_OF_CLIENT = { nordwind: 'cxs', tavola: 'cxs', meridian: 'medfar', orbit: 'upland' };
+  const ORG_OF_CLIENT = { nordwind: 'cxs', tavola: 'cxs', meridian: 'medfar', orbit: 'upland',
+    /* The console's clients carry the same names as two of the orgs above,
+       because they ARE those tenancies — CXS and Upland log in to their own.
+       The rest sit in FlairsTech's, which is the default below anyway; they are
+       written out so the mapping can be read rather than inferred. */
+    cxs: 'cxs', upland: 'upland', asteris: 'flairs', valsoft: 'flairs',
+    connect: 'flairs', flighthub: 'flairs' };
 
   /* Who works with it. A SET, not a choice — a residency policy is read by the
      reviewers who check it and the managers who quote it, and a control that
@@ -367,7 +439,7 @@
       x:{ applies:'EU storefront · all plans' } },
 
     { id:'article-returns-faq', t:'article', work:'detected', owner:'A. Mahfouz',
-      title:'Returns FAQ — activated items', col:'support', src:'zendesk', prod:'copilot', client:'',
+      title:'Returns FAQ — activated items', col:'support', src:'zendesk', prod:'kapost', client:'upland',
       tags:['refunds','warranty','policy'], upd:26, ing:300, xc:480, xu:26,
       sum:'Activation ends refund eligibility. Faults are handled under warranty instead.',
       x:{ applies:'All storefronts — unscoped' } },
@@ -379,7 +451,7 @@
       x:{ applies:'EU storefront · activated items' } },
 
     { id:'article-sso', t:'article', work:'completed', owner:'N. Wael',
-      title:'SSO provisioning — enterprise', col:'support', src:'confluence', prod:'copilot', client:'',
+      title:'SSO provisioning — enterprise', col:'support', src:'confluence', prod:'ingenius', client:'upland',
       tags:['sso','enterprise','provisioning'], upd:12, ing:220, xc:260, xu:12,
       sum:'SCIM provisioning, group mapping, and the two failure modes support sees most.',
       x:{ applies:'Enterprise tier' } },
@@ -391,7 +463,7 @@
       x:{ applies:'All tiers · EU and APAC regions' } },
 
     { id:'article-sla', t:'article', work:'completed', owner:'N. Wael',
-      title:'Support SLA — response and resolution', col:'support', src:'confluence', prod:'copilot', client:'',
+      title:'Support SLA — response and resolution', col:'support', src:'confluence', prod:'copilot', client:'upland',
       tags:['sla','support'], upd:19, ing:300, xc:340, xu:19,
       sum:'First response and resolution targets per tier, and what pauses the clock.',
       x:{ applies:'All support tiers' } },
@@ -403,7 +475,7 @@
       x:{ applies:'Self-serve and enterprise' } },
 
     { id:'article-onboarding', t:'article', work:'drafted', owner:'Unassigned',
-      title:'Onboarding checklist — enterprise', col:'support', src:'upload', prod:'copilot', client:'',
+      title:'Onboarding checklist — enterprise', col:'support', src:'upload', prod:'cxsQa', client:'cxs',
       tags:['onboarding','enterprise'], upd:6, ing:6, xc:6, xu:6,
       sum:'Drafted by AiMY from twelve resolved onboarding tickets. Nobody has published it.',
       x:{ applies:'Enterprise tier · first 30 days' } },
@@ -425,7 +497,7 @@
       x:{ applies:'Sales teams — reference only' } },
 
     { id:'article-voice-handoff', t:'article', work:'completed', owner:'Unassigned',
-      title:'Voice-to-agent handoff rules', col:'support', src:'upload', prod:'voice', client:'',
+      title:'Voice-to-agent handoff rules', col:'support', src:'upload', prod:'connectVoice', client:'connect',
       tags:['voice','support','sla'], upd:15, ing:15, xc:15, xu:15,
       sum:'When a voice call escalates to a human, and what context is carried across.',
       x:{ applies:'Voice deployments' } },
@@ -485,7 +557,7 @@
           dis:['No residency requirement','Outsourced support only'] } },
 
     { id:'icp-retail-voice', t:'icp', work:'drafted', owner:'Unassigned',
-      title:'Retail voice operations', col:'sales', src:'upload', prod:'voice', client:'',
+      title:'Retail voice operations', col:'sales', src:'upload', prod:'voice', client:'flighthub',
       tags:['voice','sales'], upd:8, ing:8, xc:8, xu:8,
       sum:'Drafted by AiMY from six won deals. No owner.',
       x:{ segment:'Retail · seasonal voice volume', score:44,
@@ -493,7 +565,7 @@
           dis:['Flat annual volume','No voice channel'] } },
 
     { id:'campaign-q3', t:'campaign', work:'completed', owner:'Marketing',
-      title:'Q3 — Quality at scale', col:'marketing', src:'hubspot', prod:'sales', client:'',
+      title:'Q3 — Quality at scale', col:'marketing', src:'hubspot', prod:'asterisImaging', client:'asteris',
       tags:['emea','qa','campaign'], upd:32, ing:120, xc:140, xu:32,
       sum:'Pipeline generation against the mid-market BPO segment.',
       x:{ objective:'Pipeline from mid-market BPO', window:'1 Jul – 30 Sep · active', assets:'6 assets · 3 landing pages' } },
@@ -511,7 +583,7 @@
       x:{ objective:'Inbound from compliance buyers', window:'1 Jan – 31 Mar · ended', assets:'4 assets' } },
 
     { id:'asset-onepager', t:'asset', work:'completed', owner:'Brand',
-      title:'Quality at scale — one-pager', col:'marketing', src:'upload', prod:'sales', client:'',
+      title:'Quality at scale — one-pager', col:'marketing', src:'upload', prod:'aspire', client:'valsoft',
       tags:['qa','emea','collateral'], upd:27, ing:27, xc:27, xu:27,
       sum:'Two-page PDF used in outbound to the BPO segment.',
       x:{ format:'PDF · A4 · 2pp', usage:'External — customer-facing', approval:'approved' } },
@@ -535,7 +607,7 @@
       x:{ format:'Doc · 3pp', usage:'Internal only', approval:'pending' } },
 
     { id:'asset-pricing-sheet', t:'asset', work:'detected', owner:'Brand',
-      title:'Enterprise pricing sheet — 2025', col:'marketing', src:'upload', prod:'sales', client:'',
+      title:'Enterprise pricing sheet — 2025', col:'marketing', src:'upload', prod:'pov', client:'',
       tags:['pricing','collateral'], upd:230, ing:230, xc:230, xu:230,
       sum:'Superseded pricing still circulating in outbound. Past review and excluded.',
       x:{ format:'PDF · A4 · 1pp', usage:'External — customer-facing', approval:'approved' } },
@@ -603,7 +675,7 @@
       x:{ url:'aimy.app/security' } },
 
     { id:'page-status', t:'webpage', work:'failed', owner:'Unassigned',
-      title:'Service status and incident history', col:'support', src:'web', prod:'copilot', client:'',
+      title:'Service status and incident history', col:'support', src:'web', prod:'interfax', client:'upland',
       tags:['sla','support'], upd:19, ing:210, xc:300, xu:19,
       sum:'Crawl blocked since 11 July. What is stored is nineteen days old.',
       x:{ url:'status.aimy.app' } },
@@ -1597,7 +1669,7 @@
    these while they hold ONE value, because the dropdown beside it is already
    showing that value and two statements of one fact is one too many.
 
-   It has to track the filter row exactly. Eleven axes left that row and kept
+   It has to track the filter row exactly. Nine axes left that row and kept
    their place on this list for as long as it took to notice: with no control
    to show them, `status=unowned` narrowed the set to two documents and put
    nothing on screen to say why, and the only way back was the browser's own
@@ -1606,7 +1678,8 @@
 
    Lazy, because PRIMARY_FILTERS is declared further down the file and a const
    that read it up here would be evaluated in its temporal dead zone. */
-  const ddKeys = () => PRIMARY_FILTERS.map((c) => c.key).concat(DATE_KEYS);
+  const ddKeys = () => PRIMARY_FILTERS.map((c) => c.key)
+    .concat(FACET_FILTERS.map((c) => c.key)).concat(DATE_KEYS);
 
   function activeChips(st) {
     const out = [];
@@ -1656,7 +1729,7 @@
   ═══════════════════════════════════════════════ */
   const opts = (obj, order) => (order || Object.keys(obj)).map((k) => [k, typeof obj[k] === 'string' ? obj[k] : obj[k].label]);
 
-  /* ── Three, and the reason the other eleven left ──
+  /* ── Five, and the reason the other nine left ──
 
      There were fourteen controls: five here, six behind a *More* disclosure,
      plus the date range, *Mine* and *More* itself. Measured, their intrinsic
@@ -1667,23 +1740,160 @@
      already speaks all of it. Checked against LEX before removing anything:
      status all seven, type all nine, source all five, client all four, product
      all three, region, service and audience complete, the date windows, `mine`
-     and `archived`. Every key being removed is typeable today. The only gap is
+     and `archived`. Every key removed is typeable today. The only gap was
      `collection` — policies, support and marketing are in the lexicon and sales
-     and legal are not — and collection is one of the three staying, so nothing
-     loses reach.
+     and legal are not — and collection stayed, so nothing lost reach.
 
      What stays is what you narrow by before you know what you are looking for:
-     where it lives, what it is, and when it moved. Everything else is a
-     question about the set, and a question belongs in the thing that answers
-     questions.
+     where it lives, what it is, what it is ABOUT, and when it moved. Everything
+     else is a question about the set, and a question belongs in the thing that
+     answers questions.
+
+     Product and Client are that third clause, and they came back for it. They
+     are not questions about the set — they are the ground a reader is already
+     standing on when they arrive: someone who works one account and someone who
+     works one product both begin by cutting the corpus down to theirs. And
+     typeable is not the same as reachable. The four client slugs and the three
+     product slugs appear nowhere else on the surface, so the lexicon could only
+     be spoken by someone who already knew the words — which is the test the
+     removal was supposed to apply and, for these two, got wrong.
+
+     They cost far less room than the disclosure they replaced. Settled with
+     Urbanist at 1536: the five controls measure 433.55px of the 1160px row
+     while empty, and 641.65px carrying the longest value on every axis — one
+     line either way, 461px still clear before *Clear*. The row wraps rather
+     than overflows below that, reaching three lines on a 390px phone, where
+     the tray and the input are the way in anyway.
 
      `work` is not migrated because it never worked: the key is absent from
      LIST_KEYS, so serialize never wrote it and parseParams never read it, and
      applyFilters has never mentioned it. Six options that filtered nothing. */
   const PRIMARY_FILTERS = [
     { key: 'collection', label: 'Collection', list: () => opts(COLLECTIONS) },
-    { key: 'type',       label: 'Type',       list: () => opts(TYPES) }
+    { key: 'type',       label: 'Type',       list: () => opts(TYPES) },
   ];
+
+  /* ═══════════════════════════════
+     CLIENT AND PRODUCT — the two that take more than one answer
+
+     `.v2-dropdown` is strictly single-select and its panel closes on choose.
+     Neither is a bug: it is the library's only select control and every other
+     filter wants exactly that. But "documents about Upland OR CXS" is a real
+     question, the URL has stored a LIST per axis since the beginning, and the
+     chip bar has always been able to name several — the control was the only
+     part that could not say it.
+
+     So this is a product extension standing beside the library's dropdown, not
+     a fork of it, on the same reasoning the date range was: it borrows the
+     panel's shape and the search field, adds the checkbox, the group heading
+     and *Select all*, and is recorded in GAPS.md as the multi-select the system
+     does not ship. Nothing here reaches into `.v2-dropdown`, so the library's
+     keyboard model and close-on-choose stay exactly as they were for the
+     controls that want them.
+
+     The panel is rendered OPEN from module state rather than toggled by a
+     class, because choosing a value writes the URL and a write repaints the
+     row — a panel owned by the DOM would close on every tick. `calOpen` solved
+     the same problem for the calendar and this follows it.
+  ═══════════════════════════════ */
+  let facetOpen = null;
+  let facetQuery = '';
+
+  /* Clients are one flat list. Products are grouped, and the grouping is the
+     connection the row is being asked for: a client's own products, then the
+     ones nobody owns, then ours.
+
+     Choosing clients SCOPES the list — other clients' products leave it rather
+     than sit there reading zero, because a product belonging to another tenant
+     is not a narrower slice of what you are looking at, it is somebody else's
+     shelf. Standalone and AiMY never leave: they belong to no client, so no
+     choice of client can exclude them. */
+  function clientGroups() {
+    return [{ label: '', items: opts(CLIENTS) }];
+  }
+
+  function productGroups(st) {
+    const sel = st.product || [];
+    const chosen = (st.client || []).filter((c) => CLIENT_PRODUCTS[c]);
+    const owners = chosen.length ? chosen : Object.keys(CLIENT_PRODUCTS);
+    const groups = owners.map((c) => ({ label: CLIENTS[c] || c, items: opts(CLIENT_PRODUCTS[c]) }));
+
+    /* A product already CHOSEN stays on the list even when its owner has been
+       scoped out from under it. Pick Kapost, then narrow the clients to CXS,
+       and scoping alone would take Kapost off the panel while it carried on
+       filtering the grid — an active filter with no control and no chip, which
+       is the one thing this row is not allowed to do. It comes back under its
+       owner's name, alone rather than with its thirteen siblings, so the list
+       still says whose it is without un-scoping anything you did not choose. */
+    Object.keys(CLIENT_PRODUCTS).forEach((c) => {
+      if (owners.indexOf(c) > -1) return;
+      const kept = opts(CLIENT_PRODUCTS[c]).filter(([slug]) => sel.indexOf(slug) > -1);
+      if (kept.length) groups.push({ label: CLIENTS[c] || c, items: kept });
+    });
+    /* No heading on the unowned ones. Every other group is headed by the client
+       that owns it, and there is no client to name here — a word like
+       "Standalone" in that position reads as one more owner. They take a
+       hairline instead, which separates without claiming anything. */
+    groups.push({ label: '', items: opts(STANDALONE_PRODUCTS) });
+    groups.push({ label: 'AiMY', items: opts(AIMY_PRODUCTS) });
+    return groups;
+  }
+
+  const FACET_FILTERS = [
+    { key: 'client',  label: 'Client',  groups: clientGroups },
+    { key: 'product', label: 'Product', groups: productGroups }
+  ];
+
+  /* ── Keeping the pair answerable ──
+
+     Client and Product are not independent, and not simply nested either. A
+     client-owned product belongs to exactly ONE client, so `client=CXS` with
+     `product=Kapost` is not a narrow question — Kapost is Upland's, and the
+     pair can only ever return nothing. The other half of the vocabulary is the
+     opposite: Copilot is ours and answers under every client, so choosing it
+     implies nothing about whose the document is. The corpus says the same —
+     twelve documents pair a client with an AiMY product against seven with the
+     client's own — so treating Client as a master and Product as its detail
+     would be wrong more often than right. These rules touch OWNED products
+     only.
+
+       a chosen product puts its owner in the client filter
+       dropping a client drops the products it owns
+
+     Both sit out while no client is chosen, because an empty client filter
+     excludes nobody and there is nothing to contradict. That is what keeps
+     "I just want Kapost" from lighting up a client nobody asked for.
+
+     Worth knowing which way round the trouble actually arrives, because it is
+     not symmetrical. Choosing the client first cannot produce the bad pair —
+     scoping has already taken the other clients' products off the list, so
+     there is nothing wrong left to press. It comes from the other order:
+     choose Kapost while the row is open, then add CXS. The one exception is a
+     client that owns nothing at all, where the list falls back to every owner
+     and a foreign product is reachable again. Both routes land in the same
+     rule.
+
+     What this is NOT is a reset. Clearing Product whenever Client changed was
+     the obvious fix and the wrong one: it makes the row ORDER-DEPENDENT, so
+     client-then-product would land somewhere other than product-then-client,
+     and a filter is a set of conditions rather than a sequence of moves.
+     Nothing here removes anything the reader did not remove themselves.
+
+     It runs on interaction only. A link that arrives already contradicting
+     itself is left alone — rewriting what a link asked for is the one thing
+     the URL contract does not allow — and `productGroups` keeps the orphan
+     listed under its owner so it can still be taken off. */
+  function reconcileScope(st, droppedClient) {
+    if (droppedClient) {
+      st.product = st.product.filter((v) => CLIENT_OF_PRODUCT[v] !== droppedClient);
+    }
+    if (!st.client.length) return st;
+    st.product.forEach((v) => {
+      const owner = CLIENT_OF_PRODUCT[v];
+      if (owner && st.client.indexOf(owner) === -1) st.client = st.client.concat([owner]);
+    });
+    return st;
+  }
 
   /* The current value of an axis, whatever shape it is stored in. */
   function filterValue(st, key) {
@@ -1873,21 +2083,91 @@
              stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
       </button>
       <div class="v2-dropdown-panel" role="listbox">
-        ${rows.length > 6 ? `<div class="dd-search">
+        ${(c.search || rows.length > 6) ? `<div class="dd-search">
           ${ICO.search.replace('<svg', '<svg width="12" height="12"')}
           <input type="text" placeholder="Search ${esc(c.label.toLowerCase())}" aria-label="Search ${esc(c.label)}"
                  data-dd-search spellcheck="false" autocomplete="off">
         </div>` : ''}
         ${rows.map(([slug, value, text]) => {
           const on = slug === cur;
+          /* `data-value` carries the label on its own, which is what the search
+             field matches on — never the rendered row. */
           return `<div class="v2-dropdown-option${on ? ' selected' : ''}" role="option"
-            aria-selected="${on}" data-value="${esc(value)}" data-slug="${esc(slug)}">${esc(text)}</div>`;
+            aria-selected="${on}" data-value="${esc(value)}" data-slug="${esc(slug)}"
+            >${esc(text)}</div>`;
         }).join('')}
         <div class="dd-none" hidden>Nothing matches</div>
       </div>
     </div>`;
   }
 
+
+  /* Every value the panel is currently offering, after scoping and after the
+     search box — which is what *Select all* has to mean. Selecting things the
+     reader cannot see would be a button that does something other than what it
+     appears to. */
+  function facetVisible(c, st) {
+    const q = facetOpen === c.key ? facetQuery.trim().toLowerCase() : '';
+    const out = [];
+    c.groups(st).forEach((g) => g.items.forEach(([slug, label]) => {
+      if (!q || label.toLowerCase().indexOf(q) > -1) out.push(slug);
+    }));
+    return out;
+  }
+
+  function facetControl(c, st) {
+    const sel = st[c.key] || [];
+    const open = facetOpen === c.key;
+    const q = open ? facetQuery.trim().toLowerCase() : '';
+
+    /* One value is named. Several cannot be — the button is one line — so it
+       says how many and the chip bar does the naming, which is the same
+       division of labour the single-select controls already use. */
+    const label = !sel.length ? c.label
+      : sel.length === 1 ? valueLabel(c.key, sel[0])
+      : c.label + ' · ' + sel.length;
+
+    const visible = facetVisible(c, st);
+    const allOn = visible.length > 0 && visible.every((v) => sel.indexOf(v) > -1);
+
+    let hits = 0;
+    const groups = c.groups(st).map((g) => {
+      const rows = g.items.filter(([, text]) => !q || text.toLowerCase().indexOf(q) > -1);
+      if (!rows.length) return '';
+      hits += rows.length;
+      return `<div class="k-facet-group${g.label ? '' : ' is-untitled'}">
+        ${g.label ? `<div class="k-facet-group-label">${esc(g.label)}</div>` : ''}
+        ${rows.map(([slug, text]) => {
+          const on = sel.indexOf(slug) > -1;
+          return `<div class="k-facet-opt${on ? ' is-on' : ''}" role="option"
+            aria-selected="${on}" tabindex="-1" data-facet-val="${esc(slug)}">
+            <span class="k-facet-check" aria-hidden="true"></span>
+            <span class="k-facet-text">${esc(text)}</span></div>`;
+        }).join('')}
+      </div>`;
+    }).join('');
+
+    return `<div class="k-facet${open ? ' is-open' : ''}" data-facet-key="${c.key}">
+      <button class="k-facet-btn${sel.length ? ' active-filter' : ''}" type="button"
+              aria-haspopup="listbox" aria-expanded="${open}" aria-label="${esc(c.label)}">
+        <span class="dd-label-text">${esc(label)}</span>
+        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+      </button>
+      ${open ? `<div class="k-facet-panel" role="listbox" aria-multiselectable="true"
+                     aria-label="${esc(c.label)}">
+        <div class="dd-search">
+          ${ICO.search.replace('<svg', '<svg width="12" height="12"')}
+          <input type="text" placeholder="Search ${esc(c.label.toLowerCase())}"
+                 aria-label="Search ${esc(c.label)}" value="${esc(facetQuery)}"
+                 data-facet-search spellcheck="false" autocomplete="off">
+        </div>
+        <button class="k-facet-all" type="button" data-facet-all>${allOn ? 'Clear all' : 'Select all'}</button>
+        ${groups}
+        <div class="dd-none"${hits ? ' hidden' : ''}>Nothing matches</div>
+      </div>` : ''}
+    </div>`;
+  }
 
   function renderFilters(st) {
     const host = $('#filterBar');
@@ -1897,6 +2177,7 @@
     host.innerHTML = `
       <div class="filter-row">
         ${PRIMARY_FILTERS.map((c) => dropdown(c, st)).join('')}
+        ${FACET_FILTERS.map((c) => facetControl(c, st)).join('')}
         ${dateFilter(st)}
         <span class="filter-row-end">
           ${dirty ? '<button class="k-clear" data-clear-all>Clear</button>' : ''}
@@ -1949,7 +2230,7 @@
            right and against the set you filtered to. This rail carries the two
            things that are only here. -->
 
-      <!-- Eleven filters left the row because the input already speaks them,
+      <!-- Nine filters left the row because the input already speaks them,
            which makes re-narrowing cheap to type and free to forget. This is
            the other half: the last five sets you looked at, named after what
            you filtered by, one click from being that set again.
@@ -2334,6 +2615,65 @@
       this.btn.setAttribute('aria-expanded', 'false');
       if (returnFocus) this.btn.focus();
       this.sync();
+    }
+  };
+
+  /* ── The account menu ──
+
+     The pill has drawn a chevron since the first build with nothing behind it,
+     and `role="button" tabindex="0"` made the same promise a second time: it
+     was focusable, announced as a button, and did nothing when you pressed it.
+     A control that announces an affordance it does not have is worse than a
+     plain <div>, because a screen-reader user is the one who acts on the claim.
+
+     Shaped like `bell` on purpose. Same row, same flank, same problem already
+     solved once, and a second dropdown language in one topnav is one too many.
+     What it does not copy is the arrow-key roving: these are ordinary links,
+     Tab already walks them in order, and a roving tabindex over four items
+     would only add a keyboard model nobody asked for.
+
+     What it opens is a page rather than a fourth overlay. This surface already
+     carries the canvas, the settings sheet and the peek; settings is a place
+     you go, not another thing that floats over the work. */
+  const userMenu = {
+    btn: null, panel: null, open: false,
+
+    init() {
+      this.btn = $('#userPill');
+      this.panel = $('#userMenu');
+      if (!this.btn || !this.panel) return;
+
+      this.btn.addEventListener('click', (e) => { e.stopPropagation(); this.toggle(); });
+
+      /* The identity guard, not the registration order, is what stops the
+         trigger press from also reading as a click-off. Registering this before
+         or after the main router makes no difference while the guard holds. */
+      document.addEventListener('click', (e) => {
+        if (!this.open || this.panel.contains(e.target) || this.btn.contains(e.target)) return;
+        this.close();
+      });
+
+      /* Following a row is the end of the menu's job — the same rule the rail
+         drawer states for itself. */
+      this.panel.addEventListener('click', (e) => { if (e.target.closest('a')) this.close(); });
+    },
+
+    toggle() { if (this.open) this.close(true); else this.show(); },
+
+    show() {
+      this.panel.hidden = false;
+      this.open = true;
+      this.btn.setAttribute('aria-expanded', 'true');
+      const first = $('.menu-item', this.panel);
+      if (first) first.focus();
+    },
+
+    close(returnFocus) {
+      if (!this.panel || !this.open) return;
+      this.panel.hidden = true;
+      this.open = false;
+      this.btn.setAttribute('aria-expanded', 'false');
+      if (returnFocus) this.btn.focus();
     }
   };
 
@@ -6677,10 +7017,21 @@
            anything underneath it can take the key. */
         if (($('#commitHost') || {}).innerHTML && $('[data-xm-save]')) { closeXModal(); return; }
         /* The bell panel is a dropdown off the chrome, so it is
-           always the shallowest thing open and always the first to go. */
+           always the shallowest thing open and always the first to go. The
+           account menu is the same kind of thing on the same row, so it sits
+           here rather than owning a listener of its own. */
         if (bell.open) { bell.close(true); return; }
+        if (userMenu.open) { userMenu.close(true); return; }
         if (peekStack.length) { closePeek(); return; }
         if (calOpen) { calOpen = null; calPick = null; renderFilters(readURL()); return; }
+        if (facetOpen) {
+          const key = facetOpen;
+          facetOpen = null; facetQuery = '';
+          renderFilters(readURL());
+          const btn = $(`[data-facet-key="${key}"] .k-facet-btn`);
+          if (btn) btn.focus();
+          return;
+        }
         if (openMulti) { openMulti = null; renderDoc(readURL()); return; }
         if (proto.open) { proto.toggle(false); return; }
         if (this.open) this.close();
@@ -8065,7 +8416,9 @@
      hard-to-reach conditions are.
 
      Each one is a phrase that reaches axes with NO control left: status,
-     source, client, product, region, service, audience. Running one fills the
+     source, region, service, audience. Two of them name Client and Product as
+     well, which have controls again — they stay because the lesson is that the
+     control and the sentence are one vocabulary, not two. Running one fills the
      input; pressing Enter narrows the set and puts the axes on the chip bar,
      which is the whole route in one move. Run two or three and the rail starts
      listing them under Recent filters.
@@ -8103,7 +8456,7 @@
 
      The five phrases above teach the input. These are the other question a
      review asks: does every axis in the data model actually FILTER, and can I
-     see it doing it? Eleven of them have no control on the surface any more,
+     see it doing it? Nine of them have no control on the surface any more,
      and two of the ones that did turned out never to have worked at all —
      `work` and `trust` moved a URL parameter nothing consumed, for as long as
      anybody had been clicking them.
@@ -8764,6 +9117,88 @@
      not check `hidden`, so arrow keys would walk through rows nobody can see.
      Removing them keeps that model honest without touching the library, and the
      full ordered set is held here so reattaching restores the order exactly. */
+  /* ── Searching a multi-select, without losing the caret ──
+
+     Narrowed in place rather than by re-rendering. A repaint on every keystroke
+     would take the field the keystroke came from with it, and putting the caret
+     back afterwards is a worse trade than filtering the rows that are already
+     standing there. The query lives in `facetQuery` so the repaint that a
+     TOGGLE causes can put it back.
+
+     `hidden` is safe here in a way it is not for `.v2-dropdown-option`: this
+     control's keyboard model is the one below, and it skips hidden rows. */
+  function facetNarrow(panel) {
+    if (!panel) return;
+    const q = facetQuery.trim().toLowerCase();
+    let hits = 0;
+    $$('.k-facet-group', panel).forEach((g) => {
+      let shown = 0;
+      $$('.k-facet-opt', g).forEach((o) => {
+        const on = !q || $('.k-facet-text', o).textContent.toLowerCase().indexOf(q) > -1;
+        o.hidden = !on;
+        if (on) shown++;
+      });
+      /* A heading with nothing under it names a group that is not there. */
+      g.hidden = !shown;
+      hits += shown;
+    });
+    const none = $('.dd-none', panel);
+    if (none) none.hidden = hits > 0;
+
+    /* *Select all* means "all of what I can see", so its label has to follow
+       the search rather than the full list. */
+    const all = $('[data-facet-all]', panel);
+    if (all) {
+      const rows = $$('.k-facet-opt', panel).filter((o) => !o.hidden);
+      all.textContent = rows.length && rows.every((o) => o.classList.contains('is-on'))
+        ? 'Clear all' : 'Select all';
+    }
+  }
+
+  document.addEventListener('input', (e) => {
+    const box = e.target.closest && e.target.closest('[data-facet-search]');
+    if (!box) return;
+    facetQuery = box.value;
+    facetNarrow(box.closest('.k-facet-panel'));
+  });
+
+  /* The keyboard half of the control. The library's model belongs to
+     `.v2-dropdown` and never sees these rows, so arrowing, activating and
+     getting back out are all wired here — hidden rows skipped, because the
+     search is usually what is standing between you and the value you want. */
+  document.addEventListener('keydown', (e) => {
+    const wrap = e.target.closest && e.target.closest('.k-facet.is-open');
+    if (!wrap) return;
+    const panel = $('.k-facet-panel', wrap);
+    if (!panel) return;
+    const rows = $$('.k-facet-opt', panel).filter((o) => !o.hidden);
+    if (!rows.length) return;
+    const here = rows.indexOf(e.target.closest('.k-facet-opt'));
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      /* From the search field, down enters the list at the top and up enters it
+         at the bottom — the field is above the rows, so both read as stepping
+         into them from where you are. */
+      const next = here === -1 ? (step === 1 ? 0 : rows.length - 1)
+                               : (here + step + rows.length) % rows.length;
+      rows[next].focus();
+      return;
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && here > -1) {
+      e.preventDefault();
+      rows[here].click();
+      return;
+    }
+    /* Typing goes to the search box wherever you are in the list, which is what
+       a list this long is usually being arrowed through to reach anyway. */
+    if (e.key.length === 1 && here > -1) {
+      const box = $('[data-facet-search]', panel);
+      if (box) { box.focus(); }
+    }
+  });
+
   const ddAll = new WeakMap();
 
   function ddFilter(panel) {
@@ -8780,7 +9215,7 @@
        clearing a filter must never be something you have to spell your way
        back to. */
     const show = all.filter((o) => !q || !o.dataset.slug ||
-      o.textContent.toLowerCase().indexOf(q) > -1);
+      (o.dataset.value || o.textContent).toLowerCase().indexOf(q) > -1);
 
     all.forEach((o) => { if (o.parentNode) o.remove(); });
     show.forEach((o) => panel.insertBefore(o, none));
@@ -9270,6 +9705,66 @@
         return;
       }
       if (calOpen && !t.closest('.k-date')) { calOpen = null; calPick = null; renderFilters(readURL()); }
+
+      /* ── multi-select filters ──
+
+         Every branch re-renders and returns, and the panel comes back open
+         because `facetOpen` is module state rather than a class on a node the
+         repaint just replaced. */
+      if ((el = t.closest('.k-facet-btn'))) {
+        const key = el.closest('[data-facet-key]').getAttribute('data-facet-key');
+        facetOpen = facetOpen === key ? null : key;
+        facetQuery = '';
+        renderFilters(readURL());
+        /* The list can be long and the search is the way through it, so the
+           caret starts there rather than making you reach for it. */
+        const box = $('.k-facet.is-open [data-facet-search]');
+        if (box) box.focus();
+        return;
+      }
+      if ((el = t.closest('.k-facet-opt'))) {
+        const key = el.closest('[data-facet-key]').getAttribute('data-facet-key');
+        const val = el.getAttribute('data-facet-val');
+        const st = readURL();
+        const cur = st[key] || [];
+        const adding = cur.indexOf(val) === -1;
+        st[key] = adding ? cur.concat([val]) : cur.filter((v) => v !== val);
+        reconcileScope(st, key === 'client' && !adding ? val : null);
+        st.doc = '';
+        rememberFilter();
+        writeURL(st);
+        /* Focus follows the row you just pressed, so a second press lands
+           without going back to the mouse. It can legitimately be gone —
+           clearing a client takes its products off the list — in which case
+           the search field is the nearest thing that still exists. */
+        const back = $(`.k-facet.is-open [data-facet-val="${val}"]`) || $('.k-facet.is-open [data-facet-search]');
+        if (back) back.focus();
+        return;
+      }
+      if ((el = t.closest('[data-facet-all]'))) {
+        const c = FACET_FILTERS.find((f) => f.key === facetOpen);
+        if (!c) return;
+        const st = readURL();
+        const visible = facetVisible(c, st);
+        const sel = st[c.key] || [];
+        const allOn = visible.length > 0 && visible.every((v) => sel.indexOf(v) > -1);
+        /* Only what is on screen is added or removed. A selection made under a
+           different client or a different search survives either way — the
+           button says "all of these", not "all of everything". */
+        st[c.key] = allOn ? sel.filter((v) => visible.indexOf(v) === -1)
+                          : sel.concat(visible.filter((v) => sel.indexOf(v) === -1));
+        /* Only the owner half applies: *Select all* never drops a client, and
+           *Clear all* on the client panel empties it — which removes the
+           contradiction rather than making one, so the products stay put. */
+        reconcileScope(st, null);
+        st.doc = '';
+        rememberFilter();
+        writeURL(st);
+        const box = $('.k-facet.is-open [data-facet-search]');
+        if (box) box.focus();
+        return;
+      }
+      if (facetOpen && !t.closest('.k-facet')) { facetOpen = null; facetQuery = ''; renderFilters(readURL()); }
 
       /* ── prototype panel ── */
       if (t.closest('#protoToggle')) { proto.toggle(); return; }
@@ -10901,6 +11396,7 @@
        canvas can be opened. */
     seedSessions();
     bell.init();
+    userMenu.init();
     setModal.init();
     drawers.init();
     wire();
