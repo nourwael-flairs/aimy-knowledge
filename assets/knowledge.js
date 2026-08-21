@@ -1676,10 +1676,9 @@
    back button. A filter with neither a control nor a chip is a filter that has
    silently taken something away.
 
-   Lazy, because PRIMARY_FILTERS is declared further down the file and a const
+   Lazy, because FACET_FILTERS is declared further down the file and a const
    that read it up here would be evaluated in its temporal dead zone. */
-  const ddKeys = () => PRIMARY_FILTERS.map((c) => c.key)
-    .concat(FACET_FILTERS.map((c) => c.key)).concat(DATE_KEYS);
+  const ddKeys = () => FACET_FILTERS.map((c) => c.key).concat(DATE_KEYS);
 
   function activeChips(st) {
     const out = [];
@@ -1768,20 +1767,23 @@
      `work` is not migrated because it never worked: the key is absent from
      LIST_KEYS, so serialize never wrote it and parseParams never read it, and
      applyFilters has never mentioned it. Six options that filtered nothing. */
-  const PRIMARY_FILTERS = [
-    { key: 'collection', label: 'Collection', list: () => opts(COLLECTIONS) },
-    { key: 'type',       label: 'Type',       list: () => opts(TYPES) },
-  ];
-
   /* ═══════════════════════════════
-     CLIENT AND PRODUCT — the two that take more than one answer
+     ALL FOUR TAKE MORE THAN ONE ANSWER
 
      `.v2-dropdown` is strictly single-select and its panel closes on choose.
-     Neither is a bug: it is the library's only select control and every other
-     filter wants exactly that. But "documents about Upland OR CXS" is a real
-     question, the URL has stored a LIST per axis since the beginning, and the
-     chip bar has always been able to name several — the control was the only
-     part that could not say it.
+     Neither is a bug: it is the library's only select control, and it was the
+     right one for Collection and Type for as long as those were believed to
+     take one answer each. They are not. "Policies OR Legal" and "Tickets OR
+     Articles" are the same shape of question as "Upland OR CXS", the URL has
+     stored a LIST per axis since the beginning, and the chip bar has always
+     been able to name several — the control was the only part that could not
+     say it, and a control that can only say one thing quietly teaches that only
+     one thing can be asked.
+
+     So the row has one kind of control now rather than two. Four multi-selects
+     and the date range, which is the odd one out for a real reason: WHEN is a
+     range, not a set, and four windows on one axis is a contradiction rather
+     than a union.
 
      So this is a product extension standing beside the library's dropdown, not
      a fork of it, on the same reasoning the date range was: it borrows the
@@ -1812,6 +1814,27 @@
     return [{ label: '', items: opts(CLIENTS) }];
   }
 
+  /* Collection and Type have nothing to group BY — no owner, no hierarchy — so
+     they are one untitled list each, which is what `is-untitled` renders
+     without a heading and without a divider when it stands alone. */
+
+  /* Entitled collections only. `ENTITLED` filters the corpus by
+     `USER.collections`, which does not include Legal, so a Legal row here is a
+     filter that can only ever return nothing — the same defect the client and
+     product pair was just taught not to construct, arrived at from the other
+     direction. It offered one before this control was rebuilt; it does not now.
+
+     Only the FILTER is narrowed. `opts(COLLECTIONS)` still holds all five for
+     the editor's own Collection field, because filing a document somewhere is
+     a different question from being able to read what is already there. */
+  function collectionGroups() {
+    return [{ label: '', items: opts(COLLECTIONS).filter(([slug]) => USER.collections.indexOf(slug) > -1) }];
+  }
+
+  function typeGroups() {
+    return [{ label: '', items: opts(TYPES) }];
+  }
+
   function productGroups(st) {
     const sel = st.product || [];
     const chosen = (st.client || []).filter((c) => CLIENT_PRODUCTS[c]);
@@ -1840,8 +1863,10 @@
   }
 
   const FACET_FILTERS = [
-    { key: 'client',  label: 'Client',  groups: clientGroups },
-    { key: 'product', label: 'Product', groups: productGroups }
+    { key: 'collection', label: 'Collection', groups: collectionGroups },
+    { key: 'type',       label: 'Type',       groups: typeGroups },
+    { key: 'client',     label: 'Client',     groups: clientGroups },
+    { key: 'product',    label: 'Product',    groups: productGroups }
   ];
 
   /* ── Keeping the pair answerable ──
@@ -1893,13 +1918,6 @@
       if (owner && st.client.indexOf(owner) === -1) st.client = st.client.concat([owner]);
     });
     return st;
-  }
-
-  /* The current value of an axis, whatever shape it is stored in. */
-  function filterValue(st, key) {
-    if (FLAG_KEYS.indexOf(key) > -1) return st[key] ? '1' : '';
-    if (DATE_KEYS.indexOf(key) > -1) return st[key];
-    return (st[key] || [])[0] || '';
   }
 
   /* ═══════════════════════════════════════════════
@@ -2065,47 +2083,6 @@
     </div>`;
   }
 
-  function dropdown(c, st) {
-    const cur = c.current ? c.current(st) : filterValue(st, c.key);
-    const extra = (LIST_KEYS.indexOf(c.key) > -1 ? st[c.key].length : 1) - 1;
-    /* With more than one value the control cannot name them — it is
-       single-select — so it says how many and lets the chips do the naming.
-       Naming the first as well would print the same value twice. */
-    const label = !cur ? c.label
-      : extra > 0 ? c.label + ' · ' + (extra + 1)
-      : (c.valueLabel ? c.valueLabel(cur) : valueLabel(c.key, cur));
-    const rows = [['', c.label, c.first || 'All']].concat(c.list().map(([slug, text]) => [slug, text, text]));
-    return `<div class="v2-dropdown k-filter" data-filter-key="${c.key}">
-      <button class="v2-dropdown-btn${cur ? ' active-filter' : ''}" type="button"
-              aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(c.label)}">
-        <span class="dd-label-text">${esc(label)}</span>
-        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
-      </button>
-      <div class="v2-dropdown-panel" role="listbox">
-        ${(c.search || rows.length > 6) ? `<div class="dd-search">
-          ${ICO.search.replace('<svg', '<svg width="12" height="12"')}
-          <input type="text" placeholder="Search ${esc(c.label.toLowerCase())}" aria-label="Search ${esc(c.label)}"
-                 data-dd-search spellcheck="false" autocomplete="off">
-        </div>` : ''}
-        ${rows.map(([slug, value, text]) => {
-          const on = slug === cur;
-          /* `data-value` carries the label on its own, which is what the search
-             field matches on — never the rendered row. */
-          return `<div class="v2-dropdown-option${on ? ' selected' : ''}" role="option"
-            aria-selected="${on}" data-value="${esc(value)}" data-slug="${esc(slug)}"
-            >${esc(text)}</div>`;
-        }).join('')}
-        <div class="dd-none" hidden>Nothing matches</div>
-      </div>
-    </div>`;
-  }
-
-
-  /* Every value the panel is currently offering, after scoping and after the
-     search box — which is what *Select all* has to mean. Selecting things the
-     reader cannot see would be a button that does something other than what it
-     appears to. */
   function facetVisible(c, st) {
     const q = facetOpen === c.key ? facetQuery.trim().toLowerCase() : '';
     const out = [];
@@ -2114,6 +2091,17 @@
     }));
     return out;
   }
+
+  /* Where focus goes after a repaint, in order of preference: the row just
+     pressed if it survived, the search field if the list has one, and the
+     trigger otherwise. The last is not a fallback for tidiness — a panel with
+     no search field has nothing else focusable at the top, and without this it
+     lands on `<body>`, which puts the whole keyboard model out of reach for
+     exactly the short lists that were given no field. */
+  const facetRefocus = (key, val) =>
+    (val && $(`.k-facet.is-open [data-facet-val="${val}"]`))
+    || $('.k-facet.is-open [data-facet-search]')
+    || $(`[data-facet-key="${key}"] .k-facet-btn`);
 
   function facetControl(c, st) {
     const sel = st[c.key] || [];
@@ -2129,6 +2117,13 @@
 
     const visible = facetVisible(c, st);
     const allOn = visible.length > 0 && visible.every((v) => sel.indexOf(v) > -1);
+
+    /* Same threshold `.v2-dropdown` uses, and for the same reason: a search
+       field over five collections is a box to look past rather than a way
+       through. Counted across every group, because what the reader is deciding
+       about is the length of the list, not the length of its longest section. */
+    const total = c.groups(st).reduce((n, g) => n + g.items.length, 0);
+    const searchable = total > 6;
 
     let hits = 0;
     const groups = c.groups(st).map((g) => {
@@ -2156,12 +2151,12 @@
       </button>
       ${open ? `<div class="k-facet-panel" role="listbox" aria-multiselectable="true"
                      aria-label="${esc(c.label)}">
-        <div class="dd-search">
+        ${searchable ? `<div class="dd-search">
           ${ICO.search.replace('<svg', '<svg width="12" height="12"')}
           <input type="text" placeholder="Search ${esc(c.label.toLowerCase())}"
                  aria-label="Search ${esc(c.label)}" value="${esc(facetQuery)}"
                  data-facet-search spellcheck="false" autocomplete="off">
-        </div>
+        </div>` : ''}
         <button class="k-facet-all" type="button" data-facet-all>${allOn ? 'Clear all' : 'Select all'}</button>
         ${groups}
         <div class="dd-none"${hits ? ' hidden' : ''}>Nothing matches</div>
@@ -2176,7 +2171,6 @@
 
     host.innerHTML = `
       <div class="filter-row">
-        ${PRIMARY_FILTERS.map((c) => dropdown(c, st)).join('')}
         ${FACET_FILTERS.map((c) => facetControl(c, st)).join('')}
         ${dateFilter(st)}
         <span class="filter-row-end">
@@ -8914,11 +8908,10 @@
       e.returnValue = '';
     });
 
-    /* The filter controls. `dd:change` reports the label, so the machine value
-       is read off the option the component marked selected. Choosing replaces
-       the axis rather than adding to it — the control is single-select and
-       pretending otherwise would leave it showing something untrue. */
-    /* Property dropdowns in the editor write straight to the object. */
+    /* Property dropdowns in the editor write straight to the object. `dd:change`
+       reports the label, so the machine value is read off the option the
+       component marked selected. These are the last `.v2-dropdown`s that write
+       anything — the filter row's went when its axes learned to take a set. */
     document.addEventListener('dd:change', (e) => {
       const dd = e.target.closest('.v2-dropdown[data-prop-key]');
       if (!dd) return;
@@ -9053,21 +9046,6 @@
       toast(cb.checked ? agent.name + ' may answer from ' + COLLECTIONS[col]
                        : agent.name + ' no longer answers from ' + COLLECTIONS[col],
         'Undo', cb.checked ? 'Internal only — not customer-facing' : 'Existing answers are unaffected');
-    });
-
-    document.addEventListener('dd:change', (e) => {
-      const dd = e.target.closest('.v2-dropdown[data-filter-key]');
-      if (!dd) return;
-      const key = dd.getAttribute('data-filter-key');
-      const slug = (dd.querySelector('.v2-dropdown-option[aria-selected="true"]') || {}).dataset;
-      const value = slug ? (slug.slug || '') : '';
-      const st = readURL();
-      if (FLAG_KEYS.indexOf(key) > -1) st[key] = !!value;
-      else if (DATE_KEYS.indexOf(key) > -1) st[key] = value;
-      else st[key] = value ? [value] : [];
-      st.doc = '';
-      rememberFilter();
-      writeURL(st);
     });
 
     const gateRun = (locked) => {
@@ -9718,8 +9696,8 @@
         renderFilters(readURL());
         /* The list can be long and the search is the way through it, so the
            caret starts there rather than making you reach for it. */
-        const box = $('.k-facet.is-open [data-facet-search]');
-        if (box) box.focus();
+        const into = facetRefocus(key, null);
+        if (into) into.focus();
         return;
       }
       if ((el = t.closest('.k-facet-opt'))) {
@@ -9737,7 +9715,7 @@
            without going back to the mouse. It can legitimately be gone —
            clearing a client takes its products off the list — in which case
            the search field is the nearest thing that still exists. */
-        const back = $(`.k-facet.is-open [data-facet-val="${val}"]`) || $('.k-facet.is-open [data-facet-search]');
+        const back = facetRefocus(key, val);
         if (back) back.focus();
         return;
       }
@@ -9760,8 +9738,8 @@
         st.doc = '';
         rememberFilter();
         writeURL(st);
-        const box = $('.k-facet.is-open [data-facet-search]');
-        if (box) box.focus();
+        const into = facetRefocus(c.key, null);
+        if (into) into.focus();
         return;
       }
       if (facetOpen && !t.closest('.k-facet')) { facetOpen = null; facetQuery = ''; renderFilters(readURL()); }
