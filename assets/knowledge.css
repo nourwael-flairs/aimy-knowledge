@@ -777,7 +777,164 @@ button {
    say about data resi…" is the half of it that does not say which question.
    The rows in this column are what you are choosing between; a list you cannot
    read is a list you cannot choose from. */
+/* TWO LINES IN ONE ROW. The wrapper is what the turn count aligns against —
+   without it `margin-left: auto` on the count would measure from the agent
+   label rather than from the block, and a two-line row would push its own
+   badge out of line with every one-line row above it. */
+
+/* ═══════════════════════════════════════════════
+   THE COMMAND PALETTE
+
+   Above everything, including the canvas and the document overlay, because it
+   is the one control that has to work from wherever you are. It is also the
+   only thing in this product that is not addressable by URL — a palette is a
+   way of reaching a place, not a place.
+═══════════════════════════════════════════════ */
+.kp { position: fixed; inset: 0; z-index: 900; }
+.kp:empty { display: none; }
+.kp-scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); }
+.kp-panel {
+  position: absolute; left: 50%; top: 12vh;
+  transform: translateX(-50%);
+  width: min(34rem, calc(100vw - 2rem));
+  display: flex; flex-direction: column;
+  border: 0.0625rem solid var(--card-border-hover);
+  border-radius: var(--r-xl);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+.kp-input {
+  padding: 0.875rem 1rem;
+  border: 0; border-bottom: 0.0625rem solid var(--hairline);
+  background: none; color: var(--ink-primary);
+  font-family: inherit; font-size: var(--ty-body);
+}
+.kp-input:focus-visible { outline: none; }
+.kp-input::placeholder { color: var(--ink-faint); }
+
+.kp-list { max-height: 22rem; overflow-y: auto; padding: 0.375rem; }
+.kp-cap {
+  padding: 0.5rem 0.625rem 0.25rem;
+  font-size: var(--ty-micro); color: var(--ink-faint);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+}
+.kp-row {
+  display: flex; align-items: baseline; gap: 0.625rem;
+  width: 100%; padding: 0.5rem 0.625rem;
+  border: 0; border-radius: var(--r-sm);
+  background: none; cursor: pointer; text-align: left;
+  font-family: inherit;
+}
+/* Selection is a background, not an outline: the palette is driven from the
+   keyboard and the highlight moves on every arrow press, so it has to read at
+   a glance without redrawing a border each time. */
+.kp-row.is-sel { background: var(--brand-dim); }
+.kp-row:hover { background: var(--card-bg-raised); }
+.kp-label { color: var(--ink-primary); font-size: var(--ty-meta); font-weight: var(--fw-medium); }
+.kp-sub {
+  margin-left: auto; flex-shrink: 0;
+  color: var(--ink-faint); font-size: var(--ty-micro);
+}
+.kp-none { padding: 1.25rem 0.625rem; text-align: center; color: var(--ink-faint); font-size: var(--ty-meta); }
+
+.kp-foot {
+  display: flex; align-items: center; gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border-top: 0.0625rem solid var(--hairline);
+  color: var(--ink-faint); font-size: var(--ty-micro);
+}
+.kp-key {
+  display: inline-flex; align-items: center;
+  padding: 0.0625rem 0.25rem;
+  border: 0.0625rem solid var(--card-border);
+  border-radius: var(--r-xs);
+  font-family: var(--font-mono); font-size: var(--ty-micro);
+  color: var(--ink-quiet);
+}
+
+@media (prefers-reduced-motion: reduce) { .kp-panel { transition: none; } }
+
+/* ══ THE ROW IS A WRAPPER NOW ══════════════════════════════════════════
+   The row itself is still a <button>; the menu control is its SIBLING, not
+   its child, because a button inside a button is markup browsers silently
+   reparent — the control would end up outside the row it belongs to.
+
+   `position: relative` so the menu hangs off the row without widening the
+   column, the same anchoring idiom the bell and the account pill use. */
+.ov-chat-row { position: relative; display: flex; align-items: stretch; }
+.ov-chat-row .ov-chat { flex: 1 1 auto; min-width: 0; }
+
+/* Quiet until wanted. Visible on hover, on keyboard focus anywhere in the
+   row, and while its own menu is open — without that last one the control
+   vanishes under the menu it just opened. */
+.ov-chat-more {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 1.5rem; margin-left: 0.125rem;
+  border: 0; border-radius: var(--r-sm);
+  background: none; color: var(--ink-faint); cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--t-fast), background-color var(--t-fast), color var(--t-fast);
+}
+.ov-chat-row:hover .ov-chat-more,
+.ov-chat-row:focus-within .ov-chat-more,
+.ov-chat-row.is-menu .ov-chat-more { opacity: 1; }
+.ov-chat-more:hover { background: var(--card-bg-raised); color: var(--ink-primary); }
+.ov-chat-more:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+
+.ov-chat-menu {
+  position: absolute; top: 100%; right: 0; z-index: 20;
+  min-width: 11rem; padding: 0.25rem;
+  border: 0.0625rem solid var(--card-border-hover);
+  border-radius: var(--r-md);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-lg);
+}
+.ov-chat-mi {
+  display: flex; align-items: center; gap: 0.5rem;
+  width: 100%; padding: 0.375rem 0.5rem;
+  border: 0; border-radius: var(--r-sm);
+  background: none; cursor: pointer; text-align: left;
+  color: var(--ink-secondary);
+  font-family: inherit; font-size: var(--ty-meta);
+}
+.ov-chat-mi:hover { background: var(--card-bg-raised); color: var(--ink-primary); }
+.ov-chat-mi:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+.ov-chat-mi.is-danger { color: var(--err); }
+.ov-chat-mi.is-danger:hover { background: var(--err-bg); color: var(--err); }
+/* The question above the two answers, so Delete is never the first thing
+   under the pointer when the confirm opens. */
+.ov-chat-mq {
+  padding: 0.375rem 0.5rem 0.25rem;
+  font-size: var(--ty-micro); color: var(--ink-quiet);
+}
+
+/* Renaming happens in place. A modal for a title is a ceremony, and the row
+   is where the name is read. */
+.ov-chat-rename {
+  flex: 1 1 auto; min-width: 0;
+  padding: 0.5rem;
+  border: 0.0625rem solid var(--card-border-focus);
+  border-radius: var(--r-sm);
+  background: var(--card-bg-raised);
+  color: var(--ink-primary);
+  font-family: inherit; font-size: var(--ty-meta);
+}
+.ov-chat-rename:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+
+/* The pin reads as part of the title, not as a badge beside it. */
+.ov-chat-pin { display: inline-flex; margin-right: 0.25rem; color: var(--ink-action); vertical-align: baseline; }
+
+.ov-chat-lines { min-width: 0; display: flex; flex-direction: column; gap: 0.0625rem; }
 .ov-chat-name { min-width: 0; line-height: var(--lh-snug); }
+/* Who answered. One rung quieter than the title and one step smaller, which is
+   the whole hierarchy — it is read after the title or not at all. */
+.ov-chat-agent {
+  font-size: var(--fs-2xs); color: var(--d500);
+  line-height: var(--lh-snug); letter-spacing: var(--ls-wide);
+}
+.ov-chat.is-here .ov-chat-agent { color: var(--d400); }
 .ov-chat-n {
   margin-left: auto; flex-shrink: 0;
   font-size: var(--fs-2xs); color: var(--d500); font-variant-numeric: tabular-nums;
@@ -1137,6 +1294,12 @@ body {
   background: none;
   font-family: inherit;
 }
+/* The tab for the page you are ALREADY on is a <span>, not a button: a
+   control that does nothing is worse than no control. Without these two rules
+   it would keep the pointer cursor and the hover wash and go on looking like
+   somewhere to go. */
+span.topnav-tab { cursor: default; }
+span.topnav-tab:hover { background: none; }
 .topnav-tab:hover { background: rgba(255, 255, 255, 0.05); color: var(--d200); }
 .topnav-tab.active { color: var(--ink-action); }
 .topnav-tab svg { width: 0.8125rem; height: 0.875rem; flex-shrink: 0; }
@@ -1878,10 +2041,319 @@ body {
    the documentation page, not on the component.
 ═══════════════════════════════════════════════ */
 
+
+/* ═══════════════════════════════════════════════
+   SKILLS AND THE TRACE, IN THE CONVERSATION
+═══════════════════════════════════════════════ */
+/* The picker sits ABOVE the composer, not below it: it is opened by typing,
+   so the eye is already at the input, and a list that pushed the input down
+   would move the thing being typed into. */
+.sk-pick {
+  display: flex; flex-direction: column; gap: 0.125rem;
+  margin-bottom: 0.5rem; padding: 0.375rem;
+  border: 0.0625rem solid var(--card-border-hover);
+  border-radius: var(--r-md);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-lg);
+}
+.sk-opt {
+  display: flex; align-items: baseline; gap: 0.5rem;
+  width: 100%; padding: 0.375rem 0.5rem;
+  border: 0; border-radius: var(--r-sm);
+  background: none; cursor: pointer; text-align: left;
+  font-family: inherit;
+  animation: sk-in 240ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 30ms);
+}
+.sk-opt:hover:not(:disabled) { background: var(--card-bg-raised); }
+.sk-opt:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+/* An automatic skill is listed but not offered. Hiding it would raise the
+   question of where it went; disabling it answers it. */
+.sk-opt:disabled { cursor: default; opacity: 0.55; }
+.sk-opt-n {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  color: var(--ink-primary); font-size: var(--ty-meta); font-weight: var(--fw-medium);
+}
+.sk-opt-d { color: var(--ink-faint); font-size: var(--ty-micro); }
+.sk-opt-t {
+  margin-left: auto; flex-shrink: 0;
+  color: var(--ink-faint); font-size: var(--ty-micro);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+}
+.sk-none { padding: 0.75rem 0.5rem; color: var(--ink-faint); font-size: var(--ty-meta); }
+.sk-manage {
+  padding: 0.375rem 0.5rem; margin-top: 0.125rem;
+  border-top: 0.0625rem solid var(--hairline);
+  color: var(--ink-quiet); font-size: var(--ty-micro); text-decoration: none;
+}
+.sk-manage:hover { color: var(--ink-primary); }
+@keyframes sk-in { from { opacity: 0; transform: translate3d(0, 0.25rem, 0); } to { opacity: 1; transform: none; } }
+
+/* THE DISCLOSURE. If a skill shaped an answer, the answer says so — the same
+   obligation the citation strip carries for sources, and for the same reason:
+   what shaped a claim is part of the claim. */
+.sk-used {
+  display: flex; align-items: center; gap: 0.375rem;
+  margin-bottom: 0.5rem; padding: 0.25rem 0.5rem;
+  border-radius: var(--r-sm);
+  background: var(--brand-dim);
+  color: var(--ink-quiet); font-size: var(--ty-micro);
+}
+.sk-used b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+
+/* THE TRACE. Closed by default: it is evidence, kept for the moment somebody
+   doubts the answer, not narration to be read every time. */
+.act-log { margin-top: 0.75rem; }
+.act-sum {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  cursor: pointer; list-style: none;
+  color: var(--ink-faint); font-size: var(--ty-micro);
+}
+.act-sum::-webkit-details-marker { display: none; }
+.act-sum:hover { color: var(--ink-quiet); }
+.act-log[open] .act-sum { color: var(--ink-quiet); margin-bottom: 0.375rem; }
+.act-steps {
+  margin: 0; padding: 0 0 0 0.75rem;
+  border-left: 0.0625rem solid var(--hairline);
+  list-style: none;
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.act-step { display: flex; gap: 0.5rem; align-items: baseline; }
+.act-what { color: var(--ink-secondary); font-size: var(--ty-micro); font-weight: var(--fw-medium); }
+.act-why { color: var(--ink-faint); font-size: var(--ty-micro); }
+
+@media (prefers-reduced-motion: reduce) { .sk-opt { animation: none; } }
+
+
+/* The way out of a question the corpus cannot answer. Beside the coverage-gap
+   action, not instead of it: raising the gap fixes it for the next person,
+   asking someone fixes it for you, and they are different jobs. */
+.hand-off {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  margin-top: 0.5rem; padding: 0.3125rem 0.625rem;
+  border: 0.0625rem solid var(--card-border-hover);
+  border-radius: var(--r-sm);
+  background: none; cursor: pointer;
+  color: var(--ink-secondary);
+  font-family: inherit; font-size: var(--ty-micro);
+}
+.hand-off:hover { background: var(--card-bg-raised); color: var(--ink-primary); }
+.hand-off:disabled { opacity: 0.6; cursor: default; }
+.hand-off:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+
+/* Attachments. The chip says "not uploaded" because it is not uploaded, and
+   the moment that stops being true is the moment this line comes out. */
+.clip-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0; width: 1.75rem; height: 1.75rem;
+  border: 0; border-radius: var(--r-sm);
+  background: none; color: var(--ink-faint); cursor: pointer;
+  transition: background-color var(--t-fast), color var(--t-fast);
+}
+.clip-btn:hover { background: var(--card-bg-raised); color: var(--ink-primary); }
+.clip-btn:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+.clip-chip {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  margin-bottom: 0.375rem; padding: 0.25rem 0.5rem;
+  border: 0.0625rem solid var(--card-border);
+  border-radius: var(--r-sm);
+  background: var(--card-bg);
+  font-size: var(--ty-micro); color: var(--ink-secondary);
+}
+.clip-name { font-weight: var(--fw-medium); color: var(--ink-primary); }
+.clip-note { color: var(--ink-faint); }
+.clip-x {
+  display: inline-flex; border: 0; padding: 0.125rem;
+  border-radius: var(--r-xs); background: none;
+  color: var(--ink-faint); cursor: pointer;
+}
+.clip-x:hover { color: var(--ink-primary); }
+.clip-in { display: none; }
+
+/* ══ AN ANSWER'S OWN CONTROLS ════════════════════════════════
+   Quiet until the message is hovered or something inside it has focus. An
+   action row at full strength under every answer competes with the answer,
+   and these are all second thoughts — copy it, ask again, see what it stood
+   on — not the reason the message is there.
+
+   Focus-within, not just hover, or the row is unreachable from a keyboard. */
+
+
+/* ══ THINKING HAS NO FRAME ═════════════════════════════════════════════
+   No bubble and no avatar while there is nothing to put in them. The classes
+   stay on the same elements throughout — only this rule comes off — so the
+   frame appears around an answer that is already streaming rather than the
+   message being rebuilt to gain one. */
+.chat-msg.is-thinking .msg-avatar { display: none; }
+.chat-msg.is-thinking .msg-bubble {
+  background: none;
+  border-color: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+/* The frame fades up rather than snapping on, so the first words are not
+   interrupted by a box drawing itself around them.
+
+   `:not(.is-thinking)` is doing real work here. A transition belongs to the
+   state being entered, so declaring it on both states animates the frame OUT
+   as well as in — and since `push` reads layout before the class is applied,
+   the browser resolves the framed style first and then fades it away. The
+   frame appeared for an instant and dissolved, which is the opposite of the
+   intent. Declared only on the resting state, entering the thinking state is
+   instant and leaving it fades in. */
+.chat-msg.aimy:not(.is-thinking) .msg-bubble,
+.chat-msg.aimy:not(.is-thinking) .msg-avatar {
+  transition: background-color var(--t-base) var(--ease-out),
+              border-color var(--t-base) var(--ease-out),
+              opacity var(--t-base) var(--ease-out);
+}
+.chat-msg.is-thinking .msg-avatar { opacity: 0; }
+
+/* Each block of the answer lands with a short rise. Transform and opacity
+   only, so the stream never costs a layout on top of the text it is already
+   reflowing. */
+.stream-in { animation: stream-in 260ms var(--ease-out) both; }
+@keyframes stream-in {
+  from { opacity: 0; transform: translate3d(0, 0.375rem, 0); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .stream-in { animation: none; } }
+
+
+/* ══ THE GREETING'S SUGGESTIONS ════════════════════════════════════════
+   Offered questions, not results, so they sit apart from the answer above
+   them with a rule rather than inside a card. The chips are the Console's
+   own `.overlay-sugg-chip`, which means the existing delegated handler
+   already submits them and nothing new has to be wired. */
+.greet-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 0.0625rem solid var(--hairline);
+}
+.greet-next-label {
+  /* A FULL ROW OF ITS OWN. As an ordinary flex item the label sat on the first
+     chip's line and only the overflow wrapped beneath it, so the label read as
+     attached to one question rather than heading all three. A 100% basis in a
+     wrapping row is the break — no extra wrapper element, and the chips stay
+     direct children so `gap` keeps spacing them as one set. */
+  flex: 0 0 100%;
+  font: var(--ty-micro);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+
+/* The thinking mark. Sized in rem so it tracks the type around it, and given
+   a `color` because the canvas reads its fill from exactly that — the dots are
+   the brand's blue without the paint being written twice. */
+.think-mark {
+  width: 1.625rem; height: 1.625rem;
+  flex-shrink: 0;
+  color: var(--ai-text);
+  vertical-align: middle;
+}
+
+/* ══ A MESSAGE IS NEVER SQUEEZED, THE THREAD SCROLLS ═══════════════
+   The thread is a flex COLUMN, so every child defaults to `flex-shrink: 1`
+   and flexbox compresses them all once the content is taller than the pane.
+   Most survive it because their text sets a minimum size. The memory panel
+   does not: `overflow: hidden` drops its automatic minimum to zero, so it
+   absorbs the ENTIRE overflow on its own and collapses to nothing but its 1px
+   borders — a stray horizontal rule above the first message, with 167px of
+   content clipped behind it.
+
+   Turning shrink off is the general form of the fix rather than a patch on the
+   one element that showed it: nothing in a transcript should ever be resized
+   to make the transcript fit. That is what scrolling is for. */
+.overlay-thread > * { flex-shrink: 0; }
+
+/* ══ THESE SIT UNDER THE MESSAGE, NOT BESIDE IT ══════════════════
+   `.chat-msg` is a flex ROW — avatar, then bubble. These three blocks were
+   written with `grid-column: 2`, which did nothing at all because the parent
+   is not a grid, so each one became another ITEM IN THAT ROW: the bubble was
+   squeezed to a fraction of its width and clipped mid-word, the action row
+   sat to its right, and three follow-up chips stacked into a narrow tower.
+
+   Wrapping the row and giving each block the full line puts them back
+   underneath. The indent is the avatar (30px) plus the row's own 10px gap, so
+   they line up with the bubble's left edge rather than with the avatar. */
+.chat-msg { flex-wrap: wrap; }
+.msg-acts,
+.msg-follow,
+.msg-sources { flex: 1 1 100%; margin-left: 2.5rem; }
+
+.msg-acts {
+  display: flex; align-items: center; gap: 0.25rem;
+  margin-top: 0.375rem;
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+.chat-msg:hover .msg-acts,
+.chat-msg:focus-within .msg-acts { opacity: 1; }
+/* The placeholder is an assistant turn too. Hidden by what is INSIDE the
+   bubble rather than by a branch in the template, so the row appears by
+   itself when the answer swaps in — no second render, nothing to keep in
+   step. */
+.chat-msg.aimy:has(.ai-thinking) .msg-acts { display: none; }
+
+.msg-act {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  padding: 0.1875rem 0.375rem;
+  border: 0; border-radius: var(--r-sm);
+  background: none; cursor: pointer;
+  color: var(--ink-faint);
+  font-family: inherit; font-size: var(--ty-micro);
+  transition: background-color var(--t-fast), color var(--t-fast);
+}
+.msg-act:hover { background: var(--card-bg-raised); color: var(--ink-primary); }
+.msg-act:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+.msg-act[aria-expanded="true"] { background: var(--card-bg-raised); color: var(--ink-primary); }
+.msg-acts-end { display: inline-flex; gap: 0.125rem; margin-left: auto; }
+.msg-act.is-rate { padding: 0.1875rem; }
+/* Rating is a stated opinion, so it stays lit once given rather than fading
+   back with the rest of the row. */
+.msg-act.is-rate[aria-pressed="true"] { color: var(--ink-action); opacity: 1; }
+.chat-msg .msg-act.is-rate[aria-pressed="true"] { opacity: 1; }
+
+/* The drawer under an answer. Opened from the row above it, and built from
+   the same `sourceRow` the answer's own source list uses — one template, so a
+   source is the same row wherever it is listed and opens the same document. */
+.msg-sources {
+  display: flex; flex-direction: column; gap: 0.25rem;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 0.0625rem solid var(--card-border);
+  border-radius: var(--r-md);
+  background: var(--card-bg);
+}
+.msg-sources-cap {
+  font-size: var(--ty-micro);
+  color: var(--ink-faint);
+  letter-spacing: var(--ls-wide);
+  text-transform: uppercase;
+  margin-bottom: 0.25rem;
+}
+
+/* Follow-ups sit under the answer at the message's own indent, wrapping
+   rather than scrolling: three short questions, and a horizontal scroller for
+   three items is a control nobody asked for. */
+.msg-follow {
+  display: flex; flex-wrap: wrap; gap: 0.375rem;
+  margin-top: 0.5rem;
+}
+
 /* An answer is not a prose bubble: it carries inline citations, a source list
    and a trust disclosure, and .msg-bubble's 480px was squeezing all three. */
-.chat-msg.aimy:has(.answer-surface),
-.chat-msg.aimy:has(.answer-surface) .msg-bubble { max-width: 100%; }
+.chat-msg.aimy:has(.answer-surface) { max-width: 100%; }
+/* Fills the space LEFT BY THE AVATAR rather than claiming the whole row.
+   At a flat 100% the bubble plus the avatar plus the gap is wider than the
+   line, and now that the row wraps, the bubble dropped onto a line of its own
+   with the avatar stranded above it. flex-basis 0 with grow takes whatever is
+   left after the avatar, which is what "full width" meant here all along. */
+.chat-msg.aimy:has(.answer-surface) .msg-bubble { max-width: 100%; flex: 1 1 0; min-width: 0; }
 .answer-surface { display: flex; flex-direction: column; gap: 0.75rem; }
 /* The surface owns the rhythm, once. Several of these blocks carry their own
    vertical margins for the places they appear outside an answer, and those
@@ -3534,6 +4006,34 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
   flex: 1; min-height: 0; overflow-y: auto;
   padding: 1.25rem 1rem 0.5rem;
   display: flex; flex-direction: column; gap: 0.5rem;
+}
+
+/* ══ THE WAY BACK TO THE CHAT ══════════════════════════════════════════
+   Pinned to the foot of the briefing rail, opposite the gate's Console link,
+   so the two surfaces point at each other from the same corner of the screen.
+   Quiet on purpose: it is a way out, not the thing you came here to do. */
+.rail-foot {
+  flex-shrink: 0;
+  padding: 0.5rem;
+  border-top: 0.0625rem solid var(--hairline);
+}
+.rail-back {
+  display: flex; align-items: center; gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--r-sm);
+  color: var(--ink-quiet); text-decoration: none;
+  transition: background-color var(--t-fast), color var(--t-fast);
+}
+.rail-back:hover { background: var(--card-bg-raised); color: var(--ink-primary); }
+.rail-back:active { transform: translateY(0.0625rem); }
+.rail-back:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+.rail-back svg { flex-shrink: 0; opacity: 0.75; }
+.rail-back-lines { display: flex; flex-direction: column; gap: 0.0625rem; min-width: 0; }
+.rail-back-name { font-size: var(--ty-meta); font-weight: var(--fw-semibold); }
+.rail-back-sub {
+  font-size: var(--ty-micro); color: var(--ink-faint);
+  line-height: var(--lh-snug);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .brief::-webkit-scrollbar { width: 0.25rem; }
 .brief::-webkit-scrollbar-track { background: transparent; }

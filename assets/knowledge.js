@@ -74,7 +74,24 @@
     send:     svg('<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>'),
     /* The same picture the drop layer draws, so choosing a file and dropping
        one read as the same capability rather than two. */
-    upload:   svg('<path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>')
+    upload:   svg('<path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>'),
+
+    /* ── Added for the conversation features ──
+       Same factory, same stroke weights. `more` is three dots rather than a
+       chevron because it opens a menu of unlike things; a chevron promises a
+       list of one kind. */
+    copy:     svg('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>', 2),
+    pin:      svg('<path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/>', 2),
+    trash:    svg('<path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>', 2),
+    more:     svg('<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>', 2),
+    chevron:  svg('<polyline points="6 9 12 15 18 9"/>', 2.2),
+    thumbUp:  svg('<path d="M7 22V11l5-9a2.5 2.5 0 012.4 3.2L13 10h5.6a2 2 0 011.9 2.6l-2 7A2 2 0 0116.6 22z"/>', 2),
+    thumbDown:svg('<path d="M17 2v11l-5 9a2.5 2.5 0 01-2.4-3.2L11 14H5.4a2 2 0 01-1.9-2.6l2-7A2 2 0 017.4 2z"/>', 2),
+    share:    svg('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>', 2),
+    clip:     svg('<path d="M21.4 11.05L12.25 20.2a5 5 0 01-7.07-7.07l9.19-9.19a3.33 3.33 0 014.71 4.71l-9.2 9.19a1.67 1.67 0 01-2.35-2.36l8.49-8.48"/>', 2),
+    skill:    svg('<path d="M12 2l2.4 5.5L20 9l-4.2 4 1 5.9L12 16l-4.8 2.9 1-5.9L4 9l5.6-1.5z"/>', 2),
+    person:   svg('<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>', 2),
+    folder2:  svg('<path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M3 12h18"/>', 2)
   };
 
   const AIMY_MARK = (w, h) =>
@@ -6719,9 +6736,61 @@
     return t.length > 42 ? t.slice(0, 41) + '…' : t;
   };
 
+  /* ══ WHO IS ANSWERING ═══════════════════════════════════════════════════
+     A conversation used to carry no record of which agent held it, because
+     there was only ever one and the app said so in its chrome. The gate lists
+     conversations from several side by side, and at that point "which one was
+     this?" stops being answerable from the title — two threads about a refund
+     read identically whether Knowledge or QA answered them.
+
+     So the agent is a field, and the row prints it. Not an icon: a logo beside
+     a title is a second thing to learn before the list can be read, and the
+     word is already the shortest unambiguous form of itself.
+
+     `id` matches the ecosystem tab it belongs to. `blurb` is what the picker
+     shows underneath the name — one line, no marketing.
+
+     ONE PER TAB. The registry is the product strip, so a conversation can
+     carry whichever console held it. Only AiMY has a chat gate; the rest are
+     consoles, and a thread held in one of them arrives here already labelled.
+     This build holds one corpus — AiMY's
+     — and an agent that can only answer from somebody else's material by
+     pretending it is its own is a label on a wrong answer. Both already link
+     out to their own deployments from the tab strip, which is the honest place
+     for them until their corpora are here.
+
+     What the three below split is not subject matter but the QUESTION each is
+     good at: prose and policy, the health of the corpus, and its shape. Each
+     one's suggestions were run against the answer engine and kept only where
+     the answer came back grounded. */
+  const CHAT_AGENTS = {
+    aimy:    { label: 'AiMY',    blurb: 'Policies, articles and the corpus' },
+    connect: { label: 'Connect', blurb: 'Integrations and the systems they touch' },
+    talent:  { label: 'Talent',  blurb: 'People, roles and hiring' },
+    qa:      { label: 'QA',      blurb: 'Corpus health — staleness, conflicts, sources' },
+    sales:   { label: 'Sales',   blurb: 'Accounts, pipeline and what was promised' }
+  };
+  const DEFAULT_AGENT = 'aimy';
+  /* Reading it back is the one place a stale or hand-edited key can arrive, so
+     it resolves rather than indexes. */
+  const agentOf = (key) => CHAT_AGENTS[(SESSIONS[key] || {}).agent] ? (SESSIONS[key] || {}).agent : DEFAULT_AGENT;
+
+  /* WHICH AGENT THIS BUILD IS -- a constant, not a preference.
+
+     There was a picker in the composer for a while and it was the wrong shape
+     for this ecosystem: QA, Talent and Sales are separate deployments, linked
+     out from the tab strip, so a conversation started HERE belongs to Knowledge
+     by construction and choosing was a decision nobody had to make.
+
+     The field survives the picker because the LIST spans the ecosystem: a
+     thread held in the QA app appears here carrying its own label, which is the
+     whole reason the subtitle exists. What changed is that this page reads that
+     field rather than writing anything but its own name into it. */
+  const PAGE_AGENT = DEFAULT_AGENT;
+
   function startSession(question) {
     const key = 'sess-' + (++sessSeq);
-    SESSIONS[key] = { title: sessTitle(question), at: iso(TODAY), state: snapshot() };
+    SESSIONS[key] = { title: sessTitle(question), at: iso(TODAY), state: snapshot(), agent: PAGE_AGENT };
     THREADS[key] = [];
     touchThread(key);
     return key;
@@ -6740,6 +6809,12 @@
      somebody's half-typed search would restore a filtered column nobody asked
      for. */
   let CHAT_Q = '';
+  /* Which row has its menu open, and which is being renamed. Both are view
+     state, not conversation state, so neither goes in the URL or the store —
+     the same reasoning that keeps CHAT_Q out of both. */
+  let CHAT_MENU = '';
+  let CHAT_EDIT = '';
+  const isPinned = (k) => !!(SESSIONS[k] && SESSIONS[k].pinned);
 
   /* What a turn SAYS, as words. Turns here hold rendered HTML rather than
      Sales' plain text, so a raw substring search would match tag names, class
@@ -6780,6 +6855,70 @@
        `<div class="mem-line"><span class="mem-who">${esc(l[0])}</span><span class="mem-what">${esc(l[1])}</span></div>`).join('')}</div>
      <div class="mem-foot"><button class="btn btn-ghost btn-sm" data-mem-drop>Answer without it</button></div>`;
 
+  /* ══ AN ANSWER'S OWN CONTROLS ══════════════════════════════════════════
+     Rendered inside `turnEl`, so the live append and the rebuild produce the
+     same thing — the rule the whole conversation store depends on.
+
+     The thinking placeholder is an assistant turn too, and it must not carry
+     these. Rather than branch on the html string, the row is hidden by CSS
+     while `.ai-thinking` is inside the bubble; it reappears by itself when
+     the answer swaps in, with no second render.
+
+     `Sources` is absent when there is nothing to show. An answer standing on
+     nothing says so in its prose, and a button that opens an empty drawer
+     would contradict it. */
+  function msgActs(turn) {
+    const q = turn.q || '';
+    const ico = (k, size) => ICO[k].replace('<svg', `<svg width="${size || 13}" height="${size || 13}"`);
+    const srcCount = q ? answerIds(q).length : 0;
+    return `<div class="msg-acts">
+      <button class="msg-act" type="button" data-msg-copy title="Copy the answer">${ico('copy')}<span>Copy</span></button>
+      ${q ? `<button class="msg-act" type="button" data-msg-retry title="Ask it again">${ico('refresh')}<span>Retry</span></button>` : ''}
+      ${srcCount ? `<button class="msg-act" type="button" data-msg-src aria-expanded="false" title="What this stands on">${ico('doc')}<span>${srcCount} source${srcCount === 1 ? '' : 's'}</span></button>` : ''}
+      <span class="msg-acts-end">
+        <button class="msg-act is-rate" type="button" data-msg-rate="up" aria-pressed="false" title="Useful">${ico('thumbUp', 12)}</button>
+        <button class="msg-act is-rate" type="button" data-msg-rate="down" aria-pressed="false" title="Not useful">${ico('thumbDown', 12)}</button>
+      </span>
+    </div>`;
+  }
+
+  /* ══ WHAT TO ASK NEXT ═══════════════════════════════════════════════════
+     Two rules, and the second is the one that makes it useful. Never offer
+     the question just asked; and prefer a DIFFERENT KIND of question — the
+     corpus answers computed questions (how many, what changed, what is stale)
+     and written ones (refunds, residency, contradictions), and having just had
+     one kind, the next useful move is usually the other. Offering three more
+     of what you just asked is a carousel, not a suggestion.
+
+     Every one of these is in the set that was checked against the answer
+     engine and came back grounded. */
+  const FOLLOW_COMPUTED = [
+    'Which documents are out of date?',
+    'What changed recently?',
+    'Which documents does nobody use?',
+    'Which sources have stopped syncing?',
+    'How many documents do we have?'
+  ];
+  const FOLLOW_WRITTEN = [
+    'Can EU customers get a refund after activating?',
+    'What does the corpus say about data residency?',
+    'Which articles contradict each other on refunds?'
+  ];
+  function followUps(q) {
+    const asked = String(q || '').trim().toLowerCase();
+    const wasComputed = !!questionShape(q);
+    const near = wasComputed ? FOLLOW_WRITTEN : FOLLOW_COMPUTED;
+    const far = wasComputed ? FOLLOW_COMPUTED : FOLLOW_WRITTEN;
+    return near.concat(far).filter((x) => x.toLowerCase() !== asked).slice(0, 3);
+  }
+  /* A greeting carries its own suggestions, chosen from this person's open
+     work. A second row of generic ones underneath would be the same offer
+     made worse. */
+  const followUpsHtml = (q) => GREETING.test(q) ? '' :
+    `<div class="msg-follow">${followUps(q)
+      .map((x, i) => `<button class="overlay-sugg-chip" type="button" style="--i:${i}">${esc(x)}</button>`)
+      .join('')}</div>`;
+
   /* One turn, one element. Both the live append and the rebuild go through
      here, so a restored conversation is the one you left rather than a second
      rendering of it that drifts. */
@@ -6793,12 +6932,24 @@
     const wrap = document.createElement('div');
     const isUser = turn.who === 'user';
     const live = typeof turn.html === 'function';
-    wrap.className = 'chat-msg ' + (isUser ? 'user' : 'aimy');
+    /* WHILE IT IS THINKING THERE IS NOTHING TO PUT IN A BUBBLE. A bordered
+       box wrapped around a loading state draws a container for content that
+       does not exist yet, and the avatar names a speaker who has not said
+       anything. Both arrive with the first words instead — as a class change
+       on an element that is already there, so nothing is re-rendered and the
+       stream is not interrupted to build a frame around it. */
+    wrap.className = 'chat-msg ' + (isUser ? 'user' : 'aimy') + (turn.thinking ? ' is-thinking' : '');
+    /* THE QUESTION TRAVELS WITH THE ELEMENT. Everything an answer's own
+       controls need — its sources, a retry — is derived from the question,
+       and an element cannot reach back into the turns array to find it
+       without an index that changes the moment a thread is rebuilt. */
+    if (turn.q) wrap.dataset.q = turn.q;
     wrap.innerHTML =
       (isUser
         ? `<div class="msg-avatar">${esc(USER.initials)}</div>`
         : '<div class="msg-avatar aimy-av"><svg width="15" height="17" viewBox="0 0 18 20"><use href="#aimy-logo-small"/></svg></div>') +
-      `<div class="msg-bubble"${turn.id ? ` id="${turn.id}"` : ''}${live ? ' data-live="1"' : ''}>${live ? turn.html() : turn.html}</div>`;
+      `<div class="msg-bubble"${turn.id ? ` id="${turn.id}"` : ''}${live ? ' data-live="1"' : ''}>${live ? turn.html() : turn.html}</div>` +
+      (isUser ? '' : msgActs(turn));
     /* Re-attached on every build, not only the first, or `repaint()` would stop
        finding the closure the moment a thread was rebuilt. */
     if (live) { const b = wrap.querySelector('.msg-bubble'); if (b) b._live = turn.html; }
@@ -6818,6 +6969,7 @@
     th.scrollTop = th.scrollHeight;
     canvas.syncEdge();
     paintChats();
+    syncTitle();
   }
 
   function paintChats() {
@@ -6849,13 +7001,54 @@
        never been added to keeps its own age and sorts below anything said this
        visit. */
     const at = (k) => THREAD_AT[k] || (SESSIONS[k] ? -1 : -2);
-    const recent = Array.from(keys).sort((a, b) => at(b) - at(a));
+    /* Pinned first, then recency. Two keys rather than a separate list,
+       because a pinned conversation is still a conversation and still sorts
+       against the others inside its own band. */
+    const recent = Array.from(keys).sort((a, b) =>
+      (isPinned(b) ? 1 : 0) - (isPinned(a) ? 1 : 0) || at(b) - at(a));
 
-    const row = (key) => `<button class="ov-chat${key === here ? ' is-here' : ''}" type="button"
+    /* TWO LINES, AND THE SECOND IS WHO ANSWERED. `surface` is the one thread
+       nobody started, so it names no agent — labelling it would claim an
+       author for a conversation that is really the page itself. */
+    /* A WRAPPER, because the menu control cannot live inside the row. The row
+       is a <button> and a button inside a button is invalid markup that
+       browsers silently reparent — the affordance would end up outside the
+       row it belongs to. The wrapper makes them siblings.
+
+       `surface` gets no menu: it is the page's own thread, not a conversation
+       somebody started, so there is nothing to rename, pin or delete. */
+    const rowMenu = (key) => `<div class="ov-chat-menu" role="menu">
+        <button class="ov-chat-mi" type="button" role="menuitem" data-chat-rename="${esc(key)}">${ICO.pen}Rename</button>
+        <button class="ov-chat-mi" type="button" role="menuitem" data-chat-pin="${esc(key)}">${ICO.pin}${isPinned(key) ? 'Unpin' : 'Pin to top'}</button>
+        <button class="ov-chat-mi" type="button" role="menuitem" data-chat-share="${esc(key)}">${ICO.share}Copy link</button>
+        <button class="ov-chat-mi is-danger" type="button" role="menuitem" data-chat-del="${esc(key)}">${ICO.trash}Delete</button>
+      </div>`;
+
+    const rowConfirm = (key) => `<div class="ov-chat-menu" role="menu">
+        <div class="ov-chat-mq">Delete this conversation?</div>
+        <button class="ov-chat-mi" type="button" data-chat-menu="">Keep it</button>
+        <button class="ov-chat-mi is-danger" type="button" data-chat-del-ok="${esc(key)}">${ICO.trash}Delete</button>
+      </div>`;
+
+    const row = (key) => `<div class="ov-chat-row${CHAT_MENU.replace(/^!/, '') === key ? ' is-menu' : ''}">
+      ${CHAT_EDIT === key
+        ? `<input class="ov-chat-rename" id="chatRename" value="${esc(threadName(key))}"
+             data-chat-rename-in="${esc(key)}" spellcheck="false" autocomplete="off" aria-label="Rename conversation" />`
+        : `<button class="ov-chat${key === here ? ' is-here' : ''}" type="button"
         data-chat="${esc(key)}" ${key === here ? 'aria-current="true"' : ''}>
-        <span class="ov-chat-name">${esc(threadName(key))}</span>
+        <span class="ov-chat-lines">
+          <span class="ov-chat-name">${isPinned(key) ? `<span class="ov-chat-pin" aria-label="Pinned">${ICO.pin.replace('<svg', '<svg width="10" height="10"')}</span>` : ''}${esc(threadName(key))}</span>
+          ${SESSIONS[key] ? `<span class="ov-chat-agent">${esc(CHAT_AGENTS[agentOf(key)].label)}</span>` : ''}
+        </span>
         ${(THREADS[key] || []).length ? `<span class="ov-chat-n">${(THREADS[key] || []).length}</span>` : ''}
-      </button>`;
+      </button>`}
+      ${SESSIONS[key] && CHAT_EDIT !== key
+        ? `<button class="ov-chat-more" type="button" data-chat-menu="${esc(key)}"
+             aria-haspopup="menu" aria-expanded="${CHAT_MENU.replace(/^!/, '') === key ? 'true' : 'false'}"
+             aria-label="More for this conversation">${ICO.more.replace('<svg', '<svg width="14" height="14"')}</button>`
+        : ''}
+      ${CHAT_MENU === key ? rowMenu(key) : CHAT_MENU === '!' + key ? rowConfirm(key) : ''}
+    </div>`;
 
     /* WHAT YOU HAVE OPEN IS NEVER FILTERED OUT. A search that could hide the
        conversation in front of you would be answering a different question
@@ -6875,10 +7068,12 @@
         <input class="ov-chat-input" type="search" id="chatFind" placeholder="Find a conversation…"
           spellcheck="false" autocomplete="off" value="${esc(CHAT_Q)}" />
       </label>
-      ${found.length ? `<div class="ov-chat-group">
-        <div class="ov-chat-cap">${q ? 'Found' : 'Recent'}</div>
-        ${found.map(row).join('')}
-      </div>` : ''}
+      ${q
+        ? (found.length ? `<div class="ov-chat-group"><div class="ov-chat-cap">Found</div>${found.map(row).join('')}</div>` : '')
+        : chatGroups(found).map((g) => `<div class="ov-chat-group">
+            <div class="ov-chat-cap">${esc(g.cap)}</div>
+            ${g.keys.map(row).join('')}
+          </div>`).join('')}
       ${q && !others.length
         ? `<p class="ov-chat-none">Nothing else matches “${esc(CHAT_Q)}” — in a title or in anything said.</p>`
         : ''}`;
@@ -6886,6 +7081,140 @@
        keystroke would otherwise send it to the end of the word. */
     const box = $('#chatFind');
     if (box && document.activeElement !== box && CHAT_Q) { box.focus(); box.setSelectionRange(CHAT_Q.length, CHAT_Q.length); }
+  }
+
+  /* ═══════════════════════════════════════════════
+     THE STORE — what was said, not what is shown
+
+     README declared, twice, that conversations do not survive a reload and
+     that nothing in the build pretends otherwise. This closes that, and both
+     passages are rewritten in the same change rather than left standing.
+
+     ── The one hard part ──
+     A turn's `html` may be a FUNCTION. Live answers are stored as closures and
+     re-run by `canvas.repaint()`, which is how an answer citing "5 sources, 2
+     failing" corrects itself after you fix a source. Functions do not
+     serialize, and `JSON.stringify` drops them silently — the failure would be
+     a thread that restores looking perfect and is quietly dead.
+
+     So a live turn persists its QUESTION and is rehydrated as a fresh closure
+     over `answerFor`. What comes back is not a photograph of the answer; it is
+     the answer, recomputed against the corpus as it stands now.
+
+     ── What it deliberately is not ──
+     `knowledge.js` states the doctrine for this: "None of this is a second
+     source of truth. The URL still decides everything on screen." The store
+     holds what was SAID. It never holds what is displayed, never restores a
+     scroll position, and never decides which conversation is open — `?chat=`
+     still does that, alone.
+  ═══════════════════════════════════════════════ */
+  const CHAT_STORE = 'aimy-k-chats';
+  /* Enough for months of real use; small enough that a quota error is a bug
+     rather than an inevitability. Oldest go first. */
+  const STORE_MAX = 40;
+  /* A seed you deleted must STAY deleted. `seedSessions()` runs on every boot
+     and would otherwise put it back, which reads as the delete having silently
+     failed. */
+  const DELETED = new Set();
+
+  const packTurn = (t) =>
+    t.who === 'memory'
+      ? { who: 'memory', cue: t.cue }
+      : { who: t.who, q: t.q || '', live: typeof t.html === 'function',
+          html: typeof t.html === 'function' ? t.html() : t.html };
+
+  const unpackTurn = (t) => {
+    if (t.who === 'memory') return { who: 'memory', cue: t.cue };
+    /* The rehydration. Without the `q` guard a live turn saved before the
+       question was recorded would come back as a closure over nothing. */
+    if (t.live && t.q) return { who: t.who, q: t.q, html: () => answerFor(t.q, readURL()) };
+    const out = { who: t.who, html: t.html };
+    if (t.q) out.q = t.q;
+    return out;
+  };
+
+  function saveChats() {
+    try {
+      const keys = Object.keys(SESSIONS)
+        .sort((a, b) => (THREAD_AT[b] || 0) - (THREAD_AT[a] || 0))
+        .slice(0, STORE_MAX);
+      const out = { v: 1, deleted: [...DELETED], sessions: {}, threads: {}, at: {} };
+      keys.forEach((k) => {
+        out.sessions[k] = SESSIONS[k];
+        out.at[k] = THREAD_AT[k] || 0;
+        out.threads[k] = (THREADS[k] || []).map(packTurn);
+      });
+      localStorage.setItem(CHAT_STORE, JSON.stringify(out));
+    } catch (e) {
+      /* A locked-down browser throws on access rather than returning null, and
+         a full quota throws on write. Neither is worth taking the page down
+         for: the conversation still works, it just will not be there tomorrow. */
+    }
+  }
+
+  function loadChats() {
+    let raw = null;
+    try { raw = localStorage.getItem(CHAT_STORE); } catch (e) { return; }
+    if (!raw) return;
+    let d;
+    try { d = JSON.parse(raw); } catch (e) { return; }
+    if (!d || d.v !== 1) return;
+
+    (d.deleted || []).forEach((k) => {
+      DELETED.add(k);
+      delete SESSIONS[k]; delete THREADS[k]; delete THREAD_AT[k];
+    });
+
+    Object.keys(d.sessions || {}).forEach((k) => {
+      if (DELETED.has(k)) return;
+      SESSIONS[k] = d.sessions[k];
+      THREAD_AT[k] = (d.at || {})[k] || 0;
+      THREADS[k] = ((d.threads || {})[k] || []).map(unpackTurn);
+      /* The counters have to clear everything restored, or the next new
+         conversation is minted onto a key that already exists and silently
+         takes over an old thread. */
+      const m = String(k).match(/^sess-(\d+)$/);
+      if (m) sessSeq = Math.max(sessSeq, Number(m[1]));
+      threadSeq = Math.max(threadSeq, THREAD_AT[k] || 0);
+    });
+  }
+
+  /* ══ WHEN, NOT JUST IN WHAT ORDER ══════════════════════════════════════
+     One undifferentiated "Recent" heading told you the order and nothing
+     else. These bands say roughly when, which is how people actually look for
+     a conversation they had — not "the fourth one down" but "some time last
+     week".
+
+     Measured against TODAY, the corpus's fixed date, NOT against the wall
+     clock. Every document in this build is dated relative to it, and a list
+     that grouped by real time would drift out of step with everything it
+     sits beside.
+
+     Pinned comes out as its own band and keeps its place at the top, because
+     a pin is a statement that this one is not to be found by date.
+
+     `surface` has no session and therefore no date. It belongs with today's
+     — it is the thread you are in right now. */
+  function chatGroups(keys) {
+    const band = (k) => {
+      if (isPinned(k)) return 0;
+      if (!SESSIONS[k]) return 1;
+      const d = offsetOf(SESSIONS[k].at);
+      return d <= 0 ? 1 : d === 1 ? 2 : d < 7 ? 3 : d < 30 ? 4 : 5;
+    };
+    const CAP = ['Pinned', 'Today', 'Yesterday', 'Earlier this week', 'This month', 'Older'];
+    /* BUCKETED, not walked. Walking the sorted list and breaking on a change
+       of band looks equivalent and is not: the list is ordered by recency, and
+       a band is a range of dates, so one band can be entered, left and entered
+       again — which printed "Earlier this week" twice with another heading
+       wedged between the two halves. Buckets can only produce each heading
+       once, and the keys arrive already sorted so the order inside each is the
+       order the sort chose. */
+    const buckets = CAP.map(() => []);
+    keys.forEach((k) => buckets[band(k)].push(k));
+    return buckets
+      .map((ks, i) => ({ cap: CAP[i], keys: ks }))
+      .filter((g) => g.keys.length);
   }
 
   /* ══ CONVERSATIONS THAT ALREADY EXIST ══════════════════════════════════
@@ -6914,8 +7243,9 @@
       Object.keys(over).forEach((k) => { st[k] = over[k]; });
       return serialize(st);
     };
-    const seed = (key, title, ago, state, turns) => {
-      SESSIONS[key] = { title: title, at: iso(new Date(TODAY.getTime() - ago * 864e5)), state: state };
+    const seed = (key, title, ago, state, turns, agent) => {
+      SESSIONS[key] = { title: title, at: iso(new Date(TODAY.getTime() - ago * 864e5)), state: state,
+                        agent: agent || DEFAULT_AGENT };
       THREADS[key] = turns;
       /* Ordered by their own age, and all of them below anything touched this
          visit — `threadSeq` only ever counts up from 1. */
@@ -6956,7 +7286,7 @@
            'Grouped by client, most of what we hold is not about a client at all — it is '
            + 'policy and product material that applies to everyone. The named clients each '
            + 'have a handful of tickets and little else, so anything you want to say about '
-           + 'one of them comes from the general material rather than from their own.'));
+           + 'one of them comes from the general material rather than from their own.'), 'qa');
 
     /* ── A query and a date window ── */
     const residency = byId('article-residency');
@@ -6970,6 +7300,25 @@
              + 'version most people see is not the version that is maintained.'));
     }
 
+    /* ── TWO THREADS FROM OTHER CONSOLES ──
+          The conversation list spans the ecosystem: only AiMY has a gate, but
+          every console carries the canvas, and a thread held in one of them
+          arrives here under its own label. Without these the subtitle is a
+          column that says the same word on every row. */
+    seed('s-seed-6', 'Which accounts renew this quarter?', 4,
+      stateOf({}),
+      said('Which accounts renew this quarter?',
+           'Six, and two of them are the ones to watch: Upland renews across fourteen products '
+           + 'on a single date, and Asteris renews forty days later on a contract that was '
+           + 'amended twice. The rest are single-product and roll automatically.'), 'sales');
+
+    seed('s-seed-7', 'What does onboarding cover in week one?', 11,
+      stateOf({}),
+      said('What does onboarding cover in week one?',
+           'Access, the handbook, and one shadowed call per day. The written plan stops at day '
+           + 'three — everything after that is described as "with your lead", which is why two '
+           + 'people this quarter reported week one as the part that felt improvised.'), 'talent');
+
     /* ── A flag, and what it is for ── */
     const mine = one((o) => responsible(o) === USER.owner && o.status !== 'current');
     if (mine) {
@@ -6979,7 +7328,7 @@
              'Everything filed to you that is not simply current. Some of it is waiting on '
              + 'an upstream that moved and some on a judgement only you can make, and the '
              + 'surface does not distinguish them — the status says what is true of the '
-             + 'document, not what is being asked of you.'));
+             + 'document, not what is being asked of you.'), 'qa');
     }
   }
 
@@ -6996,9 +7345,31 @@
 
     init() {
       this.overlay = $('#aimyOverlay');
-      if (!this.overlay) return;
-      this.thread   = $('#overlayThread', this.overlay);
-      this.input    = $('#overlayInput', this.overlay);
+      /* ══ THE GATE HAS NO OVERLAY ═══════════════════════════════════════
+         On the gate the thread IS the page: there is nothing to open, nothing
+         to close, and no backdrop to click off. That is the only difference,
+         and it is why `ask`, `push`, `paintThread` and `paintChats` are the
+         same code on both surfaces — they were always addressing elements by
+         id, never reaching through a container. Binding from `document` when
+         the overlay is absent is the whole of the port.
+
+         `open: true` from the start, because the one thing `open` gates is the
+         rebuild-on-open transition, and a surface that is always up has
+         already had it. */
+      this.inline = !this.overlay;
+      this.thread = $('#overlayThread', this.overlay || document);
+      this.input  = $('#overlayInput', this.overlay || document);
+      /* Before the inline early-return below, or the gate — the surface with
+         the composer people actually use — is the one that does not get it. */
+      this.mountClip();
+      if (this.inline) {
+        this.open = true;
+        if (this.thread) {
+          this.thread.addEventListener('scroll', () => this.syncEdge(), { passive: true });
+          this.syncEdge();
+        }
+        return;
+      }
       this.floatBar = $('#aimyFloatBar');
 
       const opener = $('#canvasOpen');
@@ -7043,8 +7414,28 @@
       }
     },
 
+    /* ══ ATTACHMENTS ═══════════════════════════════════════════════════
+       Injected into the composer rather than written into two shells, because
+       the bar is identical on both and a second copy is a second thing to keep
+       in step.
+
+       WHAT IT DOES AND DOES NOT DO: it accepts a file, names it, and lets you
+       take it back off. It does not upload — there is nowhere to upload to —
+       and it says so on the chip rather than failing later or, worse, quietly
+       pretending. The seam is exactly where a real upload would go. */
+    mountClip() {
+      const bar = $('.overlay-input-bar', this.overlay || document);
+      const send = $('.overlay-send', this.overlay || document);
+      if (!bar || !send || $('#clipBtn')) return;
+      send.insertAdjacentHTML('beforebegin',
+        `<button class="clip-btn" id="clipBtn" type="button" aria-label="Attach a file" title="Attach a file">
+           ${ICO.clip.replace('<svg', '<svg width="15" height="15"')}
+         </button>
+         <input class="clip-in" id="clipIn" type="file" hidden />`);
+    },
+
     show(basis) {
-      if (!this.open) {
+      if (!this.inline && !this.open) {
         /* Opening the canvas is reading it, so the count goes. */
         bumpCanvasBadge(0);
         this.overlay.classList.add('open');
@@ -7064,6 +7455,9 @@
     },
 
     close(opts) {
+      /* Nothing to close. Escape on the gate must not dismiss the surface the
+         page is made of. */
+      if (this.inline) return;
       this.overlay.classList.remove('open');
       if (this.floatBar) this.floatBar.classList.remove('hidden');
       this.open = false;
@@ -7173,25 +7567,99 @@
       this.push('user', esc(text));
       const id = 'a' + Date.now();
       const turn = this.push('aimy',
-        '<span class="ai-thinking"><span class="dots"><span></span><span></span><span></span></span>' +
+        '<span class="ai-thinking"><canvas class="think-mark" width="26" height="26" aria-hidden="true"></canvas>' +
         '<span class="ai-thinking-label">Searching the corpus…</span></span>', id);
+      /* Both, and both are needed. The FLAG is what a rebuild reads, so a
+         thread repainted mid-think comes back bare rather than framed. The
+         CLASS is what this render needs, because `push` built the element
+         before this line could set the flag — the same ordering that catches
+         `turn.q` a few lines below. */
+      if (turn) turn.thinking = true;
+      const ph = document.getElementById(id);
+      const phMsg = ph && ph.closest('.chat-msg');
+      if (phMsg) phMsg.classList.add('is-thinking');
+      startThinking();
+      /* ══ THE TURN REMEMBERS ITS QUESTION ═══════════════════════════════
+         `answerFor` returns an opaque HTML string, so nothing downstream can
+         ask a finished answer which documents it stood on. `answerIds(q)`
+         recomputes that from the QUESTION, and until now the question was
+         only on the user turn one position earlier — recoverable by index,
+         which is a way of saying not recoverable.
+
+         One field, and it is what lets an answer show its sources, be
+         retried, and hand its documents to the Console. */
+      if (turn) turn.q = text;
       setTimeout(() => {
         /* THE TURN IS UPDATED BEFORE THE ELEMENT, and whether or not the
            element is still there. Switching conversations mid-answer removes
            the bubble from the DOM, and returning to that conversation rebuilds
            it from the turn — so an early return here would leave the thread
            holding the thinking dots for the rest of the session. */
-        if (turn) turn.html = answer;
+        /* Assembled BEFORE the element is looked for, so a conversation you
+           switched away from still gets the disclosure and the trace. Built
+           once and assigned once: two assignments, with the element check
+           between them, is how a thread ends up holding a different answer
+           from the one on screen. */
+        const shaped = armedSkill;
+        armedSkill = null;
+        const finalHtml = (shaped
+          ? `<div class="sk-used">${ICO.skill.replace('<svg', '<svg width="11" height="11"')}Shaped by <b>${esc(shaped.name)}</b></div>`
+          : '') + (typeof answer === 'function' ? answer() : answer) + activityLog(text, readURL());
+        if (turn) turn.html = finalHtml;
+
+        stopThinking();
+        if (turn) turn.thinking = false;
         const el = document.getElementById(id);
         if (!el) return;
-        if (typeof answer === 'function') { el._live = answer; el.dataset.live = '1'; }
-        el.innerHTML = typeof answer === 'function' ? answer() : answer;
+        /* The bubble and the avatar arrive here, with the first words. */
+        const msg = el.closest('.chat-msg');
+        if (msg) msg.classList.remove('is-thinking');
+        /* A live answer keeps its closure, but the closure alone would drop
+           the disclosure and the trace on the next repaint — so it is wrapped
+           to rebuild the whole thing rather than just the prose. */
+        if (typeof answer === 'function') {
+          const wrapLive = () => (shaped
+            ? `<div class="sk-used">${ICO.skill.replace('<svg', '<svg width="11" height="11"')}Shaped by <b>${esc(shaped.name)}</b></div>`
+            : '') + answer() + activityLog(text, readURL());
+          el._live = wrapLive; el.dataset.live = '1';
+          if (turn) turn.html = wrapLive;
+        }
+        typeIn(el, finalHtml);
+        /* After the answer, not with it: the chips are about where to go
+           next, and offering them beside a paragraph nobody has read yet is
+           asking the question for them. Appended to the MESSAGE, so a rebuild
+           of the thread reproduces them from `turn.q` rather than losing them. */
+        const wrap = el.closest('.chat-msg');
+        if (wrap) {
+          /* THE ACTION ROW IS REBUILT HERE, and it has to be. turnEl renders
+             it when the turn is first pushed — which is while the turn still
+             holds the thinking dots and has not been told its question — so
+             the first render has no Retry and no source count. The bubble swap
+             above replaces the answer only; this replaces the controls that
+             describe it. */
+          wrap.dataset.q = text;
+          const acts = wrap.querySelector('.msg-acts');
+          if (acts) acts.outerHTML = msgActs(turn);
+          if (!wrap.querySelector('.msg-follow')) wrap.insertAdjacentHTML('beforeend', followUpsHtml(text));
+        }
         this.reveal(el);
         if (opt && opt.autoSurface) {
           const ids = answerIds(text);
           if (ids.length) surfaceIds(ids, 'while you were asking');
         }
-      }, 900);
+        /* ══ SAVE AGAIN, NOW THAT THE TURN IS FINISHED ═══════════════════
+           `push` saves, and push happens while this turn still holds the
+           thinking dots and has not yet been told its question. Saving only
+           there persisted every last answer as "Searching the corpus…" and
+           dropped the `q` that the sources panel and retry depend on. The
+           turn is only complete here. */
+        saveChats();
+      /* Three seconds, not the original 900ms. The mark's cycle is 2.56s, so
+         under a second showed a fragment of a gesture and cut it off. This is
+         long enough to complete one and start the next. It is a fixed wait
+         either way — there is no backend to be slow — so the number is a
+         reading decision rather than a measurement. */
+      }, 3000);
     },
 
     /* Appends, and RECORDS. The turn is what a conversation is made of — the
@@ -7218,6 +7686,8 @@
       this.syncEdge();
       /* The column carries a turn count and an order, and both just moved. */
       paintChats();
+      /* The single write path. Every turn on both surfaces arrives here. */
+      saveChats();
       return turn;
     },
 
@@ -7286,10 +7756,25 @@
   /* Every answer keeps this button even though a fresh question surfaces its
      sources automatically: scrolling back to an older message and re-applying
      it is the one case automation cannot serve. */
+  /* ══ THE SAME BUTTON, TWO TRUE SENTENCES ═══════════════════════════════
+     This control was hidden on the gate, because its own copy promised a grid
+     that is not there — "the grid becomes exactly these documents" is a lie on
+     a page with no grid, and a lie in an answer costs more than a missing
+     button.
+
+     It is back, saying what it will really do. On the Console it filters the
+     surface, as it always has. On the gate it carries the documents ACROSS:
+     one click from an answer to the workbench, already narrowed to exactly
+     what the answer stood on. `ids` is a real filter key, so the destination
+     is an ordinary addressable URL and not a special case. */
   const applyBtn = (ids, label) =>
-    `<div class="answer-apply">${entryAction('direct', label || `Show these ${ids.length} on the surface`,
+    `<div class="answer-apply">${entryAction('direct',
+      label || (canvas.inline ? `Open these ${ids.length} in the Console`
+                              : `Show these ${ids.length} on the surface`),
       `data-apply-ids="${ids.join(',')}"`)}
-      <span class="answer-apply-note">The grid becomes exactly these documents.</span>
+      <span class="answer-apply-note">${canvas.inline
+        ? 'The Console opens filtered to exactly these.'
+        : 'The grid becomes exactly these documents.'}</span>
     </div>`;
 
   const ANSWERS = [
@@ -7371,6 +7856,10 @@
     </div>`;
   }
 
+  /* The terminal state of a knowledge base is a question it cannot answer, and
+     until now that was where the surface stopped. */
+  const handoffBtn = () => `<button class="hand-off" type="button" data-handoff>${ICO.person.replace('<svg', '<svg width="13" height="13"')}Ask a person instead</button>`;
+
   function noGroundingAnswer(q, scope, st) {
     /* Where it looked, so the claim is checkable. "Nothing grounds that" is a
        strong thing to say and it should say what it searched. */
@@ -7386,6 +7875,7 @@
         <div class="td-row is-err">${ICO.slash}<span class="td-text"><strong>0 sources matched.</strong> This is a
         genuine coverage gap, not a retrieval or a permission problem.</span></div>
         <button class="td-action" data-raise-gap="${esc(q).slice(0, 80)}">Raise it as a coverage gap →</button>
+        ${handoffBtn()}
       </div>
     </div>`;
   }
@@ -7695,13 +8185,26 @@
     source(scope, st, q) {
       const keys = Object.keys(SRC).filter((k) => k !== 'upload');
       const named = keys.filter((k) => q.toLowerCase().indexOf(SRC[k].label.toLowerCase()) > -1);
-      const list = named.length ? named : keys.filter((k) => SRC[k].health !== 'ok');
+      /* NOT-OK IS NOT THE SAME AS NOT SYNCING. `health` has three values and
+         this read it as two: a warned source is running and dropping rows,
+         which is a different thing from one that has stopped. Counting it as
+         stopped made the headline contradict the note printed directly under
+         it — "3 of 4 sources are not syncing", above "HubSpot — 3 records
+         skipped", which only happens if HubSpot ran. */
+      const stopped = keys.filter((k) => SRC[k].health === 'failed');
+      const degraded = keys.filter((k) => SRC[k].health === 'warn');
+      const list = named.length ? named : stopped.concat(degraded);
       const shown = list.length ? list : keys;
       return `<div class="answer-surface">
         <div class="answer-body">
           <p>${list.length && !named.length
-            ? `<strong>${list.length}</strong> of ${keys.length} sources ${list.length === 1 ? 'is' : 'are'} not syncing.`
-            : shown.map((k) => `<strong>${esc(SRC[k].label)}</strong> ${SRC[k].health === 'ok' ? 'is syncing' : 'is not syncing'}`).join('; ') + '.'}</p>
+            ? `<strong>${stopped.length}</strong> of ${keys.length} sources ${stopped.length === 1 ? 'has' : 'have'} stopped syncing`
+              + (degraded.length ? `, and ${degraded.length === 1 ? 'another is' : degraded.length + ' more are'} running but dropping rows` : '')
+              + '.'
+            : shown.map((k) => `<strong>${esc(SRC[k].label)}</strong> ${
+                SRC[k].health === 'ok' ? 'is syncing'
+                : SRC[k].health === 'warn' ? 'is syncing but dropping rows'
+                : 'has stopped syncing'}`).join('; ') + '.'}</p>
           ${shown.map((k) => `<p>${esc(SRC[k].label)} — ${esc(SRC[k].note)}.
             ${LIVE.filter((o) => o.src === k).length} documents come from it.</p>`).join('')}
         </div>
@@ -7734,12 +8237,138 @@
   const topicFor = (q) => ANSWERS.filter((a) => a.match.test(q))
     .sort((a, b) => (b.weight || 1) - (a.weight || 1))[0] || null;
 
+  /* ══ SAYING HELLO ══════════════════════════════════════════════════════
+     "hi" is not a question about the corpus. Put through the grounding path it
+     produced the right answer to the wrong question — *nothing in the corpus
+     grounds an answer to that* — which is true, and is not what a person
+     saying hello has asked. So it is handled before the shape and topic
+     matchers, because it is not a retrieval problem at all.
+
+     ── The greeting is the whole message ──
+     `hi` is greeted; `hi, which documents are out of date?` is ANSWERED. A
+     greeting used as a preamble is not a request to be greeted, and matching
+     on a prefix would swallow the question riding behind it.
+
+     ── What makes this more than a greeting ──
+     The suggestions are not a fixed list. They are chosen from what is
+     actually sitting with this person, ranked by `needScore` — the product's
+     own definition of what needs someone, already behind the landing set and
+     the Needs-attention sort. A second definition of "your work" is how the
+     two start disagreeing about it.
+
+     ── Why these questions always resolve ──
+     Each suggestion is a bare SHAPE question: every word in it is a stop word
+     or a shape word, so `questionScope` drops them all, returns the full pool
+     with `broad: true`, and `COMPUTED[shape]` always has something to answer
+     from. Suggestion chips that resolved to "nothing grounds an answer" have
+     shipped here before — these cannot, by construction rather than by
+     having been checked once. */
+  const GREETING = /^\s*(hi|hey|hello|hiya|howdy|yo|greetings|good\s+(morning|afternoon|evening)|morning|evening|salam|salaam|marhaba|hala)\s*(there|aimy|again|all)?\s*[!.,?]*\s*$/i;
+
+  /* Read off the real clock, not `TODAY`. The corpus date is fixed at
+     2026-07-30 so the fixtures hold still; which part of the day it is for the
+     person reading is the one thing that fixed date cannot know. */
+  function dayPart() {
+    const h = new Date().getHours();
+    if (h < 5) return 'Still up';
+    if (h < 12) return 'Good morning';
+    if (h < 18) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  /* Sentence-cased so a title can open a sentence without shouting. */
+  const docPhrase = (o) => `<strong>${esc(o.title)}</strong>`;
+
+  function greetAnswer() {
+    const first = String(USER.name || '').trim().split(/\s+/)[0] || 'there';
+
+    /* Ranked by the product's own measure. The +2 in `needScore` for being
+       yours is why this list is about this person and not about the corpus. */
+    const mine = LIVE.filter((o) => responsible(o) === USER.owner)
+      .sort((a, b) => needScore(b) - needScore(a));
+    /* Above 2 means something is wrong with it beyond merely being yours. */
+    const needs = mine.filter((o) => needScore(o) > 2);
+
+    /* A broken source only matters here if it actually feeds documents this
+       person can see. Naming a failure with nothing behind it is noise.
+
+       DOWN AND DEGRADED ARE DIFFERENT NEWS. A failed source is not syncing at
+       all, so everything from it is a copy of an unknown age. A warned one is
+       syncing and skipping rows. Reporting them in one sentence said the
+       stronger thing about both, which overstated HubSpot and buried Zendesk
+       in a list. */
+    const feeds = (k) => ENTITLED.some((o) => o.src === k);
+    const down = Object.keys(SRC).filter((k) => SRC[k].health === 'failed' && feeds(k)).map((k) => SRC[k]);
+    const partial = Object.keys(SRC).filter((k) => SRC[k].health === 'warn' && feeds(k)).map((k) => SRC[k]);
+
+    const lines = [];
+    lines.push(`<p>${dayPart()}, ${esc(first)} — how are you doing?</p>`);
+
+    if (needs.length) {
+      const top = needs.slice(0, 2);
+      const rest = needs.length - top.length;
+      lines.push(`<p>${mine.length} document${mine.length === 1 ? '' : 's'} in the corpus
+        ${mine.length === 1 ? 'is' : 'are'} yours, and ${needs.length === 1 ? 'one of them is' : needs.length + ' of them are'}
+        asking for something. ${top.map((o) => `${docPhrase(o)} is
+        ${esc(String((STATUS[o.status] || {}).label || 'open').toLowerCase())}${o.upd ? `, ${o.upd} days since it last changed` : ''}`).join('; and ')}${rest > 0 ? `, with ${rest} more behind ${rest === 1 ? 'it' : 'them'}` : ''}.</p>`);
+    } else if (mine.length) {
+      lines.push(`<p>Nothing on your ${mine.length} document${mine.length === 1 ? '' : 's'} needs you
+        right now — they are all current.</p>`);
+    }
+
+    /* The notes are written prose and carry proper nouns — OAuth, Jul, the
+       source names. Lower-casing them to fit inside a sentence produced
+       "oauth token rejected since 26 jul", so they are joined as clauses
+       instead and left exactly as they are written. */
+    const list = (xs) => xs.map((x) => `<strong>${esc(x.label)}</strong> (${esc(x.note)})`)
+      .join(xs.length > 2 ? ', ' : ' and ')
+      .replace(/, ([^,]*)$/, xs.length > 2 ? ', and $1' : ' and $1');
+
+    if (down.length) {
+      lines.push(`<p>${down.length === 1 ? 'One source is' : down.length + ' sources are'} not syncing —
+        ${list(down)}. Anything answered from ${down.length === 1 ? 'it' : 'them'} is standing on the copy
+        we already had.</p>`);
+    }
+    if (partial.length) {
+      lines.push(`<p>${list(partial)} ${partial.length === 1 ? 'is' : 'are'} still syncing but dropping rows
+        on the way in.</p>`);
+    }
+
+    /* Each suggestion is offered because something in the corpus makes it
+       worth asking. An unconditional list would be a menu; this is a reading
+       of the state. */
+    /* Each of these asks a DIFFERENT question. "Which documents are out of
+       date?" and "What is out of date or contradicted?" both shipped in the
+       first cut, and offering a person the same question twice out of three
+       is worse than offering two. */
+    const asks = [];
+    if (needs.some((o) => o.status === 'conflicting')) asks.push('What contradicts what?');
+    if (needs.some((o) => o.status === 'outdated') || mine.some((o) => o.upd > 60)) {
+      asks.push('Which documents are out of date?');
+    }
+    if (down.length || partial.length) asks.push('Which sources have stopped syncing?');
+    if (LIVE.some((o) => o.status === 'unowned')) asks.push('What here is unowned?');
+    if (LIVE.some((o) => o.status === 'unused')) asks.push('What is nobody using?');
+    asks.push('What changed recently?');
+
+    const chips = asks.slice(0, 3)
+      .map((q, i) => `<button class="overlay-sugg-chip" type="button" style="--i:${i}">${esc(q)}</button>`)
+      .join('');
+
+    return `<div class="answer-body">${lines.join('')}</div>
+      <div class="greet-next"><span class="greet-next-label">Worth asking</span>${chips}</div>`;
+  }
+
   function answerFor(q, st) {
     /* Order matters, and it is the whole fix. What the question ASKS comes
        first: "what changed in the refund policy" and "can EU customers get a
        refund after activating" share a noun and are different questions, and
        the topic match cannot tell them apart. Only once the question asks
        nothing computable does the noun get to choose the answer. */
+    /* Before everything, because a greeting is not a question about the
+       corpus and every matcher below assumes it is looking at one. */
+    if (GREETING.test(q)) return greetAnswer();
+
     const shape = questionShape(q);
     const scope = questionScope(q, st, shape);
     if (shape && COMPUTED[shape] && (scope.docs.length || shape === 'source')) {
@@ -8253,8 +8882,46 @@
   /* ═══════════════════════════════════════════════
      RENDER — one entry point, driven by the URL
   ═══════════════════════════════════════════════ */
+  /* ══ THE TAB TITLE IS STATE TOO ════════════════════════════════════
+     `document.title` was assigned in exactly one place in the whole product
+     — the settings page — so on a product whose entire premise is that the
+     URL is the state, the one piece of chrome that reports where you are
+     never moved. Opening a document, switching conversation, filtering: the
+     tab read a static string throughout.
+
+     It names the surface, then what is open on it. Nothing else, because a
+     title that carries the filter set is a title nobody can read in a tab
+     strip eight tabs wide. */
+  function syncTitle() {
+    const base = canvas.inline ? 'AiMY' : 'AiMY Console';
+    const st = readURL();
+    let sub = '';
+    if (!canvas.inline && st.doc && byId(st.doc)) sub = byId(st.doc).title;
+    else { const k = threadKey(); if (SESSIONS[k] && !SESSIONS[k].blank) sub = SESSIONS[k].title; }
+    document.title = sub ? base + ' \u2014 ' + sub : base;
+  }
+
   function render() {
     const st = readURL();
+    syncTitle();
+
+    /* ══ THE GATE HAS NO SURFACE TO RENDER ═════════════════════════════
+       No grid, no filter row, no briefing, no document, no settings sheet.
+       Everything above the last two statements of this function addresses an
+       element that does not exist on that page, and `$('#wbStage')` is the
+       one that does not merely no-op — it returns null and throws.
+
+       That mattered more than it looks: `patch()` calls `render()`, and
+       `canvas.ask` calls `patch()` to attach a new conversation to the URL.
+       So the throw landed BETWEEN starting a session and pushing the first
+       turn — the address bar gained a `?chat=` and the question itself was
+       never appended. A conversation that exists and is empty.
+
+       What still has to run is the pair at the bottom: a live answer re-runs
+       so it never trails the model it describes, and the conversation list
+       follows the URL. */
+    if (canvas.inline) { canvas.repaint(); paintChats(); return; }
+
     /* Before anything reads them. The corpus cannot move during a paint, so the
        findings are computed once and every card, the rail and the bell read the
        same answer. */
@@ -8303,6 +8970,49 @@
   ═══════════════════════════════════════════════ */
   function submit(text) {
     const st = readURL();
+
+    /* ══ THE GATE ANSWERS, AND ONLY ANSWERS ════════════════════════════
+       The four routes below exist because the Console has a surface to steer:
+       filters to set, a document to open in place, a write to stage. The gate
+       has none of those, so classifying a sentence by its shape there would
+       send half of what people type into a route with nowhere to land — a
+       typed title would try to open a document on a page with no grid.
+
+       One route, no `parseIntent`. This is what "answers in place, no surface
+       manipulation" means in code. */
+    if (canvas.inline) {
+      if (!String(text || '').trim()) return;
+      /* `answerFor` always returns — `noGroundingAnswer` is its floor — so this
+         catches a genuine fault rather than an unrecognised question. The
+         Console can afford to let one throw: it has a grid, a rail and a
+         document still on screen behind the canvas. The gate is the
+         conversation, so a thrown answer here would leave the thinking dots
+         spinning forever with nothing else to look at. */
+      let answer;
+      try {
+        answer = answerFor(text, st);
+      } catch (err) {
+        answer = '<div class="gate-error">That answer could not be assembled. '
+               + 'The question reached the corpus — something went wrong turning the result into prose. '
+               + 'Asking it a different way usually clears it.</div>';
+      }
+      canvas.ask(text, null, answer);
+      return;
+    }
+
+    /* ══ A GREETING IS NOT ONE OF THE FOUR ROUTES ══════════════════════
+       The gate branch above answers everything, so `hi` was already greeted
+       there. Here it went to `parseIntent`, which had nowhere to put it: not
+       a write, not a settings phrase, not a document title, and carrying no
+       filter tokens and no question shape. It fell past all four routes, the
+       composer cleared itself, and nothing appeared — the input swallowed the
+       word and gave no sign it had.
+
+       Routed before the classifier rather than added as a fifth route,
+       because the four routes are all about steering a surface and this one
+       is not about the surface at all. */
+    if (GREETING.test(text)) { canvas.ask(text, null, greetAnswer()); return; }
+
     const intent = parseIntent(text);
     if (intent.route === 'empty') return;
 
@@ -9850,6 +10560,13 @@
            an outside click otherwise, which would leave it hanging over the
            page it just sent you to. */
         if (peekStack.length) closePeek();
+        /* The gate answers with citations and has nowhere to put a document.
+           `patch` would write `?doc=` into a URL whose render is a no-op — a
+           source row that says it is clickable and is not, which is the exact
+           bug the `data-open-doc` attribute was added to fix in the first
+           place. It leaves for the Console instead: same key, same document,
+           one page over. Reading a cited source is not surface manipulation. */
+        if (canvas.inline) { location.href = 'console.html?doc=' + encodeURIComponent(el.getAttribute('data-open-doc')); return; }
         patch({ doc: el.getAttribute('data-open-doc') });
         return;
       }
@@ -10070,6 +10787,11 @@
       if ((el = t.closest('[data-new-type]'))) { newDocument(el.getAttribute('data-new-type')); return; }
       if ((el = t.closest('[data-apply-ids]'))) {
         const ids = el.getAttribute('data-apply-ids').split(',');
+        /* The gate has no surface to narrow, so the documents leave with you.
+           A cross-page navigation rather than a patch, because the destination
+           is a different document \u2014 and `ids` means the same thing on both
+           sides, so nothing has to be translated. */
+        if (canvas.inline) { location.href = 'console.html?ids=' + encodeURIComponent(ids.join(',')); return; }
         canvas.close();
         surfaceIds(ids);
         return;
@@ -10447,6 +11169,10 @@
       }
       if ((el = t.closest('[data-flag]'))) {
         const id = el.getAttribute('data-flag');
+        /* Same reasoning as the source row above, and the toast goes with it:
+           the message it would show describes the document it just opened, and
+           on the gate that document is on the next page. */
+        if (canvas.inline) { location.href = 'console.html?doc=' + encodeURIComponent(id); return; }
         canvas.close();
         patch({ doc: id });
         toast('Flagged — opened the source so it can be corrected', null, 'Feedback is captured per citation, not per answer');
@@ -10465,6 +11191,115 @@
         if (i > -1) turns.splice(i, 1);
         return;
       }
+      /* ── Skills, from the composer ── */
+      if ((el = t.closest('[data-skill-use]'))) {
+        const k = CHAT_SKILLS.find((x) => x.id === el.getAttribute('data-skill-use'));
+        skillPickOpen = false;
+        paintSkillPicker();
+        if (!k) return;
+        armedSkill = k;
+        const box = $('#overlayInput') || $('#floatInput');
+        if (box) {
+          /* The slash comes back out. It was a way of opening the picker, not
+             part of the question, and leaving it in the box means it arrives
+             in the question text and in the conversation title. */
+          box.value = String(box.value || '').replace(/^\s*\/\S*\s?/, '');
+          box.focus();
+        }
+        toast('Using ' + k.name, null, 'Applies to your next question, then clears');
+        return;
+      }
+      if (skillPickOpen && !t.closest('#skPick') && !t.closest('.overlay-input-bar')) {
+        skillPickOpen = false; paintSkillPicker();
+      }
+
+      if (t.closest('[data-kp-close]')) { palette.close(); return; }
+      if ((el = t.closest('[data-kp]'))) { palette.run(Number(el.getAttribute('data-kp'))); return; }
+
+      /* ══ AN ANSWER'S OWN CONTROLS ══════════════════════════════════════
+         All four read the question off the message rather than off an index
+         into the turns array, because a rebuild replaces every element and an
+         index would be pointing at the wrong turn by the time it was used. */
+      if (t.closest('#clipBtn')) { const f = $('#clipIn'); if (f) f.click(); return; }
+      if ((el = t.closest('[data-clip-drop]'))) {
+        const bar = el.closest('.overlay-input-wrap') || document;
+        const chip = $('.clip-chip', bar);
+        if (chip) chip.remove();
+        const f = $('#clipIn'); if (f) f.value = '';
+        return;
+      }
+
+      if ((el = t.closest('[data-handoff]'))) {
+        /* STAGED, NOT SENT. There is no routing table and no queue, so this
+           writes the request where one would be picked up and says exactly
+           that. The repo already treats writes it cannot execute this way. */
+        toast('Request staged for a person', null,
+              'Nothing was sent \u2014 there is no routing yet. The question and its scope are recorded.');
+        el.setAttribute('disabled', '');
+        el.textContent = 'Staged';
+        return;
+      }
+
+      if ((el = t.closest('[data-msg-copy]'))) {
+        const msg = el.closest('.chat-msg');
+        const bubble = msg && msg.querySelector('.msg-bubble');
+        if (!bubble) return;
+        /* The TEXT, not the markup. Pasting an answer into a ticket should
+           give prose, not a div carrying citation tooltips. */
+        const text = (bubble.innerText || bubble.textContent || '').trim();
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).then(
+            () => toast('Answer copied', null, text.length + ' characters, as plain text'),
+            () => toast('Could not copy', null, 'The browser refused clipboard access')
+          );
+        }
+        return;
+      }
+
+      if ((el = t.closest('[data-msg-retry]'))) {
+        const msg = el.closest('.chat-msg');
+        const q = msg && msg.dataset.q;
+        if (!q) return;
+        /* Asked again, as a new turn rather than in place. An answer that
+           quietly rewrote itself would destroy the thing you wanted to compare
+           it against, which is the only reason to press Retry. */
+        submit(q);
+        return;
+      }
+
+      if ((el = t.closest('[data-msg-rate]'))) {
+        const on = el.getAttribute('aria-pressed') === 'true';
+        const row = el.closest('.msg-acts');
+        /* One opinion per answer: rating it useful clears "not useful". */
+        if (row) $$('[data-msg-rate]', row).forEach((b) => b.setAttribute('aria-pressed', 'false'));
+        el.setAttribute('aria-pressed', on ? 'false' : 'true');
+        if (!on) {
+          toast(el.getAttribute('data-msg-rate') === 'up' ? 'Marked useful' : 'Marked not useful',
+                null, 'Recorded against this answer, not the conversation');
+        }
+        return;
+      }
+
+      if ((el = t.closest('[data-msg-src]'))) {
+        const msg = el.closest('.chat-msg');
+        const q = msg && msg.dataset.q;
+        if (!msg || !q) return;
+        const open = msg.querySelector('.msg-sources');
+        if (open) { open.remove(); el.setAttribute('aria-expanded', 'false'); return; }
+        const ids = answerIds(q);
+        if (!ids.length) return;
+        /* `sourceRow` is the Console's own template, so a source listed here
+           and a source listed inside an answer are the same row with the same
+           behaviour — including opening the document. */
+        const rows = ids.map((id, i) => sourceRow(i + 1, id)).join('');
+        const acts = msg.querySelector('.msg-acts');
+        const html = `<div class="msg-sources"><div class="msg-sources-cap">What this answer stands on</div>${rows}</div>`;
+        if (acts) acts.insertAdjacentHTML('afterend', html);
+        else msg.insertAdjacentHTML('beforeend', html);
+        el.setAttribute('aria-expanded', 'true');
+        return;
+      }
+
       if ((el = t.closest('.overlay-sugg-chip'))) { submit(el.textContent.trim()); return; }
 
       /* ══ STARTING A CONVERSATION ══════════════════════════════════════
@@ -10479,7 +11314,8 @@
          is — a new conversation is a new subject, not a new place. */
       if (t.closest('[data-newchat]')) {
         const key = 'sess-' + (++sessSeq);
-        SESSIONS[key] = { title: 'New conversation', at: iso(TODAY), state: snapshot(), blank: true };
+        SESSIONS[key] = { title: 'New conversation', at: iso(TODAY), state: snapshot(),
+                          agent: PAGE_AGENT, blank: true };
         THREADS[key] = [];
         /* Stamped on creation, or a brand-new conversation would sort below
            every one you had already spoken in — including at the moment it is
@@ -10491,6 +11327,86 @@
         canvas.show();
         paintThread();
         if (canvas.input) canvas.input.focus();
+        return;
+      }
+
+      /* ══ THE CONVERSATION'S OWN CONTROLS ═══════════════════════════════
+         BEFORE the `data-chat` branch below, and that ordering is the whole
+         reason these work. Every one of these lives inside `.ov-chat-row`, and
+         the switch handler matches on `[data-chat]` anywhere in the row — so
+         placed after it, a click on Rename would open the conversation
+         instead. It is the same failure the card branch documents at the
+         bottom of this router. */
+
+      /* Click-off. Deliberately does NOT return: the click that closes a menu
+         is usually also a click on something else, and swallowing it would
+         make every first click after opening a menu do nothing. */
+      if (CHAT_MENU && !t.closest('.ov-chat-row')) { CHAT_MENU = ''; paintChats(); }
+
+      if ((el = t.closest('[data-chat-menu]'))) {
+        const k = el.getAttribute('data-chat-menu');
+        CHAT_MENU = (!k || CHAT_MENU === k) ? '' : k;
+        paintChats();
+        return;
+      }
+
+      if ((el = t.closest('[data-chat-rename]'))) {
+        CHAT_EDIT = el.getAttribute('data-chat-rename');
+        CHAT_MENU = '';
+        paintChats();
+        const box = $('#chatRename');
+        /* Select rather than place a caret: the title is a whole question, and
+           renaming almost always means replacing it, not editing a word. */
+        if (box) { box.focus(); box.select(); }
+        return;
+      }
+
+      if ((el = t.closest('[data-chat-share]'))) {
+        const k = el.getAttribute('data-chat-share');
+        const url = location.origin + location.pathname + '?chat=' + encodeURIComponent(k);
+        CHAT_MENU = '';
+        paintChats();
+        if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => {}, () => {});
+        /* SAID PLAINLY. The link is real and it works — for you. Conversations
+           live in this browser, so it opens empty for anybody else, and a
+           share control that did not say so would be the one place this build
+           lied about what it is. */
+        toast('Link copied', null, 'Opens this conversation in your browser. Nobody else can read it yet.');
+        return;
+      }
+
+      if ((el = t.closest('[data-chat-pin]'))) {
+        const k = el.getAttribute('data-chat-pin');
+        if (SESSIONS[k]) SESSIONS[k].pinned = !SESSIONS[k].pinned;
+        CHAT_MENU = '';
+        saveChats();
+        paintChats();
+        return;
+      }
+
+      /* Two rungs, and the first one is not destructive. A conversation is not
+         corpus data, so it does not deserve the typed confirmation a document
+         deletion gets — but it does deserve more than a single click on a
+         menu item sitting where "Rename" was a moment ago. */
+      if ((el = t.closest('[data-chat-del]'))) {
+        CHAT_MENU = '!' + el.getAttribute('data-chat-del');
+        paintChats();
+        return;
+      }
+
+      if ((el = t.closest('[data-chat-del-ok]'))) {
+        const k = el.getAttribute('data-chat-del-ok');
+        const wasHere = threadKey() === k;
+        /* Recorded, not just removed. `seedSessions()` runs on every boot and
+           would otherwise put a deleted fixture straight back, which reads as
+           the delete having silently failed. */
+        DELETED.add(k);
+        delete SESSIONS[k]; delete THREADS[k]; delete THREAD_AT[k];
+        CHAT_MENU = '';
+        saveChats();
+        if (wasHere) { restoring = true; patch({ chat: '' }); restoring = false; }
+        paintThread();
+        toast('Conversation deleted', null, 'Removed from this browser');
         return;
       }
 
@@ -10509,6 +11425,16 @@
         const ck = el.getAttribute('data-chat');
         const sess = SESSIONS[ck];
         restoring = true;
+        /* The gate has no surface to restore, so restoring one would write
+           filter keys into a URL nothing on the page reads — state that then
+           travels with you into the Console. The thread alone is the whole of
+           what switching means here. */
+        if (canvas.inline) {
+          patch({ chat: ck === 'surface' ? '' : ck });
+          restoring = false;
+          paintThread();
+          return;
+        }
         if (sess && sess.state) {
           const st = parseParams(new URLSearchParams(String(sess.state).replace(/^\?/, '')));
           st.chat = ck;
@@ -11120,10 +12046,10 @@
                sub: 'The file becomes “' + o.title + '”. Nothing else is created.' };
     }
     if (o) {
-      return { title: 'Drop to add to Knowledge',
+      return { title: 'Drop to add to the corpus',
                sub: 'A draft per file. This document stays open.' };
     }
-    return { title: 'Drop to add to Knowledge',
+    return { title: 'Drop to add to the corpus',
              sub: 'A draft per file, owned by you. Nothing goes live until you say so.' };
   }
 
@@ -11365,26 +12291,783 @@
     docAct(cardAction(o)[2], id);
   }
 
+
+  /* Rename commits on Enter and abandons on Escape, and commits on blur
+     because a half-typed title left behind by clicking elsewhere is a title
+     somebody meant to set. Empty input keeps the old name rather than leaving
+     a row with nothing to read. */
+  function commitRename(box, keep) {
+    const k = box.getAttribute('data-chat-rename-in');
+    const v = String(box.value || '').trim();
+    if (keep && v && SESSIONS[k]) { SESSIONS[k].title = sessTitle(v); SESSIONS[k].blank = false; saveChats(); }
+    CHAT_EDIT = '';
+    paintChats();
+    syncTitle();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const box = e.target;
+    if (!box || box.id !== 'chatRename') return;
+    if (e.key === 'Enter') { e.preventDefault(); commitRename(box, true); }
+    else if (e.key === 'Escape') { e.preventDefault(); commitRename(box, false); }
+  });
+  document.addEventListener('focusout', (e) => {
+    const box = e.target;
+    if (box && box.id === 'chatRename' && CHAT_EDIT) commitRename(box, true);
+  });
+  /* ═══════════════════════════════════════════════
+     SKILLS, FROM THE CHAT SIDE
+
+     The definitions live in the settings console; what the composer needs is
+     the short form — what it is called, when it fires, and one line saying
+     what it does. Copied rather than imported, and that is a KNOWN DEBT, not
+     an oversight: settings.js already carries a hand-copy of this file's
+     fixtures with a header saying it will drift and naming the fix (lift both
+     into a shared `assets/data.js`). This is the same seam, and it will drift
+     the same way until that is done.
+
+     `manual` skills are what `/` offers. `auto` skills are chosen by the agent
+     from the description, and are listed here so the picker can say which
+     ones you cannot invoke and why.
+  ═══════════════════════════════════════════════ */
+  const CHAT_SKILLS = [
+    { id: 'refund-response', name: 'Draft a refund response', trigger: 'auto', on: true,
+      desc: 'Cites the policy and flags the contested clause' },
+    { id: 'stale-sweep', name: 'Weekly staleness sweep', trigger: 'manual', on: true,
+      desc: 'Documents behind their source, grouped by connector' },
+    { id: 'ticket-triage', name: 'Triage an inbound ticket', trigger: 'auto', on: false,
+      desc: 'Classify, cite, and say when nothing settles it' }
+  ];
+  /* The skill the NEXT question will be sent through, if any. Cleared once it
+     has been used: a skill is applied to a question, not switched on for a
+     conversation. */
+  let armedSkill = null;
+  let skillPickOpen = false;
+
+  const skillPicker = () => {
+    const usable = CHAT_SKILLS.filter((k) => k.on);
+    return `<div class="sk-pick" id="skPick" role="listbox" aria-label="Skills">
+      ${usable.length ? usable.map((k, i) => `<button class="sk-opt" type="button" role="option"
+          aria-selected="false" data-skill-use="${esc(k.id)}" style="--i:${i}"
+          ${k.trigger === 'auto' ? 'disabled title="Chosen by AiMY when the question matches. Not invoked by hand."' : ''}>
+          <span class="sk-opt-n">${ICO.skill.replace('<svg', '<svg width="12" height="12"')}${esc(k.name)}</span>
+          <span class="sk-opt-d">${esc(k.desc)}</span>
+          ${k.trigger === 'auto' ? '<span class="sk-opt-t">automatic</span>' : ''}
+        </button>`).join('')
+        : '<div class="sk-none">No skills are switched on.</div>'}
+      <a class="sk-manage" href="settings.html?module=skills">Manage skills</a>
+    </div>`;
+  };
+
+  function paintSkillPicker() {
+    const bar = $('.overlay-input-bar');
+    if (!bar) return;
+    const open = $('#skPick');
+    if (!skillPickOpen) { if (open) open.remove(); return; }
+    if (open) return;
+    bar.insertAdjacentHTML('beforebegin', skillPicker());
+  }
+
+  /* What the agent did, in the order it did it. Derived from the same three
+     functions the answer itself is built from, so the trace cannot claim a
+     step the answer did not take. Collapsed by default: it is evidence, not
+     narration. */
+  function activityLog(q, st) {
+    /* No shape was read and no corpus was scoped, so every step this would
+       print is a description of work that did not happen. An audit trail that
+       narrates a search nobody ran is worse than no audit trail. */
+    if (GREETING.test(q)) return '';
+    const shape = questionShape(q);
+    const scope = questionScope(q, st, shape);
+    const topic = topicFor(q);
+    const steps = [];
+    steps.push(['Read the question', shape ? 'Recognised as a ' + shape + ' question' : 'No computed shape — matched on subject']);
+    if (topic && !shape) steps.push(['Matched a known subject', topic.ids.length + ' documents are hand-linked to it']);
+    steps.push(['Scoped the corpus', scope.broad ? 'Nothing narrowed it — the whole corpus was in scope'
+      : scope.docs.length + ' document' + (scope.docs.length === 1 ? '' : 's') + ' in scope']);
+    if (armedSkill) steps.push(['Applied a skill', armedSkill.name]);
+    steps.push(['Wrote the answer', scope.docs.length ? 'Cited what it stood on' : 'Said what it could not ground']);
+    return `<details class="act-log"><summary class="act-sum">${ICO.clock.replace('<svg', '<svg width="11" height="11"')}How this was answered</summary>
+      <ol class="act-steps">${steps.map(([a, b]) =>
+        `<li class="act-step"><span class="act-what">${esc(a)}</span><span class="act-why">${esc(b)}</span></li>`).join('')}</ol>
+    </details>`;
+  }
+
+  /* ══ THE TYPEWRITER ══════════════════════════════════════════════════════
+     A reveal, not a stream. There is no backend, so the whole answer exists
+     before the first character is shown — and saying otherwise in the UI would
+     be the kind of theatre this repo avoids elsewhere.
+
+     Three constraints the surrounding code imposes, all of them load-bearing:
+
+     1. `turn.html` is written in full BEFORE this runs. A rebuild renders from
+        the turn, so a half-typed string must never be written back or
+        switching away and back would freeze the answer mid-word.
+     2. The element can leave the DOM mid-reveal — switching conversation
+        removes it — so every tick re-checks that it is still connected.
+     3. It mutates INSIDE the bubble. chat.js observes the thread with
+        `childList` only, deliberately, so that the answer swap does not fire
+        it per character; writing to the bubble keeps that guarantee.
+
+     Character-by-character on HTML would tear tags open, so it reveals by
+     BLOCK — the answer's own top-level children, which is also how a person
+     reads it. */
+  /* ══ THE STREAM ════════════════════════════════════════════════════════
+     The first version appended whole blocks every 90ms, which is not a stream
+     — it is a slideshow, and a 90ms step is visible as a step. This advances
+     on the frame clock and reveals CHARACTERS, so the rate is continuous and
+     the motion is whatever the display can draw.
+
+     ── Why not simply type the HTML ──
+     The answer is markup, not prose: cutting a string of it at an arbitrary
+     index tears tags open. So the markup is inserted intact and the TEXT NODES
+     are emptied and refilled. The structure is always valid; only how much of
+     it has been said changes.
+
+     ── Prose streams, structure arrives ──
+     Typing out a status badge or a source row character by character reads as
+     a machine filling in a form. Those blocks are revealed whole, with a short
+     fade; only prose is streamed. Both are on the same clock, so the answer
+     still assembles at one pace.
+
+     ── 1100 characters a second ──
+     Fast enough not to be a wait, slow enough to read as arriving. Measured
+     against the answers this corpus actually produces: the refund answer runs
+     about 1.4s, which is close to how long it takes to read the first line. */
+  const STREAM_CPS = 1100;
+  let streamRAF = 0;
+
+  const isProse = (b) =>
+    !b.querySelector('.type-card, .source-item, .trust-disclosure, .answer-apply, .rs-list, .act-log, .greet-next, table')
+    && !b.classList.contains('greet-next');
+
+  function stopStream() {
+    if (streamRAF) cancelAnimationFrame(streamRAF);
+    streamRAF = 0;
+  }
+
+  function typeIn(el, html, done) {
+    stopStream();
+    const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const src = document.createElement('div');
+    src.innerHTML = html;
+    const blocks = Array.from(src.children);
+    if (still || blocks.length < 2) { el.innerHTML = html; if (done) done(); return; }
+
+    el.innerHTML = '';
+    let bi = 0;
+
+    /* ══ THE ANSWER IS NEVER LEFT HALF-SAID ═══════════════════════
+       requestAnimationFrame does not run in a backgrounded tab, so switching
+       away mid-stream would freeze the text where it stood and leave it there
+       on return — a truncated answer that reads as the product having stopped
+       mid-sentence. It also does not run at all in this repo's review pane.
+
+       So the frame clock is an optimisation, not the contract: a timer sized
+       to twice the expected duration finishes the answer outright if the
+       frames never came. setTimeout is throttled in a background tab but it
+       still fires, which is the property being relied on. */
+    const expected = (src.textContent || '').length / STREAM_CPS * 1000;
+    let bail = setTimeout(() => {
+      stopStream();
+      if (el.isConnected) el.innerHTML = html;
+      if (done) done();
+    }, Math.max(2200, expected * 2 + 1200));
+    const finish = (fn) => { clearTimeout(bail); bail = 0; if (fn) fn(); };
+
+    const nextBlock = () => {
+      if (!el.isConnected) { stopStream(); clearTimeout(bail); return; }
+      if (bi >= blocks.length) { stopStream(); finish(done); return; }
+      const b = blocks[bi++];
+      el.appendChild(b);
+      b.classList.add('stream-in');
+
+      if (!isProse(b)) { streamRAF = requestAnimationFrame(nextBlock); return; }
+
+      /* Emptied here and refilled below. Whitespace-only nodes are left alone:
+         blanking them collapses the spacing between words and the line reflows
+         on every frame. */
+      const walk = document.createTreeWalker(b, NodeFilter.SHOW_TEXT);
+      const parts = [];
+      let total = 0, node;
+      while ((node = walk.nextNode())) {
+        const v = node.nodeValue;
+        if (!v || !v.trim()) continue;
+        parts.push({ node: node, full: v });
+        total += v.length;
+        node.nodeValue = '';
+      }
+      if (!total) { streamRAF = requestAnimationFrame(nextBlock); return; }
+
+      let t0 = 0, cut = 0;
+      const step = (ts) => {
+        if (!el.isConnected) { stopStream(); return; }
+        if (!t0) t0 = ts;
+        const want = Math.min(total, Math.floor(((ts - t0) / 1000) * STREAM_CPS));
+        /* `cut` is where the last frame finished, so each frame touches only
+           the nodes that actually changed rather than rewriting the block. */
+        let seen = 0;
+        for (let i = 0; i < parts.length; i++) {
+          const pt = parts[i];
+          const start = seen, end = seen + pt.full.length;
+          seen = end;
+          if (end <= cut) continue;
+          if (start >= want) break;
+          pt.node.nodeValue = pt.full.slice(0, Math.max(0, Math.min(pt.full.length, want - start)));
+        }
+        cut = want;
+        if (want < total) { streamRAF = requestAnimationFrame(step); return; }
+        streamRAF = requestAnimationFrame(nextBlock);
+      };
+      streamRAF = requestAnimationFrame(step);
+    };
+
+    nextBlock();
+  }
+
+
+  /* ═══════════════════════════════════════════════
+     THE COMMAND PALETTE
+
+     Every destination in this product is already a URL, so the palette is not
+     a new navigation model — it is a view over the routes that exist. That is
+     why it can be written in one place and work identically on the gate and
+     the Console: it never does anything but go where you could already go.
+
+     It builds its host lazily rather than asking three shells to carry an
+     empty div each. Nothing is rendered until the first time it opens.
+  ═══════════════════════════════════════════════ */
+  const palette = {
+    open: false, sel: 0, q: '', host: null,
+
+    items() {
+      const q = this.q.trim().toLowerCase();
+      const out = [];
+      const push = (group, label, sub, run) => out.push({ group, label, sub, run });
+
+      /* Conversations first: it is the thing there are most of, and the thing
+         a palette is usually opened to find. */
+      Object.keys(SESSIONS)
+        .sort((a, b) => (THREAD_AT[b] || 0) - (THREAD_AT[a] || 0))
+        .forEach((k) => {
+          const t = SESSIONS[k].title;
+          if (q && t.toLowerCase().indexOf(q) < 0) return;
+          push('Conversations', t, CHAT_AGENTS[agentOf(k)].label, () => {
+            restoring = true; patch({ chat: k }); restoring = false;
+            paintThread();
+          });
+        });
+
+      push('Do', 'New conversation', 'Start a fresh thread', () => {
+        const b = $('[data-newchat]'); if (b) b.click();
+      });
+
+      if (canvas.inline) push('Go', 'Console', 'Filters, documents, the corpus', () => { location.href = 'console.html'; });
+      else push('Go', 'Chat', 'Ask across everything AiMY knows', () => { location.href = 'index.html'; });
+      push('Go', 'Knowledge sources', 'Connectors and their health', () => { location.href = 'settings.html?module=sources'; });
+      push('Go', 'AI instructions', 'Rules, precedence and reach', () => { location.href = 'settings.html?module=instructions'; });
+      push('Go', 'Skills', 'Reusable procedures an agent can apply', () => { location.href = 'settings.html?module=skills'; });
+      push('Go', 'Access and roles', 'People and what they may do', () => { location.href = 'settings.html?module=access'; });
+
+      return q
+        ? out.filter((i) => (i.label + ' ' + i.group).toLowerCase().indexOf(q) > -1
+                            || i.group === 'Conversations')
+        : out;
+    },
+
+    show() {
+      if (!this.host) {
+        this.host = document.createElement('div');
+        this.host.className = 'kp';
+        this.host.id = 'kPalette';
+        document.body.appendChild(this.host);
+      }
+      this.open = true; this.sel = 0; this.q = '';
+      this.paint();
+      const box = $('#kpInput'); if (box) box.focus();
+    },
+
+    close() {
+      this.open = false;
+      if (this.host) this.host.innerHTML = '';
+      this.host = this.host;
+    },
+
+    paint() {
+      if (!this.host || !this.open) return;
+      const items = this.items();
+      if (this.sel >= items.length) this.sel = Math.max(0, items.length - 1);
+      let last = '';
+      const rows = items.map((it, i) => {
+        const cap = it.group !== last ? `<div class="kp-cap">${esc(it.group)}</div>` : '';
+        last = it.group;
+        return cap + `<button class="kp-row${i === this.sel ? ' is-sel' : ''}" type="button" data-kp="${i}">
+          <span class="kp-label">${esc(it.label)}</span>
+          <span class="kp-sub">${esc(it.sub)}</span>
+        </button>`;
+      }).join('');
+      this.host.innerHTML = `<div class="kp-scrim" data-kp-close></div>
+        <div class="kp-panel" role="dialog" aria-modal="true" aria-label="Command palette">
+          <input class="kp-input" id="kpInput" placeholder="Find a conversation, or go somewhere…"
+                 spellcheck="false" autocomplete="off" value="${esc(this.q)}" aria-label="Search" />
+          <div class="kp-list">${rows || '<div class="kp-none">Nothing matches that.</div>'}</div>
+          <div class="kp-foot"><span class="kp-key">↑↓</span> move <span class="kp-key">↵</span> open <span class="kp-key">esc</span> close</div>
+        </div>`;
+      const sel = $('.kp-row.is-sel', this.host);
+      if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+    },
+
+    run(i) {
+      const items = this.items();
+      const it = items[i];
+      this.close();
+      if (it) it.run();
+    },
+
+    move(d) {
+      const n = this.items().length;
+      if (!n) return;
+      this.sel = (this.sel + d + n) % n;
+      this.paint();
+    }
+  };
+
   /* ═══════════════════════════════════════════════
      BOOT
   ═══════════════════════════════════════════════ */
+  /* ══ WHAT THE GATE IS ALLOWED TO REACH ═════════════════════════════════
+     A narrow, deliberate surface rather than a namespace of everything. The
+     gate drives a conversation and nothing else, so it gets the verbs for
+     exactly that — and notably not `patch`, `writeURL` or `applyFilters`,
+     because "no surface manipulation" is a property worth making structural
+     instead of merely intended. */
+  const GATE_API = {
+    submit: submit,
+    paintThread: paintThread,
+    paintChats: paintChats,
+    threadKey: threadKey,
+    hasTurns: () => (THREADS[threadKey()] || []).length > 0,
+    user: USER,
+    esc: esc
+  };
+
+  /* Cmd/Ctrl+K was unclaimed. Registered on the document rather than inside
+     either surface's Escape ladder, because the palette belongs to the product
+     and not to a page. */
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      palette.open ? palette.close() : palette.show();
+      return;
+    }
+    if (e.key === 'Escape' && skillPickOpen) { skillPickOpen = false; paintSkillPicker(); return; }
+    if (!palette.open) return;
+    if (e.key === 'Escape') { e.preventDefault(); palette.close(); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); palette.move(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); palette.move(-1); }
+    else if (e.key === 'Enter') { e.preventDefault(); palette.run(palette.sel); }
+  });
+
+  document.addEventListener('change', (e) => {
+    if (!e.target || e.target.id !== 'clipIn') return;
+    const file = e.target.files && e.target.files[0];
+    const wrap = $('.overlay-input-wrap');
+    if (!file || !wrap) return;
+    const old = $('.clip-chip', wrap);
+    if (old) old.remove();
+    const kb = Math.max(1, Math.round(file.size / 1024));
+    wrap.insertAdjacentHTML('afterbegin',
+      `<div class="clip-chip">${ICO.doc.replace('<svg', '<svg width="12" height="12"')}
+         <span class="clip-name">${esc(file.name)}</span>
+         <span class="clip-note">${kb} KB \u00b7 not uploaded</span>
+         <button class="clip-x" type="button" data-clip-drop aria-label="Remove">${ICO.x.replace('<svg', '<svg width="11" height="11"')}</button>
+       </div>`);
+  });
+
+  /* `/` opens the picker, and only from an empty box. A slash mid-sentence is
+     a slash; a slash on its own is somebody reaching for a command — the same
+     rule every editor with a slash menu uses, and the reason it can coexist
+     with typing normally. */
+  document.addEventListener('input', (e) => {
+    const box = e.target;
+    if (!box || (box.id !== 'overlayInput' && box.id !== 'floatInput')) return;
+    const v = String(box.value || '');
+    const want = /^\s*\/\S*$/.test(v);
+    if (want !== skillPickOpen) { skillPickOpen = want; paintSkillPicker(); }
+  });
+
+  document.addEventListener('input', (e) => {
+    if (!palette.open || !e.target || e.target.id !== 'kpInput') return;
+    palette.q = e.target.value;
+    palette.sel = 0;
+    palette.paint();
+    const box = $('#kpInput');
+    /* The list is rebuilt on every keystroke, so the caret has to be put back
+       — the same repair the conversation search needs for the same reason. */
+    if (box) { box.focus(); box.setSelectionRange(palette.q.length, palette.q.length); }
+  });
+  /* ══ THE CITATION HOVERCARD LEAVES THE THREAD ══════════════════════════
+     `.cite-preview` is written as a child of its `.cite-wrap`, and every way
+     that card has broken traces back to that one fact:
+
+       · the thread scrolls, so `overflow-x` computes to `auto` and the card is
+         CLIPPED whenever a citation sits within half a card-width of an edge;
+       · a `transform` or `filter` anywhere above it makes that ancestor the
+         containing block, so `position: fixed` stops meaning the viewport and
+         the card lands offset by however far that ancestor is from the corner;
+       · the stylesheet anchors it with `bottom`, so adding a `top` leaves the
+         box over-constrained and the height resolves from the offsets instead
+         of the content.
+
+     Positioning it in place fixes those one at a time and leaves the next one
+     waiting. Moving it out fixes the category: on open the card is reparented
+     to `<body>`, where nothing clips and nothing can be a containing block but
+     the viewport, and on close it goes home. `document.body` is the only
+     element in the page guaranteed to be neither.
+
+     This file already recorded the diagnosis — "it is `position: absolute`
+     against a `.cite-wrap` parent … needs fixed positioning", filed in
+     GAPS.md. This is the whole of that fix.
+
+     THE TRANSFORM IS LEFT ALONE. The stylesheet centres the card with
+     `translateX(-50%)` and TRANSITIONS transform, so writing `none` starts an
+     animation rather than setting a value — for its duration the card sits
+     half its width to the left. The offset is added back into `left` instead,
+     so the untouched -50% lands the edge exactly where it was asked to go. */
+  const CITE_GAP = 8;
+  let citeOut = null;
+
+  function closeCite() {
+    if (!citeOut) return;
+    const tip = citeOut.tip, home = citeOut.home;
+    citeOut = null;
+    tip.classList.remove('is-open');
+    tip.removeAttribute('style');
+    /* Home is where the markup says it lives. Returning it means a rebuild of
+       the thread disposes of it with everything else, and nothing is left
+       parented to the body after the answer it belonged to is gone. */
+    if (home && home.isConnected) home.appendChild(tip);
+    else if (tip.parentNode) tip.parentNode.removeChild(tip);
+  }
+
+  function openCite(wrap) {
+    if (citeOut && citeOut.home === wrap) return;
+    closeCite();
+    const tip = wrap.querySelector('.cite-preview');
+    if (!tip) return;
+
+    citeOut = { tip: tip, home: wrap };
+    document.body.appendChild(tip);
+    /* Out here the CSS `:hover` on the wrap no longer reaches it, so the open
+       state has to be stated. The stylesheet already supports the class. */
+    tip.classList.add('is-open');
+    tip.style.position = 'fixed';
+    tip.style.bottom = 'auto';
+    tip.style.right = 'auto';
+    tip.style.left = '0px';
+    tip.style.top = '0px';
+    void tip.offsetWidth;
+
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    if (!w || !h) { closeCite(); return; }
+    const c = wrap.getBoundingClientRect();
+
+    let left = c.left + c.width / 2 - w / 2;
+    left = Math.max(CITE_GAP, Math.min(left, window.innerWidth - w - CITE_GAP));
+    let top = c.top - h - CITE_GAP;
+    if (top < CITE_GAP) top = c.bottom + CITE_GAP;
+
+    tip.style.left = Math.round(left + w / 2) + 'px';
+    tip.style.top = Math.round(top) + 'px';
+  }
+
+  /* Delegated, because citations are rendered into answers that did not exist
+     when this ran. The card counts as part of its own hover target now that it
+     is elsewhere in the DOM — without that, moving the pointer from the chip
+     onto the card would read as leaving, and Flag would be unclickable. */
+  const citeFrom = (t) => (t && t.closest)
+    ? (t.closest('.cite-wrap') || (t.closest('.cite-preview') && citeOut ? citeOut.home : null))
+    : null;
+
+  document.addEventListener('mouseover', (e) => {
+    const w = citeFrom(e.target);
+    if (w) openCite(w); else if (citeOut) closeCite();
+  });
+  document.addEventListener('focusin', (e) => {
+    const w = citeFrom(e.target);
+    if (w) openCite(w); else if (citeOut) closeCite();
+  });
+  /* A fixed card does not travel with the text it is anchored to, so a scroll
+     under an open one would leave it floating beside nothing. */
+  document.addEventListener('scroll', closeCite, true);
+  window.addEventListener('resize', closeCite);
+
+
+  /* ══ WHICH BUILD IS THIS ══════════════════════════════════════════════
+     One line, once, at boot. Not decoration: this prototype is iterated by
+     reloading a file:// URL, where a stale cache is completely invisible and
+     has already cost several rounds of "that is fixed" answered by a
+     screenshot of the old build. Read from the script tag rather than written
+     here, so it can never drift from the number the shell actually asked for. */  /* ═══════════════════════════════════════════════
+     THINKING — the mark, dispersed and reformed
+
+     Three dots said "something is happening" and nothing else. This says who
+     is doing it: the AiMY mark scatters into an orbit, holds there while the
+     corpus is searched, and gathers back into itself.
+
+     ── Sampled, not hand-plotted ──
+     The mark is one <path>. Rather than rasterise it to a canvas and read
+     pixels back — which needs an image load, and taints the canvas on some
+     configurations, `file://` among them — the path is handed to `Path2D` and
+     candidate points are tested with `isPointInPath`. Pure geometry: no image,
+     no decode, no taint, and it works from a local file.
+
+     ── Cheap on purpose ──
+     Sampling runs ONCE, lazily, on the first answer. The loop runs only while
+     a placeholder is on screen and stops the moment its canvas leaves the DOM,
+     so nothing is burning frames between questions. About 90 points at 26px —
+     the reference uses 300 at 64px, and past a point more dots at this size is
+     just grey.
+  ═══════════════════════════════════════════════ */
+  /* ══ THE MARK'S OWN COLOURS ════════════════════════════════════════════
+     The logo is not one colour: it is a radial gradient running violet at the
+     centre out to blue at the rim. A single flat fill throws that away, and
+     the scatter is the one moment the gradient is legible as a gradient —
+     ninety dots each holding their own stop, spread out where the artwork
+     usually packs them into a 26px mark.
+
+     READ FROM THE <radialGradient> IN THE PAGE, not copied here. The stops,
+     the centre and the radius all come off the element the logo itself paints
+     with, so a rebrand moves this with it and cannot leave the two disagreeing.
+
+     A dot keeps the colour of the petal it CAME FROM, rather than taking one
+     from wherever it currently floats. The alternative reads as a colour wheel
+     the dots pass through; this reads as the mark coming apart and back
+     together, which is the thing being said. */
+  const hexRGB = (h) => {
+    h = String(h || '').trim().replace('#', '');
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    const n = parseInt(h, 16);
+    return h.length === 6 && !isNaN(n) ? [(n >> 16) & 255, (n >> 8) & 255, n & 255] : null;
+  };
+
+  function markGradient() {
+    const fallback = { cx: 75.72, cy: 73.83, r: 70.54,
+                       stops: [{ o: 0.26, c: [140, 79, 244] }, { o: 0.95, c: [0, 102, 255] }] };
+    try {
+      const g = $('#aimy-rg');
+      if (!g) return fallback;
+      const stops = $$('stop', g)
+        .map((st) => ({ o: parseFloat(st.getAttribute('offset')), c: hexRGB(st.getAttribute('stop-color')) }))
+        .filter((st) => st.c && !isNaN(st.o))
+        .sort((a, b) => a.o - b.o);
+      if (!stops.length) return fallback;
+      return {
+        cx: parseFloat(g.getAttribute('cx')) || fallback.cx,
+        cy: parseFloat(g.getAttribute('cy')) || fallback.cy,
+        r: parseFloat(g.getAttribute('r')) || fallback.r,
+        stops: stops
+      };
+    } catch (e) { return fallback; }
+  }
+
+  /* SVG's own rule at the ends: before the first stop and after the last, the
+     gradient holds that stop's colour rather than fading out. */
+  function stopColour(stops, o) {
+    if (o <= stops[0].o) return stops[0].c;
+    const last = stops[stops.length - 1];
+    if (o >= last.o) return last.c;
+    for (let i = 1; i < stops.length; i++) {
+      if (o <= stops[i].o) {
+        const a = stops[i - 1], b = stops[i];
+        const t = (o - a.o) / (b.o - a.o || 1);
+        return [Math.round(a.c[0] + (b.c[0] - a.c[0]) * t),
+                Math.round(a.c[1] + (b.c[1] - a.c[1]) * t),
+                Math.round(a.c[2] + (b.c[2] - a.c[2]) * t)];
+      }
+    }
+    return last.c;
+  }
+
+  const THINK_N = 90;
+  let THINK_PTS = null;   /* null = not tried yet, [] = tried and failed */
+
+  function sampleMark() {
+    if (THINK_PTS) return THINK_PTS;
+    THINK_PTS = [];
+    try {
+      const path = $('#aimy-logo-small path');
+      const d = path && path.getAttribute('d');
+      if (!d || typeof Path2D === 'undefined') return THINK_PTS;
+      const cv = document.createElement('canvas');
+      const ctx = cv.getContext('2d');
+      if (!ctx) return THINK_PTS;
+      const p2 = new Path2D(d);
+      const grad = markGradient();
+      /* The symbol's own viewBox. Sampling in its coordinate space and
+         normalising afterwards keeps this correct if the artwork is replaced. */
+      const VW = 151.43, VH = 147.66;
+      cv.width = Math.ceil(VW); cv.height = Math.ceil(VH);
+      const pts = [];
+      /* A jittered grid rather than pure random: an even spread reads as the
+         shape, where clustering reads as noise. The step is tuned to overshoot
+         the target so the filter below still has enough to choose from. */
+      const step = Math.sqrt((VW * VH) / (THINK_N * 2.2));
+      for (let y = step / 2; y < VH; y += step) {
+        for (let x = step / 2; x < VW; x += step) {
+          const jx = x + (((x * 7 + y * 13) % 10) / 10 - 0.5) * step * 0.8;
+          const jy = y + (((x * 11 + y * 5) % 10) / 10 - 0.5) * step * 0.8;
+          if (ctx.isPointInPath(p2, jx, jy)) {
+            /* The gradient is defined in the artwork's own user space, so the
+               offset is measured there — before these coordinates are
+               normalised for the canvas. */
+            const off = Math.sqrt((jx - grad.cx) * (jx - grad.cx) + (jy - grad.cy) * (jy - grad.cy)) / grad.r;
+            const c = stopColour(grad.stops, off);
+            pts.push({ x: jx / VW - 0.5, y: jy / VH - 0.5, c: 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')' });
+          }
+        }
+      }
+      /* Each point gets a fixed orbit seat derived from where it sits in the
+         mark, so a point always leaves for the same place and comes back to
+         the same petal. Random seats every cycle would read as static. */
+      pts.forEach((pt, i) => {
+        const a = Math.atan2(pt.y, pt.x) + (i % 5) * 0.21;
+        const r = 0.34 + ((i * 37) % 11) / 55;
+        pt.ox = Math.cos(a) * r;
+        pt.oy = Math.sin(a) * r;
+        pt.sp = 0.6 + ((i * 17) % 7) / 10;
+        pt.sz = 0.7 + ((i * 23) % 5) / 8;
+      });
+      THINK_PTS = pts;
+    } catch (e) { THINK_PTS = []; }
+    return THINK_PTS;
+  }
+
+  /* dwell in the orbit, then gather, then hold the mark, then scatter again.
+     Shorter than the reference's 5.5s because this state lasts about a second
+     — a cycle nobody sees complete is a cycle nobody reads. */
+  const T_SCATTER = 620, T_ORBIT = 900, T_GATHER = 620, T_HOLD = 420;
+  const T_CYCLE = T_SCATTER + T_ORBIT + T_GATHER + T_HOLD;
+  const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+  let thinkRAF = 0;
+
+  function thinkFrame(cv, ms) {
+    if (!cv.isConnected) return false;
+    const ctx = cv.getContext('2d');
+    const pts = sampleMark();
+    if (!ctx || !pts.length) return false;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const css = cv.clientWidth || 26;
+    if (cv.width !== Math.round(css * dpr)) {
+      cv.width = Math.round(css * dpr); cv.height = Math.round(css * dpr);
+    }
+    const S = cv.width;
+    ctx.clearRect(0, 0, S, S);
+
+    const phase = ms % T_CYCLE;
+    /* `mix` is 0 in the mark and 1 in the orbit. */
+    let mix;
+    if (phase < T_SCATTER) mix = easeInOut(phase / T_SCATTER);
+    else if (phase < T_SCATTER + T_ORBIT) mix = 1;
+    else if (phase < T_SCATTER + T_ORBIT + T_GATHER) mix = 1 - easeInOut((phase - T_SCATTER - T_ORBIT) / T_GATHER);
+    else mix = 0;
+
+    const spin = (ms / 2600) * Math.PI * 2;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      /* In orbit the seats rotate; in the mark they do not, so the logo
+         arrives upright rather than at whatever angle the spin had reached. */
+      const a = spin * p.sp;
+      const ox = p.ox * Math.cos(a) - p.oy * Math.sin(a);
+      const oy = p.ox * Math.sin(a) + p.oy * Math.cos(a);
+      const x = (p.x + (ox - p.x) * mix) * S * 0.92 + S / 2;
+      const y = (p.y + (oy - p.y) * mix) * S * 0.92 + S / 2;
+      const r = Math.max(0.6, p.sz * (S / 26) * (1 - mix * 0.25));
+      ctx.globalAlpha = 0.45 + (1 - mix) * 0.55;
+      /* Per dot rather than per frame. Ninety fill changes at 60fps is
+         nothing, and batching by colour would mean sorting a set that is
+         already in the order the eye reads it. */
+      if (p.c) ctx.fillStyle = p.c;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    return true;
+  }
+
+  function startThinking() {
+    stopThinking();
+    const cv = $('.think-mark');
+    if (!cv) return;
+    const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const ctx = cv.getContext && cv.getContext('2d');
+    /* Only a floor. Every dot sets its own fill from the mark's gradient; this
+       is what paints them if that could not be read. */
+    if (ctx) ctx.fillStyle = getComputedStyle(cv).color || '#61adf1';
+    /* Reduced motion still gets the mark, drawn once, at rest. The state is
+       information; only the movement is decoration. */
+    if (still) { thinkFrame(cv, T_SCATTER + T_ORBIT + T_GATHER + 1); return; }
+    const t0 = performance.now();
+    const step = () => {
+      if (!thinkFrame(cv, performance.now() - t0)) { thinkRAF = 0; return; }
+      thinkRAF = requestAnimationFrame(step);
+    };
+    step();
+  }
+
+  function stopThinking() {
+    if (thinkRAF) cancelAnimationFrame(thinkRAF);
+    thinkRAF = 0;
+  }
+
+
+  function announceBuild() {
+    try {
+      const me = [].slice.call(document.scripts).filter((x) => /knowledge\.js/.test(x.src || ''))[0];
+      const v = me && (me.src.match(/[?&]v=(\d+)/) || [])[1];
+      console.log('AiMY' + (v ? ' · build ' + v : ' · build unversioned') +
+                  ' · ' + (document.body.getAttribute('data-page') || 'page'));
+    } catch (e) {}
+  }
+
   function init() {
+    announceBuild();
+    /* `data-page` was declared on both existing pages and read by nothing.
+       It is the seam now: the gate boots a conversation and a shell, and none
+       of the grid, filters, briefing, bell, drop layer or document machinery,
+       because none of that has anywhere to render on it. */
+    const gate = document.body.getAttribute('data-page') === 'gate';
+
     canvas.init();
     /* Before the first render, so the column has something in it the moment the
        canvas can be opened. */
     seedSessions();
-    bell.init();
+    /* AFTER the seeds, deliberately. The fixtures give a first-time visitor a
+       history to look at; anything real then lands on top of them, keyed by
+       the same ids, so a renamed or deleted seed stays renamed or deleted. */
+    loadChats();
     userMenu.init();
-    setModal.init();
-    drawers.init();
     wire();
-    wireDrop();
-    renderAiState();
 
     const u = $('#userName'), r = $('#userRole'), a = $('#userAvatar');
     if (u) u.textContent = USER.name;
     if (r) r.textContent = USER.role;
     if (a) a.textContent = USER.initials;
+
+    if (gate) {
+      if (window.AIMY_GATE) window.AIMY_GATE.init(GATE_API);
+      paintThread();
+      return;
+    }
+
+    bell.init();
+    setModal.init();
+    drawers.init();
+    wireDrop();
+    renderAiState();
 
     render();
 

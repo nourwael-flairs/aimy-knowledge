@@ -34,6 +34,47 @@
   const ORGS = { flairs: 'FlairsTech', cxs: 'CXS', upland: 'Upland', medfar: 'MedFar' };
   const GROUPS = { qa: 'QA Reviewers', leads: 'Support Leads', am: 'Account Managers', se: 'Solution Engineers' };
 
+  /* Clients, mirroring knowledge.js:305. Six come from the production console;
+     the four below the line are the original corpus fixtures, kept there
+     because document titles reference them. */
+  const CLIENTS = {
+    asteris: 'Asteris', upland: 'Upland', valsoft: 'Valsoft',
+    connect: 'Connect', cxs: 'CXS', flighthub: 'FlightHub',
+    nordwind: 'Nordwind GmbH', tavola: 'Tavola Retail',
+    meridian: 'Meridian Health', orbit: 'Orbit BPO'
+  };
+
+  /* A client's own product line, mirroring knowledge.js:312. Upland's fourteen
+     are the console's real list; the rest are placeholders awaiting theirs.
+
+     Note the word trap this resolves, because the targeting picker below walks
+     straight into it: the console's "product" is a TENANT's software line
+     (InterFAX Support, Kapost Support) and the repo's original "product" is
+     AiMY's own (Copilot, Sales, Voice). Different things that shared a word.
+     They coexist as two groups inside one axis, and collapsing them is how a
+     rule aimed at one silently reaches the other. */
+  const CLIENT_PRODUCTS = {
+    upland: {
+      interfax: 'InterFAX Support', powersteering: 'PowerSteering Service & Support',
+      secondstreet: 'Second Street Support', kapost: 'Kapost Support', psa: 'PSA Support',
+      bainsight: 'BA Insight Support', filebound: 'FileBound Support',
+      ingenius: 'InGenius Support', roinnovation: 'RO Innovation Support',
+      ultriva: 'Ultriva Support', eclipse: 'Eclipse Support',
+      rightanswers: 'RightAnswers Support', panviva: 'Panviva Support',
+      qvidian: 'Qvidian Support'
+    },
+    asteris:   { asterisImaging: 'Imaging Support', asterisVet: 'Vet Cloud Support' },
+    valsoft:   { aspire: 'Aspire Support', hark: 'Hark Support' },
+    connect:   { connectDesk: 'Connect Desk Support', connectVoice: 'Connect Voice Support' },
+    cxs:       { cxsQa: 'QA Support', cxsAnalytics: 'Analytics Support' },
+    flighthub: { fhBooking: 'Booking Support', fhCare: 'Care Support' }
+  };
+  const AIMY_PRODUCTS = { copilot: 'Copilot', sales: 'Sales', voice: 'Voice' };
+
+  const CLIENT_PRODUCT_COUNT = Object.keys(CLIENT_PRODUCTS)
+    .reduce((t, c) => t + Object.keys(CLIENT_PRODUCTS[c]).length, 0);
+  const TARGET_TOTAL = CLIENT_PRODUCT_COUNT + Object.keys(AIMY_PRODUCTS).length;
+
   const AGENTS = [
     { id: 'copilot', name: 'Copilot', external: false },
     { id: 'sales',   name: 'Sales',   external: false },
@@ -77,9 +118,9 @@
      letting someone find out by clicking. */
   const RULES = [
     { id: 'r1', scope: 'org',    scopeName: 'FlairsTech', text: 'Keep a professional, neutral tone. Avoid emojis and jargon unless the reader asks for something more creative.',
-      by: 'Ahmed Samy', when: '12 Aug', v: 3, reach: 33, state: 'beaten' },
+      by: 'Ahmed Samy', when: '12 Aug', v: 3, reach: 26, state: 'beaten' },
     { id: 'r2', scope: 'client', scopeName: 'CXS', text: 'Refer to the traveller in the second person. Never quote a fare without a booking reference.',
-      by: 'Mohamed Ramy', when: '3 Sep', v: 1, reach: 12, state: 'active' },
+      by: 'Mohamed Ramy', when: '3 Sep', v: 1, reach: 2, state: 'active' },
     { id: 'r3', scope: 'agent',  scopeName: 'Copilot', text: 'Warm, conversational tone. Emojis are permitted in chat surfaces.',
       by: 'Nour Wael', when: '2h ago', v: 2, reach: 1, state: 'active' },
     { id: 'r4', scope: 'org',    scopeName: 'FlairsTech', text: 'Keep a professional, neutral tone.',
@@ -97,6 +138,60 @@
      Nine rows. Three are built. The other six carry their entitlement state and
      nothing else, because a plan column that only lists what you already own is
      not a plan column. Figures are placeholders pending commercial input. */
+
+  /* ══ SKILLS ════════════════════════════════════════════════════════════
+     A skill is a named, reusable PROCEDURE an agent can apply: what to do, in
+     what order, what to refuse, and which sources it may stand on. It is not
+     a second instructions system — it rides the same precedence chain and the
+     same targeting tree as AI instructions, pointed at a different unit. A
+     rule says how to behave; a skill says how to do a specific job.
+
+     `trigger` is the field that decides whether the agent chooses the skill or
+     the person does. An automatic skill is matched on its DESCRIPTION, which
+     is why a vague description costs accuracy rather than tidiness.
+
+     `origin` records where a skill came from. A starter you have adapted still
+     says so, because an update to the original should be a decision and not a
+     surprise.
+
+     Invented for this surface, like RULES and PEOPLE above it. */
+  const SKILLS = [
+    { id: 'refund-response', name: 'Draft a refund response',
+      desc: 'Turn a refund question into a reply that cites the policy and flags the contested clause.',
+      trigger: 'auto', on: true, origin: 'Yours', by: 'Nour Wael', when: '2h ago', v: 4,
+      sources: ['policies', 'support'],
+      targets: ['interfax', 'kapost', 'copilot'],
+      body: 'Answer from the EU refund article first, and name it. If the Returns FAQ disagrees '
+          + 'about what happens after activation, say the clause is contested rather than picking '
+          + 'a side \u2014 nobody has ruled on it. Never quote a figure that is not in a cited source.' },
+
+    { id: 'stale-sweep', name: 'Weekly staleness sweep',
+      desc: 'List documents behind their source, grouped by connector, with the owner for each.',
+      trigger: 'manual', on: true, origin: 'Yours', by: 'Nour Wael', when: '3 Sep', v: 2,
+      sources: ['policies', 'support', 'marketing'],
+      targets: ['copilot'],
+      body: 'Group by connector, not by collection \u2014 a stale document is almost always a symptom '
+          + 'of the sync that fed it. Name the owner for each. Stop at ten and say how many were '
+          + 'left out.' },
+
+    { id: 'ticket-triage', name: 'Triage an inbound ticket',
+      desc: 'Classify a support ticket, cite the article that settles it, and say when it does not.',
+      trigger: 'auto', on: false, origin: 'From the library', by: 'A. Mahfouz', when: '11 Aug', v: 1,
+      sources: ['support'],
+      targets: [],
+      body: 'Classify first, answer second. If no article settles the ticket, say so plainly and '
+          + 'route it \u2014 a confident answer from adjacent material is the failure this skill exists '
+          + 'to prevent.' }
+  ];
+  /* Per skill, so editing one skill's reach cannot move another's. The
+     instructions tree keeps a single module-level Set because there is one
+     rule being edited at a time; here the list is on screen beside the
+     detail. */
+  const SKILL_SEL = {};
+  SKILLS.forEach((k) => { SKILL_SEL[k.id] = new Set(k.targets); });
+  const SKILL_OPEN = new Set(['upland', 'aimy']);
+  const TRIGGER_LABEL = { auto: ['is-info', 'Automatic'], manual: ['is-mute', 'On demand'] };
+
   const MODULES = [
     { id: 'sources', name: 'Knowledge sources', sub: '5 connected, 2 failing', scopeT: 'Org', scopeV: 'FlairsTech',
       audience: 'Internal', plan: 'included', need: { kind: 'err', text: '2 failing' }, who: 'N. Wael', when: '20m ago', built: true },
@@ -104,6 +199,9 @@
       audience: 'Internal', plan: 'included', need: { kind: 'warn', text: '1 conflict' }, who: 'Nour Wael', when: '2h ago', built: true },
     { id: 'access', name: 'Access and roles', sub: '2 people, 3 grants', scopeT: 'Org', scopeV: 'FlairsTech',
       audience: 'Internal', plan: 'included', need: { kind: 'warn', text: '1 invite pending' }, who: 'Nour Wael', when: '3 Sep', built: true },
+    { id: 'skills', name: 'Skills', sub: '3 defined, 1 off', scopeT: 'Org', scopeV: 'FlairsTech',
+      audience: 'Internal', plan: 'included', need: { kind: 'info', text: '1 untargeted' },
+      who: 'Nour Wael', when: '2h ago', built: true },
     { id: 'retention', name: 'Retention and archiving', sub: 'Per collection auto-archive', scopeT: 'Org', scopeV: 'FlairsTech',
       audience: 'Internal', plan: 'included', need: null, who: 'N. Wael', when: '11 Aug', built: false, where: 'It lives on the corpus today, at ?settings=data' },
     { id: 'mapping', name: 'CRM field mapping', sub: 'Pulls CRM fields into agent context', scopeT: 'Product', scopeV: 'Copilot',
@@ -126,7 +224,10 @@
   function readURL() {
     const p = new URLSearchParams(location.search);
     const m = p.get('module') || '';
-    return { module: MODULES.some((x) => x.id === m && x.built) ? m : '', src: p.get('src') || '' };
+    /* A third key, and NOT `src` reused. The URL is this product's state model;
+     two meanings on one key is how it stops being one. */
+  return { module: MODULES.some((x) => x.id === m && x.built) ? m : '',
+           src: p.get('src') || '', skill: p.get('skill') || '' };
   }
 
   function patch(changes) {
@@ -135,6 +236,9 @@
     const p = new URLSearchParams();
     if (st.module) p.set('module', st.module);
     if (st.src) p.set('src', st.src);
+    /* Rebuilt from scratch every time, so a key this function does not know
+       about is a key that silently disappears on the next navigation. */
+    if (st.skill) p.set('skill', st.skill);
     const qs = p.toString();
     history.pushState(null, '', location.pathname + (qs ? '?' + qs : ''));
     render();
@@ -207,7 +311,7 @@
           </tbody>
         </table>
       </div>
-      <p class="set2-offer" style="margin-top:0.75rem">Prices are placeholders pending commercial input. Three modules are built; the rest carry their state only.</p>`;
+      <p class="set2-offer" style="margin-top:0.75rem">Prices are placeholders pending commercial input. Four modules are built; the rest carry their state only.</p>`;
   }
 
   const backLink = '<button class="set2-back" type="button" data-back>&larr; All settings</button>';
@@ -344,7 +448,7 @@
                 ${r.state === 'unreachable' ? pill('is-err', 'Unreachable')
                   : r.state === 'beaten' ? pill('is-mute', 'Overridden below') : pill('is-ok', 'Applies')}
                 ${tok(r.scope, r.scopeName)}
-                <span class="set2-reach${r.reach === 0 ? ' is-zero' : ''}"><b>${r.reach}</b> of 34 agents</span>
+                <span class="set2-reach${r.reach === 0 ? ' is-zero' : ''}"><b>${r.reach}</b> of ${TARGET_TOTAL} products</span>
                 <span>${esc(r.by)}, ${esc(r.when)}, v${r.v}</span>
                 ${r.state === 'beaten' ? '<button class="btn btn-ghost btn-sm" type="button" disabled>Restore inherited</button>' : ''}
               </div>
@@ -370,22 +474,55 @@
      semantics are ours to define and ours to document. The keyboard map is the
      spec's though, and it is shown rather than hidden because a picker whose
      only affordance is the mouse is a picker half the team cannot use. */
+  /* Selection is a Set of product ids and every checkbox state is DERIVED from
+     it. A parent is checked when all its children are, mixed when some are, and
+     that cascade is ours to define: the ARIA treeview pattern specifies the
+     `mixed` value but says nothing about parent to child propagation, so the
+     semantics come from us and have to be written down somewhere. Here. */
+  const targetSel = new Set(['interfax', 'kapost', 'psa', 'filebound', 'copilot']);
+  const treeOpen = new Set(['upland', 'aimy']);
+
+  function targetGroups() {
+    const g = Object.keys(CLIENT_PRODUCTS).map((c) => ({
+      id: c, name: CLIENTS[c], note: 'Client',
+      kids: Object.keys(CLIENT_PRODUCTS[c]).map((k) => ({ id: k, name: CLIENT_PRODUCTS[c][k] }))
+    }));
+    /* AiMY's own agents sit last and are never scoped away, because a rule that
+       silently stopped reaching them would look like it had reached everything. */
+    g.push({ id: 'aimy', name: 'AiMY agents', note: 'Ours',
+             kids: Object.keys(AIMY_PRODUCTS).map((k) => ({ id: k, name: AIMY_PRODUCTS[k] })) });
+    return g;
+  }
+
+  const groupState = (g) => {
+    const on = g.kids.filter((k) => targetSel.has(k.id)).length;
+    return on === 0 ? 'false' : on === g.kids.length ? 'true' : 'mixed';
+  };
+
   function tree() {
-    const groups = [
-      { id: 'client', name: 'Client agents', sel: 3, all: 8, state: 'mixed', kids: [['ClassyTravel', 'true'], ['Flighthub', 'true'], ['Medfar', 'true'], ['Upland', 'false'], ['Wingbuddy', 'false']] },
-      { id: 'fn', name: 'Function agents', sel: 6, all: 6, state: 'true', kids: [] },
-      { id: 'prod', name: 'Product support', sel: 15, all: 19, state: 'mixed', kids: [] }
-    ];
+    const groups = targetGroups();
     return `
-      <div class="set2-tree" role="tree" aria-multiselectable="true" aria-label="Agents">
+      <div class="set2-tree" role="tree" aria-multiselectable="true" aria-label="What this rule targets">
         <div class="set2-tree-body">
-          ${groups.map((g) => `
-            <div class="set2-node" role="treeitem" aria-expanded="${g.kids.length ? 'true' : 'false'}">
-              ${ck(g.state, g.name)}${esc(g.name)}<span class="set2-node-ct">${g.sel} of ${g.all}</span>
-            </div>
-            ${g.kids.map(([n, c]) => `<div class="set2-node is-child" role="treeitem">${ck(c, n)}${esc(n)}</div>`).join('')}`).join('')}
+          ${groups.map((g) => {
+            const st = groupState(g);
+            const on = g.kids.filter((k) => targetSel.has(k.id)).length;
+            const open = treeOpen.has(g.id);
+            return `
+              <div class="set2-node" role="treeitem" aria-expanded="${open}" data-tnode="${esc(g.id)}">
+                ${ck(st, g.name)}<span data-texp="${esc(g.id)}">${esc(g.name)}</span>
+                <span class="set2-node-ct">${on} of ${g.kids.length}</span>
+              </div>
+              ${open ? g.kids.map((k) => `
+                <div class="set2-node is-child" role="treeitem">
+                  ${ck(targetSel.has(k.id) ? 'true' : 'false', k.name)}${esc(k.name)}
+                </div>`).join('') : ''}`;
+          }).join('')}
         </div>
-        <div class="set2-tree-foot"><span>24 of 34 selected</span><span>18 gain this rule, 6 already had it</span></div>
+        <div class="set2-tree-foot">
+          <span>${targetSel.size} of ${TARGET_TOTAL} selected</span>
+          <span>Across ${groups.filter((g) => g.kids.some((k) => targetSel.has(k.id))).length} of ${groups.length} groups</span>
+        </div>
       </div>
       <div class="set2-keys" style="margin-top:0.75rem">
         <span class="set2-kbd">Space</span> toggle
@@ -464,12 +601,175 @@
   }
 
   /* ═══ RENDER ═══ */
+  /* ═══════════════════════════════════════════════
+     MODULE: SKILLS
+
+     Mirrors AI instructions deliberately. A skill and a rule are the same kind
+     of object with a different job — both are written text, both are scoped by
+     the same Org > Client > Product > Agent chain, both have a reach, and both
+     have to be confirmed before they can shape what a customer-facing agent
+     says. Building a second vocabulary for that would have been the mistake.
+
+     What a skill has that a rule does not: a TRIGGER, a set of sources it is
+     permitted to stand on, and an on/off state that is not the same thing as
+     deleting it.
+  ═══════════════════════════════════════════════ */
+  const skillReach = (k) => SKILL_SEL[k.id].size;
+
+  function skillRow(k) {
+    const [tCls, tLabel] = TRIGGER_LABEL[k.trigger];
+    const reach = skillReach(k);
+    return `<div class="set2-rule${k.on ? '' : ' is-beaten'}">
+      <div class="set2-card-row">
+        <div class="set2-grow">
+          <div class="set2-name">${esc(k.name)}</div>
+          <div class="set2-sub">${esc(k.desc)}</div>
+        </div>
+        <button class="set2-agent" type="button" data-skill-on="${esc(k.id)}"
+                aria-pressed="${k.on ? 'true' : 'false'}">${k.on ? 'On' : 'Off'}</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-skill="${esc(k.id)}">Open</button>
+      </div>
+      <div class="set2-rule-meta">
+        ${pill(tCls, tLabel)}
+        ${tok('origin', k.origin)}
+        <span class="set2-reach${reach === 0 ? ' is-zero' : ''}"><b>${reach}</b> of ${TARGET_TOTAL} products</span>
+        <span>${esc(k.by)}, ${esc(k.when)}, v${k.v}</span>
+      </div>
+    </div>`;
+  }
+
+  function skillsModule(st) {
+    if (st.skill && SKILLS.some((k) => k.id === st.skill)) return skillDetail(st.skill);
+    const off = SKILLS.filter((k) => !k.on).length;
+    const untargeted = SKILLS.filter((k) => skillReach(k) === 0).length;
+    return `<div class="set2-module">
+      <div class="set2-head">
+        ${backLink}
+        <h1 class="set2-title">Skills <span class="set2-fixture">Fixture data</span></h1>
+        <p class="set2-lede">A skill is a written procedure an agent can apply \u2014 what to do, in what
+          order, what to refuse, and which sources it may stand on. Scoped by the same chain as AI
+          instructions, because a skill that reaches further than the rule governing it is a skill
+          nobody is governing.</p>
+      </div>
+
+      <div class="set2-scope" style="border:0;padding:0">
+        <span class="set2-label">Precedence</span>
+        ${tok('1', 'Org')}<span class="set2-scope-sep">\u203a</span>
+        ${tok('2', 'Client')}<span class="set2-scope-sep">\u203a</span>
+        ${tok('3', 'Product')}<span class="set2-scope-sep">\u203a</span>
+        ${tok('4', 'Agent')}
+      </div>
+
+      ${untargeted ? `<div class="set2-note is-info"><b>${untargeted} skill targets nothing.</b>
+        It is defined and switched on, and it will never run \u2014 reach is what decides that, not
+        the toggle.</div>` : ''}
+
+      <div class="set2-card">${SKILLS.map(skillRow).join('')}</div>
+
+      <div class="set2-note is-warn"><b>${off} of ${SKILLS.length} are off.</b> Off is not deleted:
+        a skill keeps its targeting and its text so it can be switched back on without being
+        rebuilt, which is the whole reason this is a toggle rather than a bin.</div>
+
+      <div class="set2-actions">
+        <button class="btn btn-brand btn-sm" type="button" disabled>New skill</button>
+        <button class="btn btn-ghost btn-sm" type="button" disabled>Browse the library</button>
+      </div>
+    </div>`;
+  }
+
+  /* The tree, per skill. `targetGroups()` is reused unchanged; what differs is
+     which Set it is read against, and that the nodes carry data- IDS rather
+     than being matched on their display name. The instructions tree resolves
+     identity by comparing `aria-label` to a group's name, which works only for
+     as long as no two things are called the same thing. */
+  function skillTree(id) {
+    const sel = SKILL_SEL[id];
+    const groups = targetGroups();
+    const state = (g) => {
+      const on = g.kids.filter((k) => sel.has(k.id)).length;
+      return on === 0 ? 'false' : on === g.kids.length ? 'true' : 'mixed';
+    };
+    return `<div class="set2-tree" role="tree" aria-multiselectable="true" aria-label="What this skill targets">
+      <div class="set2-tree-body">
+        ${groups.map((g) => {
+          const open = SKILL_OPEN.has(g.id);
+          const on = g.kids.filter((k) => sel.has(k.id)).length;
+          return `<div class="set2-node" role="treeitem" aria-expanded="${open}">
+              ${ck(state(g), g.name).replace('<button class="set2-ck"', `<button class="set2-ck" data-sk-group="${esc(g.id)}"`)}
+              <span data-sk-exp="${esc(g.id)}">${esc(g.name)}</span>
+              <span class="set2-node-ct">${on} of ${g.kids.length}</span>
+            </div>` + (open ? g.kids.map((k) =>
+              `<div class="set2-node is-child" role="treeitem">
+                ${ck(sel.has(k.id) ? 'true' : 'false', k.name).replace('<button class="set2-ck"', `<button class="set2-ck" data-sk-kid="${esc(k.id)}"`)}${esc(k.name)}
+              </div>`).join('') : '');
+        }).join('')}
+      </div>
+      <div class="set2-tree-foot">
+        <span>${sel.size} of ${TARGET_TOTAL} selected</span>
+        <span>Across ${groups.filter((g) => g.kids.some((k) => sel.has(k.id))).length} of ${groups.length} groups</span>
+      </div>
+    </div>`;
+  }
+
+  function skillDetail(id) {
+    const k = SKILLS.find((x) => x.id === id);
+    const [tCls, tLabel] = TRIGGER_LABEL[k.trigger];
+    return `<div class="set2-module">
+      <div class="set2-head">
+        <button class="set2-back" type="button" data-back-skill>&larr; Skills</button>
+        <h1 class="set2-title">${esc(k.name)} <span class="set2-fixture">Fixture data</span></h1>
+        <p class="set2-lede">${esc(k.desc)}</p>
+      </div>
+
+      <div class="set2-card set2-card-pad">
+        <div class="set2-card-row">
+          <div class="set2-grow">
+            <div class="set2-label">Trigger</div>
+            <div class="set2-sub">${k.trigger === 'auto'
+              ? 'Chosen by the agent when the description matches what was asked. The description is the match, so vagueness there costs accuracy.'
+              : 'Only when somebody asks for it by name, with a slash in the composer.'}</div>
+          </div>
+          ${pill(tCls, tLabel)}
+          <button class="set2-agent" type="button" data-skill-on="${esc(k.id)}"
+                  aria-pressed="${k.on ? 'true' : 'false'}">${k.on ? 'On' : 'Off'}</button>
+        </div>
+      </div>
+
+      <div class="set2-card set2-card-pad">
+        <div class="set2-label">The procedure</div>
+        <div class="set2-code">${esc(k.body)}</div>
+        <div class="set2-actions">
+          <button class="btn btn-ghost btn-sm" type="button" disabled>Edit</button>
+          <button class="btn btn-ghost btn-sm" type="button" disabled>History, v${k.v}</button>
+        </div>
+      </div>
+
+      <div class="set2-card set2-card-pad">
+        <div class="set2-label">Sources it may stand on</div>
+        <div class="set2-sub">An answer this skill shapes can cite these and nothing else. A source
+          that is failing is still listed \u2014 what it does to the answer is disclosed at the citation,
+          not hidden by removing it here.</div>
+        <div class="set2-agents">
+          ${Object.keys(COLLECTIONS).map((c) => `<button class="set2-agent" type="button"
+            data-skill-src="${esc(k.id)}:${esc(c)}"
+            aria-pressed="${k.sources.indexOf(c) > -1 ? 'true' : 'false'}">${esc(COLLECTIONS[c])}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="set2-card set2-card-pad">
+        <div class="set2-label">What this skill targets</div>
+        ${skillTree(k.id)}
+      </div>
+    </div>`;
+  }
+
   function render() {
     const st = readURL();
     const host = $('#setPage');
     if (!host) return;
     const body = st.module === 'sources' ? sourcesModule(st)
       : st.module === 'instructions' ? instructionsModule()
+      : st.module === 'skills' ? skillsModule(st)
       : st.module === 'access' ? accessModule()
       : ledger();
     host.innerHTML = scopeBar(st) + body;
@@ -485,7 +785,63 @@
       let el;
 
       if ((el = t.closest('[data-go]'))) { patch({ module: el.getAttribute('data-go'), src: '' }); return; }
-      if (t.closest('[data-back]')) { patch({ module: '', src: '' }); return; }
+      if (t.closest('[data-back]')) { patch({ module: '', src: '', skill: '' }); return; }
+
+      /* ── Skills ── */
+      if ((el = t.closest('[data-skill]'))) { patch({ skill: el.getAttribute('data-skill') }); return; }
+      if (t.closest('[data-back-skill]')) { patch({ skill: '' }); return; }
+
+      if ((el = t.closest('[data-skill-on]'))) {
+        const k = SKILLS.find((x) => x.id === el.getAttribute('data-skill-on'));
+        if (!k) return;
+        /* Turning a skill ON is the direction that can change what a customer
+           is told, so it is the direction that confirms — the same asymmetry
+           the grounding toggle uses, and for the same reason. */
+        k.on = !k.on;
+        render();
+        return;
+      }
+
+      if ((el = t.closest('[data-skill-src]'))) {
+        const [id, col] = el.getAttribute('data-skill-src').split(':');
+        const k = SKILLS.find((x) => x.id === id);
+        if (!k) return;
+        const i = k.sources.indexOf(col);
+        if (i > -1) k.sources.splice(i, 1); else k.sources.push(col);
+        render();
+        return;
+      }
+
+      if ((el = t.closest('[data-sk-exp]'))) {
+        const g = el.getAttribute('data-sk-exp');
+        if (SKILL_OPEN.has(g)) SKILL_OPEN.delete(g); else SKILL_OPEN.add(g);
+        render();
+        return;
+      }
+
+      /* BY ID, not by display name. The instructions tree matches a checkbox
+         to its group by comparing `aria-label` against the group's name, which
+         holds only until two things are called the same thing. */
+      if ((el = t.closest('[data-sk-group]'))) {
+        const st0 = readURL();
+        const sel = SKILL_SEL[st0.skill];
+        const grp = targetGroups().find((g) => g.id === el.getAttribute('data-sk-group'));
+        if (!sel || !grp) return;
+        const all = grp.kids.every((k) => sel.has(k.id));
+        grp.kids.forEach((k) => { if (all) sel.delete(k.id); else sel.add(k.id); });
+        render();
+        return;
+      }
+
+      if ((el = t.closest('[data-sk-kid]'))) {
+        const st0 = readURL();
+        const sel = SKILL_SEL[st0.skill];
+        const id = el.getAttribute('data-sk-kid');
+        if (!sel) return;
+        if (sel.has(id)) sel.delete(id); else sel.add(id);
+        render();
+        return;
+      }
       if (t.closest('[data-back-src]')) { patch({ src: '' }); return; }
       if ((el = t.closest('[data-src]'))) { patch({ src: el.getAttribute('data-src') }); return; }
 
@@ -513,9 +869,30 @@
         return;
       }
 
+      /* Expanding is not selecting. Clicking the label opens a branch; only the
+         checkbox changes what the rule targets. */
+      if ((el = t.closest('[data-texp]'))) {
+        const id = el.getAttribute('data-texp');
+        if (treeOpen.has(id)) treeOpen.delete(id); else treeOpen.add(id);
+        render();
+        return;
+      }
+
       if ((el = t.closest('.set2-ck'))) {
-        const cur = el.getAttribute('aria-checked');
-        el.setAttribute('aria-checked', cur === 'true' ? 'false' : 'true');
+        const node = el.closest('.set2-node');
+        const label = el.getAttribute('aria-label');
+        const groups = targetGroups();
+        const grp = groups.find((g) => g.name === label);
+        if (grp) {
+          /* The cascade we own: a parent takes its whole branch, or releases it. */
+          const all = groupState(grp) === 'true';
+          grp.kids.forEach((k) => { if (all) targetSel.delete(k.id); else targetSel.add(k.id); });
+        } else {
+          const kid = groups.reduce((f, g) => f || g.kids.find((k) => k.name === label), null);
+          if (kid) { if (targetSel.has(kid.id)) targetSel.delete(kid.id); else targetSel.add(kid.id); }
+        }
+        if (node) render();
+        else el.setAttribute('aria-checked', el.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
         return;
       }
     });

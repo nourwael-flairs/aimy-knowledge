@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AiMY Knowledge</title>
+  <title>AiMY Console</title>
 
   <link rel="icon" type="image/svg+xml" href="assets/Aimy-full.svg" />
   <link rel="apple-touch-icon" href="assets/Aimy-full.svg" />
@@ -13,7 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Poppins:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="assets/aimy-ds.css" />
-  <link rel="stylesheet" href="assets/knowledge.css?v=128" />
+  <link rel="stylesheet" href="assets/knowledge.css?v=156" />
 
   <script>
     /* Apply saved theme before paint to avoid flash. Default = dark. */
@@ -79,13 +79,25 @@
   </div>
 
   <div class="topnav-tabs">
+    <!-- ══ THE PRODUCT STRIP ═══════════════════════════════════════════
+         AiMY is first and it is the only tab with a CHAT GATE behind it. The
+         other four are consoles: workbenches with the canvas inside them,
+         entered without passing a gate. That asymmetry is the reason the tab
+         order is what it is, and the reason a conversation's subtitle names
+         the tab it was held under.
+
+         `aria-current="page"` appears on exactly ONE of the three shells --
+         whichever page you are actually on. It used to sit on all three,
+         including settings.html where the element is a link pointing AWAY
+         from the current page: a control announcing "you are here" while
+         navigating elsewhere. `active` carries the product context; only
+         `aria-current` claims the page. -->
     <div class="topnav-tabs-inner" role="navigation" aria-label="AiMY products">
-        <button class="topnav-tab" type="button">Connect</button>
-        <button class="topnav-tab active" type="button" aria-current="page">
+        <a class="topnav-tab active" href="index.html">
           <svg width="18" height="20" viewBox="0 0 18 20"><use href="#aimy-logo-small"/></svg>
-          Knowledge
-        </button>
-        <button class="topnav-tab" type="button">Analytics</button>
+          AiMY
+        </a>
+        <button class="topnav-tab" type="button">Connect</button>
         <button class="topnav-tab" type="button">Talent</button>
         <a class="topnav-tab" href="https://aimyqa.nour-ali.workers.dev/">QA</a>
         <a class="topnav-tab" href="https://aimy-sales.nour-ali.workers.dev/">Sales</a>
@@ -163,9 +175,15 @@
         <div class="menu-label">Settings</div>
         <a class="menu-item" role="menuitem" href="settings.html?module=sources">Knowledge sources</a>
         <a class="menu-item" role="menuitem" href="settings.html?module=instructions">AI instructions</a>
+        <a class="menu-item" role="menuitem" href="settings.html?module=skills">Skills</a>
         <a class="menu-item" role="menuitem" href="settings.html?module=access">Access and roles</a>
         <div class="menu-sep"></div>
         <a class="menu-item" role="menuitem" href="settings.html">All settings</a>
+        <div class="menu-sep"></div>
+        <!-- The way back to the gate. Without it the Console is a one-way
+             door: chat routes here from two places and nothing routed back,
+             which leaves the browser button as the only exit. -->
+        <a class="menu-item" role="menuitem" href="index.html">Back to chat</a>
       </div>
     </div>
   </div>
@@ -189,6 +207,29 @@
   ══════════════════════════════════════════════ -->
   <nav class="app-sidebar" id="appSidebar" aria-label="Briefing" tabindex="-1">
     <div class="brief" id="brief"></div>
+
+    <!-- ══ THE WAY BACK ══════════════════════════════════════════════════
+         The chat is the front door and this is the workbench behind it, so
+         there has to be a door back that is not the browser button. The
+         account menu carries one, but two clicks inside a dropdown is where
+         you put a thing people should be able to find, not a thing they use.
+
+         Foot of the rail, mirroring where the gate keeps its Console link, so
+         the two surfaces point at each other from the same corner. Outside
+         `#brief` because `renderBrief` owns that element's innerHTML and would
+         paint over anything left inside it. -->
+    <div class="rail-foot">
+      <a class="rail-back" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="15" height="15">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+        </svg>
+        <span class="rail-back-lines">
+          <span class="rail-back-name">Back to chat</span>
+          <span class="rail-back-sub">Ask across everything AiMY knows</span>
+        </span>
+      </a>
+    </div>
   </nav>
 
   <!-- Dismiss surface for the drawer. Sibling of the rail so the two share one
@@ -356,7 +397,7 @@
   <div class="drop-card">
     <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8"
          stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
-    <span class="drop-title">Drop to add to Knowledge</span>
+    <span class="drop-title">Drop to add to the corpus</span>
     <span class="drop-sub">A draft per file, owned by you. Nothing goes live until you say so.</span>
   </div>
 </div>
@@ -396,6 +437,6 @@
 
 
 <script src="assets/aimy-ds.js"></script>
-<script src="assets/knowledge.js?v=128"></script>
+<script src="assets/knowledge.js?v=155"></script>
 </body>
 </html>
