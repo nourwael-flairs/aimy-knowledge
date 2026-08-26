@@ -476,6 +476,181 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
 .set2-add:hover { background: var(--card-bg); }
 .set2-add.is-inline { padding: 0.1875rem 0.4375rem; margin: 0; }
 
+/* The row now carries two lines: the path, and what that path returns. The
+   sample is the load-bearing half. A path that resolves cleanly and returns
+   the wrong column passes every other check on this page, and the values are
+   the only place it shows. */
+.set2-map-row { grid-template-columns: 9rem 1fr auto; align-items: center; }
+.set2-map-mid { min-width: 0; }
+.set2-sample {
+  display: flex; gap: 0.5rem; margin-top: 0.1875rem;
+  font-family: var(--font-mono); font-size: var(--ty-micro);
+  color: var(--ink-faint); min-width: 0; overflow: hidden;
+}
+.set2-sample i { font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.set2-sample i + i::before { content: "·"; margin-right: 0.5rem; color: var(--ink-rule); }
+.set2-sample.is-none { color: var(--ink-warn); font-style: italic; }
+
+/* A suggestion is not an error and not a fact. It sits between them, and the
+   row says so without dimming: everything stays fully readable, because a
+   surface that hides its own guesses cannot be checked. */
+.set2-map-row.is-unmapped .set2-map-ctx { color: var(--ink-faint); font-weight: var(--fw-medium); }
+
+.set2-tally { display: flex; gap: 0.75rem; font-size: var(--ty-micro); color: var(--ink-faint); }
+.set2-tally b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.set2-tally .is-info b { color: var(--ink-info); }
+.set2-tally .is-err b  { color: var(--ink-err); }
+.set2-tally .is-mute b { color: var(--ink-faint); }
+
+/* ══ SETUP CHECKLIST ═════════════════════════════════════════════════════
+   Scaffolding, and it removes itself. A checklist that outlives the job it
+   describes becomes furniture nobody can dismiss. */
+.set2-setup { background: var(--card-bg); border-radius: var(--r-lg); padding: 0.875rem 1rem 1rem; }
+.set2-setup-hd { display: flex; align-items: center; gap: 0.625rem; }
+.set2-setup-t { font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary); }
+.set2-setup-n { margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint); }
+.set2-setup-bar { height: 0.1875rem; border-radius: 0.125rem; background: var(--card-bg-raised); margin: 0.625rem 0 0.75rem; overflow: hidden; }
+.set2-setup-bar i { display: block; height: 100%; background: var(--brand); border-radius: inherit; }
+.set2-setup-list { display: flex; flex-direction: column; gap: 0.125rem; }
+.set2-setup-i {
+  display: flex; align-items: center; gap: 0.625rem;
+  padding: 0.375rem 0.5rem; border-radius: var(--r-sm);
+  font-size: var(--ty-micro); color: var(--ink-secondary);
+}
+.set2-setup-i.is-done { color: var(--ink-faint); }
+.set2-setup-ck {
+  width: 0.875rem; height: 0.875rem; flex-shrink: 0;
+  border-radius: var(--r-pill); border: 0.0938rem solid var(--ink-rule);
+  display: grid; place-items: center;
+}
+.set2-setup-i.is-done .set2-setup-ck { background: var(--ok); border-color: var(--ok); }
+.set2-setup-ck svg { width: 0.5rem; height: 0.5rem; color: #fff; }
+/* An honest estimate per step. HoneyBook's, and it is the detail that makes a
+   four-step list feel finishable rather than open-ended. */
+.set2-setup-m { margin-left: auto; color: var(--ink-faint); }
+
+/* ══ ROLE MATRIX ═════════════════════════════════════════════════════════
+   Words, not ticks. A checkbox encodes a binary and permissions here are
+   ternary: "can read it but not change it" is the most common answer and a
+   tick has nowhere to put it. */
+.set2-matrix-wrap { overflow-x: auto; background: var(--card-bg); border-radius: var(--r-lg); }
+.set2-matrix { border-collapse: collapse; width: 100%; min-width: 44rem; font-size: var(--ty-micro); }
+.set2-matrix th {
+  text-align: left; padding: 0.75rem 0.625rem 0.5rem; white-space: nowrap;
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
+}
+.set2-matrix td { padding: 0.4375rem 0.625rem; }
+.set2-matrix-g td {
+  padding-top: 0.875rem; font-weight: var(--fw-semibold); color: var(--ink-primary);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; font-size: var(--ty-micro);
+}
+.set2-matrix-cap { color: var(--ink-secondary); white-space: nowrap; }
+.set2-cell { white-space: nowrap; }
+.set2-cell.is-ok   { color: var(--ink-ok); font-weight: var(--fw-semibold); }
+.set2-cell.is-mute { color: var(--ink-quiet); }
+.set2-cell.is-off  { color: var(--ink-faint); }
+.set2-cell.is-locked { display: table-cell; }
+.set2-cell.is-locked .w-lock { color: var(--ink-ok); margin-right: 0.25rem; vertical-align: -0.0625rem; }
+
+/* ══ CASCADE ═════════════════════════════════════════════════════════════
+   The second casualty. A count says how big the hole is; this says what falls
+   into it, which is the part people do not predict. */
+.set2-cascade { background: var(--card-bg); border-radius: var(--r-md); padding: 0.75rem 0.875rem; margin-bottom: 1rem; }
+.set2-cascade-t {
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--ink-faint); margin-bottom: 0.5rem;
+}
+.set2-cascade-i { display: flex; gap: 0.625rem; align-items: baseline; padding: 0.1875rem 0; font-size: var(--ty-micro); }
+.set2-cascade-k { flex: 0 0 10rem; color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.set2-cascade-v { color: var(--ink-quiet); }
+
+/* ══ JOIN BAR ════════════════════════════════════════════════════════════ */
+.set2-joinbar {
+  display: flex; align-items: center; gap: 0.5rem;
+  margin-bottom: 0.5rem; font-size: var(--ty-micro); color: var(--ink-quiet);
+}
+.set2-joinbar .seg { background: var(--card-bg); }
+.set2-joinbar .seg-btn { font-size: var(--ty-micro); padding: 0.1875rem 0.5rem; }
+.set2-joinbar .seg-btn.active { background: var(--card-bg-raised); color: var(--ink-primary); }
+
+/* ══ PREVIEW TABLE ═══════════════════════════════════════════════════════
+   The mapping and the data in one place, which is the only view where a wrong
+   column is obvious. */
+.set2-modal.is-wide { max-width: 52rem; }
+.set2-pv-wrap { overflow-x: auto; border-radius: var(--r-md); background: var(--card-bg); }
+.set2-pv { border-collapse: collapse; width: 100%; font-size: var(--ty-micro); }
+.set2-pv th {
+  text-align: left; padding: 0.625rem 0.75rem 0.5rem; white-space: nowrap;
+  color: var(--ink-primary); font-weight: var(--fw-semibold);
+}
+.set2-pv th span {
+  display: block; font-family: var(--font-mono); font-weight: var(--fw-regular);
+  color: var(--ink-faint); margin-top: 0.125rem;
+}
+.set2-pv td {
+  padding: 0.4375rem 0.75rem; color: var(--ink-secondary);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.set2-pv tbody tr:nth-child(odd) td { background: var(--card-bg-raised); }
+.set2-pv td i { color: var(--ink-faint); }
+
+/* ══ SEARCH ══════════════════════════════════════════════════════════════
+   Indexes leaf settings, not modules. "retention" finds the FreshDesk
+   threshold, not the page holding it. */
+.set2-search {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  appearance: none; background: var(--card-bg);
+  border: 0.0625rem solid var(--card-border);
+  padding: 0.4375rem 0.625rem; margin-bottom: 1.5rem;
+  border-radius: var(--r-md);
+  font: inherit; font-size: var(--ty-micro);
+  color: var(--ink-faint); cursor: pointer; text-align: left;
+}
+.set2-search:hover { color: var(--ink-secondary); }
+.set2-search-k { margin-left: auto; display: flex; gap: 0.1875rem; }
+kbd {
+  font-family: var(--font-mono); font-size: var(--ty-micro);
+  background: var(--card-bg-raised); color: var(--ink-faint);
+  padding: 0.0625rem 0.25rem; border-radius: var(--r-sm);
+}
+
+.set2-scrim.is-top { align-items: flex-start; padding-top: 12vh; }
+.set2-pal {
+  width: 100%; max-width: 34rem; max-height: 60vh;
+  display: flex; flex-direction: column;
+  background: var(--body-bg);
+  border: 0.0625rem solid var(--card-border);
+  border-radius: var(--r-lg); overflow: hidden;
+}
+.set2-pal-f {
+  appearance: none; border: 0; background: transparent;
+  padding: 0.875rem 1rem; font: inherit; font-size: var(--ty-body);
+  color: var(--ink-primary); width: 100%;
+}
+.set2-pal-f:focus-visible { outline: 0; }
+.set2-pal-f::placeholder { color: var(--ink-faint); }
+.set2-pal-bd { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.25rem; scrollbar-width: thin; }
+.set2-pal-i {
+  display: flex; align-items: baseline; gap: 0.75rem; width: 100%;
+  appearance: none; border: 0; background: transparent;
+  padding: 0.5rem 0.75rem; border-radius: var(--r-md);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.set2-pal-i:hover, .set2-pal-i.is-on { background: var(--card-bg); }
+.set2-pal-n { font-size: var(--ty-meta); color: var(--ink-primary); font-weight: var(--fw-semibold); }
+/* The path is what makes a result specific. Without it "Endpoint" could be
+   any of four things. */
+.set2-pal-p { margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint); white-space: nowrap; }
+.set2-pal-empty { padding: 1.5rem 0.75rem; text-align: center; font-size: var(--ty-meta); color: var(--ink-faint); }
+.set2-pal-empty b { color: var(--ink-secondary); }
+.set2-pal-ft {
+  display: flex; gap: 1rem; padding: 0.5rem 1rem;
+  background: var(--card-bg); font-size: var(--ty-micro); color: var(--ink-faint);
+}
+.set2-pal-ft span { display: flex; align-items: center; gap: 0.25rem; }
+
 /* ══ CHIPS ═══════════════════════════════════════════════════════════════ */
 
 .set2-chip {

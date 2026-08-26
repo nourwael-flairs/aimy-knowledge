@@ -281,6 +281,49 @@
     }
   };
 
+  /* ── What the path actually returns ──
+     The single most important thing on this screen. A path that resolves
+     cleanly and returns the WRONG column passes every other check there is:
+     the schema accepts it, the syntax is fine, nothing goes red. The only way
+     to catch it is to look at the values.
+
+     Attio, HubSpot, folk and Podia all pin a data preview beside the mapping
+     for exactly this reason. The production console does too, and mislabels it
+     `SELECT KEY` -- those names under the picker are the VALUES coming back,
+     not the keys going in. */
+  const SAMPLES = {
+    zendesk: {
+      'assignee.name': ['Mohamed Ramy', 'Mostafa Adel', 'Mosaab Hany'],
+      'assignee.email': ['m.ramy@cxs.com', 'm.adel@cxs.com', 'm.hany@cxs.com'],
+      'assignee.id': ['4471', '4472', '4488'],
+      'assignee.phone': ['+20 100 442 1180', '+20 100 771 3325', 'null'],
+      'requester.name': ['Dana Whitfield', 'Ivo Kraus', 'Priya Raghavan'],
+      'requester.email': ['dana@nordwind.de', 'ivo@tavola.it', 'priya@meridian.health'],
+      'requester.organization.name': ['Nordwind GmbH', 'Tavola Retail', 'Meridian Health'],
+      'requester.organization.domain': ['nordwind.de', 'tavola.it', 'meridian.health'],
+      'ticket.id': ['88214', '88215', '88220'],
+      'ticket.subject': ['Refund not received', 'Cannot export batch', 'Seat count wrong'],
+      'ticket.status': ['solved', 'open', 'pending'],
+      'ticket.priority': ['5', '2', '3'],
+      'ticket.created_at': ['2026-08-14', '2026-08-14', '2026-08-15'],
+      'brand.name': ['FileBound', 'FileBound', 'InterFAX']
+    },
+    freshdesk: {
+      'agent.name': ['Tarek Ahmed', 'Salma Nabil', 'Karim Fouad'],
+      'agent.email': ['tarek@upland.com', 'salma@upland.com', 'karim@upland.com'],
+      'agent.id': ['9012', '9013', '9020'],
+      'contact.name': ['Lena Fischer', 'Marco Rossi', 'Aisha Bello'],
+      'contact.email': ['lena@nordwind.de', 'marco@tavola.it', 'aisha@orbit.bpo'],
+      'contact.company.name': ['Nordwind GmbH', 'Tavola Retail', 'Orbit BPO'],
+      'contact.company.domain': ['nordwind.de', 'tavola.it', 'orbit.bpo'],
+      'ticket.id': ['5510', '5511', '5514'],
+      'ticket.subject': ['Licence renewal', 'Batch stuck', 'Export failing'],
+      'ticket.status': ['open', 'open', 'pending'],
+      'ticket.priority': ['1', '3', '2']
+    }
+  };
+  const samplesFor = (crmId, path) => (SAMPLES[crmId] || {})[path.join('.')] || null;
+
   /* Walk a path against the schema. Returns the node, or the index of the
      segment that broke. A mapping pointing at a key the connector no longer
      exposes is the failure that actually costs answers, and the console has
@@ -309,6 +352,39 @@
      mapping is ours, the right side is theirs. */
   const CTX_FIELDS = ['Agent name', 'Email address', 'Email domain', 'Ticket number',
                       'Priority level', 'Ticket subject', 'Company name', 'Created at'];
+
+  /* ── Auto-match ──
+     Nobody should meet an empty mapping table. The system reads the connector's
+     schema, proposes a path for every context field it recognises, and marks
+     each proposal as SUGGESTED until a person confirms it.
+
+     What it deliberately does NOT do is hide the rest. A suggestion collapses
+     nothing: every context field stays on screen with its own state, whether
+     it is confirmed, suggested, unmapped or broken. Filtering the screen down
+     to "just the uncertain ones" would make the fast path opaque, and the
+     whole point of this surface is that you can see what it will do. */
+  const MATCH_HINTS = {
+    'Agent name':     [['assignee', 'name'], ['agent', 'name']],
+    'Email address':  [['requester', 'email'], ['contact', 'email']],
+    'Email domain':   [['requester', 'organization', 'domain'], ['contact', 'company', 'domain']],
+    'Ticket number':  [['ticket', 'id']],
+    'Priority level': [['ticket', 'priority']],
+    'Ticket subject': [['ticket', 'subject']],
+    'Company name':   [['requester', 'organization', 'name'], ['contact', 'company', 'name']],
+    'Created at':     [['ticket', 'created_at']]
+  };
+  /* Confidence is honest rather than decorative: a proposal only counts as
+     strong when the connector actually returns values for it. A path that
+     resolves but comes back empty is exactly the case a person must look at. */
+  function propose(crmId, ctx) {
+    const tries = MATCH_HINTS[ctx] || [];
+    for (const path of tries) {
+      if (!walkPath(crmId, path).ok) continue;
+      const s = samplesFor(crmId, path);
+      return { path: path, confidence: s && s.length ? 'strong' : 'weak' };
+    }
+    return null;
+  }
 
   const CONNECTIONS = [
     { id: 'fb-zendesk', product: 'FileBound Support', crm: 'Zendesk', crmId: 'zendesk',
@@ -351,13 +427,49 @@
   ];
   const connById = (id) => CONNECTIONS.filter((c) => c.id === id)[0];
 
+  /* Everything already in a fixture was authored by a person, so it is
+     confirmed. Every context field NOT yet mapped gets a proposal appended, so
+     the table always shows the full vocabulary and never an empty page. */
+  CONNECTIONS.forEach((c) => {
+    c.maps.forEach((m) => { m.state = 'confirmed'; });
+    CTX_FIELDS.forEach((ctx) => {
+      if (c.maps.some((m) => m.ctx === ctx)) return;
+      const p = propose(c.crmId, ctx);
+      c.maps.push(p
+        ? { ctx: ctx, path: p.path, state: 'suggested', confidence: p.confidence }
+        : { ctx: ctx, path: [], state: 'unmapped' });
+    });
+    /* Keep the authored order, then suggestions, then the ones nothing could
+       be found for. Sorting by state rather than name means the work to do
+       collects at the bottom without anything being hidden. */
+    const rank = { confirmed: 0, suggested: 1, unmapped: 2 };
+    c.maps.sort((a, b) => rank[a.state] - rank[b.state]);
+  });
+
+  const mapCounts = (c) => ({
+    confirmed: c.maps.filter((m) => m.state === 'confirmed').length,
+    suggested: c.maps.filter((m) => m.state === 'suggested').length,
+    unmapped:  c.maps.filter((m) => m.state === 'unmapped').length,
+    broken:    c.maps.filter((m) => m.path.length && !walkPath(c.crmId, m.path).ok).length,
+    total:     CTX_FIELDS.length
+  });
+
   /* Match count. Every criterion narrows, so the number falls as you add one.
      Deterministic from the criteria themselves, because a figure that moved on
      its own would be worse than no figure. */
+  /* ANY genuinely selects more than ALL, and the figure has to move or the
+     control is decoration. Intersecting filters narrow; a union of the same
+     filters widens toward the sum of their individual shares. */
   function matchCount(c) {
-    let n = c.records;
-    c.criteria.forEach((k, i) => { n = Math.floor(n * (i === 0 ? 0.42 : 0.61)); });
-    return n;
+    if (!c.criteria.length) return c.records;
+    const share = c.criteria.map((k, i) => (i === 0 ? 0.42 : 0.61));
+    if ((c.join || 'all') === 'all') {
+      return Math.floor(c.records * share.reduce((a, b) => a * b, 1));
+    }
+    /* Union by inclusion-exclusion on independent shares: 1 - product of the
+       complements. Always at least as large as the intersection. */
+    const none = share.reduce((a, s) => a * (1 - s), 1);
+    return Math.floor(c.records * (1 - none));
   }
 
   const CRITERIA_VOCAB = {
@@ -367,13 +479,11 @@
     Brand: ['FileBound', 'InterFAX', 'Kapost']
   };
 
-  /* ═══ THE OTHER MODULES ═══ */
-  const SRC = [
-    { id: 'confluence', name: 'Confluence', d: 'Synced 14 minutes ago · every 15 minutes', s: ['is-ok', 'Healthy'], n: 1204 },
-    { id: 'zendesk', name: 'Zendesk', d: 'OAuth token rejected since 26 Jul', s: ['is-err', 'Failing'], n: 118 },
-    { id: 'hubspot', name: 'HubSpot', d: '3 records skipped, missing owner', s: ['is-warn', 'Degraded'], n: 340 },
-    { id: 'web', name: 'Website crawl', d: 'Blocked by robots.txt since 11 Jul', s: ['is-err', 'Failing'], n: 42 }
-  ];
+  /* ═══ THE OTHER MODULES ═══
+     The `SRC` connector fixture that used to live here went with the sync
+     module when field mapping and sync folded into one connection contract.
+     It survived the merge unreferenced for a while, which is how a fixture
+     starts disagreeing with the thing it once described. */
 
   const PEOPLE = [
     { id: 'p1', name: 'Alex Smith', mail: 'alex.smith@flairstech.com', s: ['is-ok', 'Active'],
@@ -655,11 +765,63 @@
       })).join('')}</div>
     </section>`;
 
+  /* ── Roles ──
+     A capability matrix, and the values are WORDS. A tick grid encodes a
+     binary, and permissions here are not binary: "can read it but not change
+     it" is the single most common answer and a checkbox has nowhere to put it.
+
+     Cells that cannot legally change are locked rather than merely unchecked,
+     so nobody can save a workspace with no administrator in it. */
+  const CAPS = [
+    ['AI Controls', [
+      ['Write organization skills', ['full', 'full', 'none', 'none', 'none', 'none']],
+      ['Write personal skills',     ['full', 'full', 'full', 'full', 'full', 'none']],
+      ['Change what a skill reaches', ['full', 'full', 'view', 'none', 'none', 'none']],
+      ['Ground an agent on a collection', ['full', 'full', 'view', 'none', 'none', 'none']]
+    ]],
+    ['Organization', [
+      ['Invite and remove people', ['full', 'full', 'none', 'none', 'none', 'none']],
+      ['Assign roles',            ['lock', 'full', 'none', 'none', 'none', 'none']],
+      ['Edit the hierarchy',      ['full', 'view', 'view', 'view', 'none', 'none']],
+      ['Change the plan',         ['lock', 'none', 'none', 'none', 'none', 'none']]
+    ]],
+    ['Operations', [
+      ['Edit a connection mapping', ['full', 'full', 'full', 'view', 'none', 'none']],
+      ['Run a sync',                ['full', 'full', 'full', 'full', 'none', 'none']],
+      ['Delete synced records',     ['lock', 'full', 'none', 'none', 'none', 'none']],
+      ['Read the audit trail',      ['full', 'full', 'view', 'view', 'none', 'none']]
+    ]]
+  ];
+  const CAP_STATE = {
+    full: ['is-ok', 'Full'],
+    view: ['is-mute', 'View only'],
+    none: ['is-off', 'No access'],
+    lock: ['is-ok', 'Always']
+  };
+
   M.roles = () => `
     <section class="set2-sec">
-      <div class="set2-sec-h"><h2 class="set2-sec-t">Roles</h2>
+      <div class="set2-sec-h"><h2 class="set2-sec-t">What each role can do</h2>
         <span class="set2-sec-end"><button class="btn btn-ghost btn-sm" type="button">New role</button></span></div>
-      <div class="set2-rows">${ROLES.map((r) => row({ ico: I.key, name: r[0], d: r[1] })).join('')}</div>
+      <div class="set2-matrix-wrap">
+        <table class="set2-matrix">
+          <thead><tr><th></th>${ROLES.map((r) => `<th>${esc(r[0])}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${CAPS.map(([group, caps]) => `
+              <tr class="set2-matrix-g"><td colspan="${ROLES.length + 1}">${esc(group)}</td></tr>
+              ${caps.map(([cap, states]) => `
+                <tr>
+                  <td class="set2-matrix-cap">${esc(cap)}</td>
+                  ${states.map((s) => {
+                    const [cls, label] = CAP_STATE[s];
+                    return `<td class="set2-cell ${cls}${s === 'lock' ? ' is-locked' : ''}">
+                      ${s === 'lock' ? I.lock : ''}${esc(label)}</td>`;
+                  }).join('')}
+                </tr>`).join('')}`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="set2-note" style="margin-top:0.75rem">Locked cells cannot be changed. A workspace with no one able to assign roles or change the plan could not be recovered from inside the product.</div>
     </section>`;
 
   M.hierarchy = () => {
@@ -720,7 +882,8 @@
 
   /* ── The contract ── */
   function connectionDetail(c, st) {
-    const bad = c.maps.filter((m) => !walkPath(c.crmId, m.path).ok).length;
+    const k = mapCounts(c);
+    const bad = k.broken;
     const n = matchCount(c);
     return `
       <button class="set2-back" type="button" data-back>&larr; Connections</button>
@@ -736,15 +899,25 @@
         </div>
       </div>
 
+      ${setupChecklist(c)}
+
       <section class="set2-sec">
         <div class="set2-sec-h"><h2 class="set2-sec-t">What each field means</h2>
-          <span class="set2-sec-end set2-from">${c.maps.length} of ${CTX_FIELDS.length} mapped</span></div>
+          <span class="set2-sec-end set2-tally">
+            <span class="set2-num"><b>${k.confirmed}</b> confirmed</span>
+            ${k.suggested ? `<span class="set2-num is-info"><b>${k.suggested}</b> suggested</span>` : ''}
+            ${k.unmapped ? `<span class="set2-num is-mute"><b>${k.unmapped}</b> not mapped</span>` : ''}
+            ${k.broken ? `<span class="set2-num is-err"><b>${k.broken}</b> broken</span>` : ''}
+          </span></div>
         <div class="set2-map">
-          <div class="set2-map-hd"><span>AiMY field</span><span>${esc(c.crm)} path</span><span></span></div>
+          <div class="set2-map-hd"><span>AiMY field</span><span>${esc(c.crm)} path and what it returns</span><span></span></div>
           ${c.maps.map((m, i) => mapRow(c, m, i)).join('')}
         </div>
-        <button class="set2-add" type="button" data-map-add>+ Map another field</button>
-        ${bad ? `<div class="set2-note is-err" style="margin-top:0.5rem">${bad} path no longer exists in ${esc(c.crm)}. Fix or remove it.</div>` : ''}
+        ${k.suggested ? `<div class="set2-note" style="margin-top:0.5rem">
+          <span>${k.suggested} ${k.suggested === 1 ? 'path was' : 'paths were'} proposed from ${esc(c.crm)}'s schema. Check the values, then confirm.</span>
+          <span style="margin-left:auto"><button class="btn btn-ghost btn-sm" type="button" data-map-ok-all>Confirm all suggested</button></span>
+        </div>` : ''}
+        ${bad ? `<div class="set2-note is-err" style="margin-top:0.5rem">${bad} path no longer exists in ${esc(c.crm)}. Fix or clear it.</div>` : ''}
       </section>
 
       <section class="set2-sec">
@@ -798,22 +971,48 @@
     const transforms = []
       .concat(m.values ? [{ k: 'values', label: m.values.length + ' values mapped' }] : [])
       .concat(m.idres ? [{ k: 'idres', label: 'ID resolved to name' }] : []);
+    const samples = (res.ok && !incomplete) ? samplesFor(c.crmId, m.path) : null;
+
+    /* The row's own verdict, in one word, on the right. Four states and they
+       are mutually exclusive, so there is never more than one badge to read. */
+    let flag = '';
+    if (!res.ok) flag = pill('is-err', 'Not in ' + c.crm);
+    else if (m.state === 'unmapped') flag = pill('is-mute', 'Not mapped');
+    else if (incomplete) flag = pill('is-warn', 'Incomplete');
+    else if (m.state === 'suggested') flag = pill(m.confidence === 'weak' ? 'is-warn' : 'is-info', 'Suggested');
+
+    const cls = [!res.ok ? 'is-broken' : '', incomplete ? 'is-partial' : '',
+                 m.state === 'unmapped' ? 'is-unmapped' : '',
+                 m.state === 'suggested' ? 'is-suggested' : ''].filter(Boolean).join(' ');
+
     return `
-      <div class="set2-map-row${res.ok ? (incomplete ? ' is-partial' : '') : ' is-broken'}" data-map="${i}">
+      <div class="set2-map-row ${cls}" data-map="${i}">
         <span class="set2-map-ctx">${esc(m.ctx)}</span>
-        <span class="set2-map-path">
-          ${m.path.map((seg, j) => `
-            ${j ? '<span class="set2-map-dot">.</span>' : ''}
-            <button class="set2-seg${!res.ok && res.at === j ? ' is-bad' : ''}" type="button"
-                    data-seg="${i}:${j}">${esc(seg)}</button>`).join('')}
-          ${incomplete
-            ? `${m.path.length ? '<span class="set2-map-dot">.</span>' : ''}
-               <button class="set2-seg is-more" type="button" data-seg="${i}:${m.path.length}">Choose a key</button>` : ''}
+        <span class="set2-map-mid">
+          <span class="set2-map-path">
+            ${m.path.map((seg, j) => `
+              ${j ? '<span class="set2-map-dot">.</span>' : ''}
+              <button class="set2-seg${!res.ok && res.at === j ? ' is-bad' : ''}" type="button"
+                      data-seg="${i}:${j}">${esc(seg)}</button>`).join('')}
+            ${incomplete
+              ? `${m.path.length ? '<span class="set2-map-dot">.</span>' : ''}
+                 <button class="set2-seg is-more" type="button" data-seg="${i}:${m.path.length}">${m.path.length ? 'Choose a key' : 'Map a field'}</button>` : ''}
+          </span>
+          ${/* What comes back. Three values is enough to recognise a column and
+                short enough to sit on one line. */ ''}
+          ${samples
+            ? `<span class="set2-sample">${samples.slice(0, 3).map((v) => `<i>${esc(v)}</i>`).join('')}</span>`
+            : res.ok && !incomplete
+              ? '<span class="set2-sample is-none">No values returned</span>'
+              : ''}
         </span>
         <span class="set2-map-end">
           ${transforms.map((t) => `<button class="set2-chip is-act" type="button" data-tf="${i}:${t.k}">${esc(t.label)}</button>`).join('')}
-          ${!res.ok ? pill('is-err', 'Not in ' + c.crm) : incomplete ? pill('is-warn', 'Incomplete') : ''}
-          <button class="set2-x" type="button" data-map-del="${i}" aria-label="Remove ${esc(m.ctx)} mapping">${I.x}</button>
+          ${flag}
+          ${m.state === 'suggested' && res.ok && !incomplete
+            ? `<button class="btn btn-ghost btn-sm" type="button" data-map-ok="${i}">Confirm</button>` : ''}
+          ${m.state === 'unmapped' ? ''
+            : `<button class="set2-x" type="button" data-map-del="${i}" aria-label="Clear ${esc(m.ctx)} mapping">${I.x}</button>`}
         </span>
       </div>`;
   }
@@ -822,17 +1021,92 @@
      shows the same chips with no conjunction stated anywhere, so whether two
      criteria mean AND or OR is left to the reader. */
   function criteriaEditor(c) {
+    const join = c.join || 'all';
     return `
+      ${/* The conjunction is a CONTROL, not a convention. Two filters meant AND
+            by assumption before this, and nothing on screen said so, which is
+            how a sync quietly pulls the wrong half of a corpus. */ ''}
+      <div class="set2-joinbar">
+        <span>Match</span>
+        <span class="seg" role="group" aria-label="How filters combine">
+          <button class="seg-btn${join === 'all' ? ' active' : ''}" type="button" data-join="all">All</button>
+          <button class="seg-btn${join === 'any' ? ' active' : ''}" type="button" data-join="any">Any</button>
+        </span>
+        <span>of the following</span>
+      </div>
       <div class="set2-crit" data-crit>
         ${c.criteria.length
           ? c.criteria.map((k, i) => `
-              ${i ? '<span class="set2-crit-and">and</span>' : ''}
+              ${i ? `<span class="set2-crit-and">${join === 'all' ? 'and' : 'or'}</span>` : ''}
               <span class="set2-chip">${esc(k[0])} is <b>${esc(k[1])}</b>
                 <button type="button" data-crit-del="${i}" aria-label="Remove ${esc(k[0])} filter">${I.x}</button>
               </span>`).join('')
           : '<span class="set2-crit-all">Every record. Add a filter to narrow it.</span>'}
         <button class="set2-add is-inline" type="button" data-crit-add>+ Filter</button>
       </div>`;
+  }
+
+  /* ── Setup checklist ──
+     A new connection is a four-step job whose steps live on different parts of
+     one page. Externalising the sequence, with an honest estimate per step,
+     beats leaving a person to work out the order. It removes itself once done
+     rather than becoming permanent furniture. */
+  function setupSteps(c) {
+    const k = mapCounts(c);
+    return [
+      { t: 'Authorise ' + c.crm, m: '2 min', done: true },
+      { t: 'Confirm the field mapping', m: '5 min', done: k.suggested === 0 && k.broken === 0 && k.confirmed > 0 },
+      { t: 'Set how far back to read', m: '1 min', done: !!c.window },
+      { t: 'Run a preview', m: '1 min', done: !!c.previewed }
+    ];
+  }
+  function setupChecklist(c) {
+    if (c.setupHidden) return '';
+    const steps = setupSteps(c);
+    const done = steps.filter((s) => s.done).length;
+    if (done === steps.length) return '';
+    return `
+      <section class="set2-sec">
+        <div class="set2-setup">
+          <div class="set2-setup-hd">
+            <span class="set2-setup-t">Finish connecting ${esc(c.crm)}</span>
+            <span class="set2-setup-n set2-num">${done} of ${steps.length}</span>
+            <button class="set2-x" type="button" data-setup-hide aria-label="Hide setup steps">${I.x}</button>
+          </div>
+          <div class="set2-setup-bar"><i style="width:${Math.round(done / steps.length * 100)}%"></i></div>
+          <div class="set2-setup-list">
+            ${steps.map((s) => `
+              <div class="set2-setup-i${s.done ? ' is-done' : ''}">
+                <span class="set2-setup-ck">${s.done ? I.tick : ''}</span>
+                <span>${esc(s.t)}</span>
+                <span class="set2-setup-m set2-num">${esc(s.m)}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+      </section>`;
+  }
+
+  /* ── The dry run ──
+     Was a ghost button beside Run sync. A preview that shows nothing is worse
+     than no preview, because it reads as reassurance. This renders real records
+     with the mapping applied, which is the only place the mapping and the data
+     are visible together. */
+  function previewRows(c, n) {
+    const cols = c.maps.filter((m) => m.path.length && walkPath(c.crmId, m.path).ok
+                                   && keysAt(c.crmId, m.path).length === 0);
+    const depth = cols.reduce((d, m) => Math.max(d, (samplesFor(c.crmId, m.path) || []).length), 0);
+    const rows = [];
+    for (let r = 0; r < Math.min(n, depth || 0); r++) {
+      rows.push(cols.map((m) => {
+        const s = samplesFor(c.crmId, m.path);
+        let v = s ? s[r % s.length] : null;
+        /* Transforms are applied here too, or the preview would show the raw
+           value while the agent receives the mapped one. */
+        if (v && m.values) { const hit = m.values.filter((x) => x[0] === v)[0]; if (hit) v = hit[1]; }
+        return v;
+      }));
+    }
+    return { cols: cols, rows: rows };
   }
 
   /* ── Retention ──
@@ -845,8 +1119,13 @@
      graded by that consequence rather than by which page you are on: typing
      the connector's name is required only because the records are gone. */
   const RETENTION = [
-    { id: 'freshdesk', name: 'FreshDesk', days: 90, matched: 4210 },
-    { id: 'zendesk', name: 'ZenDesk', days: 90, matched: 1180 }
+    { id: 'freshdesk', name: 'FreshDesk', days: 90, matched: 4210,
+      affects: [['Support', 'loses grounding for tickets before the threshold'],
+                ['Triage an inbound ticket', 'answers from a shorter history'],
+                ['FileBound Support', 'next sync re-reads only what remains']] },
+    { id: 'zendesk', name: 'ZenDesk', days: 90, matched: 1180,
+      affects: [['Support', 'loses grounding for tickets before the threshold'],
+                ['Draft a refund response', 'loses the older refund precedents it cites']] }
   ];
   /* Fewer days selects MORE records for deletion. Getting this backwards is
      how a retention control becomes an incident. */
@@ -1161,9 +1440,46 @@
     if (!MODAL) { host.innerHTML = ''; return; }
     host.innerHTML = MODAL === 'new' ? newSkillModal()
                    : MODAL === 'upload' ? uploadModal()
+                   : MODAL.kind === 'preview' ? previewModal(MODAL.c)
                    : deleteModal(MODAL);
     const f = $('.set2-modal input, .set2-modal textarea', host);
     if (f) f.focus();
+  }
+
+  function previewModal(c) {
+    const p = previewRows(c, 20);
+    const n = matchCount(c);
+    const k = mapCounts(c);
+    return `
+      <div class="set2-scrim" data-scrim>
+        <div class="set2-modal is-wide" role="dialog" aria-modal="true" aria-labelledby="pvT">
+          <div class="set2-modal-hd">
+            <h2 class="set2-modal-t" id="pvT">What ${esc(c.crm)} would send</h2>
+            <button class="set2-modal-x" type="button" data-close aria-label="Close">${I.x}</button>
+          </div>
+          <div class="set2-modal-bd">
+            ${p.cols.length ? `
+              <div class="set2-pv-wrap">
+                <table class="set2-pv">
+                  <thead><tr>${p.cols.map((m) => `<th>${esc(m.ctx)}<span>${esc(m.path.join('.'))}</span></th>`).join('')}</tr></thead>
+                  <tbody>
+                    ${p.rows.map((r) => `<tr>${r.map((v) =>
+                      `<td>${v == null || v === 'null' ? '<i>empty</i>' : esc(v)}</td>`).join('')}</tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+              ${k.unmapped ? `<div class="set2-note" style="margin-top:0.75rem">${k.unmapped} field${k.unmapped > 1 ? 's are' : ' is'} not mapped and would arrive empty.</div>` : ''}
+            ` : `<div class="set2-empty"><b>Nothing to preview</b>No field is mapped to a value yet.</div>`}
+          </div>
+          <div class="set2-modal-ft">
+            <span class="set2-save-n">Showing ${p.rows.length} of <b class="set2-num">${n.toLocaleString()}</b> matching records</span>
+            <span class="set2-modal-end">
+              <button class="btn btn-ghost btn-sm" type="button" data-close>Close</button>
+              <button class="btn btn-brand btn-sm" type="button" data-close>Run sync</button>
+            </span>
+          </div>
+        </div>
+      </div>`;
   }
 
   function deleteModal(m) {
@@ -1179,9 +1495,25 @@
               <span class="set2-blast-n set2-num">${m.n.toLocaleString()}</span>
               <span class="set2-blast-l">records older than ${m.r.days} days will be removed and cannot be recovered</span>
             </div>
+            ${/* The cascade. A count says how big the hole is; this says what
+                  falls into it. Okta warns about dependent flows, Replit about
+                  the deployment that dies with the app -- the pattern is to
+                  name the SECOND casualty, which is always the surprising one. */ ''}
+            <div class="set2-cascade">
+              <div class="set2-cascade-t">What else this affects</div>
+              ${m.r.affects.map((a) => `
+                <div class="set2-cascade-i">
+                  <span class="set2-cascade-k">${esc(a[0])}</span>
+                  <span class="set2-cascade-v">${esc(a[1])}</span>
+                </div>`).join('')}
+            </div>
             <div class="set2-field">
-              <label class="set2-lbl" for="dlType">Type <b>${esc(m.r.name)}</b> to confirm</label>
-              <input class="set2-fld" id="dlType" autocomplete="off" data-confirm="${esc(m.r.name)}">
+              ${/* Typing the COUNT rather than the name, following HubSpot: the
+                    number is the thing that must not be skimmed past, and a
+                    name can be typed without ever reading the figure above it. */ ''}
+              <label class="set2-lbl" for="dlType">Type <b class="set2-num">${m.n.toLocaleString()}</b> to confirm you have read the number</label>
+              <input class="set2-fld set2-num" id="dlType" autocomplete="off" inputmode="numeric"
+                     data-confirm="${esc(String(m.n))}" data-confirm-loose="${esc(m.n.toLocaleString())}">
             </div>
           </div>
           <div class="set2-modal-ft">
@@ -1267,12 +1599,93 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     SEARCH
+
+     Indexes LEAF SETTINGS, not modules. Typing "retention" should find the
+     FreshDesk threshold itself, not the page it sits on -- Devin's palette
+     returns "Settings > Review > Per-PR spend limit" and that specificity is
+     the whole value. Module-level search would have been a nicer-looking
+     version of the profile-pill deep links this replaced.
+
+     Every entry carries its full path, so a result says where it lives as well
+     as what it is.
+     ═══════════════════════════════════════════════════════════════════════ */
+  function searchIndex() {
+    const out = [];
+    const add = (path, name, go) => out.push({ path: path, name: name, go: go });
+
+    MODULES.forEach((m) => add([m.g], m.name, { m: m.id }));
+
+    SKILLS.forEach((s) => add(['AI Controls', 'Skills'], s.name, { m: 'skills', skill: s.id }));
+    AGENTS.forEach((a) => add(['AI Controls', 'Agents and tools'], a.name, { m: 'agents' }));
+    COLS.forEach((c) => add(['AI Controls', 'Grounding'], c.name, { m: 'grounding' }));
+
+    PEOPLE.forEach((p) => add(['Organization', 'People'], p.name, { m: 'people' }));
+    ROLES.forEach((r) => add(['Organization', 'Roles and permissions'], r[0], { m: 'roles' }));
+    CAPS.forEach(([g, caps]) => caps.forEach(([cap]) =>
+      add(['Organization', 'Roles', g], cap, { m: 'roles' })));
+
+    CONNECTIONS.forEach((c) => {
+      add(['Operations', 'Connections'], c.product + ' and ' + c.crm, { m: 'connections', conn: c.id });
+      add(['Operations', c.product, c.crm], 'How far back to read', { m: 'connections', conn: c.id });
+      add(['Operations', c.product, c.crm], 'Which records to pull', { m: 'connections', conn: c.id });
+      /* The CRM has to be in the path. One product can hold several
+         connections, and without it two results read identically and go to
+         different places, which is worse than not finding them. */
+      c.maps.filter((m) => m.state !== 'unmapped').forEach((m) =>
+        add(['Operations', c.product, c.crm], m.ctx, { m: 'connections', conn: c.id }));
+    });
+    RETENTION.forEach((r) =>
+      add(['Operations', 'Retention'], r.name + ' threshold', { m: 'retention' }));
+    add(['Operations', 'Enablement webhooks'], 'Endpoint', { m: 'webhooks' });
+    add(['Operations', 'Enablement webhooks'], 'Auth token', { m: 'webhooks' });
+    return out;
+  }
+
+  let PAL = null;
+  function paintPalette() {
+    const host = $('#setPal');
+    if (PAL === null) { host.innerHTML = ''; return; }
+    const q = PAL.toLowerCase().trim();
+    const hits = q
+      ? searchIndex().filter((e) =>
+          (e.name + ' ' + e.path.join(' ')).toLowerCase().indexOf(q) >= 0).slice(0, 12)
+      : searchIndex().slice(0, 8);
+    host.innerHTML = `
+      <div class="set2-scrim is-top" data-pal-scrim>
+        <div class="set2-pal" role="dialog" aria-modal="true" aria-label="Search settings">
+          <input class="set2-pal-f" type="search" placeholder="Search every setting" value="${esc(PAL)}"
+                 data-pal-f autocomplete="off" aria-label="Search every setting">
+          <div class="set2-pal-bd">
+            ${hits.length ? hits.map((e, i) => `
+              <button class="set2-pal-i${i === 0 ? ' is-on' : ''}" type="button" data-pal-go="${esc(JSON.stringify(e.go))}">
+                <span class="set2-pal-n">${esc(e.name)}</span>
+                <span class="set2-pal-p">${e.path.map(esc).join(' &rsaquo; ')}</span>
+              </button>`).join('')
+              : `<div class="set2-pal-empty">Nothing matches <b>${esc(PAL)}</b>. Try a field name, a person, or a connector.</div>`}
+          </div>
+          <div class="set2-pal-ft">
+            <span><kbd>&uarr;</kbd><kbd>&darr;</kbd> move</span>
+            <span><kbd>&crarr;</kbd> open</span>
+            <span><kbd>Esc</kbd> close</span>
+          </div>
+        </div>
+      </div>`;
+    const f = $('[data-pal-f]', host);
+    if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
+  }
+
   /* ═══ RENDER ═══ */
   const RAW = new Set();
   const FILTER = {};
 
   function rail(st) {
-    return GROUPS.map((g) => `
+    return `
+      <button class="set2-search" type="button" data-pal-open>
+        <span>Search settings</span>
+        <span class="set2-search-k"><kbd>${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'}</kbd><kbd>K</kbd></span>
+      </button>` + GROUPS.map((g) => `
       <div class="set2-rail-group">
         <div class="set2-rail-label">${esc(g)}</div>
         ${MODULES.filter((m) => m.g === g).map((m) => `
@@ -1315,11 +1728,15 @@
        stacked two titles and two scope lines on one page, and the outer one
        named the list you had just left. */
     $('#setCol').innerHTML = ((st.skill || st.conn) ? '' : head(st)) + body + `
+      ${/* Three exits, not two. A half-finished mapping is a normal condition
+            and needs somewhere to go that is neither losing the work nor
+            publishing it half-done. Navan's bar is the reference. */ ''}
       <div class="set2-save${DIRTY.size ? ' is-on' : ''}" data-save>
         <span class="set2-save-n"><b class="set2-num">${DIRTY.size}</b> unsaved in ${esc(m.name)}</span>
         <span class="set2-save-end">
           <button class="btn btn-ghost btn-sm" type="button" data-discard>Discard</button>
-          <button class="btn btn-brand btn-sm" type="button" data-save-go>Save</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-save-go>Save as draft</button>
+          <button class="btn btn-brand btn-sm" type="button" data-save-go>Publish</button>
         </span>
       </div>`;
     seatTabindex();
@@ -1382,20 +1799,47 @@
     const tf = e.target.closest('[data-tf]');
     if (tf) { openTransform(tf, connById(st.conn), +tf.dataset.tf.split(':')[0], tf.dataset.tf.split(':')[1]); return; }
 
+    /* Clearing a mapping does not remove the ROW. The context field still
+       exists and still needs an answer, so it drops back to "Not mapped"
+       rather than vanishing from a list that is meant to be the full
+       vocabulary. */
     const mdel = e.target.closest('[data-map-del]');
     if (mdel) {
       const c = connById(st.conn);
-      c.maps.splice(+mdel.dataset.mapDel, 1);
+      const m = c.maps[+mdel.dataset.mapDel];
+      m.path = []; m.state = 'unmapped'; delete m.values; delete m.idres;
       DIRTY.add('maps'); render(); return;
     }
-    const madd = e.target.closest('[data-map-add]');
-    if (madd) {
+    const mok = e.target.closest('[data-map-ok]');
+    if (mok) {
       const c = connById(st.conn);
-      const used = c.maps.map((m) => m.ctx);
-      const free = CTX_FIELDS.filter((f) => used.indexOf(f) < 0);
-      if (!free.length) return;
-      c.maps.push({ ctx: free[0], path: [] });
+      c.maps[+mok.dataset.mapOk].state = 'confirmed';
       DIRTY.add('maps'); render(); return;
+    }
+    if (e.target.closest('[data-map-ok-all]')) {
+      const c = connById(st.conn);
+      c.maps.forEach((m) => { if (m.state === 'suggested' && walkPath(c.crmId, m.path).ok) m.state = 'confirmed'; });
+      DIRTY.add('maps'); render(); return;
+    }
+
+    /* Criteria join. */
+    const join = e.target.closest('[data-join]');
+    if (join) { connById(st.conn).join = join.dataset.join; DIRTY.add('criteria'); render(); return; }
+
+    /* The dry run. */
+    if (e.target.closest('[data-test]')) {
+      const c = connById(st.conn);
+      c.previewed = true;
+      /* Repaint the page under the modal too. The checklist's fourth step is
+         "run a preview", and it has just been satisfied -- leaving the page
+         stale means the step stays open behind the thing that completed it. */
+      render();
+      MODAL = { kind: 'preview', c: c };
+      paintModal(); return;
+    }
+
+    if (e.target.closest('[data-setup-hide]')) {
+      connById(st.conn).setupHidden = true; render(); return;
     }
 
     /* ── Criteria ── */
@@ -1419,7 +1863,14 @@
       rev.textContent = shown ? 'Reveal' : 'Hide';
       return;
     }
-    if (e.target.closest('[data-run]') || e.target.closest('[data-test]')) return;
+    if (e.target.closest('[data-run]')) return;
+
+    /* ── Palette ── */
+    if (e.target.closest('[data-pal-open]')) { PAL = ''; paintPalette(); return; }
+    const palGo = e.target.closest('[data-pal-go]');
+    if (palGo) { const go = JSON.parse(palGo.dataset.palGo); PAL = null; paintPalette();
+                 patch({ m: go.m, skill: go.skill || '', conn: go.conn || '' }); return; }
+    if (e.target.hasAttribute && e.target.hasAttribute('data-pal-scrim')) { PAL = null; paintPalette(); return; }
 
     if (e.target.closest('[data-new]')) { MODAL = 'new'; paintModal(); return; }
     if (e.target.closest('[data-open-upload]')) { MODAL = 'upload'; paintModal(); return; }
@@ -1474,10 +1925,16 @@
     }
     /* Type-to-confirm. The button stays dead until the name matches, so the
        gate is the typing rather than the clicking. */
+    if (e.target.closest('[data-pal-f]')) { PAL = e.target.value; paintPalette(); return; }
+
     const cf = e.target.closest('[data-confirm]');
     if (cf) {
       const ok = $('[data-confirm-go]');
-      if (ok) ok.disabled = cf.value.trim().toLowerCase() !== cf.dataset.confirm.toLowerCase();
+      /* Accepts the number with or without its thousands separators, because
+         insisting on the comma tests typing rather than reading. */
+      const v = cf.value.trim().toLowerCase().replace(/[\s,]/g, '');
+      const want = String(cf.dataset.confirm).toLowerCase().replace(/[\s,]/g, '');
+      if (ok) ok.disabled = v !== want;
       return;
     }
     /* Retention threshold. The consequence recomputes as you type, because a
@@ -1539,6 +1996,30 @@
      propagation -- and it is the same cascade the mouse gets, because two
      selection models on one widget is how a picker disagrees with itself. */
   document.addEventListener('keydown', (e) => {
+    /* Open from anywhere. Meta on mac, Ctrl elsewhere. */
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault(); PAL = PAL === null ? '' : null; paintPalette(); return;
+    }
+    if (PAL !== null) {
+      const items = $$('.set2-pal-i');
+      const at = items.findIndex((b) => b.classList.contains('is-on'));
+      if (e.key === 'Escape') { e.preventDefault(); PAL = null; paintPalette(); return; }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!items.length) return;
+        const to = Math.max(0, Math.min(items.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)));
+        items.forEach((b, i) => b.classList.toggle('is-on', i === to));
+        items[to].scrollIntoView({ block: 'nearest' });
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const sel = items[at < 0 ? 0 : at];
+        if (sel) sel.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        return;
+      }
+      return;
+    }
     if (e.key === 'Escape' && MODAL) { closeModal(); return; }
     const node = e.target.closest && e.target.closest('[data-node]');
     if (!node) return;
