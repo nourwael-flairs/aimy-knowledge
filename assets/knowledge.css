@@ -2220,6 +2220,33 @@ span.topnav-tab:hover { background: none; }
 @media (prefers-reduced-motion: reduce) { .stream-in { animation: none; } }
 
 
+
+/* ══ A CLOSED HOVERCARD TAKES NO ROOM ══════════════════════════════════
+   `.cite-preview` is `position: absolute`, 320px wide, and closed with
+   `opacity: 0; visibility: hidden`. Hidden that way it is still LAID OUT,
+   so it still contributes to every ancestor's scroll width — a 315px card
+   hanging off a 20px citation chip.
+
+   On a desktop nothing shows for it: the thread is 720px and the card is
+   centred over the chip with room on both sides. On a phone the thread is
+   338px, so each closed card pushed the scroll width to 433 and the
+   conversation scrolled sideways. Measured: with these cards taken out of
+   layout the thread's scroll width is 338 — exactly its client width, with
+   no other content overflowing at all.
+
+   `display` rather than a width clamp, because the card is not merely too
+   wide — it is in the wrong place entirely until it opens, at which point
+   `openCite` reparents it to <body>. Until then it is a template, and a
+   template should not occupy the layout it is a template for.
+
+   OVERRIDDEN HERE, NOT PATCHED IN THE LIBRARY. `aimy-ds.css` is marked "not
+   authored here"; this file loads after it and the selectors are matched at
+   equal specificity, so later-wins does the work. */
+.cite-preview { display: none; }
+.cite-wrap:hover > .cite-preview,
+.cite-wrap:focus-within > .cite-preview,
+.cite-preview.is-open { display: block; }
+
 /* ══ THE GREETING'S SUGGESTIONS ════════════════════════════════════════
    Offered questions, not results, so they sit apart from the answer above
    them with a rule rather than inside a card. The chips are the Console's

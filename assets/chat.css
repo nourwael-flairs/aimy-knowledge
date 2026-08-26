@@ -571,14 +571,70 @@ body[data-thread="active"] .gate-chips { display: none; }
     visibility: visible;
     border-right: 0.0625rem solid var(--glass-border);
   }
-  /* Collapsed is a desktop state. Below 900 the drawer's own transform is what
-     hides the rail, and the grid track must not also close on it. */
-  body[data-rail="collapsed"] .gate-body { grid-template-columns: 15rem minmax(0, 1fr); }
+  /* ══ ONE COLUMN, BECAUSE THERE IS ONLY ONE THING IN IT ═════════════════
+     The rail is `position: fixed` from here down, which takes it OUT OF THE
+     GRID ENTIRELY. The 15rem track it used to sit in stayed behind and kept
+     reserving its width, so `.gate-main` became the first item, landed in
+     that track, and rendered 240px wide inside a 375px phone with the
+     remaining 135px column standing empty beside it.
+
+     Every cramped thing on the gate at phone widths was this one track: the
+     hero wrapped after three words, the composer was 208px, and the chip
+     scroller had 208px to work with. One declaration, and all three take the
+     width of the screen.
+
+     It is written for EVERY rail state, not just the collapsed one. The
+     previous rule set the two-track template only under `[data-rail=
+     "collapsed"]` to stop the collapse animation closing the track — correct
+     reasoning about the wrong track. Out of flow is out of flow whether the
+     drawer is open, shut or mid-slide, so there is nothing here for the
+     collapsed state to protect. */
+  .gate-body,
+  body[data-rail="collapsed"] .gate-body { grid-template-columns: minmax(0, 1fr); }
   body[data-rail="collapsed"] .gate-rail { visibility: hidden; }
   body[data-rail="open"] .gate-rail { transform: none; visibility: visible; }
   /* Base rules live outside this query now; only the reveal is width-bound. */
   .gate-scrim { transition: opacity var(--t-base) var(--ease-out), visibility var(--t-base); }
   body[data-rail="open"] .gate-scrim { opacity: 1; visibility: visible; pointer-events: auto; }
+}
+
+/* ══ A DRAWER INSIDE A DRAWER IS ONE DRAWER TOO MANY ═════════════════════
+   `.overlay-chats` is the Console's conversation column, and below 900 the
+   Console turns it into its own slide-in panel: absolutely positioned,
+   translated fully off to the left, `visibility: hidden`, and brought back
+   only by `.aimy-overlay.chats-open`.
+
+   The gate borrows that column but puts it inside `.gate-rail`, which IS the
+   drawer here. So below 900 the gate had two: the rail slid in correctly, and
+   the column inside it stayed translated off and invisible, because
+   `.aimy-overlay.chats-open` is a Console class that never appears on this
+   page. The rail opened onto its own header and footer with nothing between
+   them -- ten conversations and the New conversation button were all present
+   and all invisible.
+
+   The existing `.gate-rail .overlay-chats` rule already undoes the column's
+   OVERLAY-CHILD styling, and it outranks the Console's plain `.overlay-chats`
+   on specificity. It could not help here because it never declared these
+   properties, and specificity only settles declarations that exist. So they
+   are declared.
+
+   Written as its own block at the same 900 breakpoint rather than folded into
+   the base rule: this exists to answer a rule that only applies below 900, and
+   above 900 there is nothing here to undo. */
+@media (max-width: 56.25rem) {
+  .gate-rail .overlay-chats {
+    position: static;
+    transform: none;
+    visibility: visible;
+    width: auto;
+    /* The panel dressing belongs to the drawer, and the drawer is the rail.
+       Left on, the column would paint a second glass panel and a second
+       shadow inside the first. */
+    background: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 /* Below 900 the rail is a DRAWER, and its header control travels off-screen
@@ -592,16 +648,142 @@ body[data-thread="active"] .gate-chips { display: none; }
 @media (max-width: 56.25rem) {
   .gate-rail-peek { display: inline-flex; }
   body[data-rail="open"] .gate-rail-peek { display: none; }
+
+  /* ══ THE PEEK FLOATS, SO THE THREAD MAKES ROOM FOR IT ═══════════════
+     The peek is absolutely positioned in `.gate-main`, which means it is over
+     the conversation rather than beside it. On a desktop that is invisible:
+     the stage is 44rem centred inside a much wider column, so the button sits
+     in the margin. As the viewport narrows the stage runs out of margin to
+     hide in, and below roughly 810px the button lands on top of the thread's
+     first element — the memory panel, whose own header icon it covers almost
+     exactly.
+
+     REPLACING the thread's top padding rather than adding to it. Padding the
+     stage as well would push the conversation down twice for one button.
+
+     Applied at 900 rather than at the ~810 where the collision actually
+     starts, because 810 is not a rung on this ladder and the cost of the
+     wider net is 40px of headroom on a tablet, which is not visible. */
+  body[data-thread="active"] .gate-stage .overlay-thread { padding-top: 4rem; }
+
+  /* Padding fixes where the conversation STARTS. It scrolls under the button
+     either way, and a transparent button with text moving through it reads as
+     a rendering fault. The raised card ground is what the hover state already
+     used, so the control keeps one material and only its elevation changes. */
+  .gate-rail-peek {
+    background: var(--card-bg-raised);
+    backdrop-filter: blur(0.5rem);
+    -webkit-backdrop-filter: blur(0.5rem);
+    box-shadow: var(--shadow-sm);
+  }
 }
 
 @media (max-width: 45rem) {     /* 720 */
-  .gate-stage { padding: 0 1rem; }
-  .gate-hello { font-size: var(--ty-title); }
+  /* The home indicator sits over the bottom of the screen on a notched phone.
+     `env()` returns 0 everywhere else, and 0 today as well since the viewport
+     meta does not opt into `viewport-fit=cover` -- written the way the float
+     composer already writes it, so both are correct the moment it does. */
+  .gate-stage { padding: 0 1rem calc(env(safe-area-inset-bottom, 0px)); }
   .gate-console-sub { display: none; }
+
+  /* ══ THE GREETING KEEPS ITS SIZE ═══════════════════════════════════════
+     This used to drop to `--ty-title`, 17px against the 28px it has on a
+     desktop: the page's welcome set smaller than a card heading. It was a
+     reasonable defence when the column was 208px wide and "Hello, Nour"
+     wrapped, but the column is the width of the screen now and 28px fits
+     across 343px with room to spare. The shrink was treating a symptom of
+     the grid bug.
+
+     `balance` because a two-line subtitle broken 6/1 is the failure this
+     property exists for, and a centred block makes it obvious. */
+  .gate-hello { font-size: var(--ty-display); }
+  .gate-hello,
+  .gate-sub { text-wrap: balance; }
+
+  /* ══ THE OPENING SCREEN SITS LOW ═══════════════════════════════════════
+     Centred, the greeting and the composer floated in the middle of a phone
+     with 244px of nothing above them and 244px below: a balanced composition
+     that reads as an empty screen, because 265px of content cannot hold the
+     middle of an 812px viewport.
+
+     Bottom-weighted, the same content lands where a thumb already is, the
+     bloom gets the upper two thirds it was drawn to fill, and the empty space
+     reads as headroom rather than as a layout that failed to place anything.
+
+     It also survives the keyboard. When a soft keyboard opens the viewport
+     shrinks from the bottom; a centred column moves the composer up and out
+     from under the caret, and an end-aligned one keeps it against the
+     keyboard where it belongs.
+
+     EMPTY STATE ONLY. Once a thread is running the stage holds a scroller
+     that already fills the height, and end-alignment there would fight the
+     thread for the same space. */
+  body[data-thread="empty"] .gate-stage {
+    justify-content: flex-end;
+    padding-bottom: calc(3rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* ══ WHERE THE GREETING SITS ═══════════════════════════════════════════
+     End-alignment alone put the greeting directly on top of the composer and
+     left the whole upper half empty: the composer reached the thumb, and the
+     welcome arrived as a caption to an input box.
+
+     AUTO MARGINS SPLIT THE FREE SPACE, so the greeting centres in whatever is
+     left above the composer while the composer and its chips stay at the
+     bottom. One element with two auto margins does what a second nested
+     flex container would otherwise be needed for, and auto margins outrank
+     `justify-content` for the space they claim, so the two rules are not in
+     conflict -- the end-alignment still holds everything else down. */
+  body[data-thread="empty"] .gate-hero {
+    margin-top: auto;
+    margin-bottom: auto;
+  }
+}
+
+/* ══ A DOOR BIG ENOUGH TO HIT ════════════════════════════════════════════
+   Below 900 the rail is a drawer and these two buttons are the ONLY way into
+   it, so they are the most important controls on the screen at exactly the
+   width where they were smallest: 1.75rem, which is 28px, which is a target
+   sized for a cursor.
+
+   Keyed to `pointer: coarse` rather than to a width. The question is what is
+   doing the pointing, not how wide the window is — a touchscreen laptop at
+   1200px has the same problem and a narrow desktop window does not have it
+   at all. It also means nothing here can reach a mouse-driven display at any
+   size. The icon inside is left alone; the button grows around it. */
+@media (pointer: coarse) {
+  .gate-rail-btn,
+  .gate-rail-peek { width: 2.75rem; height: 2.75rem; }
+  .gate-rail-peek { top: 0.5rem; left: 0.5rem; }
 }
 
 @media (max-width: 32.5rem) {   /* 520 */
-  .gate-chips { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; }
+  /* ══ THE CHIPS BECOME A CAROUSEL ═══════════════════════════════════════
+     `nowrap` alone was half the change. A flex item still SHRINKS in a
+     nowrap row, so each chip collapsed to its min-content width and wrapped
+     its own text down four lines — three 94x100px ovals where three pills
+     were meant to be, which is what a fully-rounded corner does to a box
+     that has become nearly square.
+
+     `flex-shrink: 0` is what makes the row overflow instead of squeezing,
+     and `white-space: nowrap` is what keeps a question on one line so the
+     pill stays a pill. The scroller was already here; it had nothing to
+     scroll because the chips kept folding themselves small enough to fit. */
+  .gate-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    /* The scrollbar is chrome on a decorative row, and on a phone it is drawn
+       over the chips rather than beside them. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    /* The same fade the product strip uses at this width, for the same reason:
+       a hard stop at the edge reads as "that is all of them". */
+    -webkit-mask-image: linear-gradient(90deg, #000 0 90%, transparent 100%);
+            mask-image: linear-gradient(90deg, #000 0 90%, transparent 100%);
+  }
+  .gate-chips::-webkit-scrollbar { display: none; }
+  .gate-chips .overlay-sugg-chip { flex-shrink: 0; white-space: nowrap; }
 }
 
 /* ═══════════════════════════════════════════════

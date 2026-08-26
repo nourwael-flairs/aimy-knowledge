@@ -12758,9 +12758,21 @@
 
     citeOut = { tip: tip, home: wrap };
     document.body.appendChild(tip);
-    /* Out here the CSS `:hover` on the wrap no longer reaches it, so the open
-       state has to be stated. The stylesheet already supports the class. */
-    tip.classList.add('is-open');
+    /* ── THE ORDER HERE IS THE ANIMATION ──
+       The card is `display: none` until it opens, so it has to be given a box
+       BEFORE it can be measured — `offsetWidth` on an undisplayed element is
+       0, and this function measures to decide where to put it.
+
+       So: display it while it is still transparent, force the reflow, measure
+       and place it, and only then add `is-open`. Setting `is-open` first — as
+       this did — meant the browser had never rendered a frame at opacity 0,
+       so there was no start value to animate from and the card appeared fully
+       formed. Same two declarations, opposite result, purely from which side
+       of the reflow they fall on.
+
+       Out here the CSS `:hover` on the wrap no longer reaches the card, so
+       the open state has to be stated. The stylesheet already supports it. */
+    tip.style.display = 'block';
     tip.style.position = 'fixed';
     tip.style.bottom = 'auto';
     tip.style.right = 'auto';
@@ -12779,6 +12791,11 @@
 
     tip.style.left = Math.round(left + w / 2) + 'px';
     tip.style.top = Math.round(top) + 'px';
+    /* Placed, still transparent. This reflow is what gives the transition a
+       frame to start from, so the card fades in where it belongs rather than
+       fading in on its way there from the top-left corner. */
+    void tip.offsetWidth;
+    tip.classList.add('is-open');
   }
 
   /* Delegated, because citations are rendered into answers that did not exist
