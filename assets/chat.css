@@ -438,7 +438,12 @@ body[data-thread="active"] .gate-composer { animation: none; }
 
 /* THE FOCUS GLOW IS PRE-RENDERED. A box-shadow that animates repaints a large
    blurred region every frame; painted once on a pseudo-element and revealed by
-   opacity, it costs a compositor property and nothing else. */
+   opacity, it costs a compositor property and nothing else.
+
+   IT LAYERS OVER THE DESIGN SYSTEM'S OWN FOCUS RING, which sets a 3px halo in
+   `--accent-rgb` (139,79,244, purple) while both tokens here are 51,105,255,
+   blue. Focusing this control therefore lights two rings in two hues. Kept
+   deliberately — raised, reviewed, and left as it is. */
 .gate-stage .overlay-input-bar { position: relative; }
 .gate-stage .overlay-input-bar::after {
   content: "";

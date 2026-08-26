@@ -2185,7 +2185,25 @@ span.topnav-tab:hover { background: none; }
    frame appears around an answer that is already streaming rather than the
    message being rebuilt to gain one. */
 .chat-msg.is-thinking .msg-avatar { display: none; }
-.chat-msg.is-thinking .msg-bubble {
+/* ══ UNDRESSING THE BUBBLE TAKES TWO SELECTORS ═════════════════════
+   The bubble is dressed TWICE in the library: once as `.chat-msg.aimy
+   .msg-bubble` for the default dark theme, and again as `:root[data-theme=
+   "light"] .chat-msg.aimy .msg-bubble` for light, which is five class-level
+   selectors deep.
+
+   The single rule here was three deep, so it beat the dark one and lost to
+   the light one — and lost only PARTLY, which is why this was easy to miss.
+   Padding and shadow are not set by the light rule, so those cleared; the
+   background and border are, so a white pill with a hairline survived on a
+   state that is meant to have no container at all. Dark mode was correct the
+   whole time and light mode was not, from one rule that half-applied.
+
+   So the light theme is answered on its own terms. Not `!important`, which
+   would win here and then have to be fought later, and not a bare `:root`
+   prefix to pad the count — the second selector says which rule it exists to
+   override, which is the thing a reader needs to know. */
+.chat-msg.is-thinking .msg-bubble,
+:root[data-theme="light"] .chat-msg.aimy.is-thinking .msg-bubble {
   background: none;
   border-color: transparent;
   padding: 0;

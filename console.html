@@ -13,7 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Poppins:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="assets/aimy-ds.css" />
-  <link rel="stylesheet" href="assets/knowledge.css?v=157" />
+  <link rel="stylesheet" href="assets/knowledge.css?v=158" />
 
   <script>
     /* Apply saved theme before paint to avoid flash. Default = dark. */
@@ -171,19 +171,26 @@
         </span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
+      <!-- ══ IDENTITY ONLY ═══════════════════════════════════════════════
+           This carried four deep links into settings modules plus "All
+           settings" -- a second copy of the settings IA, duplicated verbatim
+           across three files, that went stale the moment a module was renamed
+           because nothing pointed at it from the page it described. Two of
+           those four modules no longer exist under those names.
+
+           What belongs under a name and a face is WHO YOU ARE. One Settings
+           item; search inside settings does what the shortcuts were for. -->
       <div class="menu user-menu" id="userMenu" role="menu" aria-label="Account" hidden>
-        <div class="menu-label">Settings</div>
-        <a class="menu-item" role="menuitem" href="settings.html?module=sources">Knowledge sources</a>
-        <a class="menu-item" role="menuitem" href="settings.html?module=instructions">AI instructions</a>
-        <a class="menu-item" role="menuitem" href="settings.html?module=skills">Skills</a>
-        <a class="menu-item" role="menuitem" href="settings.html?module=access">Access and roles</a>
-        <div class="menu-sep"></div>
-        <a class="menu-item" role="menuitem" href="settings.html">All settings</a>
+        <div class="menu-label">Signed in as Nour Wael</div>
+        <a class="menu-item" role="menuitem" href="settings.html">Settings</a>
+        <button class="menu-item" role="menuitem" type="button">Viewing as&hellip;</button>
         <div class="menu-sep"></div>
         <!-- The way back to the gate. Without it the Console is a one-way
              door: chat routes here from two places and nothing routed back,
              which leaves the browser button as the only exit. -->
         <a class="menu-item" role="menuitem" href="index.html">Back to chat</a>
+        <div class="menu-sep"></div>
+        <button class="menu-item" role="menuitem" type="button">Sign out</button>
       </div>
     </div>
   </div>

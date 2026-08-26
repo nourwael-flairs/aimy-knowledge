@@ -1,0 +1,515 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   widgets.css — Wave 1 variant gallery
+
+   Loaded after aimy-ds.css and knowledge.css, so every token is already here
+   and nothing below redefines one. Prefix is `wv-` for the gallery chrome and
+   `w1-` for the widgets themselves, because the widgets are meant to graduate
+   into settings.css under their own names and the gallery is not.
+
+   Everything is rem. The lever in knowledge.css (`font-size: max(1rem,
+   calc(100vw / 96))`) makes 1rem === 16px at and below the 1536 reference, so
+   a px value here would be the only thing that does not scale.
+
+   Three taste rules bind this file and are worth stating where they are easy
+   to break:
+     T2  separators are a smell. Related rows are separated by SURFACE STEP and
+         space, never by a drawn line. The only borders below are the outer
+         edge of a card and the focus ring.
+     T3  no drop shadows. Elevation is `--card-bg` -> `--card-bg-raised`.
+     accent under 5%. `--brand` appears on the primary action and on the
+         winning ladder stop. Nowhere else. Grep for it before adding one.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ══ OPTING OUT OF THE APP SHELL ═════════════════════════════════════════
+   knowledge.css:1161 sets `body { height: 100dvh; display: flex; overflow:
+   hidden }`. That is correct for the app — a fixed topnav, a fixed rail and
+   ONE scrolling pane inside — and wrong for a long document, because the body
+   then clips at the viewport with no scroll to reach the rest. Measured here
+   before the fix: body 720px, content 4580px, `scrollY` pinned at 0. Nearly
+   four thousand pixels of this gallery existed in the DOM and could not be
+   reached, which is why a structural check passed while the page was broken.
+
+   Scoped to this page's own `data-page`, so the shell rule is untouched for
+   every surface that actually wants it. */
+body[data-page="widgets"] {
+  height: auto;
+  min-height: 100dvh;
+  display: block;
+  overflow: visible;
+}
+
+/* ══ GALLERY CHROME ══════════════════════════════════════════════════════ */
+
+.wv-top {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--body-bg);
+  padding: 0 1.5rem;
+}
+.wv-top-in {
+  display: flex; align-items: center; gap: 1.5rem;
+  max-width: 78rem; margin: 0 auto;
+  height: 3.5rem;
+}
+.wv-top-name {
+  font-size: var(--ty-meta); font-weight: var(--fw-bold);
+  color: var(--ink-primary); white-space: nowrap;
+}
+/* `min-width: 0` is what lets a flex child shrink below its content; without
+   it the four links push the bar wider than the glass and take the page with
+   them. The strip scrolls rather than wrapping, so the bar stays one row. */
+.wv-top-nav {
+  display: flex; align-items: center; gap: 0.25rem;
+  flex: 1 1 auto; min-width: 0;
+  overflow-x: auto; scrollbar-width: none;
+}
+.wv-top-nav::-webkit-scrollbar { display: none; }
+.wv-navlink { flex: 0 0 auto; }
+.wv-top-end { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+
+.wv-navlink {
+  appearance: none; border: 0; background: transparent;
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--r-md);
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-faint); cursor: pointer;
+  transition: color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+}
+.wv-navlink:hover { color: var(--ink-secondary); background: var(--card-bg-raised); }
+.wv-navlink.is-on { color: var(--ink-primary); background: var(--card-bg-raised); }
+
+.wv-density {
+  appearance: none; background: var(--card-bg-raised);
+  border: 0.0625rem solid var(--card-border);
+  padding: 0.3125rem 0.625rem;
+  border-radius: var(--r-md);
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-quiet); cursor: pointer;
+}
+.wv-density[aria-pressed="true"] { color: var(--ink-primary); }
+
+.wv-page { max-width: 78rem; margin: 0 auto; padding: 1.5rem 1.5rem 6rem; }
+
+.wv-sec { scroll-margin-top: 4.5rem; padding-top: 2rem; }
+.wv-sec-h { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.25rem; }
+.wv-sec-n {
+  font-family: var(--font-mono); font-size: var(--ty-micro);
+  color: var(--ink-faint); font-variant-numeric: tabular-nums;
+}
+.wv-sec-t { font-size: var(--ty-display); font-weight: var(--fw-bold); color: var(--ink-primary); letter-spacing: var(--ls-tight); }
+.wv-sec-job { font-size: var(--ty-meta); color: var(--ink-quiet); margin-bottom: 1.5rem; }
+
+/* A variant is a specimen with a name and one line of reason. The reason is
+   here so a choice can be defended later; it is gallery furniture and does not
+   travel into the product. */
+.wv-var { margin-top: 1.5rem; }
+.wv-var-h { display: flex; align-items: baseline; gap: 0.625rem; margin-bottom: 0.625rem; flex-wrap: wrap; }
+.wv-var-k {
+  font-family: var(--font-mono); font-size: var(--ty-micro); font-weight: var(--fw-medium);
+  color: var(--ink-action); font-variant-numeric: tabular-nums;
+}
+.wv-var-t { font-size: var(--ty-meta); font-weight: var(--fw-bold); color: var(--ink-primary); }
+.wv-var-why { font-size: var(--ty-micro); color: var(--ink-faint); }
+.wv-var-why b { color: var(--ink-quiet); font-weight: var(--fw-semibold); }
+
+/* The stage. A surface step, not a border, so the specimen's own edges are the
+   only edges you judge. */
+.wv-stage { background: var(--card-bg-raised); border-radius: var(--r-xl); padding: 1.25rem; }
+.wv-stage.is-plain { background: var(--card-bg); }
+
+/* ══ SHARED WIDGET ATOMS ═════════════════════════════════════════════════ */
+
+.w1-tok {
+  display: inline-flex; align-items: baseline; gap: 0.25rem;
+  padding: 0.125rem 0.5rem; border-radius: var(--r-xs);
+  background: var(--card-bg-raised); font-size: var(--ty-micro); white-space: nowrap;
+}
+.wv-stage .w1-tok { background: var(--card-bg); }
+.w1-tok-t { text-transform: uppercase; letter-spacing: var(--ls-wide); color: var(--ink-faint); }
+.w1-tok-v { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+
+.w1-pill {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.125rem 0.5rem; border-radius: var(--r-pill);
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold); white-space: nowrap;
+}
+.w1-pill i { width: 0.3125rem; height: 0.3125rem; border-radius: var(--r-pill); background: currentColor; flex-shrink: 0; }
+.w1-pill.is-ok   { background: var(--ok-bg);   color: var(--ink-ok); }
+.w1-pill.is-warn { background: var(--warn-bg); color: var(--ink-warn); }
+.w1-pill.is-err  { background: var(--err-bg);  color: var(--ink-err); }
+.w1-pill.is-info { background: var(--info-bg); color: var(--ink-info); }
+.w1-pill.is-mute { background: var(--card-bg); color: var(--ink-faint); }
+.wv-stage.is-plain .w1-pill.is-mute { background: var(--card-bg-raised); }
+
+/* Every number in this file is tabular. A count that reflows as it changes
+   reads as a layout bug, and the ladder and the reach counter both change. */
+.w1-num { font-variant-numeric: tabular-nums; }
+
+.w1-lock { width: 0.75rem; height: 0.75rem; flex-shrink: 0; color: var(--ink-faint); }
+
+/* ══ WIDGET 1 — MODULE SHELL ═════════════════════════════════════════════ */
+
+.w1-mod { border-radius: var(--r-lg); background: var(--card-bg); overflow: hidden; }
+.wv-stage .w1-mod { background: var(--card-bg); }
+
+.w1-mod-hd { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1.125rem; flex-wrap: wrap; }
+.w1-mod-hd.is-band { background: var(--card-bg-raised); }
+.w1-mod-name { font-size: var(--ty-title); font-weight: var(--fw-bold); color: var(--ink-primary); }
+.w1-mod-end { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+
+/* The repeating row. No border between rows -- the gap and the raised surface
+   do the separating (T2). */
+.w1-mod-body { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.375rem; }
+.w1-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  min-height: 2.5rem; padding: 0.5rem 0.75rem;
+  border-radius: var(--r-md);
+  transition: background var(--t-fast) var(--ease-out);
+}
+.w1-row:hover { background: var(--card-bg-raised); }
+[data-density="compact"] .w1-row { min-height: 2rem; padding: 0.3125rem 0.75rem; }
+.w1-row-ico {
+  width: 1.25rem; height: 1.25rem; flex-shrink: 0;
+  color: var(--ink-faint);
+}
+.w1-row-main { flex: 1 1 0; min-width: 0; }
+.w1-row-n { font-size: var(--ty-body); font-weight: var(--fw-semibold); color: var(--ink-primary); }
+.w1-row-d {
+  font-size: var(--ty-micro); color: var(--ink-faint); margin-top: 0.0625rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+[data-density="compact"] .w1-row-d { display: none; }
+.w1-row-end { display: flex; align-items: center; gap: 0.625rem; flex-shrink: 0; }
+
+/* Source of a row's value. Reads at a glance without colour carrying it. */
+.w1-src {
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-faint); white-space: nowrap;
+}
+.w1-src.is-org { color: var(--ink-quiet); }
+
+/* Save boundary. Rises from the module's own bottom edge, and only when this
+   module is dirty. Transform + opacity only. */
+.w1-save {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.625rem 1.125rem;
+  background: var(--card-bg-raised);
+  transform: translateY(100%); opacity: 0;
+  transition: transform var(--t-base) var(--ease-out), opacity var(--t-base) var(--ease-out);
+}
+.w1-mod.is-dirty .w1-save { transform: translateY(0); opacity: 1; }
+.w1-save-n { font-size: var(--ty-micro); color: var(--ink-quiet); }
+.w1-save-end { margin-left: auto; display: flex; gap: 0.5rem; }
+
+/* Not entitled. V4 dims the module; V5 leaves it legible and locks the
+   controls only. The difference is the whole point of the pair. */
+.w1-mod.is-dim { opacity: 0.55; }
+.w1-mod.is-dim .w1-mod-name { color: var(--ink-quiet); }
+.w1-tier {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.625rem 1.125rem;
+  background: var(--card-bg-raised);
+  font-size: var(--ty-micro); color: var(--ink-quiet);
+}
+.w1-tier-end { margin-left: auto; }
+
+/* Bare shell (V3) -- no card at all. */
+.w1-bare { }
+.w1-bare-t { font-size: var(--ty-title); font-weight: var(--fw-bold); color: var(--ink-primary); margin-bottom: 0.75rem; }
+.w1-bare .w1-mod-body { padding: 0; background: transparent; }
+.w1-bare .w1-row { background: var(--card-bg); }
+.wv-stage .w1-bare .w1-row { background: var(--card-bg); }
+
+/* Ledger (V1) */
+.w1-led { width: 100%; border-collapse: collapse; font-size: var(--ty-meta); }
+.w1-led th {
+  text-align: left; padding: 0 0.75rem 0.5rem;
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
+}
+.w1-led td { padding: 0.625rem 0.75rem; vertical-align: middle; }
+.w1-led tbody tr { background: var(--card-bg); }
+.w1-led tbody tr td:first-child { border-radius: var(--r-md) 0 0 var(--r-md); }
+.w1-led tbody tr td:last-child { border-radius: 0 var(--r-md) var(--r-md) 0; text-align: right; }
+.w1-led-sp { height: 0.25rem; }
+.w1-led-n { font-weight: var(--fw-semibold); color: var(--ink-primary); }
+.w1-led-s { font-size: var(--ty-micro); color: var(--ink-faint); margin-top: 0.0625rem; }
+
+/* ══ WIDGET 2 — SCOPE + LENS BAR ═════════════════════════════════════════ */
+
+.w1-bar { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.w1-bar.is-two { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+.w1-bar-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.w1-bar-end { margin-left: auto; display: flex; align-items: center; gap: 0.625rem; }
+
+.w1-crumb { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; min-width: 0; }
+.w1-crumb-i { font-size: var(--ty-micro); color: var(--ink-quiet); white-space: nowrap; }
+.w1-crumb-i b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.w1-crumb-s { color: var(--ink-rule); font-size: var(--ty-micro); }
+.w1-crumb-more {
+  appearance: none; border: 0; background: var(--card-bg);
+  padding: 0.125rem 0.4375rem; border-radius: var(--r-xs);
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-faint); cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.w1-crumb-more:hover { color: var(--ink-secondary); }
+
+/* The lens. The one writable control in the bar, which is why it is the only
+   thing in it that looks writable. */
+.w1-lens { display: inline-flex; padding: 0.1875rem; border-radius: var(--r-md); background: var(--card-bg); gap: 0.125rem; }
+.wv-stage.is-plain .w1-lens { background: var(--card-bg-raised); }
+.w1-lens-b {
+  appearance: none; border: 0; background: transparent;
+  padding: 0.25rem 0.625rem; border-radius: var(--r-sm);
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-faint); cursor: pointer; white-space: nowrap;
+  transition: color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+}
+.w1-lens-b:hover { color: var(--ink-secondary); }
+.w1-lens-b.is-on { background: var(--card-bg-raised); color: var(--ink-primary); }
+.wv-stage.is-plain .w1-lens-b.is-on { background: var(--card-bg); }
+.w1-lens.is-big .w1-lens-b { font-size: var(--ty-meta); padding: 0.375rem 0.875rem; }
+
+.w1-lens-sel {
+  appearance: none; background: var(--card-bg);
+  border: 0.0625rem solid var(--card-border);
+  padding: 0.3125rem 1.75rem 0.3125rem 0.625rem;
+  border-radius: var(--r-md);
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-primary); cursor: pointer;
+}
+
+.w1-write { font-size: var(--ty-micro); color: var(--ink-faint); white-space: nowrap; }
+
+/* ══ WIDGET 3 — PRECEDENCE LADDER ════════════════════════════════════════ */
+
+/* V1 rail. Six stops on a line. The line is a track, not a separator, so T2
+   is not in play -- it is the widget's own geometry. */
+.w1-rail { display: inline-flex; align-items: center; gap: 0; }
+.w1-rail-s {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.3125rem;
+  padding: 0 0.0625rem;
+}
+.w1-rail-d {
+  width: 0.5rem; height: 0.5rem; border-radius: var(--r-pill);
+  background: var(--card-border); flex-shrink: 0;
+  transition: background var(--t-base) var(--ease-out), box-shadow var(--t-base) var(--ease-out);
+}
+.w1-rail-s.has-val .w1-rail-d { background: var(--ink-rule); }
+.w1-rail-s.is-win .w1-rail-d { background: var(--brand); box-shadow: 0 0 0 0.1875rem var(--brand-dim); }
+.w1-rail-s.is-lock .w1-rail-d { background: var(--ink-faint); }
+.w1-rail-l {
+  font-size: var(--ty-micro); color: var(--ink-faint); white-space: nowrap;
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+}
+.w1-rail-s.is-win .w1-rail-l { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.w1-rail-t { width: 1.75rem; height: 0.0625rem; background: var(--card-border); flex-shrink: 0; margin-bottom: 1.0625rem; }
+.w1-rail-t.is-past { background: var(--ink-rule); }
+
+/* V2 stepped bar. */
+.w1-steps { display: flex; gap: 0.125rem; width: 100%; max-width: 22rem; }
+.w1-steps i {
+  height: 0.25rem; flex: 1 1 0; border-radius: 0.0625rem;
+  background: var(--card-border);
+  transition: background var(--t-base) var(--ease-out);
+}
+.w1-steps i.is-past { background: var(--ink-rule); }
+.w1-steps i.is-win { background: var(--brand); }
+.w1-steps-l { display: flex; justify-content: space-between; margin-top: 0.375rem; font-size: var(--ty-micro); color: var(--ink-faint); }
+
+/* V3 stacked. Rows separated by gap and surface, never a rule. */
+.w1-stack { display: flex; flex-direction: column; gap: 0.1875rem; }
+.w1-stack-r {
+  display: flex; align-items: center; gap: 0.625rem;
+  padding: 0.4375rem 0.625rem; border-radius: var(--r-sm);
+  background: var(--card-bg); font-size: var(--ty-micro);
+}
+.wv-stage.is-plain .w1-stack-r { background: var(--card-bg-raised); }
+.w1-stack-r.is-empty { background: transparent; }
+.w1-stack-lv {
+  width: 5.5rem; flex-shrink: 0;
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
+}
+.w1-stack-v { flex: 1 1 0; min-width: 0; color: var(--ink-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w1-stack-r.is-beat .w1-stack-v { color: var(--ink-faint); text-decoration: line-through; }
+.w1-stack-r.is-win .w1-stack-v { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.w1-stack-r.is-win { background: var(--brand-dim); }
+
+/* V4 winner-first. Quiet at rest, opens on contact. */
+.w1-fold { }
+.w1-fold-hd {
+  display: flex; align-items: center; gap: 0.5rem;
+  appearance: none; border: 0; background: transparent; padding: 0;
+  font: inherit; cursor: pointer; color: inherit;
+}
+.w1-fold-more { font-size: var(--ty-micro); color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.w1-fold-ch {
+  width: 0.75rem; height: 0.75rem; color: var(--ink-faint);
+  transition: transform var(--t-base) var(--ease-out);
+}
+.w1-fold.is-open .w1-fold-ch { transform: rotate(180deg); }
+.w1-fold-bd { display: none; margin-top: 0.625rem; }
+.w1-fold.is-open .w1-fold-bd { display: block; }
+
+/* V5 default + exceptions. */
+.w1-def { display: flex; flex-direction: column; gap: 0.1875rem; }
+.w1-def-r {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.5625rem 0.75rem; border-radius: var(--r-md);
+  background: var(--card-bg); font-size: var(--ty-micro);
+}
+.wv-stage.is-plain .w1-def-r { background: var(--card-bg-raised); }
+.w1-def-k {
+  width: 4.5rem; flex-shrink: 0; font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; font-size: var(--ty-micro);
+  color: var(--ink-faint);
+}
+.w1-def-r.is-def .w1-def-k { color: var(--ink-quiet); }
+.w1-def-v { flex: 1 1 0; min-width: 0; color: var(--ink-secondary); }
+.w1-def-end { margin-left: auto; display: flex; align-items: center; gap: 0.625rem; flex-shrink: 0; }
+.w1-add {
+  appearance: none; border: 0; background: transparent;
+  padding: 0.375rem 0.75rem; border-radius: var(--r-md);
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-action); cursor: pointer; text-align: left;
+}
+.w1-add:hover { background: var(--card-bg); }
+
+/* ══ WIDGET 4 — TARGETING PICKER ═════════════════════════════════════════ */
+
+.w1-pick { background: var(--card-bg); border-radius: var(--r-lg); overflow: hidden; }
+.wv-stage.is-plain .w1-pick { background: var(--card-bg-raised); }
+.w1-pick-hd { display: flex; align-items: center; gap: 0.625rem; padding: 0.625rem 0.75rem; flex-wrap: wrap; }
+.w1-pick-bd { max-height: 17rem; overflow: auto; padding: 0 0.375rem 0.375rem; }
+.w1-pick-ft {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.5rem 0.875rem; background: var(--card-bg-raised);
+  font-size: var(--ty-micro); color: var(--ink-faint);
+}
+.wv-stage.is-plain .w1-pick-ft { background: var(--card-bg); }
+.w1-pick-ft b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+
+.w1-node {
+  display: flex; align-items: center; gap: 0.5rem;
+  min-height: 1.875rem; padding: 0.1875rem 0.375rem;
+  border-radius: var(--r-sm); font-size: var(--ty-micro); color: var(--ink-secondary);
+  cursor: pointer;
+}
+.w1-node:hover { background: var(--card-bg-raised); }
+.wv-stage.is-plain .w1-node:hover { background: var(--card-bg); }
+/* The node is the focusable treeitem, not the box inside it, so the ring goes
+   here. Removing it would leave a six-level tree with no visible caret. */
+.w1-node:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+.w1-node.is-l1 { padding-left: 0.375rem; }
+.w1-node.is-l2 { padding-left: 1.5rem; }
+.w1-node.is-l3 { padding-left: 2.625rem; }
+.w1-node.is-l4 { padding-left: 3.75rem; }
+.w1-node.is-l5 { padding-left: 4.875rem; }
+.w1-node-n { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w1-node.is-grp .w1-node-n { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.w1-node-ct { font-size: var(--ty-micro); color: var(--ink-faint); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.w1-node-ty {
+  font-size: var(--ty-micro); color: var(--ink-faint);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; flex-shrink: 0;
+}
+.w1-exp {
+  width: 0.875rem; height: 0.875rem; flex-shrink: 0; color: var(--ink-faint);
+  transition: transform var(--t-fast) var(--ease-out);
+}
+.w1-node.is-open > .w1-exp { transform: rotate(90deg); }
+.w1-exp.is-none { visibility: hidden; }
+
+/* Tri-state box. `mixed` is a dash, not a smaller tick, because a smaller tick
+   at 12px is a tick. */
+.w1-ck {
+  appearance: none; border: 0.0938rem solid var(--ink-rule); background: transparent;
+  width: 0.875rem; height: 0.875rem; border-radius: 0.1875rem;
+  flex-shrink: 0; padding: 0; cursor: pointer;
+  display: grid; place-items: center;
+  transition: background var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+}
+.w1-ck svg { width: 0.625rem; height: 0.625rem; color: #fff; opacity: 0; transition: opacity var(--t-fast) var(--ease-out); }
+.w1-ck[aria-checked="true"] { background: var(--brand); border-color: var(--brand); }
+.w1-ck[aria-checked="true"] svg { opacity: 1; }
+/* `mixed` takes the DIM fill, matching the existing picker in settings.css. A
+   solid fill with a dash reads as checked at a glance, which defeats the only
+   job the third state has. */
+.w1-ck[aria-checked="mixed"] { background: var(--brand-dim); border-color: var(--brand); }
+.w1-ck[aria-checked="mixed"] svg { opacity: 1; color: var(--brand); }
+.w1-ck:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+
+.w1-fld {
+  appearance: none; width: 100%;
+  background: var(--card-bg-raised); border: 0.0625rem solid var(--card-border);
+  padding: 0.375rem 0.625rem; border-radius: var(--r-md);
+  font: inherit; font-size: var(--ty-micro); color: var(--ink-primary);
+}
+.wv-stage.is-plain .w1-fld { background: var(--card-bg); }
+.w1-fld::placeholder { color: var(--ink-faint); }
+.w1-fld:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.0625rem; border-color: transparent; }
+
+/* Selected chips (V3) */
+.w1-chips { display: flex; flex-wrap: wrap; gap: 0.3125rem; }
+.w1-chip {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.1875rem 0.4375rem 0.1875rem 0.5rem; border-radius: var(--r-sm);
+  background: var(--card-bg-raised); font-size: var(--ty-micro); color: var(--ink-secondary);
+}
+.wv-stage.is-plain .w1-chip { background: var(--card-bg); }
+.w1-chip button {
+  appearance: none; border: 0; background: transparent; padding: 0; cursor: pointer;
+  color: var(--ink-faint); display: grid; place-items: center;
+}
+.w1-chip button:hover { color: var(--ink-primary); }
+.w1-chip svg { width: 0.625rem; height: 0.625rem; }
+
+/* Column browser (V2) */
+.w1-cols { display: flex; gap: 0.25rem; overflow-x: auto; }
+.w1-col { flex: 0 0 10rem; background: var(--card-bg); border-radius: var(--r-md); padding: 0.25rem; min-height: 12rem; }
+.wv-stage.is-plain .w1-col { background: var(--card-bg-raised); }
+.w1-col-h {
+  padding: 0.375rem 0.5rem 0.5rem;
+  font-size: var(--ty-micro); letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
+}
+.w1-col-i {
+  display: flex; align-items: center; gap: 0.4375rem;
+  padding: 0.3125rem 0.5rem; border-radius: var(--r-sm);
+  font-size: var(--ty-micro); color: var(--ink-secondary); cursor: pointer;
+}
+.w1-col-i:hover { background: var(--card-bg-raised); }
+.wv-stage.is-plain .w1-col-i:hover { background: var(--card-bg); }
+.w1-col-i.is-on { background: var(--card-bg-raised); color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.wv-stage.is-plain .w1-col-i.is-on { background: var(--card-bg); }
+.w1-col-i span { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Level-scoped (V4) */
+.w1-lvl { display: flex; flex-wrap: wrap; gap: 0.3125rem; }
+.w1-lvl-b {
+  appearance: none; border: 0; background: var(--card-bg);
+  padding: 0.3125rem 0.625rem; border-radius: var(--r-md);
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-faint); cursor: pointer;
+}
+.wv-stage.is-plain .w1-lvl-b { background: var(--card-bg-raised); }
+.w1-lvl-b.is-on { color: var(--ink-primary); }
+.w1-flat { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.w1-flat .w1-node { width: calc(33.333% - 0.1875rem); background: var(--card-bg); }
+.wv-stage.is-plain .w1-flat .w1-node { background: var(--card-bg-raised); }
+
+/* Rule-based (V5) */
+.w1-rule { display: flex; flex-direction: column; gap: 0.375rem; }
+.w1-rule-r { display: flex; align-items: center; gap: 0.5rem; padding: 0.4375rem 0.625rem; border-radius: var(--r-md); background: var(--card-bg); font-size: var(--ty-micro); }
+.wv-stage.is-plain .w1-rule-r { background: var(--card-bg-raised); }
+.w1-rule-k {
+  font-weight: var(--fw-bold); letter-spacing: var(--ls-wide); text-transform: uppercase;
+  font-size: var(--ty-micro); flex-shrink: 0; width: 3.5rem;
+}
+.w1-rule-r.is-inc .w1-rule-k { color: var(--ink-ok); }
+.w1-rule-r.is-exc .w1-rule-k { color: var(--ink-err); }
+.w1-rule-v { flex: 1 1 0; color: var(--ink-secondary); }
+.w1-rule-v b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+
+@media (prefers-reduced-motion: reduce) {
+  .w1-save, .w1-rail-d, .w1-steps i, .w1-exp, .w1-fold-ch, .w1-ck, .w1-ck svg, .w1-row {
+    transition-duration: 0.01ms !important;
+  }
+}

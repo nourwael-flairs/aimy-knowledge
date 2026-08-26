@@ -16,8 +16,8 @@
        same two sheets the corpus does so the topnav and every token are the
        same object rather than a copy that will drift by Friday. -->
   <link rel="stylesheet" href="assets/aimy-ds.css" />
-  <link rel="stylesheet" href="assets/knowledge.css?v=157" />
-  <link rel="stylesheet" href="assets/settings.css?v=3" />
+  <link rel="stylesheet" href="assets/knowledge.css?v=158" />
+  <link rel="stylesheet" href="assets/settings.css?v=11" />
 
   <script>
     /* Apply saved theme before paint to avoid flash. Default = dark. */
@@ -74,15 +74,13 @@
     <!-- ══ THE PRODUCT STRIP ═══════════════════════════════════════════
          AiMY is first and it is the only tab with a CHAT GATE behind it. The
          other four are consoles: workbenches with the canvas inside them,
-         entered without passing a gate. That asymmetry is the reason the tab
-         order is what it is, and the reason a conversation's subtitle names
-         the tab it was held under.
+         entered without passing a gate.
 
          `aria-current="page"` appears on exactly ONE of the three shells --
-         whichever page you are actually on. It used to sit on all three,
-         including settings.html where the element is a link pointing AWAY
-         from the current page: a control announcing "you are here" while
-         navigating elsewhere. `active` carries the product context; only
+         whichever page you are actually on. It is absent here because every
+         element in this strip is a link pointing AWAY from settings, and a
+         control announcing "you are here" while navigating elsewhere is a
+         control that lies. `active` carries the product context; only
          `aria-current` claims the page. -->
     <div class="topnav-tabs-inner" role="navigation" aria-label="AiMY products">
         <a class="topnav-tab active" href="index.html">
@@ -130,24 +128,46 @@
         </span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
+
+      <!-- ══ IDENTITY ONLY ═══════════════════════════════════════════════
+           This menu used to carry four deep links into settings modules, plus
+           "All settings" and "Console" -- a second, rotting copy of the
+           settings IA, duplicated verbatim across three files. Deep links here
+           go stale the moment a module is renamed and nobody notices, because
+           nothing points at them from the page they describe.
+
+           What belongs under a name and a face is WHO YOU ARE: who you are
+           signed in as, who you are acting as, and the way out. One Settings
+           item, and search inside settings does the rest. -->
       <div class="menu user-menu" id="userMenu" role="menu" aria-label="Account" hidden>
-        <div class="menu-label">Settings</div>
-        <a class="menu-item" role="menuitem" href="settings.html?module=sources">Knowledge sources</a>
-        <a class="menu-item" role="menuitem" href="settings.html?module=instructions">AI instructions</a>
-        <a class="menu-item" role="menuitem" href="settings.html?module=skills">Skills</a>
-        <a class="menu-item" role="menuitem" href="settings.html?module=access">Access and roles</a>
+        <div class="menu-label">Signed in as Nour Wael</div>
+        <a class="menu-item" role="menuitem" href="settings.html">Settings</a>
+        <button class="menu-item" role="menuitem" type="button">Viewing as&hellip;</button>
         <div class="menu-sep"></div>
-        <a class="menu-item" role="menuitem" href="settings.html">All settings</a>
-        <a class="menu-item" role="menuitem" href="console.html">Console</a>
         <a class="menu-item" role="menuitem" href="index.html">Back to chat</a>
+        <a class="menu-item" role="menuitem" href="console.html">Console</a>
+        <div class="menu-sep"></div>
+        <button class="menu-item" role="menuitem" type="button">Sign out</button>
       </div>
     </div>
   </div>
 </div>
 
-<main class="set2-page" id="setPage"></main>
+<!-- ══ SHELL ════════════════════════════════════════════════════════════
+     Rail beside a scroll port, both inside the app shell's flex column. The
+     previous build hung a plain <main> here with no scroll container, so
+     anything past the viewport was clipped with nothing to scroll to: at
+     1536x900 the ledger lost 195px and its last rows could not be reached. -->
+<div class="set2-shell">
+  <nav class="set2-rail" id="setRail" aria-label="Settings"></nav>
+  <main class="set2-main" id="setMain">
+    <div class="set2-col" id="setCol"></div>
+  </main>
+</div>
+
+<div id="setModal"></div>
 
 <script src="assets/aimy-ds.js"></script>
-<script src="assets/settings.js?v=3"></script>
+<script src="assets/settings.js?v=11"></script>
 </body>
 </html>

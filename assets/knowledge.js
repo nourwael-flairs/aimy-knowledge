@@ -12564,10 +12564,18 @@
 
       if (canvas.inline) push('Go', 'Console', 'Filters, documents, the corpus', () => { location.href = 'console.html'; });
       else push('Go', 'Chat', 'Ask across everything AiMY knows', () => { location.href = 'index.html'; });
-      push('Go', 'Knowledge sources', 'Connectors and their health', () => { location.href = 'settings.html?module=sources'; });
-      push('Go', 'AI instructions', 'Rules, precedence and reach', () => { location.href = 'settings.html?module=instructions'; });
-      push('Go', 'Skills', 'Reusable procedures an agent can apply', () => { location.href = 'settings.html?module=skills'; });
-      push('Go', 'Access and roles', 'People and what they may do', () => { location.href = 'settings.html?module=access'; });
+      /* Settings re-cut its IA: the key is `m`, not `module`, and instructions
+         folded into skills because an instruction is a skill that always
+         applies. These four entries pointed at three ids that no longer exist
+         and one key that is no longer read, so all four landed on the default
+         module while looking like they had worked. Kept in the palette rather
+         than deleted -- this is the search that replaced the profile pill's
+         deep links, so it is the only route left to a named module. */
+      push('Go', 'Skills', 'Skills and instructions, and which level governs', () => { location.href = 'settings.html?m=skills'; });
+      push('Go', 'Connectors and sync', 'Connectors and their health', () => { location.href = 'settings.html?m=sync'; });
+      push('Go', 'People', 'Who exists, and what they reach', () => { location.href = 'settings.html?m=people'; });
+      push('Go', 'Roles and permissions', 'What each role may do', () => { location.href = 'settings.html?m=roles'; });
+      push('Go', 'Hierarchy', 'Organisation, client, unit, product, team, user', () => { location.href = 'settings.html?m=hierarchy'; });
 
       return q
         ? out.filter((i) => (i.label + ' ' + i.group).toLowerCase().indexOf(q) > -1

@@ -1,281 +1,656 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   settings.css — AiMY Settings, page layout only
+   settings.css — AiMY Settings
 
    Loaded after aimy-ds.css and knowledge.css, so every token, the topnav and
-   the whole component library are already here. This file positions a page;
-   it does not restyle a component. Where a rule below looks like it is
-   describing what something LOOKS like rather than where it sits, that is a
-   component the design system should own and this file is the wrong home.
+   the whole component library are already here. This file positions a page and
+   defines the four shapes settings needs that the library does not have. It
+   does not restyle a library component: `.toggle`, `.seg`, `.btn` and the menu
+   are used as they ship.
 
-   Prefix is `set2-`. The existing `set-` namespace belongs to the settings
-   SHEET in knowledge.css (the per-source and per-collection overlay), which is
-   a different surface with a different job, and two things sharing a prefix is
-   how a rule written for one silently repaints the other.
+   Prefix stays `set2-`. The `set-` namespace belongs to the settings SHEET in
+   knowledge.css (the per-source overlay), a different surface with a different
+   job, and two things sharing a prefix is how a rule written for one silently
+   repaints the other.
 
    Everything is rem. The lever in knowledge.css (`font-size: max(1rem,
    calc(100vw / 96))`) makes 1rem === 16px at and below the 1536 reference, so
-   a px value here would be the only thing on the page that does not scale.
+   a px value here would be the only thing that does not scale.
 
-   Spacing stays on the audited ladder: 4 8 12 16 20 24 32 40 48 60, which is
-   0.25 0.5 0.75 1 1.25 1.5 2 2.5 3 3.75 in rem. Type is --ty-* only. Colour is
-   --ink-* for text and the tint tokens for fills.
+   ── The three rules this file is most likely to break ──
+   T1  Layout carries meaning, copy does not. There is no `lede` class any
+       more. A heading followed by a paragraph explaining the heading was the
+       old shape and it is gone: the ladder, the reach counter and the row's
+       own right-hand cluster say what those paragraphs used to say.
+   T2  Separators are a smell. There is not one `border-bottom` between rows
+       below. Rows are separated by a SURFACE STEP and a 2px gap, so the page
+       ground shows through as the line.
+   T3  No harsh drop shadows. Elevation is card-bg vs card-bg-raised. The only
+       shadow in the file is on the one element that floats over content.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── The page ──
-   One column, capped at the same measure the corpus uses, so moving between
-   the two does not move the left edge. */
-.set2-page {
-  max-width: var(--measure-page, 72.5rem);
-  margin: 0 auto;
-  padding: 2rem 1.5rem 3.75rem;
+/* ══ SHELL ═══════════════════════════════════════════════════════════════
+   body is `height: 100dvh; display: flex; flex-direction: column; overflow:
+   hidden` from knowledge.css:1161. That is the app shell's contract and this
+   page keeps it rather than opting out, because the topnav should stay put
+   while the settings body scrolls under it.
+
+   The previous build did NOT do this: it hung a plain `<main>` in that flex
+   column with no scroll container, so anything past the viewport was clipped
+   with nothing to scroll. At 1536x900 the ledger lost 195px and its last rows,
+   Audit trail among them, could not be reached at all. `min-height: 0` on the
+   shell is the load-bearing line — without it a flex child refuses to shrink
+   below its content and the overflow moves back up to the clipped body. */
+.set2-shell {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
 }
 
-/* ── Scope context ──
-   The bar states two things and writes neither: where you are, and whether you
-   may write here. It is display-first on purpose. A single editable control in
-   the chrome that re-scopes the page underneath it is the shape behind every
-   wrong-context incident worth reading about, and the fix in each of those
-   write-ups was visibility of the active context, not another gate. */
-.set2-scope {
-  display: flex; align-items: center; flex-wrap: wrap;
-  gap: 0.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 0.0625rem solid var(--hairline);
+/* ── Rail ──
+   Text only. Icons here would be sixteen more objects competing with the one
+   thing the rail has to say, which is where you are. */
+.set2-rail {
+  flex: 0 0 15rem;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.75rem 0.75rem 3rem 1.5rem;
+  scrollbar-width: thin;
 }
-.set2-scope-end { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
-
-/* A typed token. The type sits beside the value because a bare "CXS" does not
-   say whether it is a client, a product or a group, and the current console
-   ships chips that do exactly that. */
-.set2-tok {
-  display: inline-flex; align-items: baseline; gap: 0.25rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--r-xs);
-  background: var(--card-bg-raised);
-  font-size: var(--ty-micro);
-  white-space: nowrap;
-}
-.set2-tok-t { text-transform: uppercase; letter-spacing: var(--ls-wide); color: var(--ink-faint); }
-.set2-tok-v { color: var(--ink-primary); font-weight: var(--fw-semibold); }
-.set2-scope-sep { color: var(--ink-rule); }
-
-/* The URL, shown. Nothing narrows this page without appearing here. */
-.set2-url {
-  display: block;
-  margin-top: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--r-md);
-  background: var(--card-bg-raised);
-  border: 0.0625rem solid var(--hairline);
-  font-family: var(--font-mono);
-  font-size: var(--ty-micro);
-  color: var(--ink-quiet);
-  overflow-x: auto;
-  white-space: nowrap;
-}
-.set2-url b { color: var(--ink-action); font-weight: var(--fw-medium); }
-
-/* ── Page head ── */
-.set2-head { padding: 1.5rem 0 1.25rem; }
-.set2-back {
-  display: inline-flex; align-items: center; gap: 0.375rem;
-  margin-bottom: 0.75rem;
-  font-size: var(--ty-meta);
-  color: var(--ink-quiet);
-  cursor: pointer;
-}
-.set2-back:hover { color: var(--ink-primary); }
-.set2-back:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; border-radius: var(--r-xs); }
-.set2-title { font-size: var(--ty-display); font-weight: var(--fw-extrabold); color: var(--ink-primary); letter-spacing: var(--ls-tight); }
-.set2-lede { margin-top: 0.5rem; max-width: 60ch; font-size: var(--ty-body); color: var(--ink-quiet); line-height: 1.6; }
-
-/* ── The module ledger ──
-   A table, not a board. Read the Plan column top to bottom and the gap between
-   what this workspace has and what it could have is one vertical sweep, which
-   is the entire commercial argument made without a word of marketing. */
-.set2-ledger-wrap { overflow-x: auto; border: 0.0625rem solid var(--card-border); border-radius: var(--r-lg); background: var(--card-bg); }
-.set2-ledger { width: 100%; border-collapse: collapse; min-width: 48rem; }
-.set2-ledger th {
-  text-align: left;
-  padding: 0.75rem 1rem;
-  border-bottom: 0.0625rem solid var(--card-border);
+.set2-rail-group + .set2-rail-group { margin-top: 1.5rem; }
+.set2-rail-label {
+  padding: 0 0.625rem 0.5rem;
   font-size: var(--ty-micro);
   font-weight: var(--fw-semibold);
-  letter-spacing: var(--ls-wide);
+  letter-spacing: var(--ls-wider);
   text-transform: uppercase;
   color: var(--ink-faint);
-  white-space: nowrap;
 }
-.set2-ledger td {
-  padding: 0.75rem 1rem;
-  border-bottom: 0.0625rem solid var(--hairline);
-  font-size: var(--ty-meta);
-  color: var(--ink-secondary);
-  vertical-align: middle;
+.set2-rail-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  width: 100%;
+  appearance: none; border: 0; background: transparent;
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--r-md);
+  font: inherit; font-size: var(--ty-meta);
+  color: var(--ink-quiet); text-align: left; cursor: pointer;
+  transition: color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
 }
-.set2-ledger tr:last-child td { border-bottom: 0; }
-.set2-ledger tbody tr:hover { background: var(--card-bg-raised); }
-.set2-ledger-name { font-size: var(--ty-body); font-weight: var(--fw-semibold); color: var(--ink-primary); }
-.set2-ledger-sub { margin-top: 0.125rem; font-size: var(--ty-micro); color: var(--ink-faint); }
-.set2-ledger-end { text-align: right; white-space: nowrap; }
-/* An unavailable module recedes. It does not disappear: hiding it removes the
-   only thing that would ever prompt the question. */
-.set2-row-off td { color: var(--ink-faint); }
-.set2-offer { margin-top: 0.25rem; font-size: var(--ty-micro); color: var(--ink-faint); line-height: 1.4; }
+.set2-rail-item:hover { color: var(--ink-primary); background: var(--card-bg); }
+.set2-rail-item.is-on { color: var(--ink-primary); background: var(--card-bg-raised); font-weight: var(--fw-semibold); }
+.set2-rail-item:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+/* A count sits at the end of the row rather than after the word, so the names
+   stay a readable column instead of a ragged sentence. */
+.set2-rail-n {
+  margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.set2-rail-item .w-lock { width: 0.75rem; height: 0.75rem; margin-left: auto; color: var(--ink-faint); }
 
-/* ── Status ──
-   Always a mark and a word. Colour alone fails the one reader who most needs
-   to know a source is down. */
+/* ── Main ──
+   This is the scroll port. One per page. */
+.set2-main { flex: 1 1 0; min-width: 0; min-height: 0; overflow-y: auto; }
+
+/* The column is narrow on purpose. A settings row read at 1100px wide puts a
+   toggle a hand's width from the label it belongs to, and the eye stops
+   pairing them. 46rem is the widest this stays legible. */
+.set2-col { max-width: 46rem; margin: 0 auto; padding: 2.25rem 2rem 6rem; }
+
+/* ══ HEAD ════════════════════════════════════════════════════════════════ */
+
+.set2-title {
+  font-size: var(--ty-display);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-tight);
+  color: var(--ink-primary);
+  line-height: var(--lh-tight);
+}
+
+/* Scope reads, the lens writes. One editable control in the chrome that
+   re-scopes the page under it is the shape behind every wrong-context incident
+   worth reading about, and the remedy in each of those write-ups was
+   visibility of the active context rather than one more gate. So the scope is
+   text, and only the lens is a control. */
+.set2-bar {
+  display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+  margin-top: 0.875rem;
+}
+.set2-scope { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; min-width: 0; }
+.set2-scope-i { font-size: var(--ty-micro); color: var(--ink-quiet); white-space: nowrap; }
+.set2-scope-i b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.set2-scope-s { color: var(--ink-rule); font-size: var(--ty-micro); }
+.set2-bar-end { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+
+/* The library's `.seg-btn.active` pairs `--accent` as TEXT with `--accent-dim`
+   as fill. Measured on this page: 2.86:1 dark, 3.77:1 light -- both under the
+   4.5 floor, on what is the only writable control in the chrome. Swapping in
+   `--ink-action` (the library's own "accent AS TEXT" token) lifts it to 4.18
+   and 4.90, so light passes and dark still does not.
+
+   So the lens drops hue altogether. Its selected state is already carried by
+   a surface step, and a control that needs colour ON TOP of a fill to say
+   which segment is chosen was saying it twice. This also returns the whole
+   accent budget to the one primary action per view, which is where it was
+   supposed to be.
+
+   Raised as a library gap regardless: every other consumer of `.seg` is still
+   failing quietly. */
+.set2-bar .seg { background: var(--card-bg); }
+.set2-bar .seg-btn.active { background: var(--card-bg-raised); color: var(--ink-primary); }
+
+/* ══ SECTION ═════════════════════════════════════════════════════════════ */
+
+.set2-sec { margin-top: 2.25rem; }
+.set2-sec-h { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
+.set2-sec-t { font-size: var(--ty-body); font-weight: var(--fw-semibold); color: var(--ink-primary); }
+.set2-sec-end { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+
+/* ══ ROW ═════════════════════════════════════════════════════════════════
+   The atom that repeats everywhere: a skill, a connector, a person, a policy.
+   Icon, name, one line under it, and the state cluster hard right.
+
+   Rows are their own surfaces with a 2px gap, so the page ground shows between
+   them. That gap IS the separator and it costs no ink (T2). */
+.set2-rows { display: flex; flex-direction: column; gap: 0.125rem; }
+.set2-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.6875rem 0.875rem;
+  background: var(--card-bg);
+  border-radius: var(--r-md);
+  text-align: left; width: 100%;
+  appearance: none; border: 0; font: inherit;
+  transition: background var(--t-fast) var(--ease-out);
+}
+.set2-row:first-child { border-radius: var(--r-lg) var(--r-lg) var(--r-md) var(--r-md); }
+.set2-row:last-child  { border-radius: var(--r-md) var(--r-md) var(--r-lg) var(--r-lg); }
+.set2-row:only-child  { border-radius: var(--r-lg); }
+.set2-row[data-go] { cursor: pointer; }
+.set2-row[data-go]:hover { background: var(--card-bg-raised); }
+.set2-row:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+.set2-row.is-off .set2-row-n,
+.set2-row.is-off .set2-row-ico { opacity: 0.5; }
+
+.set2-row-ico { width: 1rem; height: 1rem; flex-shrink: 0; color: var(--ink-faint); }
+.set2-row-main { flex: 1 1 0; min-width: 0; }
+.set2-row-n {
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.set2-row-d {
+  font-size: var(--ty-micro); color: var(--ink-faint); margin-top: 0.0625rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.set2-row-end { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+
+/* Where a row's value came from. A word, not a badge -- five coloured chips in
+   a column is a bar chart nobody asked for. */
+.set2-from { font-size: var(--ty-micro); color: var(--ink-faint); white-space: nowrap; }
+.set2-from.is-org { color: var(--ink-quiet); font-weight: var(--fw-semibold); }
+
+.set2-chev { width: 0.875rem; height: 0.875rem; color: var(--ink-rule); flex-shrink: 0; }
+
+/* ══ PILL / TOKEN ════════════════════════════════════════════════════════ */
+
 .set2-pill {
   display: inline-flex; align-items: center; gap: 0.375rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--r-pill);
-  font-size: var(--ty-micro);
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
+  padding: 0.125rem 0.5rem; border-radius: var(--r-pill);
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold); white-space: nowrap;
 }
-.set2-pill-dot { width: 0.3125rem; height: 0.3125rem; border-radius: var(--r-pill); background: currentColor; flex-shrink: 0; }
+.set2-pill i { width: 0.3125rem; height: 0.3125rem; border-radius: var(--r-pill); background: currentColor; flex-shrink: 0; }
 .set2-pill.is-ok   { background: var(--ok-bg);   color: var(--ink-ok); }
 .set2-pill.is-warn { background: var(--warn-bg); color: var(--ink-warn); }
 .set2-pill.is-err  { background: var(--err-bg);  color: var(--ink-err); }
 .set2-pill.is-info { background: var(--info-bg); color: var(--ink-info); }
 .set2-pill.is-mute { background: var(--card-bg-raised); color: var(--ink-faint); }
 
-/* ── Module body ── */
-.set2-module { display: flex; flex-direction: column; gap: 1.25rem; }
-.set2-card { border: 0.0625rem solid var(--card-border); border-radius: var(--r-lg); background: var(--card-bg); }
-.set2-card-pad { padding: 1rem 1.25rem; }
-.set2-card-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem;
-  padding: 0.75rem 1.25rem;
-  border-bottom: 0.0625rem solid var(--hairline);
+.set2-num { font-variant-numeric: tabular-nums; }
+.w-lock { width: 0.75rem; height: 0.75rem; flex-shrink: 0; color: var(--ink-faint); }
+
+/* ══ LADDER ══════════════════════════════════════════════════════════════
+   Quiet at rest: one line naming the level that governs. The whole six-stop
+   chain is one click away and not before, because the chain is the answer to a
+   question most readers are not asking yet. */
+.set2-lad { background: var(--card-bg); border-radius: var(--r-lg); overflow: hidden; }
+.set2-lad-hd {
+  display: flex; align-items: center; gap: 0.625rem; width: 100%;
+  appearance: none; border: 0; background: transparent;
+  padding: 0.75rem 0.875rem; font: inherit; cursor: pointer; color: inherit;
 }
-.set2-card-row:last-child { border-bottom: 0; }
-.set2-grow { flex: 1 1 0; min-width: 0; }
-.set2-name { font-size: var(--ty-body); font-weight: var(--fw-semibold); color: var(--ink-primary); }
-.set2-sub { font-size: var(--ty-micro); color: var(--ink-faint); margin-top: 0.125rem; }
-.set2-label { font-size: var(--ty-micro); font-weight: var(--fw-semibold); letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint); }
+.set2-lad-hd:hover { background: var(--card-bg-raised); }
+.set2-lad-hd:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+.set2-lad-lv { font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary); }
+.set2-lad-more { margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.set2-lad-ch {
+  width: 0.75rem; height: 0.75rem; color: var(--ink-faint);
+  transition: transform var(--t-base) var(--ease-out);
+}
+.set2-lad.is-open .set2-lad-ch { transform: rotate(180deg); }
+.set2-lad-bd { display: none; padding: 0 0.375rem 0.375rem; }
+.set2-lad.is-open .set2-lad-bd { display: block; }
 
-/* Ingestion is two steps, so the row shows two. One opaque "Processing" is the
-   defect this replaces: it says a thing is happening and nothing about which. */
-.set2-phase { display: flex; gap: 0.125rem; margin-top: 0.5rem; }
-.set2-phase i { height: 0.1875rem; flex: 1 1 0; border-radius: 0.0625rem; background: var(--card-border); }
-.set2-phase i.is-done { background: var(--ok); }
-.set2-phase i.is-live { background: var(--info); }
-.set2-phase i.is-fail { background: var(--err); }
-.set2-phase-lbl { display: flex; justify-content: space-between; gap: 0.75rem; margin-top: 0.25rem; font-size: var(--ty-micro); color: var(--ink-faint); }
-.set2-code { font-family: var(--font-mono); font-size: var(--ty-micro); color: var(--ink-faint); }
-
-/* Run history. Three rows, because a fourth has never answered a question. */
-.set2-run { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.75rem; align-items: baseline; padding: 0.375rem 0; border-bottom: 0.0625rem solid var(--hairline); font-size: var(--ty-meta); }
-.set2-run:last-child { border-bottom: 0; }
-.set2-run-when { font-family: var(--font-mono); font-size: var(--ty-micro); color: var(--ink-faint); white-space: nowrap; }
-
-/* ── Grounding ──
-   The one control on this page whose confirmation depends on which way it
-   moves. Letting an internal agent read a collection is reversible and nobody
-   outside sees it. Letting a customer-facing one read it puts the content in
-   front of customers, so it reverts and stays reverted until the name is typed. */
-.set2-agents { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.set2-agent {
-  display: inline-flex; align-items: center; gap: 0.375rem;
-  min-height: 1.75rem;
-  padding: 0 0.625rem;
-  border: 0.0625rem solid var(--card-border);
-  border-radius: var(--r-md);
-  background: var(--card-bg);
+.set2-stop {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.5rem 0.5rem; border-radius: var(--r-sm);
   font-size: var(--ty-micro);
-  font-weight: var(--fw-medium);
-  color: var(--ink-quiet);
+}
+.set2-stop-lv {
+  width: 4.75rem; flex-shrink: 0;
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
+}
+.set2-stop-v { flex: 1 1 0; min-width: 0; color: var(--ink-secondary); }
+.set2-stop.is-empty .set2-stop-v { color: var(--ink-faint); }
+.set2-stop.is-beat .set2-stop-v { color: var(--ink-faint); text-decoration: line-through; }
+.set2-stop.is-win { background: var(--brand-dim); }
+.set2-stop.is-win .set2-stop-v { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.set2-stop-end { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+
+/* ══ TARGETING PICKER ════════════════════════════════════════════════════ */
+
+.set2-pick { background: var(--card-bg); border-radius: var(--r-lg); overflow: hidden; }
+.set2-pick-hd { padding: 0.625rem 0.625rem 0.5rem; }
+.set2-pick-bd { max-height: 15rem; overflow-y: auto; padding: 0 0.375rem 0.375rem; scrollbar-width: thin; }
+.set2-pick-ft {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.5rem 0.875rem; background: var(--card-bg-raised);
+  font-size: var(--ty-micro); color: var(--ink-faint);
+}
+.set2-pick-ft b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.set2-pick-ft.is-zero { color: var(--ink-err); }
+.set2-pick-ft.is-zero b { color: var(--ink-err); }
+
+.set2-node {
+  display: flex; align-items: center; gap: 0.5rem;
+  min-height: 1.875rem; padding: 0.1875rem 0.375rem;
+  border-radius: var(--r-sm); font-size: var(--ty-micro);
+  color: var(--ink-secondary); cursor: pointer;
+}
+.set2-node:hover { background: var(--card-bg-raised); }
+.set2-node:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+.set2-node.is-grp > .set2-node-n { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.set2-node.is-l1 { padding-left: 0.375rem; }
+.set2-node.is-l2 { padding-left: 1.375rem; }
+.set2-node.is-l3 { padding-left: 2.375rem; }
+.set2-node.is-l4 { padding-left: 3.375rem; }
+.set2-node.is-l5 { padding-left: 4.375rem; }
+.set2-node.is-l6 { padding-left: 5.375rem; }
+.set2-node-n { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set2-node-ct { font-size: var(--ty-micro); color: var(--ink-faint); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.set2-exp {
+  width: 0.875rem; height: 0.875rem; flex-shrink: 0; color: var(--ink-faint);
+  transition: transform var(--t-fast) var(--ease-out);
+}
+.set2-node.is-open > .set2-exp { transform: rotate(90deg); }
+.set2-exp.is-none { visibility: hidden; }
+
+/* `mixed` takes the DIM fill. A solid fill with a dash in it reads as checked
+   at a glance, which defeats the only job the third state has. */
+.set2-ck {
+  appearance: none; border: 0.0938rem solid var(--ink-rule); background: transparent;
+  width: 0.875rem; height: 0.875rem; border-radius: 0.1875rem;
+  flex-shrink: 0; padding: 0; cursor: pointer;
+  display: grid; place-items: center;
+  transition: background var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+}
+.set2-ck svg { width: 0.625rem; height: 0.625rem; color: #fff; opacity: 0; }
+.set2-ck[aria-checked="true"]  { background: var(--brand); border-color: var(--brand); }
+.set2-ck[aria-checked="true"] svg  { opacity: 1; }
+.set2-ck[aria-checked="mixed"] { background: var(--brand-dim); border-color: var(--brand); }
+.set2-ck[aria-checked="mixed"] svg { opacity: 1; color: var(--brand); }
+
+/* ══ FIELDS ══════════════════════════════════════════════════════════════ */
+
+.set2-fld {
+  appearance: none; width: 100%;
+  background: var(--card-bg); border: 0.0625rem solid var(--card-border);
+  padding: 0.4375rem 0.6875rem; border-radius: var(--r-md);
+  font: inherit; font-size: var(--ty-meta); color: var(--ink-primary);
+}
+.set2-fld::placeholder { color: var(--ink-faint); }
+.set2-fld:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.0625rem; border-color: transparent; }
+textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-base); }
+.set2-lbl {
+  display: block; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-quiet); margin-bottom: 0.375rem;
+}
+.set2-field + .set2-field { margin-top: 1rem; }
+.set2-hint { font-size: var(--ty-micro); color: var(--ink-faint); margin-top: 0.375rem; }
+.set2-mono { font-family: var(--font-mono); }
+
+/* ══ EMPTY / NOTE ════════════════════════════════════════════════════════ */
+
+.set2-empty {
+  padding: 2.5rem 1rem; text-align: center;
+  background: var(--card-bg); border-radius: var(--r-lg);
+  font-size: var(--ty-meta); color: var(--ink-faint);
+}
+.set2-empty b { display: block; color: var(--ink-secondary); font-weight: var(--fw-semibold); margin-bottom: 0.25rem; }
+
+/* One line, one accent edge, no icon-and-paragraph. Used where a fact about
+   the whole section cannot be carried by a row. */
+.set2-note {
+  display: flex; gap: 0.625rem; align-items: baseline;
+  padding: 0.625rem 0.875rem; border-radius: var(--r-md);
+  background: var(--card-bg-raised);
+  font-size: var(--ty-micro); color: var(--ink-quiet);
+}
+.set2-note.is-warn { color: var(--ink-warn); background: var(--warn-bg); }
+.set2-note.is-err  { color: var(--ink-err);  background: var(--err-bg); }
+
+/* ══ ENTITLEMENT ═════════════════════════════════════════════════════════
+   The module stays at FULL contrast and only the controls die. Dimming the
+   whole thing hides what you would be buying, which is the one thing an upsell
+   surface has to show. */
+.set2-tier {
+  display: flex; align-items: center; gap: 0.625rem;
+  margin-top: 0.125rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--r-md) var(--r-md) var(--r-lg) var(--r-lg);
+  background: var(--card-bg-raised);
+  font-size: var(--ty-micro); color: var(--ink-quiet);
+}
+.set2-tier-end { margin-left: auto; }
+.set2-row.is-locked { pointer-events: none; }
+.set2-row.is-locked .set2-row-end > *:not(.w-lock) { opacity: 0.4; }
+
+/* ══ SAVE BOUNDARY ═══════════════════════════════════════════════════════
+   Each module owns its own. It rises from the bottom of the scroll port with
+   the count of what is unsaved, and it belongs to ONE module -- a global save
+   bar is how an edit in one place commits an edit in another. */
+.set2-save {
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; align-items: center; gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding: 0.6875rem 0.875rem;
+  border-radius: var(--r-lg);
+  background: var(--card-bg-raised);
+  /* The one shadow in this file. It is the only element that floats over
+     content, and without a lift it reads as part of the list it covers. */
+  box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.18);
+  transform: translateY(0.75rem); opacity: 0; pointer-events: none;
+  transition: transform var(--t-base) var(--ease-out), opacity var(--t-base) var(--ease-out);
+}
+.set2-save.is-on { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.set2-save-n { font-size: var(--ty-micro); color: var(--ink-quiet); }
+.set2-save-end { margin-left: auto; display: flex; gap: 0.5rem; }
+
+/* ══ DETAIL ══════════════════════════════════════════════════════════════ */
+
+.set2-back {
+  appearance: none; border: 0; background: transparent; padding: 0;
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-faint); cursor: pointer; margin-bottom: 0.75rem;
+}
+.set2-back:hover { color: var(--ink-primary); }
+
+/* The skill body, shown as prose or as the file it actually is. A skill that
+   can be uploaded as a file has to be readable as one, or the download and the
+   display are two different objects. */
+.set2-view { display: inline-flex; gap: 0.125rem; padding: 0.1875rem; border-radius: var(--r-md); background: var(--card-bg-raised); }
+.set2-view-b {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  padding: 0.25rem 0.5rem; border-radius: var(--r-sm);
+  color: var(--ink-faint); display: grid; place-items: center;
+}
+.set2-view-b svg { width: 0.875rem; height: 0.875rem; }
+.set2-view-b.is-on { background: var(--card-bg); color: var(--ink-primary); }
+
+.set2-body {
+  padding: 0.875rem 1rem; border-radius: var(--r-lg);
+  background: var(--card-bg);
+  font-size: var(--ty-meta); color: var(--ink-secondary); line-height: var(--lh-base);
+}
+.set2-body.is-raw {
+  font-family: var(--font-mono); font-size: var(--ty-micro);
+  color: var(--ink-quiet); white-space: pre-wrap; line-height: var(--lh-snug);
+}
+
+/* ══ FIELD MAPPING ═══════════════════════════════════════════════════════
+   A table, and the only place in this file where alignment rather than a
+   surface step carries the structure. That is the exception T2 allows: in a
+   table the columns ARE the separator, so a rule between rows would be a
+   second one. There is still not a single border-bottom below.
+
+   The console renders this as a bordered grid with a hairline under every row
+   plus alternating tinted fills, which is three separating devices doing one
+   job. */
+.set2-map { display: flex; flex-direction: column; gap: 0.125rem; }
+.set2-map-hd {
+  display: grid; grid-template-columns: 9rem 1fr auto;
+  gap: 0.75rem; padding: 0 0.875rem 0.375rem;
+  font-size: var(--ty-micro); letter-spacing: var(--ls-wide);
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.set2-map-row {
+  display: grid; grid-template-columns: 9rem 1fr auto;
+  gap: 0.75rem; align-items: center;
+  padding: 0.5rem 0.875rem;
+  background: var(--card-bg); border-radius: var(--r-md);
+}
+.set2-map-row:first-of-type { border-radius: var(--r-lg) var(--r-lg) var(--r-md) var(--r-md); }
+.set2-map-row:last-of-type  { border-radius: var(--r-md) var(--r-md) var(--r-lg) var(--r-lg); }
+.set2-map-ctx {
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.set2-map-path { display: flex; align-items: center; gap: 0.125rem; flex-wrap: wrap; min-width: 0; }
+/* `--ink-rule` is the library's NON-TEXT ink, for hairlines and dots that carry
+   no meaning. This dot does carry meaning -- it is what makes the segments read
+   as one dotted path rather than three separate values -- so it takes the
+   ambient TEXT ink and meets the text floor. Measured 3.99:1 on rule, 5.33 on
+   faint. */
+.set2-map-dot { color: var(--ink-faint); font-family: var(--font-mono); font-size: var(--ty-micro); }
+.set2-map-end { display: flex; align-items: center; gap: 0.375rem; justify-content: flex-end; }
+
+/* Each segment is its own control. The path is the structure, so extending it
+   IS adding a subfield and there is no second affordance for that. */
+.set2-seg {
+  appearance: none; border: 0; background: var(--card-bg-raised);
+  padding: 0.1875rem 0.4375rem; border-radius: var(--r-sm);
+  font-family: var(--font-mono); font-size: var(--ty-micro);
+  color: var(--ink-secondary); cursor: pointer;
+}
+.set2-seg:hover { color: var(--ink-primary); }
+.set2-seg:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+.set2-seg.is-more { color: var(--ink-faint); font-family: var(--font-sans); font-weight: var(--fw-semibold); }
+.set2-seg.is-bad { background: var(--err-bg); color: var(--ink-err); text-decoration: line-through; }
+.set2-map-row.is-broken .set2-map-ctx { color: var(--ink-err); }
+/* Incomplete is not broken. The path is valid so far and simply does not reach
+   a value yet, so it prompts forward instead of shouting. */
+.set2-seg.is-more { background: transparent; color: var(--ink-action); }
+.set2-seg.is-more:hover { background: var(--card-bg-raised); }
+
+.set2-x {
+  appearance: none; border: 0; background: transparent; padding: 0.1875rem;
+  cursor: pointer; color: var(--ink-faint); display: grid; place-items: center; border-radius: var(--r-sm);
+}
+.set2-x:hover { color: var(--ink-err); background: var(--err-bg); }
+.set2-x svg { width: 0.75rem; height: 0.75rem; }
+
+.set2-add {
+  appearance: none; border: 0; background: transparent;
+  padding: 0.5rem 0.875rem; margin-top: 0.125rem;
+  border-radius: var(--r-md);
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-action); cursor: pointer; text-align: left;
+}
+.set2-add:hover { background: var(--card-bg); }
+.set2-add.is-inline { padding: 0.1875rem 0.4375rem; margin: 0; }
+
+/* ══ CHIPS ═══════════════════════════════════════════════════════════════ */
+
+.set2-chip {
+  display: inline-flex; align-items: center; gap: 0.3125rem;
+  padding: 0.1875rem 0.4375rem; border-radius: var(--r-sm);
+  background: var(--card-bg-raised);
+  font-size: var(--ty-micro); color: var(--ink-quiet); white-space: nowrap;
+}
+.set2-chip b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.set2-chip button {
+  appearance: none; border: 0; background: transparent; padding: 0; cursor: pointer;
+  color: var(--ink-faint); display: grid; place-items: center;
+}
+.set2-chip button:hover { color: var(--ink-primary); }
+.set2-chip button svg { width: 0.625rem; height: 0.625rem; }
+.set2-chip.is-act { border: 0; cursor: pointer; font: inherit; font-size: var(--ty-micro); }
+.set2-chip.is-act:hover { color: var(--ink-primary); }
+
+/* ══ CRITERIA ════════════════════════════════════════════════════════════ */
+
+.set2-crit {
+  display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap;
+  padding: 0.625rem 0.75rem; background: var(--card-bg); border-radius: var(--r-lg);
+}
+/* The conjunction is stated. The console shows the same chips side by side
+   with nothing between them, so whether two filters mean AND or OR is left
+   for the reader to assume. */
+.set2-crit-and { font-size: var(--ty-micro); color: var(--ink-faint); font-style: italic; }
+.set2-crit-all { font-size: var(--ty-micro); color: var(--ink-faint); }
+
+/* ══ BLAST RADIUS ════════════════════════════════════════════════════════
+   What the action is about to touch, next to the button that does it. The
+   console offers Test Sync and Run Sync with no figure anywhere, so the only
+   way to learn the size of a run is to start one. */
+.set2-blast {
+  display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
+  margin-top: 0.125rem; padding: 0.75rem 0.875rem;
+  background: var(--card-bg-raised); border-radius: var(--r-lg);
+}
+.set2-blast-n {
+  font-size: var(--ty-title); font-weight: var(--fw-bold); color: var(--ink-primary);
+  line-height: var(--lh-none);
+}
+.set2-blast-l { font-size: var(--ty-micro); color: var(--ink-quiet); }
+.set2-blast-end { margin-left: auto; display: flex; gap: 0.5rem; align-self: center; }
+.set2-blast.is-err { background: var(--err-bg); }
+.set2-blast.is-err .set2-blast-n { color: var(--ink-err); }
+.set2-blast.is-err .set2-blast-l { color: var(--ink-err); }
+
+/* ══ RUNS ════════════════════════════════════════════════════════════════ */
+
+.set2-runs { display: flex; flex-direction: column; gap: 0.125rem; }
+.set2-run {
+  display: grid; grid-template-columns: 7.5rem 1fr auto auto;
+  gap: 0.75rem; align-items: center;
+  padding: 0.5rem 0.875rem; background: var(--card-bg); border-radius: var(--r-md);
+  font-size: var(--ty-micro);
+}
+.set2-run:first-child { border-radius: var(--r-lg) var(--r-lg) var(--r-md) var(--r-md); }
+.set2-run:last-child  { border-radius: var(--r-md) var(--r-md) var(--r-lg) var(--r-lg); }
+.set2-run-when { color: var(--ink-quiet); }
+.set2-run-crit { display: flex; gap: 0.25rem; flex-wrap: wrap; min-width: 0; }
+.set2-run-n { color: var(--ink-secondary); text-align: right; }
+
+/* ══ INLINE FIELD ROW ════════════════════════════════════════════════════ */
+
+.set2-inline {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  font-size: var(--ty-meta); color: var(--ink-secondary);
+}
+.set2-fld-n { width: 5rem; flex: 0 0 auto; text-align: right; }
+.set2-inline .set2-fld:not(.set2-fld-n) { flex: 1 1 14rem; }
+
+/* ══ POPOVER ═════════════════════════════════════════════════════════════
+   Anchored beside the cell it changes. GAPS 22 and 25 note the library has one
+   dialog and it assumes the decision was made before it opened; choosing a CRM
+   key IS the decision, and it is a decision about one cell. */
+.set2-pop {
+  position: fixed; z-index: 80;
+  width: 15rem; max-height: 18rem;
+  display: flex; flex-direction: column;
+  background: var(--card-bg-raised);
+  border: 0.0625rem solid var(--card-border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.22);
+}
+.set2-pop-hd { padding: 0.4375rem; }
+.set2-pop-hd.set2-pop-t {
+  padding: 0.5rem 0.6875rem 0.25rem;
+  font-size: var(--ty-micro); letter-spacing: var(--ls-wide);
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.set2-pop-bd { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.1875rem; scrollbar-width: thin; }
+.set2-pop-i {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  appearance: none; border: 0; background: transparent;
+  padding: 0.375rem 0.5rem; border-radius: var(--r-sm);
+  font: inherit; font-size: var(--ty-micro); font-family: var(--font-mono);
+  color: var(--ink-secondary); text-align: left; cursor: pointer;
+}
+.set2-pop-i:hover { background: var(--card-bg); color: var(--ink-primary); }
+.set2-pop-i span:first-child { flex: 1 1 auto; }
+.set2-pop-i .set2-pop-t {
+  font-family: var(--font-sans); font-size: var(--ty-micro);
+  color: var(--ink-faint); letter-spacing: var(--ls-wide); text-transform: uppercase;
+}
+.set2-pop-row {
+  display: flex; align-items: baseline; gap: 0.5rem;
+  padding: 0.3125rem 0.5rem; font-size: var(--ty-micro); color: var(--ink-faint);
+}
+.set2-pop-row code { font-family: var(--font-mono); color: var(--ink-secondary); }
+.set2-pop-row b { color: var(--ink-primary); font-weight: var(--fw-semibold); margin-left: auto; }
+
+/* ══ MODAL ═══════════════════════════════════════════════════════════════
+   The library's `.modal` is a centred box that grows until something stops it.
+   These two surfaces are the case GAPS 22 and 25 describe -- the body IS the
+   decision -- so they get a height contract and an internal scroll here rather
+   than inheriting one that has neither. */
+.set2-scrim {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid; place-items: center; padding: 1.5rem;
+}
+.set2-modal {
+  width: 100%; max-width: 34rem;
+  max-height: calc(100dvh - 6rem);
+  display: flex; flex-direction: column;
+  background: var(--body-bg);
+  border: 0.0625rem solid var(--card-border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.set2-modal-hd { display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.125rem 0.75rem; }
+.set2-modal-t { font-size: var(--ty-title); font-weight: var(--fw-bold); color: var(--ink-primary); }
+.set2-modal-x {
+  margin-left: auto; appearance: none; border: 0; background: transparent;
+  cursor: pointer; color: var(--ink-faint); display: grid; place-items: center; padding: 0.25rem;
+}
+.set2-modal-x:hover { color: var(--ink-primary); }
+.set2-modal-x svg { width: 0.875rem; height: 0.875rem; }
+.set2-modal-bd { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 1.125rem 1rem; }
+.set2-modal-ft {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.875rem 1.125rem; background: var(--card-bg);
+}
+.set2-modal-ft .set2-modal-end { margin-left: auto; display: flex; gap: 0.5rem; }
+
+/* Upload: what the file must contain sits on the LEFT with the template button
+   under it, and the dropzone on the right. The template is a thing you read
+   before you drop, not an action on what you dropped. */
+.set2-up { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.set2-up-req { font-size: var(--ty-micro); color: var(--ink-quiet); line-height: var(--lh-base); }
+.set2-up-req li { margin-bottom: 0.375rem; }
+.set2-up-req code { font-family: var(--font-mono); color: var(--ink-primary); }
+.set2-drop {
+  display: grid; place-items: center; gap: 0.5rem;
+  min-height: 9rem; padding: 1rem; text-align: center;
+  border: 0.0938rem dashed var(--card-border-hover);
+  border-radius: var(--r-lg);
+  background: var(--card-bg);
+  font-size: var(--ty-micro); color: var(--ink-faint);
   cursor: pointer;
 }
-.set2-agent:hover { border-color: var(--card-border-hover); }
-.set2-agent:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
-.set2-agent[aria-pressed="true"] { border-color: var(--ok); background: var(--ok-bg); color: var(--ink-ok); }
-.set2-agent.is-ext[aria-pressed="true"] { border-color: var(--warn); background: var(--warn-bg); color: var(--ink-warn); }
+.set2-drop:hover, .set2-drop.is-over { border-color: var(--brand); color: var(--ink-secondary); }
+.set2-drop svg { width: 1.25rem; height: 1.25rem; }
 
-/* ── Checkbox ──
-   A 14px mark inside a 24px target. WCAG 2.2 puts the pointer floor at 24 by
-   24 CSS pixels and the mark alone is under it; padding the hit area to the
-   full row is what clears it without drawing a bigger box. */
-.set2-ck { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; flex-shrink: 0; cursor: pointer; }
-.set2-ck-box { width: 0.875rem; height: 0.875rem; border-radius: var(--r-xs); border: 0.09375rem solid var(--ink-rule); display: grid; place-items: center; }
-.set2-ck[aria-checked="true"] .set2-ck-box { background: var(--brand); border-color: var(--brand); }
-.set2-ck[aria-checked="mixed"] .set2-ck-box { background: var(--brand-dim); border-color: var(--brand); }
-.set2-ck[aria-checked="mixed"] .set2-ck-box::after { content: ""; width: 0.4375rem; height: 0.09375rem; background: var(--brand); border-radius: 0.0625rem; }
-.set2-ck svg { width: 0.5625rem; height: 0.5625rem; color: #fff; }
-.set2-ck[aria-checked="false"] svg, .set2-ck[aria-checked="mixed"] svg { display: none; }
-.set2-ck:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; border-radius: var(--r-xs); }
+@media (max-width: 52rem) {
+  .set2-rail { display: none; }
+  .set2-col { padding: 1.5rem 1.25rem 5rem; }
+  .set2-up { grid-template-columns: 1fr; }
+}
 
-/* ── Tree ── */
-.set2-tree { border: 0.0625rem solid var(--card-border); border-radius: var(--r-lg); background: var(--card-bg); overflow: hidden; max-width: 24rem; }
-.set2-tree-body { max-height: 14rem; overflow-y: auto; padding: 0.25rem; }
-.set2-node { display: flex; align-items: center; gap: 0.25rem; min-height: 2rem; padding: 0 0.5rem; border-radius: var(--r-md); font-size: var(--ty-meta); color: var(--ink-secondary); cursor: pointer; }
-.set2-node:hover { background: var(--card-bg-raised); }
-.set2-node.is-child { padding-left: 1.5rem; }
-.set2-node-ct { margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint); }
-.set2-tree-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0.75rem; border-top: 0.0625rem solid var(--hairline); background: var(--card-bg-raised); font-size: var(--ty-micro); color: var(--ink-faint); }
-.set2-keys { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: var(--ty-micro); color: var(--ink-faint); }
-.set2-kbd { display: inline-block; padding: 0 0.375rem; border: 0.0625rem solid var(--card-border); border-radius: var(--r-xs); background: var(--card-bg-raised); font-family: var(--font-mono); font-size: var(--ty-micro); color: var(--ink-secondary); }
-
-/* ── Rules ── */
-.set2-rule { padding: 0.75rem 1.25rem; border-bottom: 0.0625rem solid var(--hairline); }
-.set2-rule:last-child { border-bottom: 0; }
-/* Superseded recedes rather than vanishing, so override is visible instead of
-   inferred. No left stripe: a colour bar carries nothing in greyscale and
-   nothing to a screen reader. */
-.set2-rule.is-beaten { background: var(--card-bg-raised); }
-.set2-rule.is-beaten .set2-rule-txt { color: var(--ink-faint); }
-.set2-rule-txt { font-size: var(--ty-meta); color: var(--ink-secondary); line-height: 1.6; }
-.set2-rule-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; font-size: var(--ty-micro); color: var(--ink-faint); }
-/* A rule reaching nobody is always a defect, so reach sits on the card rather
-   than in a report someone would have to go and ask for. */
-.set2-reach { display: inline-flex; align-items: baseline; gap: 0.25rem; font-weight: var(--fw-semibold); color: var(--ink-quiet); }
-.set2-reach b { font-size: var(--ty-meta); color: var(--ink-primary); }
-.set2-reach.is-zero b { color: var(--ink-err); }
-.set2-effective { border: 0.0625rem solid var(--ok); border-radius: var(--r-lg); background: var(--ok-bg); padding: 0.75rem 1.25rem; }
-
-/* ── Access ── */
-.set2-tuple { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.5rem 1.25rem; border-top: 0.0625rem solid var(--hairline); background: var(--card-bg-raised); font-size: var(--ty-meta); }
-.set2-tuple-on { color: var(--ink-faint); font-size: var(--ty-micro); }
-.set2-tuple-end { margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint); }
-.set2-av { width: 2rem; height: 2rem; border-radius: var(--r-pill); flex-shrink: 0; background: var(--grad-avatar, linear-gradient(135deg, #7c3aed, #3369ff)); color: #fff; display: grid; place-items: center; font-size: var(--ty-micro); font-weight: var(--fw-bold); }
-.set2-can { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.5rem 0; font-size: var(--ty-meta); color: var(--ink-secondary); line-height: 1.6; }
-.set2-because { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 0.0625rem solid var(--hairline); font-size: var(--ty-micro); color: var(--ink-faint); line-height: 1.6; }
-
-/* ── Notes ── */
-.set2-note { display: flex; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: var(--r-md); font-size: var(--ty-meta); line-height: 1.6; }
-.set2-note.is-info { background: var(--info-bg); color: var(--ink-info); }
-.set2-note.is-warn { background: var(--warn-bg); color: var(--ink-warn); }
-.set2-note.is-err  { background: var(--err-bg);  color: var(--ink-err); }
-.set2-note b { font-weight: var(--fw-bold); }
-
-/* ── Typed confirmation ──
-   Stated blast radius first, then the typing. The count is what changes the
-   decision; the typing only stops the hand. */
-.set2-confirm { border: 0.0625rem solid var(--warn); border-radius: var(--r-lg); background: var(--card-bg); overflow: hidden; }
-.set2-confirm-hd { padding: 0.75rem 1.25rem; background: var(--warn-bg); color: var(--ink-warn); font-size: var(--ty-meta); font-weight: var(--fw-semibold); }
-.set2-confirm-bd { padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; }
-.set2-field { display: flex; align-items: center; min-height: 2rem; padding: 0 0.75rem; border: 0.0625rem solid var(--card-border); border-radius: var(--r-md); background: var(--card-bg); font: inherit; font-size: var(--ty-meta); color: var(--ink-primary); max-width: 18rem; width: 100%; }
-.set2-field::placeholder { color: var(--ink-faint); }
-.set2-field:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
-
-/* ── Empty and loading ── */
-.set2-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 2rem 1.25rem; border: 0.0625rem dashed var(--card-border); border-radius: var(--r-lg); background: var(--card-bg); }
-.set2-skel { display: flex; flex-direction: column; gap: 0.5rem; }
-.set2-skel span { height: 0.625rem; border-radius: var(--r-xs); background: var(--card-bg-raised); border: 0.0625rem solid var(--hairline); }
-
-/* ── Actions ── */
-.set2-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
-
-/* ── A note the page owes the reader ──
-   Two of the three modules run on fixtures. Saying so on the surface is
-   cheaper than letting someone discover it by clicking. */
-.set2-fixture { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.125rem 0.5rem; border-radius: var(--r-pill); background: var(--card-bg-raised); border: 0.0625rem dashed var(--card-border); font-size: var(--ty-micro); color: var(--ink-faint); }
-
-/* Below the point where the ledger stops fitting, it scrolls inside its own
-   container rather than pushing the page sideways. The rule above already does
-   that; this only reclaims the page gutters on a small screen. */
-@media (max-width: 720px) {
-  .set2-page { padding: 1.25rem 1rem 2.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  .set2-save, .set2-lad-ch, .set2-exp, .set2-ck, .set2-row, .set2-rail-item {
+    transition-duration: 0.01ms !important;
+  }
 }

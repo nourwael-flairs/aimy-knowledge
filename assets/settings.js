@@ -2,951 +2,1588 @@
    settings.js — AiMY Settings
 
    A page, not a fourth overlay. The corpus already carries the canvas, the
-   settings sheet and the peek; settings is somewhere you go, and giving it a
+   settings sheet and the peek; settings is somewhere you GO, and giving it a
    URL is what makes it linkable, bookmarkable and drivable by an agent.
 
-   The state is the query string, same as the corpus. `?module=` names which
-   surface is open and its absence means the ledger. Nothing on this page
-   narrows the view off a variable the URL does not also hold, because a filter
-   with neither a control nor a chip has silently taken something away.
+   ── The IA ──
+   The production console splits at the top by WHO (Personal | Workspace
+   Admin). That forces every capability to exist twice and reduces the whole
+   override story to a banner sentence plus a padlock. This build splits by
+   WHAT, and demotes "whose" to a LENS that sits across every module:
+
+       AI Controls   what AiMY can do        Skills, Agents, Grounding
+       Organization  who exists and reaches  People, Roles, Hierarchy, Plan
+       Operations    the machinery           Sync, Webhooks, Mapping, ...
+
+       Lens          Yours | Organization | Effective     (default Effective)
+
+   So Skills is ONE destination. Your skills and the organisation's are in one
+   list, each saying where it came from and whether it survived.
+
+   ── Instructions are skills ──
+   They were a separate object with their own module. They are the same thing:
+   an instruction is a skill that ALWAYS applies. `trigger: 'always'` is the
+   whole of the merge, and the four old RULES fixtures come across with their
+   scope, their reach and their state intact. This reverses the position
+   argued in the previous build of this file; it was a deliberate call, not an
+   oversight.
+
+   ── State ──
+   The query string, same as the corpus. Nothing narrows the view off a
+   variable the URL does not also hold, because a filter with neither a control
+   nor a chip has silently taken something away.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
 
-  const $ = (sel, root) => (root || document).querySelector(sel);
-  const $$ = (sel, root) => Array.prototype.slice.call((root || document).querySelectorAll(sel));
+  const $  = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  /* ═══ FIXTURES ═══
-     Mirrors assets/knowledge.js lines 224-352 and 255-275. This page cannot
-     load knowledge.js without booting the whole corpus, so the shape is copied.
-     It WILL drift, and the fix is to lift both into a shared assets/data.js;
-     that is deliberately not done here because it would edit knowledge.js and
-     this build was scoped to leave the app alone. Until then, this block is the
-     copy and knowledge.js is the original. */
-  const USER = {
-    name: 'Nour Wael', initials: 'NW', role: 'Product Design', owner: 'N. Wael',
-    collections: ['policies', 'support', 'marketing', 'sales']   /* legal is not entitled */
+  /* ═══ ICONS ═══ */
+  const I = {
+    tick: '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.2 4.6 8.8 10 3.4"/></svg>',
+    dash: '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 6h6"/></svg>',
+    caret: '<svg class="set2-exp" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5 8 6l-3.5 3.5"/></svg>',
+    down: '<svg class="set2-lad-ch" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5 6 8l3.5-3.5"/></svg>',
+    chev: '<svg class="set2-chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 2.5 8 6l-3.5 3.5"/></svg>',
+    lock: '<svg class="w-lock" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5.5" width="7" height="5" rx="1"/><path d="M4.2 5.5V4a1.8 1.8 0 0 1 3.6 0v1.5"/></svg>',
+    x: '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l6 6M9 3l-6 6"/></svg>',
+    up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7.5 8.5 12 4l4.5 4.5M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16"/></svg>',
+    eye: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/></svg>',
+    code: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/></svg>',
+    /* Row glyphs. One family, one stroke, 16px grid. */
+    bolt: '<svg class="set2-row-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 1.5 4 8.5h3l-1 6 5-7H8z"/></svg>',
+    doc:  '<svg class="set2-row-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 1.5H4.5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V4.5z"/><path d="M9.5 1.5v3h3M6 8.5h4M6 11h2.5"/></svg>',
+    hand: '<svg class="set2-row-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14.5a4.5 4.5 0 0 0 4.5-4.5V6a1 1 0 0 0-2 0V4a1 1 0 0 0-2 0V3a1 1 0 0 0-2 0v1a1 1 0 0 0-2 0v5.5"/><path d="M4.5 9.5 3 11l2 3"/></svg>',
+    plug: '<svg class="set2-row-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 1.5v4M10 1.5v4M4 5.5h8v2a4 4 0 0 1-8 0z"/><path d="M8 11.5v3"/></svg>',
+    user: '<svg class="set2-row-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5.5" r="2.5"/><path d="M2.5 14a5.5 5.5 0 0 1 11 0"/></svg>',
+    tree: '<svg class="set2-row-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="1.5" width="5" height="3.5" rx="1"/><rect x="1.5" y="11" width="4.5" height="3.5" rx="1"/><rect x="10" y="11" width="4.5" height="3.5" rx="1"/><path d="M8 5v3.5M3.75 11V8.5h8.5V11"/></svg>',
+    key:  '<svg class="set2-row-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="10.5" r="3"/><path d="M7.6 8.4 13 3M11 5l1.5 1.5M12.5 3.5 14 5"/></svg>'
   };
 
-  const COLLECTIONS = { policies: 'Policies', support: 'Support', sales: 'Sales', marketing: 'Marketing', legal: 'Legal' };
-  const ORGS = { flairs: 'FlairsTech', cxs: 'CXS', upland: 'Upland', medfar: 'MedFar' };
-  const GROUPS = { qa: 'QA Reviewers', leads: 'Support Leads', am: 'Account Managers', se: 'Solution Engineers' };
+  /* ═══ WHO ═══ */
+  const USER = { name: 'Nour Wael', initials: 'NW', role: 'Product Design' };
 
-  /* Clients, mirroring knowledge.js:305. Six come from the production console;
-     the four below the line are the original corpus fixtures, kept there
-     because document titles reference them. */
-  const CLIENTS = {
-    asteris: 'Asteris', upland: 'Upland', valsoft: 'Valsoft',
-    connect: 'Connect', cxs: 'CXS', flighthub: 'FlightHub',
-    nordwind: 'Nordwind GmbH', tavola: 'Tavola Retail',
-    meridian: 'Meridian Health', orbit: 'Orbit BPO'
+  /* ═══ THE SIX-LEVEL TREE ═══
+     The console's Access & hierarchy prototype, which is the only screen there
+     that knows all six levels exist. CXS reaches all six; Upland five; MedFar
+     is a client with nothing under it yet, which is the state most real
+     clients are in and the one a picker most often gets wrong. AiMY's own
+     agents sit last and are never scoped away. */
+  const TREE = [{
+    id: 'flairs', name: 'FlairsTech', type: 'Organisation', kids: [
+      { id: 'cxs', name: 'CXS', type: 'Client', kids: [
+        { id: 'cxs-ops', name: 'Customer Operations', type: 'Business Unit', kids: [
+          { id: 'cxs-copilot', name: 'Support Copilot', type: 'Product', kids: [
+            { id: 'cxs-kops', name: 'Knowledge Ops', type: 'Team', kids: [
+              { id: 'u-mahfouz', name: 'A. Mahfouz', type: 'User' },
+              { id: 'u-nour', name: 'Nour Wael', type: 'User' }
+            ]},
+            { id: 'cxs-senab', name: 'Support Enablement', type: 'Team', kids: [
+              { id: 'u-alex', name: 'Alex Smith', type: 'User' },
+              { id: 'u-saly', name: 'Saly Tarek', type: 'User' }
+            ]}
+          ]},
+          { id: 'cxs-ksearch', name: 'Knowledge Search', type: 'Product', kids: [
+            { id: 'cxs-disc', name: 'Discovery', type: 'Team', kids: [
+              { id: 'u-ramy', name: 'Mohamed Ramy', type: 'User' }
+            ]}
+          ]}
+        ]},
+        { id: 'cxs-dx', name: 'Digital Experience', type: 'Business Unit', kids: [
+          { id: 'cxs-self', name: 'Self-Service', type: 'Product', kids: [] }
+        ]}
+      ]},
+      { id: 'upland', name: 'Upland', type: 'Client', kids: [
+        { id: 'upl-sup', name: 'Support Operations', type: 'Business Unit', kids: [
+          { id: 'interfax', name: 'InterFAX Support', type: 'Product', kids: [
+            { id: 'ifx-t1', name: 'Tier 1', type: 'Team', kids: [
+              { id: 'u-tarek', name: 'Tarek Ahmed', type: 'User' }
+            ]}
+          ]},
+          { id: 'kapost', name: 'Kapost Support', type: 'Product', kids: [] },
+          { id: 'filebound', name: 'FileBound Support', type: 'Product', kids: [] }
+        ]}
+      ]},
+      { id: 'medfar', name: 'MedFar', type: 'Client', kids: [] },
+      { id: 'aimy', name: 'AiMY agents', type: 'Ours', kids: [
+        { id: 'copilot', name: 'Copilot', type: 'Agent' },
+        { id: 'sales', name: 'Sales', type: 'Agent' },
+        { id: 'voice', name: 'Voice', type: 'Agent' }
+      ]}
+    ]
+  }];
+
+  function leavesOf(node, out) {
+    out = out || [];
+    if (!node.kids || !node.kids.length) { out.push(node); return out; }
+    node.kids.forEach((k) => leavesOf(k, out));
+    return out;
+  }
+  const ALL_LEAVES = TREE.reduce((a, n) => a.concat(leavesOf(n)), []);
+  const LEAF_TOTAL = ALL_LEAVES.length;
+  const nodeState = (node, sel) => {
+    const lv = leavesOf(node);
+    const on = lv.filter((l) => sel.has(l.id)).length;
+    return on === 0 ? 'false' : on === lv.length ? 'true' : 'mixed';
   };
+  function findNode(id, list) {
+    list = list || TREE;
+    for (const n of list) {
+      if (n.id === id) return n;
+      if (n.kids) { const f = findNode(id, n.kids); if (f) return f; }
+    }
+    return null;
+  }
 
-  /* A client's own product line, mirroring knowledge.js:312. Upland's fourteen
-     are the console's real list; the rest are placeholders awaiting theirs.
+  /* ═══ PRECEDENCE ═══
+     Six stops, one order, for every governed object.
 
-     Note the word trap this resolves, because the targeting picker below walks
-     straight into it: the console's "product" is a TENANT's software line
-     (InterFAX Support, Kapost Support) and the repo's original "product" is
-     AiMY's own (Copilot, Sales, Voice). Different things that shared a word.
-     They coexist as two groups inside one axis, and collapsing them is how a
-     rule aimed at one silently reaches the other. */
-  const CLIENT_PRODUCTS = {
-    upland: {
-      interfax: 'InterFAX Support', powersteering: 'PowerSteering Service & Support',
-      secondstreet: 'Second Street Support', kapost: 'Kapost Support', psa: 'PSA Support',
-      bainsight: 'BA Insight Support', filebound: 'FileBound Support',
-      ingenius: 'InGenius Support', roinnovation: 'RO Innovation Support',
-      ultriva: 'Ultriva Support', eclipse: 'Eclipse Support',
-      rightanswers: 'RightAnswers Support', panviva: 'Panviva Support',
-      qvidian: 'Qvidian Support'
-    },
-    asteris:   { asterisImaging: 'Imaging Support', asterisVet: 'Vet Cloud Support' },
-    valsoft:   { aspire: 'Aspire Support', hark: 'Hark Support' },
-    connect:   { connectDesk: 'Connect Desk Support', connectVoice: 'Connect Voice Support' },
-    cxs:       { cxsQa: 'QA Support', cxsAnalytics: 'Analytics Support' },
-    flighthub: { fhBooking: 'Booking Support', fhCare: 'Care Support' }
-  };
-  const AIMY_PRODUCTS = { copilot: 'Copilot', sales: 'Sales', voice: 'Voice' };
+     Specificity alone would hand every argument to the User stop, because the
+     user is always the narrowest scope -- the opposite of what is wanted. A
+     LOCK reconciles them: it sits at the level that set it and blocks every
+     level BELOW, so specificity still decides among the levels it allows.
+     That is what the console's padlock meant and never said. */
+  const LEVELS = ['Organisation', 'Client', 'Business Unit', 'Product', 'Team', 'You'];
 
-  const CLIENT_PRODUCT_COUNT = Object.keys(CLIENT_PRODUCTS)
-    .reduce((t, c) => t + Object.keys(CLIENT_PRODUCTS[c]).length, 0);
-  const TARGET_TOTAL = CLIENT_PRODUCT_COUNT + Object.keys(AIMY_PRODUCTS).length;
+  function resolve(chain, lens, lockAt) {
+    const floorFor = (top) => (lockAt == null ? top : Math.min(top, lockAt));
+    if (lens === 'yours') return (chain[5] && chain[5].val && floorFor(5) === 5) ? 5 : -1;
+    const top = lens === 'org' ? 4 : 5;           /* the org lens cannot see You */
+    for (let i = floorFor(top); i >= 0; i--) if (chain[i] && chain[i].val) return i;
+    return -1;
+  }
 
-  const AGENTS = [
-    { id: 'copilot', name: 'Copilot', external: false },
-    { id: 'sales',   name: 'Sales',   external: false },
-    { id: 'voice',   name: 'Voice',   external: true  }
+  /* ═══ SKILLS ═══
+     `trigger: always` is what an instruction was. Nothing else changed: the
+     old rules keep their scope, their reach and their state. */
+  const TRIGGER = { always: 'Always', auto: 'Automatic', manual: 'On demand' };
+
+  const SKILLS = [
+    { id: 'tone', name: 'Professional tone', from: 'Organization', trigger: 'always', on: true,
+      desc: 'Neutral register. No emojis or jargon unless the reader asks for something looser.',
+      by: 'A. Mahfouz', when: '11 Aug', v: 3, sources: ['policies'], targets: ['copilot', 'sales', 'voice'],
+      body: 'Keep a professional, neutral tone. Avoid emojis and jargon unless the reader asks '
+          + 'for something more creative. Never open with an apology.',
+      lock: null,
+      chain: [
+        { on: 'FlairsTech', val: 'Professional, neutral tone. No emojis.', by: 'A. Mahfouz', when: '11 Aug' },
+        {}, {}, {}, {}, {}
+      ] },
+
+    { id: 'refund', name: 'Draft a refund response', from: 'Yours', trigger: 'auto', on: true,
+      desc: 'Cite the policy article and flag the contested clause rather than picking a side.',
+      by: USER.name, when: '20m ago', v: 4, sources: ['policies', 'support'],
+      targets: ['u-mahfouz', 'u-nour', 'copilot'],
+      body: 'Answer from the EU refund article first, and name it. If the Returns FAQ disagrees '
+          + 'about what happens after activation, say the clause is contested rather than picking '
+          + 'a side. Nobody has ruled on it. Never quote a figure that is not in a cited source.',
+      /* The organisation locked at Product, so this personal skill exists, is
+         visible, and does not apply. This is the case the brief named. */
+      lock: 3,
+      chain: [
+        { on: 'FlairsTech', val: 'Professional, neutral tone. No emojis.', by: 'A. Mahfouz', when: '11 Aug' },
+        { on: 'CXS', val: 'Second person. Never quote a fare without a booking reference.', by: 'Ahmed Samy', when: '3 Sep' },
+        {},
+        { on: 'Support Copilot', val: 'Warm and conversational. Emojis permitted in chat.', by: 'Nour Wael', when: '2h ago' },
+        {},
+        { on: USER.name, val: 'Always open with the policy article, then the exception.', by: 'You', when: '20m ago' }
+      ] },
+
+    { id: 'booking', name: 'Booking reference guard', from: 'Organization', trigger: 'always', on: true,
+      desc: 'Never quote a fare without a booking reference.',
+      by: 'Ahmed Samy', when: '3 Sep', v: 1, sources: ['policies'], targets: ['u-alex', 'u-saly'],
+      body: 'Refer to the traveller in the second person. Never quote a fare without a booking '
+          + 'reference in hand.',
+      lock: null,
+      chain: [ {}, { on: 'CXS', val: 'Never quote a fare without a booking reference.', by: 'Ahmed Samy', when: '3 Sep' }, {}, {}, {}, {} ] },
+
+    { id: 'sweep', name: 'Weekly staleness sweep', from: 'Yours', trigger: 'manual', on: true,
+      desc: 'Documents behind their source, grouped by connector, with an owner for each.',
+      by: USER.name, when: '3 Sep', v: 2, sources: ['policies', 'support', 'marketing'], targets: ['copilot'],
+      body: 'Group by connector, not by collection. A stale document is almost always a symptom '
+          + 'of the sync that fed it. Name the owner for each. Stop at ten and say how many were '
+          + 'left out.',
+      lock: null,
+      chain: [ {}, {}, {}, {}, {}, { on: USER.name, val: 'Group by connector, stop at ten.', by: 'You', when: '3 Sep' } ] },
+
+    { id: 'triage', name: 'Triage an inbound ticket', from: 'Library', trigger: 'auto', on: false,
+      desc: 'Classify, cite the article that settles it, and say plainly when none does.',
+      by: 'A. Mahfouz', when: '11 Aug', v: 1, sources: ['support'], targets: [],
+      body: 'Classify first, answer second. If no article settles the ticket, say so plainly and '
+          + 'route it. A confident answer from adjacent material is the failure this skill exists '
+          + 'to prevent.',
+      lock: null,
+      chain: [ {}, {}, {}, {}, {}, {} ] }
   ];
 
-  const COLLECTION_META = {
-    policies:  { owner: 'A. Mahfouz', grounding: { copilot: true,  sales: false, voice: false } },
-    support:   { owner: 'N. Wael',    grounding: { copilot: true,  sales: false, voice: true  } },
-    sales:     { owner: 'Sales Ops',  grounding: { copilot: false, sales: true,  voice: false } },
-    marketing: { owner: 'Marketing',  grounding: { copilot: false, sales: true,  voice: false } },
-    legal:     { owner: 'Legal',      grounding: { copilot: false, sales: false, voice: false } }
+  /* Per skill, so editing one skill's reach cannot move another's. */
+  const SEL = {};
+  SKILLS.forEach((s) => { SEL[s.id] = new Set(s.targets); });
+  const OPEN = new Set(['flairs', 'cxs', 'cxs-ops', 'upland', 'aimy']);
+  const DIRTY = new Set();
+
+  const skillById = (id) => SKILLS.filter((s) => s.id === id)[0];
+  const reachOf = (s) => SEL[s.id].size;
+
+  /* A skill's standing under the current lens. `zero` is a defect, not an
+     empty state: a skill that reaches nothing can never fire. */
+  function standing(s, lens) {
+    if (!s.on) return ['is-mute', 'Off'];
+    if (reachOf(s) === 0) return ['is-err', 'Reaches nothing'];
+    const win = resolve(s.chain, lens, s.lock);
+    if (win === -1) return ['is-mute', 'Nothing of yours applies'];
+    if (s.lock != null && s.chain[5] && s.chain[5].val && win !== 5) return ['is-mute', 'Overridden by Organization'];
+    return ['is-ok', 'Applies'];
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     CONNECTIONS
+
+     The console models this surface as four unrelated sections stacked on one
+     scroll, scoped by two dropdowns that sit in different places and mean
+     different things: a product picker in the page chrome ("FileBound") and a
+     CRM picker in a section header ("CRM"). A third copy of the product,
+     disabled, sits inside the sync form. Nothing on the page says that all
+     four sections describe ONE thing.
+
+     They do. A product plus a CRM is a CONNECTION, and everything else here
+     is that connection's contract: what its fields mean, how far back to
+     read, when to pull, and what to throw away. So the scope stops being two
+     dropdowns and becomes a list you pick from, the way Supabase and Railway
+     scope a project. You are never in a state where the page is showing you
+     one product's mapping and another product's sync.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  /* The connector's own schema. Typeahead has to come from somewhere real or
+     the picker is a text box wearing a costume. `o` marks an object, which is
+     what makes a path longer than one segment possible.
+
+     NOTE on the console's version: its key picker suggests "Mohamed, Mostafa,
+     Mosaab" under a heading that reads SELECT KEY. Those are values, not keys.
+     Either the prototype was wired to the wrong fixture or the control means
+     something other than its label. Modelled here as keys, which is the only
+     reading where the control and its heading agree. */
+  const SCHEMA = {
+    zendesk: {
+      assignee:  { o: { name: 's', email: 's', id: 'id', phone: 's' } },
+      requester: { o: { name: 's', email: 's',
+                        organization: { o: { name: 's', domain: 's' } } } },
+      ticket:    { o: { id: 'id', subject: 's', status: 'e', priority: 'e', created_at: 'd' } },
+      brand:     { o: { name: 's' } }
+    },
+    freshdesk: {
+      agent:    { o: { name: 's', email: 's', id: 'id' } },
+      contact:  { o: { name: 's', email: 's', company: { o: { name: 's', domain: 's' } } } },
+      ticket:   { o: { id: 'id', subject: 's', status: 'e', priority: 'e' } }
+    }
   };
 
-  const SRC = {
-    confluence: { label: 'Confluence', health: 'ok', note: 'Synced 14 minutes ago', cadence: 'Every 15 minutes',
-                  docs: 1204, crawled: true, indexed: true,
-                  history: [[0, 'ok', '14 objects checked, 2 updated'], [1, 'ok', '14 objects checked, none changed'], [2, 'ok', '13 objects checked, 1 added']] },
-    zendesk:    { label: 'Zendesk', health: 'failed', note: 'OAuth token rejected since 26 Jul', cadence: 'Every hour',
-                  code: 'AUTH_401_TOKEN_EXPIRED', docs: 118, crawled: false, indexed: false, lastGood: '26 Jul',
-                  history: [[0, 'failed', 'OAuth token rejected'], [2, 'failed', 'OAuth token rejected'], [4, 'ok', '9 objects checked, 3 updated']] },
-    hubspot:    { label: 'HubSpot', health: 'warn', note: '3 records skipped, missing owner', cadence: 'Every 6 hours',
-                  docs: 340, crawled: true, indexed: 'running',
-                  history: [[0, 'warn', '12 checked, 3 skipped, no owner'], [1, 'warn', '12 checked, 3 skipped, no owner'], [3, 'ok', '11 checked, 1 added']] },
-    web:        { label: 'Website crawl', health: 'failed', note: 'Crawler blocked by robots.txt since 11 Jul', cadence: 'Weekly',
-                  code: 'CRAWL_403_ROBOTS', docs: 42, crawled: false, indexed: false, lastGood: '11 Jul',
-                  history: [[0, 'failed', 'Blocked by robots.txt'], [7, 'failed', 'Blocked by robots.txt'], [19, 'ok', '5 pages crawled, 2 changed']] },
-    upload:     { label: 'Manual upload', health: 'ok', note: 'No schedule, uploaded by hand', cadence: 'On demand',
-                  docs: 6, crawled: true, indexed: true,
-                  history: [[1, 'ok', '1 document uploaded by N. Wael'], [5, 'ok', '1 document uploaded by N. Wael']] }
+  /* Walk a path against the schema. Returns the node, or the index of the
+     segment that broke. A mapping pointing at a key the connector no longer
+     exposes is the failure that actually costs answers, and the console has
+     no way to show it. */
+  function walkPath(crmId, path) {
+    let node = { o: SCHEMA[crmId] || {} };
+    for (let i = 0; i < path.length; i++) {
+      if (!node || !node.o || !(path[i] in node.o)) return { ok: false, at: i };
+      const next = node.o[path[i]];
+      node = (typeof next === 'string') ? { leaf: next } : next;
+    }
+    return { ok: true, node: node };
+  }
+  /* What may follow the path so far. An empty list means the path is complete. */
+  const keysAt = (crmId, path) => {
+    let node = { o: SCHEMA[crmId] || {} };
+    for (const seg of path) {
+      if (!node.o || !(seg in node.o)) return [];
+      const next = node.o[seg];
+      node = (typeof next === 'string') ? { leaf: next } : next;
+    }
+    return node.o ? Object.keys(node.o) : [];
   };
 
-  /* Which collections a source feeds. Grounding is a property of a collection,
-     so a source row can only say who answers from it by walking through them. */
-  const COL_OF_SRC = { confluence: ['policies'], zendesk: ['support'], hubspot: ['sales', 'marketing'], web: ['marketing'], upload: ['policies'] };
+  /* The context fields AiMY exposes. Fixed vocabulary: the left side of a
+     mapping is ours, the right side is theirs. */
+  const CTX_FIELDS = ['Agent name', 'Email address', 'Email domain', 'Ticket number',
+                      'Priority level', 'Ticket subject', 'Company name', 'Created at'];
 
-  /* ═══ FIXTURES THIS REPO DOES NOT HAVE ═══
-     Instructions and roles return zero hits across the corpus. Everything below
-     is invented for this surface and should be read as design intent, not as
-     wired behaviour. The page says so on the modules themselves rather than
-     letting someone find out by clicking. */
-  const RULES = [
-    { id: 'r1', scope: 'org',    scopeName: 'FlairsTech', text: 'Keep a professional, neutral tone. Avoid emojis and jargon unless the reader asks for something more creative.',
-      by: 'Ahmed Samy', when: '12 Aug', v: 3, reach: 26, state: 'beaten' },
-    { id: 'r2', scope: 'client', scopeName: 'CXS', text: 'Refer to the traveller in the second person. Never quote a fare without a booking reference.',
-      by: 'Mohamed Ramy', when: '3 Sep', v: 1, reach: 2, state: 'active' },
-    { id: 'r3', scope: 'agent',  scopeName: 'Copilot', text: 'Warm, conversational tone. Emojis are permitted in chat surfaces.',
-      by: 'Nour Wael', when: '2h ago', v: 2, reach: 1, state: 'active' },
-    { id: 'r4', scope: 'org',    scopeName: 'FlairsTech', text: 'Keep a professional, neutral tone.',
-      by: 'Ahmed Samy', when: '12 Aug', v: 1, reach: 0, state: 'unreachable' }
+  const CONNECTIONS = [
+    { id: 'fb-zendesk', product: 'FileBound Support', crm: 'Zendesk', crmId: 'zendesk',
+      health: ['is-ok', 'Healthy'], last: '14 minutes ago', every: 'Every 15 minutes',
+      window: 30, records: 12840,
+      maps: [
+        { ctx: 'Agent name',     path: ['assignee', 'name'] },
+        { ctx: 'Email address',  path: ['requester', 'email'] },
+        { ctx: 'Email domain',   path: ['requester', 'organization', 'domain'] },
+        { ctx: 'Ticket number',  path: ['ticket', 'id'], idres: true },
+        { ctx: 'Priority level', path: ['ticket', 'priority'],
+          values: [['5', 'Closed'], ['2', 'Open'], ['3', 'Pending']] }
+      ],
+      criteria: [['Status', 'Solved'], ['Form', 'Customer Support']],
+      runs: [
+        ['31 Oct, 15:41', [['Status', 'Closed'], ['Form', 'Sales']], 'run', 'Running', 412],
+        ['31 Oct, 14:14', [['Status', 'Solved'], ['Form', 'Customer Support']], 'ok', 'Succeeded', 1284],
+        ['31 Oct, 13:58', [['Status', 'Open'], ['Form', 'Billing']], 'err', 'Failed', 0]
+      ] },
+
+    { id: 'fb-freshdesk', product: 'FileBound Support', crm: 'FreshDesk', crmId: 'freshdesk',
+      health: ['is-err', 'Token rejected'], last: '26 Jul', every: 'Every hour',
+      window: 90, records: 4210,
+      /* Deliberately broken: `contact.organization` does not exist in FreshDesk,
+         whose equivalent is `contact.company`. This is what a renamed field on
+         the connector's side looks like from in here. */
+      maps: [
+        { ctx: 'Agent name',    path: ['agent', 'name'] },
+        { ctx: 'Email address', path: ['contact', 'email'] },
+        { ctx: 'Email domain',  path: ['contact', 'organization', 'domain'] }
+      ],
+      criteria: [['Status', 'Open']],
+      runs: [['26 Jul, 09:02', [['Status', 'Open']], 'err', 'Failed', 0]] },
+
+    { id: 'ks-zendesk', product: 'Knowledge Search', crm: 'Zendesk', crmId: 'zendesk',
+      health: ['is-warn', '3 records skipped'], last: '2 hours ago', every: 'Every 6 hours',
+      window: 30, records: 340,
+      maps: [{ ctx: 'Ticket subject', path: ['ticket', 'subject'] }],
+      criteria: [], runs: [] }
+  ];
+  const connById = (id) => CONNECTIONS.filter((c) => c.id === id)[0];
+
+  /* Match count. Every criterion narrows, so the number falls as you add one.
+     Deterministic from the criteria themselves, because a figure that moved on
+     its own would be worse than no figure. */
+  function matchCount(c) {
+    let n = c.records;
+    c.criteria.forEach((k, i) => { n = Math.floor(n * (i === 0 ? 0.42 : 0.61)); });
+    return n;
+  }
+
+  const CRITERIA_VOCAB = {
+    Status: ['Open', 'Pending', 'Solved', 'Closed'],
+    Form: ['Customer Support', 'Billing', 'Sales', 'Onboarding'],
+    Priority: ['Low', 'Normal', 'High', 'Urgent'],
+    Brand: ['FileBound', 'InterFAX', 'Kapost']
+  };
+
+  /* ═══ THE OTHER MODULES ═══ */
+  const SRC = [
+    { id: 'confluence', name: 'Confluence', d: 'Synced 14 minutes ago · every 15 minutes', s: ['is-ok', 'Healthy'], n: 1204 },
+    { id: 'zendesk', name: 'Zendesk', d: 'OAuth token rejected since 26 Jul', s: ['is-err', 'Failing'], n: 118 },
+    { id: 'hubspot', name: 'HubSpot', d: '3 records skipped, missing owner', s: ['is-warn', 'Degraded'], n: 340 },
+    { id: 'web', name: 'Website crawl', d: 'Blocked by robots.txt since 11 Jul', s: ['is-err', 'Failing'], n: 42 }
   ];
 
   const PEOPLE = [
-    { id: 'p1', name: 'Alex Smith', mail: 'alex.smith@flairstech.com', initials: 'AS', status: 'active',
-      grants: [{ role: 'Super Admin', scopeT: 'Org', scopeV: 'FlairsTech', from: 'Direct', by: 'Nour Wael, 3 Sep' },
-               { role: 'QA Manager', scopeT: 'Group', scopeV: 'QA Reviewers', from: 'Inherited from Org', by: '' }] },
-    { id: 'p2', name: 'Saly Tarek', mail: 'saly.tarek@flairstech.com', initials: 'ST', status: 'pending', grants: [] }
+    { id: 'p1', name: 'Alex Smith', mail: 'alex.smith@flairstech.com', s: ['is-ok', 'Active'],
+      grants: [['Super Admin', 'Product', 'InterFAX Support'], ['QA Manager', 'Client', 'CXS']] },
+    { id: 'p2', name: 'Saly Tarek', mail: 'saly.tarek@flairstech.com', s: ['is-warn', 'Invite pending'], grants: [] },
+    { id: 'p3', name: 'A. Mahfouz', mail: 'a.mahfouz@flairstech.com', s: ['is-ok', 'Active'],
+      grants: [['Admin', 'Organisation', 'FlairsTech']] }
+  ];
+
+  const ROLES = [
+    ['Super Admin', 'Everything, on every scope it is granted for'],
+    ['Admin', 'Manage skills, sources and people. Cannot change billing'],
+    ['Manager', 'Manage skills and sources on their own scope'],
+    ['QA Manager', 'Read everything, write reviews'],
+    ['Contributor', 'Add and edit their own skills'],
+    ['Read Only', 'Read. Nothing else']
+  ];
+
+  const AGENTS = [
+    { id: 'copilot', name: 'Copilot', d: 'Internal support agent. 4 skills, 2 collections.', on: true },
+    { id: 'sales', name: 'Sales', d: 'Internal. 2 skills, 1 collection.', on: true },
+    { id: 'voice', name: 'Voice', d: 'Client-facing. 1 skill, 1 collection.', on: false }
+  ];
+
+  const COLS = [
+    { id: 'policies', name: 'Policies', d: 'Owned by A. Mahfouz · 1,204 documents', on: true },
+    { id: 'support', name: 'Support', d: 'Owned by N. Wael · 118 documents', on: true },
+    { id: 'sales', name: 'Sales', d: 'Owned by Sales Ops · 340 documents', on: false },
+    { id: 'legal', name: 'Legal', d: 'Owned by Legal · not entitled to your plan', on: false, locked: true }
   ];
 
   /* ═══ MODULES ═══
-     Nine rows. Three are built. The other six carry their entitlement state and
-     nothing else, because a plan column that only lists what you already own is
-     not a plan column. Figures are placeholders pending commercial input. */
-
-  /* ══ SKILLS ════════════════════════════════════════════════════════════
-     A skill is a named, reusable PROCEDURE an agent can apply: what to do, in
-     what order, what to refuse, and which sources it may stand on. It is not
-     a second instructions system — it rides the same precedence chain and the
-     same targeting tree as AI instructions, pointed at a different unit. A
-     rule says how to behave; a skill says how to do a specific job.
-
-     `trigger` is the field that decides whether the agent chooses the skill or
-     the person does. An automatic skill is matched on its DESCRIPTION, which
-     is why a vague description costs accuracy rather than tidiness.
-
-     `origin` records where a skill came from. A starter you have adapted still
-     says so, because an update to the original should be a decision and not a
-     surprise.
-
-     Invented for this surface, like RULES and PEOPLE above it. */
-  const SKILLS = [
-    { id: 'refund-response', name: 'Draft a refund response',
-      desc: 'Turn a refund question into a reply that cites the policy and flags the contested clause.',
-      trigger: 'auto', on: true, origin: 'Yours', by: 'Nour Wael', when: '2h ago', v: 4,
-      sources: ['policies', 'support'],
-      targets: ['interfax', 'kapost', 'copilot'],
-      body: 'Answer from the EU refund article first, and name it. If the Returns FAQ disagrees '
-          + 'about what happens after activation, say the clause is contested rather than picking '
-          + 'a side \u2014 nobody has ruled on it. Never quote a figure that is not in a cited source.' },
-
-    { id: 'stale-sweep', name: 'Weekly staleness sweep',
-      desc: 'List documents behind their source, grouped by connector, with the owner for each.',
-      trigger: 'manual', on: true, origin: 'Yours', by: 'Nour Wael', when: '3 Sep', v: 2,
-      sources: ['policies', 'support', 'marketing'],
-      targets: ['copilot'],
-      body: 'Group by connector, not by collection \u2014 a stale document is almost always a symptom '
-          + 'of the sync that fed it. Name the owner for each. Stop at ten and say how many were '
-          + 'left out.' },
-
-    { id: 'ticket-triage', name: 'Triage an inbound ticket',
-      desc: 'Classify a support ticket, cite the article that settles it, and say when it does not.',
-      trigger: 'auto', on: false, origin: 'From the library', by: 'A. Mahfouz', when: '11 Aug', v: 1,
-      sources: ['support'],
-      targets: [],
-      body: 'Classify first, answer second. If no article settles the ticket, say so plainly and '
-          + 'route it \u2014 a confident answer from adjacent material is the failure this skill exists '
-          + 'to prevent.' }
-  ];
-  /* Per skill, so editing one skill's reach cannot move another's. The
-     instructions tree keeps a single module-level Set because there is one
-     rule being edited at a time; here the list is on screen beside the
-     detail. */
-  const SKILL_SEL = {};
-  SKILLS.forEach((k) => { SKILL_SEL[k.id] = new Set(k.targets); });
-  const SKILL_OPEN = new Set(['upland', 'aimy']);
-  const TRIGGER_LABEL = { auto: ['is-info', 'Automatic'], manual: ['is-mute', 'On demand'] };
-
+     `tier` is what the workspace is entitled to. Unowned modules stay in the
+     rail and render at full contrast with dead controls, because a module you
+     cannot read is a module you will never buy. */
   const MODULES = [
-    { id: 'sources', name: 'Knowledge sources', sub: '5 connected, 2 failing', scopeT: 'Org', scopeV: 'FlairsTech',
-      audience: 'Internal', plan: 'included', need: { kind: 'err', text: '2 failing' }, who: 'N. Wael', when: '20m ago', built: true },
-    { id: 'instructions', name: 'AI instructions', sub: '4 rules, 1 unreachable', scopeT: 'Org', scopeV: 'FlairsTech',
-      audience: 'Internal', plan: 'included', need: { kind: 'warn', text: '1 conflict' }, who: 'Nour Wael', when: '2h ago', built: true },
-    { id: 'access', name: 'Access and roles', sub: '2 people, 3 grants', scopeT: 'Org', scopeV: 'FlairsTech',
-      audience: 'Internal', plan: 'included', need: { kind: 'warn', text: '1 invite pending' }, who: 'Nour Wael', when: '3 Sep', built: true },
-    { id: 'skills', name: 'Skills', sub: '3 defined, 1 off', scopeT: 'Org', scopeV: 'FlairsTech',
-      audience: 'Internal', plan: 'included', need: { kind: 'info', text: '1 untargeted' },
-      who: 'Nour Wael', when: '2h ago', built: true },
-    { id: 'retention', name: 'Retention and archiving', sub: 'Per collection auto-archive', scopeT: 'Org', scopeV: 'FlairsTech',
-      audience: 'Internal', plan: 'included', need: null, who: 'N. Wael', when: '11 Aug', built: false, where: 'It lives on the corpus today, at ?settings=data' },
-    { id: 'mapping', name: 'CRM field mapping', sub: 'Pulls CRM fields into agent context', scopeT: 'Product', scopeV: 'Copilot',
-      audience: 'Client visible', plan: 'addon', offer: '40 per client, monthly. Needs Sync and retention.', need: null, built: false },
-    { id: 'sync', name: 'Sync and retention', sub: 'Scheduled pulls, and deletion older than a threshold', scopeT: 'Product', scopeV: 'Copilot',
-      audience: 'Internal', plan: 'addon', offer: '40 per client, monthly.', need: null, built: false },
-    { id: 'webhooks', name: 'Enablement webhooks', sub: 'Called when enrichment is triggered from your side', scopeT: 'Org', scopeV: 'FlairsTech',
-      audience: 'Client visible', plan: 'trial', offer: 'Trial ends in 9 days. Then 25 per org, monthly.', need: null, built: false },
-    { id: 'notify', name: 'Notifications', sub: 'Alerts when a sync or a rule fails', scopeT: 'Org', scopeV: 'FlairsTech',
-      audience: 'Internal', plan: 'none', offer: 'Enterprise plan only.', need: null, built: false },
-    { id: 'audit', name: 'Audit trail', sub: 'Who changed what, and when', scopeT: 'Org', scopeV: 'FlairsTech',
-      audience: 'Internal', plan: 'none', offer: 'Enterprise plan only.', need: null, built: false }
-  ];
+    { g: 'AI Controls', id: 'skills', name: 'Skills', n: () => SKILLS.length },
+    { g: 'AI Controls', id: 'agents', name: 'Agents and tools', n: () => AGENTS.length },
+    { g: 'AI Controls', id: 'grounding', name: 'Grounding', n: () => COLS.filter((c) => c.on).length },
 
-  const PLAN_LABEL = { included: ['is-ok', 'Included'], addon: ['is-mute', 'Add-on'], trial: ['is-warn', 'Trial, 9 days'], none: ['is-mute', 'Not entitled'] };
+    { g: 'Organization', id: 'people', name: 'People', n: () => PEOPLE.length },
+    { g: 'Organization', id: 'roles', name: 'Roles and permissions', n: () => ROLES.length },
+    { g: 'Organization', id: 'hierarchy', name: 'Hierarchy', n: () => LEAF_TOTAL },
+    { g: 'Organization', id: 'plan', name: 'Entitlements and plan' },
+
+    /* Field mapping and sync were two rail items in the console and are one
+       here, because they are two halves of one connection's contract and
+       neither is legible without the other. */
+    { g: 'Operations', id: 'connections', name: 'Connections', n: () => CONNECTIONS.length },
+    { g: 'Operations', id: 'retention', name: 'Retention' },
+    { g: 'Operations', id: 'webhooks', name: 'Enablement webhooks' },
+    { g: 'Operations', id: 'audit', name: 'Audit trail', tier: 'Enterprise' }
+  ];
+  const GROUPS = ['AI Controls', 'Organization', 'Operations'];
+  const moduleById = (id) => MODULES.filter((m) => m.id === id)[0];
 
   /* ═══ STATE ═══
      Read fresh on every render, never mirrored in a variable that can disagree
      with the address bar. */
   function readURL() {
     const p = new URLSearchParams(location.search);
-    const m = p.get('module') || '';
-    /* A third key, and NOT `src` reused. The URL is this product's state model;
-     two meanings on one key is how it stops being one. */
-  return { module: MODULES.some((x) => x.id === m && x.built) ? m : '',
-           src: p.get('src') || '', skill: p.get('skill') || '' };
+    const m = p.get('m') || 'skills';
+    const lens = ['yours', 'org', 'eff'].indexOf(p.get('lens')) >= 0 ? p.get('lens') : 'eff';
+    return { m: moduleById(m) ? m : 'skills', skill: p.get('skill') || '',
+             conn: p.get('conn') || '', lens: lens };
   }
-
   function patch(changes) {
     const st = readURL();
     Object.keys(changes).forEach((k) => { st[k] = changes[k]; });
     const p = new URLSearchParams();
-    if (st.module) p.set('module', st.module);
-    if (st.src) p.set('src', st.src);
+    if (st.m && st.m !== 'skills') p.set('m', st.m);
+    if (st.skill) p.set('skill', st.skill);
     /* Rebuilt from scratch every time, so a key this function does not know
        about is a key that silently disappears on the next navigation. */
-    if (st.skill) p.set('skill', st.skill);
+    if (st.conn) p.set('conn', st.conn);
+    if (st.lens && st.lens !== 'eff') p.set('lens', st.lens);
     const qs = p.toString();
     history.pushState(null, '', location.pathname + (qs ? '?' + qs : ''));
     render();
   }
+  const lensName = { yours: 'yours', org: 'org', eff: 'effective' };
 
-  /* ═══ PIECES ═══ */
-  const CHECK = '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.2 4.6 8.8 10 3.4"/></svg>';
+  /* ═══ ATOMS ═══ */
+  const pill = (k, t) => `<span class="set2-pill ${k}"><i></i>${esc(t)}</span>`;
+  const ck = (st, label) =>
+    `<button class="set2-ck" role="checkbox" aria-checked="${st}" aria-label="${esc(label)}" type="button" tabindex="-1">${st === 'mixed' ? I.dash : I.tick}</button>`;
+  const toggle = (on, label, data) => `
+    <label class="toggle" title="${esc(label)}">
+      <input type="checkbox" ${on ? 'checked' : ''} aria-label="${esc(label)}" ${data || ''}>
+      <span class="toggle-track"></span><span class="toggle-thumb"></span>
+    </label>`;
 
-  const pill = (kind, text) => `<span class="set2-pill ${esc(kind)}"><i class="set2-pill-dot"></i>${esc(text)}</span>`;
-  const tok = (t, v) => `<span class="set2-tok"><span class="set2-tok-t">${esc(t)}</span><span class="set2-tok-v">${esc(v)}</span></span>`;
-  const ck = (state, label) =>
-    `<button class="set2-ck" role="checkbox" aria-checked="${esc(state)}" aria-label="${esc(label)}" type="button"><span class="set2-ck-box">${CHECK}</span></button>`;
-
-  /* The bar reads and never writes. A single editable control in the chrome
-     that re-scopes the page under it is the shape behind every wrong-context
-     incident worth reading about, and the remedy in each of those write-ups was
-     visibility of the active context rather than one more gate. */
-  function scopeBar(st) {
-    const url = '?' + (st.module ? 'module=' + st.module : '') + (st.src ? '&src=' + st.src : '');
-    return `
-      <div class="set2-scope">
-        ${tok('Org', 'FlairsTech')}
-        <span class="set2-scope-sep">&rsaquo;</span>
-        ${tok('Signed in as', USER.name)}
-        <span class="set2-scope-end">
-          ${pill('is-ok', 'You can write here')}
-        </span>
-      </div>
-      <code class="set2-url">settings.html<b>${esc(url === '?' ? '' : url)}</b></code>`;
+  function row(o) {
+    const tag = o.go ? 'button' : 'div';
+    return `<${tag} class="set2-row${o.off ? ' is-off' : ''}${o.locked ? ' is-locked' : ''}"
+      ${o.go ? `type="button" data-go="${esc(o.go)}"` : ''}>
+      ${o.ico || ''}
+      <span class="set2-row-main">
+        <span class="set2-row-n">${esc(o.name)}${o.tagHtml || ''}</span>
+        ${o.d ? `<span class="set2-row-d">${esc(o.d)}</span>` : ''}
+      </span>
+      <span class="set2-row-end">${o.end || ''}${o.locked ? I.lock : ''}${o.go ? I.chev : ''}</span>
+    </${tag}>`;
   }
 
-  /* ═══ THE LEDGER ═══ */
-  function ledger() {
+  /* ═══ LADDER ═══ */
+  function ladder(s, lens) {
+    const win = resolve(s.chain, lens, s.lock);
+    const filled = s.chain.filter((c) => c && c.val).length;
+    const head = win === -1
+      ? `<span class="set2-lad-lv">Nothing of yours applies here</span>`
+      : `<span class="set2-lad-lv">${esc(LEVELS[win])}</span>${pill('is-ok', 'Applies')}`;
     return `
-      <div class="set2-head">
-        <h1 class="set2-title">Settings</h1>
-        <p class="set2-lede">Every capability in this workspace, what it acts on, who can see it, and whether it is on your plan.</p>
-      </div>
-      <div class="set2-ledger-wrap">
-        <table class="set2-ledger">
-          <thead><tr>
-            <th>Module</th><th>Scope</th><th>Audience</th><th>Plan</th><th>Needs you</th><th>Changed</th><th></th>
-          </tr></thead>
-          <tbody>
-            ${MODULES.map((m) => {
-              const [cls, label] = PLAN_LABEL[m.plan];
-              const off = m.plan === 'addon' || m.plan === 'none';
-              return `<tr${off ? ' class="set2-row-off"' : ''}>
-                <td>
-                  <div class="set2-ledger-name">${esc(m.name)}</div>
-                  <div class="set2-ledger-sub">${esc(m.sub)}</div>
-                </td>
-                <td>${tok(m.scopeT, m.scopeV)}</td>
-                <td>${esc(m.audience)}</td>
-                <td>
-                  ${pill(cls, label)}
-                  ${m.offer ? `<div class="set2-offer">${esc(m.offer)}</div>` : ''}
-                </td>
-                <td>${m.need ? pill('is-' + m.need.kind, m.need.text) : '<span class="set2-ledger-sub">Nothing</span>'}</td>
-                <td><span class="set2-ledger-sub">${m.who ? esc(m.who) + '<br>' + esc(m.when) : 'Never'}</span></td>
-                <td class="set2-ledger-end">${
-                  m.built ? `<button class="btn btn-ghost btn-sm" type="button" data-go="${esc(m.id)}">Open</button>`
-                  : m.plan === 'addon' ? '<button class="btn btn-ghost btn-sm" type="button" disabled>Add</button>'
-                  : m.plan === 'trial' ? '<button class="btn btn-ghost btn-sm" type="button" disabled>Keep</button>'
-                  : m.where ? `<span class="set2-ledger-sub">${esc(m.where)}</span>`
-                  : '<button class="btn btn-ghost btn-sm" type="button" disabled>Talk to us</button>'
-                }</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-      <p class="set2-offer" style="margin-top:0.75rem">Prices are placeholders pending commercial input. Four modules are built; the rest carry their state only.</p>`;
-  }
-
-  const backLink = '<button class="set2-back" type="button" data-back>&larr; All settings</button>';
-
-  /* ═══ MODULE: KNOWLEDGE SOURCES ═══
-     The only module on this page running on the corpus's own data. */
-  function sourcesModule(st) {
-    const keys = Object.keys(SRC);
-    const bad = keys.filter((k) => SRC[k].health === 'failed');
-    const rest = keys.filter((k) => SRC[k].health !== 'failed');
-
-    if (st.src && SRC[st.src]) return sourceDetail(st.src);
-
-    return `
-      <div class="set2-head">
-        ${backLink}
-        <h1 class="set2-title">Knowledge sources</h1>
-        <p class="set2-lede">Where AiMY reads from. A source that cannot connect keeps answering from whatever it last pulled, so a failure here is quieter than it looks.</p>
-      </div>
-      <div class="set2-module">
-        ${bad.length ? `<div class="set2-note is-err"><span><b>${bad.length} source${bad.length > 1 ? 's need' : ' needs'} attention.</b> Answers still cite them, from the last good pull.</span></div>` : ''}
-        <div class="set2-card">
-          ${bad.concat(rest).map((k) => srcRow(k)).join('')}
-        </div>
-      </div>`;
-  }
-
-  function srcRow(k) {
-    const s = SRC[k];
-    const cls = s.health === 'ok' ? 'is-ok' : s.health === 'warn' ? 'is-warn' : 'is-err';
-    const word = s.health === 'ok' ? 'Live' : s.health === 'warn' ? 'Partial' : 'Failed';
-    /* Two phases, because one opaque "Processing" says a thing is happening and
-       nothing about which half of it. */
-    const p1 = s.crawled ? 'is-done' : 'is-fail';
-    const p2 = s.indexed === 'running' ? 'is-live' : s.indexed ? 'is-done' : '';
-    const answers = (COL_OF_SRC[k] || []).reduce((acc, col) => {
-      AGENTS.forEach((a) => { if (COLLECTION_META[col] && COLLECTION_META[col].grounding[a.id] && acc.indexOf(a.name) === -1) acc.push(a.name); });
-      return acc;
-    }, []);
-    return `
-      <div class="set2-card-row">
-        <div class="set2-grow">
-          <div class="set2-name">${esc(s.label)} ${pill(cls, word)}</div>
-          <div class="set2-phase"><i class="${p1}"></i><i class="${p2}"></i></div>
-          <div class="set2-phase-lbl">
-            <span>${s.health === 'failed' ? esc(s.note) : 'Crawled ' + s.docs + ' objects'}</span>
-            <span>${s.code ? '<span class="set2-code">' + esc(s.code) + '</span>' : s.indexed === 'running' ? 'Indexing now' : 'Indexed, ' + esc(s.cadence.toLowerCase())}</span>
-          </div>
-          <div class="set2-phase-lbl">
-            <span>${s.lastGood ? 'Last good sync ' + esc(s.lastGood) + ', ' + s.docs + ' documents still answering' : s.docs + ' documents'}</span>
-            <span>${answers.length ? 'Answers: ' + esc(answers.join(', ')) : 'No agent answers from this'}</span>
-          </div>
-        </div>
-        <div class="set2-actions">
-          <button class="btn btn-ghost btn-sm" type="button" data-src="${esc(k)}">Open</button>
-          ${s.health === 'failed'
-            ? '<button class="btn btn-brand btn-sm" type="button" disabled>Reconnect</button>'
-            : '<button class="btn btn-ghost btn-sm" type="button" disabled>Sync now</button>'}
-        </div>
-      </div>`;
-  }
-
-  /* Governance sits with the thing it governs. Schedule, grounding and history
-     are all questions about this source and none of them is a question about a
-     document, which is why they are here and not on the corpus. */
-  function sourceDetail(k) {
-    const s = SRC[k];
-    const cols = COL_OF_SRC[k] || [];
-    const col = cols[0];
-    const meta = col ? COLLECTION_META[col] : null;
-    return `
-      <div class="set2-head">
-        <button class="set2-back" type="button" data-back-src>&larr; Knowledge sources</button>
-        <h1 class="set2-title">${esc(s.label)}</h1>
-        <p class="set2-lede">${esc(s.docs)} documents${col ? ', filed under ' + esc(COLLECTIONS[col]) : ''}. ${esc(s.note)}</p>
-      </div>
-      <div class="set2-module">
-        ${s.health === 'failed' ? `<div class="set2-note is-err"><span><b>You cannot pull from a source that is not connected.</b> The remedy is the connection, so this offers Reconnect rather than a retry that would queue and fail the same way. Error code <span class="set2-code">${esc(s.code)}</span>.</span></div>` : ''}
-
-        <div class="set2-card">
-          <div class="set2-card-row">
-            <div class="set2-grow"><div class="set2-name">Sync every</div>
-              <div class="set2-sub">Writes on change. The run log gains a row and the toast carries an undo.</div></div>
-            <span class="set2-pill is-mute">${esc(s.cadence)}</span>
-          </div>
-          ${meta ? `
-          <div class="set2-card-row">
-            <div class="set2-grow"><div class="set2-name">Which agents may answer from this</div>
-              <div class="set2-sub">Internal agents apply on the tick. A customer facing agent puts this content in front of customers, so it reverts until you type the collection name.</div>
-              <div class="set2-agents" style="margin-top:0.5rem">
-                ${AGENTS.map((a) => `<button class="set2-agent${a.external ? ' is-ext' : ''}" type="button"
-                    aria-pressed="${meta.grounding[a.id] ? 'true' : 'false'}"
-                    data-ground="${esc(a.id)}" data-col="${esc(col)}">${esc(a.name)}${a.external ? ', customer facing' : ''}</button>`).join('')}
-              </div>
-            </div>
-          </div>` : ''}
-          <div class="set2-card-pad">
-            <div class="set2-label" style="margin-bottom:0.5rem">Recent runs</div>
-            ${s.history.map(([d, st2, note]) => `
-              <div class="set2-run">
-                <span class="set2-run-when">${d === 0 ? 'Today' : d + 'd ago'}</span>
-                <span>${esc(note)}</span>
-                ${pill(st2 === 'ok' ? 'is-ok' : st2 === 'warn' ? 'is-warn' : 'is-err', st2 === 'ok' ? 'Success' : st2 === 'warn' ? 'Partial' : 'Failed')}
-              </div>`).join('')}
-          </div>
-        </div>
-        <div id="groundConfirm"></div>
-      </div>`;
-  }
-
-  /* ═══ MODULE: AI INSTRUCTIONS ═══ */
-  function instructionsModule() {
-    const beaten = RULES.filter((r) => r.state === 'beaten').length;
-    return `
-      <div class="set2-head">
-        ${backLink}
-        <h1 class="set2-title">AI instructions <span class="set2-fixture">Fixture data</span></h1>
-        <p class="set2-lede">Nobody orders these by hand. The narrower scope wins, ties break on recency, and the panel at the bottom shows what an agent actually receives.</p>
-      </div>
-      <div class="set2-module">
-        <div class="set2-scope" style="border:0;padding:0">
-          <span class="set2-label">Precedence</span>
-          ${tok('1', 'Org')}<span class="set2-scope-sep">&rsaquo;</span>
-          ${tok('2', 'Client')}<span class="set2-scope-sep">&rsaquo;</span>
-          ${tok('3', 'Product')}<span class="set2-scope-sep">&rsaquo;</span>
-          ${tok('4', 'Agent')}
-        </div>
-
-        <div class="set2-card">
-          ${RULES.map((r) => `
-            <div class="set2-rule${r.state === 'active' ? '' : ' is-beaten'}">
-              <div class="set2-rule-txt">${esc(r.text)}</div>
-              <div class="set2-rule-meta">
-                ${r.state === 'unreachable' ? pill('is-err', 'Unreachable')
-                  : r.state === 'beaten' ? pill('is-mute', 'Overridden below') : pill('is-ok', 'Applies')}
-                ${tok(r.scope, r.scopeName)}
-                <span class="set2-reach${r.reach === 0 ? ' is-zero' : ''}"><b>${r.reach}</b> of ${TARGET_TOTAL} products</span>
-                <span>${esc(r.by)}, ${esc(r.when)}, v${r.v}</span>
-                ${r.state === 'beaten' ? '<button class="btn btn-ghost btn-sm" type="button" disabled>Restore inherited</button>' : ''}
-              </div>
-            </div>`).join('')}
-        </div>
-
-        <div class="set2-note is-warn"><span><b>Two rules set tone at Org scope with identical text</b>, so the second can never fire. A rule reaching 0 agents is always a defect, which is why reach sits on every card rather than in a report.</span></div>
-
-        <div class="set2-effective">
-          <div class="set2-label" style="color:var(--ink-ok)">What Copilot receives</div>
-          <p style="margin-top:0.5rem;font-size:var(--ty-meta);color:var(--ink-secondary);line-height:1.6">Warm, conversational tone. Emojis are permitted in chat surfaces. Refer to the traveller in the second person. Never quote a fare without a booking reference.</p>
-        </div>
-
-        <div class="set2-card set2-card-pad">
-          <div class="set2-label" style="margin-bottom:0.5rem">Which agents this rule targets</div>
-          ${tree()}
-        </div>
-      </div>`;
-  }
-
-  /* The tri-state cascade is a library convention, not an ARIA rule: the spec
-     defines `mixed` and says nothing about parent to child propagation, so the
-     semantics are ours to define and ours to document. The keyboard map is the
-     spec's though, and it is shown rather than hidden because a picker whose
-     only affordance is the mouse is a picker half the team cannot use. */
-  /* Selection is a Set of product ids and every checkbox state is DERIVED from
-     it. A parent is checked when all its children are, mixed when some are, and
-     that cascade is ours to define: the ARIA treeview pattern specifies the
-     `mixed` value but says nothing about parent to child propagation, so the
-     semantics come from us and have to be written down somewhere. Here. */
-  const targetSel = new Set(['interfax', 'kapost', 'psa', 'filebound', 'copilot']);
-  const treeOpen = new Set(['upland', 'aimy']);
-
-  function targetGroups() {
-    const g = Object.keys(CLIENT_PRODUCTS).map((c) => ({
-      id: c, name: CLIENTS[c], note: 'Client',
-      kids: Object.keys(CLIENT_PRODUCTS[c]).map((k) => ({ id: k, name: CLIENT_PRODUCTS[c][k] }))
-    }));
-    /* AiMY's own agents sit last and are never scoped away, because a rule that
-       silently stopped reaching them would look like it had reached everything. */
-    g.push({ id: 'aimy', name: 'AiMY agents', note: 'Ours',
-             kids: Object.keys(AIMY_PRODUCTS).map((k) => ({ id: k, name: AIMY_PRODUCTS[k] })) });
-    return g;
-  }
-
-  const groupState = (g) => {
-    const on = g.kids.filter((k) => targetSel.has(k.id)).length;
-    return on === 0 ? 'false' : on === g.kids.length ? 'true' : 'mixed';
-  };
-
-  function tree() {
-    const groups = targetGroups();
-    return `
-      <div class="set2-tree" role="tree" aria-multiselectable="true" aria-label="What this rule targets">
-        <div class="set2-tree-body">
-          ${groups.map((g) => {
-            const st = groupState(g);
-            const on = g.kids.filter((k) => targetSel.has(k.id)).length;
-            const open = treeOpen.has(g.id);
-            return `
-              <div class="set2-node" role="treeitem" aria-expanded="${open}" data-tnode="${esc(g.id)}">
-                ${ck(st, g.name)}<span data-texp="${esc(g.id)}">${esc(g.name)}</span>
-                <span class="set2-node-ct">${on} of ${g.kids.length}</span>
-              </div>
-              ${open ? g.kids.map((k) => `
-                <div class="set2-node is-child" role="treeitem">
-                  ${ck(targetSel.has(k.id) ? 'true' : 'false', k.name)}${esc(k.name)}
-                </div>`).join('') : ''}`;
+      <div class="set2-lad" data-lad>
+        <button class="set2-lad-hd" type="button" data-lad-t aria-expanded="false">
+          ${head}
+          <span class="set2-lad-more set2-num">${filled} of 6 levels set</span>${I.down}
+        </button>
+        <div class="set2-lad-bd">
+          ${LEVELS.map((lv, i) => {
+            const c = s.chain[i] || {};
+            const empty = !c.val;
+            const blocked = s.lock != null && i > s.lock && !empty;
+            const beat = !empty && i !== win;
+            return `<div class="set2-stop ${empty ? 'is-empty' : ''} ${beat ? 'is-beat' : ''} ${i === win ? 'is-win' : ''}">
+              <span class="set2-stop-lv">${esc(lv)}</span>
+              <span class="set2-stop-v">${empty ? 'Nothing set' : esc(c.val)}</span>
+              <span class="set2-stop-end">
+                ${i === win ? pill('is-ok', 'Applies') : ''}
+                ${blocked ? I.lock + pill('is-mute', 'Locked by Organization') : ''}
+                ${!empty && !blocked && i !== win ? `<span class="set2-from">${esc(c.by)} · ${esc(c.when)}</span>` : ''}
+              </span>
+            </div>`;
           }).join('')}
         </div>
-        <div class="set2-tree-foot">
-          <span>${targetSel.size} of ${TARGET_TOTAL} selected</span>
-          <span>Across ${groups.filter((g) => g.kids.some((k) => targetSel.has(k.id))).length} of ${groups.length} groups</span>
-        </div>
-      </div>
-      <div class="set2-keys" style="margin-top:0.75rem">
-        <span class="set2-kbd">Space</span> toggle
-        <span class="set2-kbd">&rarr;</span> open
-        <span class="set2-kbd">&larr;</span> close or parent
-        <span class="set2-kbd">&uarr;&darr;</span> move
-        <span class="set2-kbd">Home</span><span class="set2-kbd">End</span> ends
       </div>`;
   }
 
-  /* ═══ MODULE: ACCESS ═══ */
-  function accessModule() {
+  /* ═══ TARGETING PICKER ═══ */
+  function walk(node, depth, out, sel, filter) {
+    const kids = node.kids || [];
+    const isLeaf = !kids.length;
+    const hit = !filter || node.name.toLowerCase().indexOf(filter) >= 0;
+    const kidRows = [];
+    if (kids.length && (OPEN.has(node.id) || filter)) kids.forEach((k) => walk(k, depth + 1, kidRows, sel, filter));
+    if (filter && !hit && !kidRows.length) return;
+    const st = nodeState(node, sel);
+    const lv = leavesOf(node);
+    out.push(`<div class="set2-node is-l${depth}${isLeaf ? '' : ' is-grp'}${OPEN.has(node.id) ? ' is-open' : ''}"
+      data-node="${esc(node.id)}" role="treeitem" tabindex="-1" aria-level="${depth}"
+      aria-selected="${st === 'true'}"${isLeaf ? '' : ` aria-expanded="${OPEN.has(node.id)}"`}>
+      ${isLeaf ? '<span class="set2-exp is-none"></span>' : I.caret}
+      ${ck(st, node.name)}
+      <span class="set2-node-n">${esc(node.name)}</span>
+      ${isLeaf ? '' : `<span class="set2-node-ct">${lv.filter((l) => sel.has(l.id)).length} of ${lv.length}</span>`}
+    </div>`);
+    out.push.apply(out, kidRows);
+  }
+
+  function picker(s, filter) {
+    const sel = SEL[s.id];
+    const rows = [];
+    TREE.forEach((n) => walk(n, 1, rows, sel, filter || ''));
+    const zero = sel.size === 0;
     return `
-      <div class="set2-head">
-        ${backLink}
-        <h1 class="set2-title">Access and roles <span class="set2-fixture">Fixture data</span></h1>
-        <p class="set2-lede">Every grant reads as one sentence: this role, on this scope. Grants add up, and a narrower one never removes a wider one.</p>
-      </div>
-      <div class="set2-module">
-        ${PEOPLE.map((p) => `
-          <div class="set2-card">
-            <div class="set2-card-row">
-              <span class="set2-av">${esc(p.initials)}</span>
-              <div class="set2-grow">
-                <div class="set2-name">${esc(p.name)}</div>
-                <div class="set2-sub">${esc(p.mail)}</div>
-              </div>
-              ${p.status === 'active' ? pill('is-ok', 'Active') : pill('is-warn', 'Invite pending')}
-            </div>
-            ${p.grants.length ? p.grants.map((g) => `
-              <div class="set2-tuple">
-                ${tok('Role', g.role)}<span class="set2-tuple-on">on</span>${tok(g.scopeT, g.scopeV)}
-                <span class="set2-tuple-end">${g.from === 'Direct' ? 'Granted by ' + esc(g.by) : esc(g.from) + ', not editable here'}</span>
-              </div>`).join('')
-              : '<div class="set2-tuple"><span class="set2-tuple-on">No grants yet. The invite carries no access until it is accepted.</span></div>'}
-          </div>`).join('')}
-
-        <div class="set2-card set2-card-pad">
-          <div class="set2-label">What Alex Smith can actually do, on FlairsTech</div>
-          <div class="set2-can" style="margin-top:0.5rem">${pill('is-ok', 'Can')}<span>Read and write instructions, manage knowledge sources, invite people</span></div>
-          <div class="set2-can">${pill('is-err', 'Cannot')}<span>Delete synced records, change billing, edit Organisation rules</span></div>
-          <p class="set2-because">Because <b>Super Admin on Org FlairsTech</b> grants the first set. Nothing above this scope exists, so the second set is reserved rather than inherited.</p>
+      <div class="set2-pick" data-pick="${esc(s.id)}">
+        <div class="set2-pick-hd">
+          <input class="set2-fld" type="search" placeholder="Search clients, products, teams or people…" data-pfilter value="${esc(filter || '')}">
         </div>
-
-        <div class="set2-note is-info"><span>Every other variant shows grants. This one shows consequences, which is the only form an admin can check against what they meant.</span></div>
+        <div class="set2-pick-bd" role="tree" aria-multiselectable="true" aria-label="What this skill reaches">${rows.join('')}</div>
+        <div class="set2-pick-ft${zero ? ' is-zero' : ''}" data-foot>
+          ${zero
+            ? '<span>Reaches nothing. A skill with no targets can never fire.</span>'
+            : `<span>Reaches <b class="set2-num">${sel.size}</b> of <span class="set2-num">${LEAF_TOTAL}</span></span>`}
+        </div>
       </div>`;
   }
 
-  /* ═══ THE LADDER ═══
-     Grounding is the one control here whose rung depends on which way it moves.
-     An internal agent is reversible and nobody outside sees it, so it applies on
-     the tick. A customer facing one puts the content in front of customers, so
-     the control reverts and stays reverted until the name is typed. */
-  function groundConfirm(agent, col) {
-    const host = $('#groundConfirm');
-    if (!host) return;
-    host.innerHTML = `
-      <div class="set2-confirm">
-        <div class="set2-confirm-hd">${esc(agent.name)} is customer facing</div>
-        <div class="set2-confirm-bd">
-          <p style="font-size:var(--ty-meta);color:var(--ink-secondary);line-height:1.6">This puts every document in <b>${esc(COLLECTIONS[col])}</b> in front of customers. It is reversible, but anything quoted in the meantime has already been said.</p>
-          <div>
-            <label class="set2-label" for="groundType">Type <b>${esc(COLLECTIONS[col])}</b> to confirm</label>
-            <input class="set2-field" id="groundType" type="text" autocomplete="off" placeholder="Collection name" style="margin-top:0.375rem">
+  /* ═══ MODULE BODIES ═══ */
+  const M = {};
+
+  M.skills = function (st) {
+    if (st.skill && skillById(st.skill)) return skillDetail(skillById(st.skill), st);
+    const mine = SKILLS.filter((s) => s.from === 'Yours');
+    const org  = SKILLS.filter((s) => s.from !== 'Yours');
+    const list = (arr) => arr.map((s) => {
+      const [k, t] = standing(s, st.lens);
+      return row({
+        go: 'skill:' + s.id, off: !s.on,
+        ico: s.trigger === 'always' ? I.bolt : s.trigger === 'manual' ? I.hand : I.doc,
+        name: s.name, d: s.desc,
+        end: `<span class="set2-from${s.from === 'Organization' ? ' is-org' : ''}">${esc(TRIGGER[s.trigger])}</span>${pill(k, t)}`
+      });
+    }).join('');
+
+    const showMine = st.lens !== 'org';
+    const showOrg  = st.lens !== 'yours';
+    return `
+      ${showOrg ? `<section class="set2-sec">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">From the organization</h2>
+          <span class="set2-sec-end set2-from set2-num">${org.length}</span></div>
+        <div class="set2-rows">${list(org)}</div>
+      </section>` : ''}
+      ${showMine ? `<section class="set2-sec">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">Yours</h2>
+          <span class="set2-sec-end"><button class="btn btn-brand btn-sm" type="button" data-new>New skill</button></span></div>
+        <div class="set2-rows">${mine.length ? list(mine) : '<div class="set2-empty"><b>No skills of your own yet</b>Write one, or start from the example file.</div>'}</div>
+      </section>` : ''}`;
+  };
+
+  function skillDetail(s, st) {
+    const [k, t] = standing(s, st.lens);
+    const raw = RAW.has(s.id);
+    return `
+      <button class="set2-back" type="button" data-back>&larr; Skills</button>
+      <div class="set2-sec-h" style="margin-bottom:0">
+        <h1 class="set2-title" style="font-size:var(--ty-title)">${esc(s.name)}</h1>
+        <span class="set2-sec-end">${pill(k, t)}${toggle(s.on, 'Enable ' + s.name, `data-skill-on="${esc(s.id)}"`)}</span>
+      </div>
+      <div class="set2-bar">
+        <div class="set2-scope">
+          <span class="set2-scope-i">${esc(s.from)}</span><span class="set2-scope-s">&middot;</span>
+          <span class="set2-scope-i">${esc(TRIGGER[s.trigger])}</span><span class="set2-scope-s">&middot;</span>
+          <span class="set2-scope-i">${esc(s.by)}, ${esc(s.when)}</span><span class="set2-scope-s">&middot;</span>
+          <span class="set2-scope-i set2-num">v${s.v}</span>
+        </div>
+      </div>
+
+      <section class="set2-sec">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">Which level governs</h2></div>
+        ${ladder(s, st.lens)}
+      </section>
+
+      <section class="set2-sec">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">Instructions</h2>
+          <span class="set2-sec-end">
+            <span class="set2-view">
+              <button class="set2-view-b${raw ? '' : ' is-on'}" type="button" data-view="pretty" data-sid="${esc(s.id)}" aria-label="Rendered">${I.eye}</button>
+              <button class="set2-view-b${raw ? ' is-on' : ''}" type="button" data-view="raw" data-sid="${esc(s.id)}" aria-label="Source">${I.code}</button>
+            </span>
+          </span></div>
+        <div class="set2-body${raw ? ' is-raw' : ''}">${raw ? esc(toMarkdown(s)) : esc(s.body)}</div>
+      </section>
+
+      <section class="set2-sec">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">What it reaches</h2></div>
+        ${picker(s, FILTER[s.id])}
+      </section>`;
+  }
+
+  M.agents = () => `
+    <section class="set2-sec">
+      <div class="set2-sec-h"><h2 class="set2-sec-t">Agents</h2></div>
+      <div class="set2-rows">${AGENTS.map((a) => row({
+        ico: I.bolt, name: a.name, d: a.d, off: !a.on,
+        end: toggle(a.on, 'Enable ' + a.name)
+      })).join('')}</div>
+    </section>`;
+
+  M.grounding = () => `
+    <section class="set2-sec">
+      <div class="set2-sec-h"><h2 class="set2-sec-t">Collections agents may answer from</h2></div>
+      <div class="set2-rows">${COLS.map((c) => row({
+        ico: I.doc, name: c.name, d: c.d, off: !c.on, locked: c.locked,
+        end: c.locked ? '' : toggle(c.on, 'Ground on ' + c.name)
+      })).join('')}</div>
+      <div class="set2-note" style="margin-top:0.75rem">Uploading documents moved to the Console. This decides which collections an agent may stand on, not what is in them.</div>
+    </section>`;
+
+  M.people = () => `
+    <section class="set2-sec">
+      <div class="set2-sec-h"><h2 class="set2-sec-t">People</h2>
+        <span class="set2-sec-end"><button class="btn btn-brand btn-sm" type="button">Invite</button></span></div>
+      <div class="set2-rows">${PEOPLE.map((p) => row({
+        ico: I.user, name: p.name, d: p.grants.length
+          ? p.grants.map((g) => g[0] + ' on ' + g[2]).join(' · ')
+          : 'No grants. The invite carries no access until it is accepted.',
+        end: pill(p.s[0], p.s[1])
+      })).join('')}</div>
+    </section>`;
+
+  M.roles = () => `
+    <section class="set2-sec">
+      <div class="set2-sec-h"><h2 class="set2-sec-t">Roles</h2>
+        <span class="set2-sec-end"><button class="btn btn-ghost btn-sm" type="button">New role</button></span></div>
+      <div class="set2-rows">${ROLES.map((r) => row({ ico: I.key, name: r[0], d: r[1] })).join('')}</div>
+    </section>`;
+
+  M.hierarchy = () => {
+    const rows = [];
+    TREE.forEach((n) => walk(n, 1, rows, new Set(), ''));
+    return `
+      <section class="set2-sec">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">Scope explorer</h2>
+          <span class="set2-sec-end"><button class="btn btn-ghost btn-sm" type="button">Create client</button></span></div>
+        <div class="set2-pick">
+          <div class="set2-pick-bd" style="max-height:24rem" role="tree" aria-label="Hierarchy">${rows.join('')}</div>
+          <div class="set2-pick-ft"><span><b class="set2-num">${LEAF_TOTAL}</b> addressable units across six levels</span></div>
+        </div>
+      </section>`;
+  };
+
+  M.plan = () => `
+    <section class="set2-sec">
+      <div class="set2-sec-h"><h2 class="set2-sec-t">On your plan</h2></div>
+      <div class="set2-rows">${MODULES.filter((m) => !m.tier).map((m) => row({
+        ico: I.doc, name: m.name, end: pill('is-ok', 'Included')
+      })).join('')}</div>
+    </section>
+    <section class="set2-sec">
+      <div class="set2-sec-h"><h2 class="set2-sec-t">Available</h2></div>
+      <div class="set2-rows">${MODULES.filter((m) => m.tier).map((m) => row({
+        ico: I.doc, name: m.name, locked: true, end: pill('is-mute', m.tier)
+      })).join('')}</div>
+      <div class="set2-tier"><span>Prices pending commercial input.</span>
+        <span class="set2-tier-end"><button class="btn btn-brand btn-sm" type="button">Talk to us</button></span></div>
+    </section>`;
+
+  /* ── The list ── */
+  M.connections = function (st) {
+    if (st.conn && connById(st.conn)) return connectionDetail(connById(st.conn), st);
+    const broken = CONNECTIONS.filter((c) => c.maps.some((m) => !walkPath(c.crmId, m.path).ok)).length;
+    return `
+      <section class="set2-sec">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">Connections</h2>
+          <span class="set2-sec-end"><button class="btn btn-brand btn-sm" type="button">Connect a CRM</button></span></div>
+        <div class="set2-rows">${CONNECTIONS.map((c) => {
+          const bad = c.maps.filter((m) => !walkPath(c.crmId, m.path).ok).length;
+          /* `d` is escaped downstream, so an HTML entity here ships as the
+             literal text `&middot;`. Real characters only in data. */
+          return row({
+            go: 'conn:' + c.id, ico: I.plug,
+            name: c.product,
+            d: c.crm + ', ' + c.maps.length + (c.maps.length === 1 ? ' field mapped' : ' fields mapped'),
+            end: (bad ? pill('is-err', bad + (bad > 1 ? ' fields broken' : ' field broken')) : '')
+               + `<span class="set2-from">${esc(c.last)}</span>`
+               + pill(c.health[0], c.health[1])
+          });
+        }).join('')}</div>
+        ${broken ? `<div class="set2-note is-err" style="margin-top:0.75rem">
+          A mapped field that no longer exists in the CRM reads as empty, and an empty field answers as though the data were missing rather than misrouted.</div>` : ''}
+      </section>`;
+  };
+
+  /* ── The contract ── */
+  function connectionDetail(c, st) {
+    const bad = c.maps.filter((m) => !walkPath(c.crmId, m.path).ok).length;
+    const n = matchCount(c);
+    return `
+      <button class="set2-back" type="button" data-back>&larr; Connections</button>
+      <div class="set2-sec-h" style="margin-bottom:0">
+        <h1 class="set2-title" style="font-size:var(--ty-title)">${esc(c.product)}</h1>
+        <span class="set2-sec-end">${pill(c.health[0], c.health[1])}</span>
+      </div>
+      <div class="set2-bar">
+        <div class="set2-scope">
+          <span class="set2-scope-i">CRM <b>${esc(c.crm)}</b></span><span class="set2-scope-s">&rsaquo;</span>
+          <span class="set2-scope-i">${esc(c.every)}</span><span class="set2-scope-s">&rsaquo;</span>
+          <span class="set2-scope-i">Last read ${esc(c.last)}</span>
+        </div>
+      </div>
+
+      <section class="set2-sec">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">What each field means</h2>
+          <span class="set2-sec-end set2-from">${c.maps.length} of ${CTX_FIELDS.length} mapped</span></div>
+        <div class="set2-map">
+          <div class="set2-map-hd"><span>AiMY field</span><span>${esc(c.crm)} path</span><span></span></div>
+          ${c.maps.map((m, i) => mapRow(c, m, i)).join('')}
+        </div>
+        <button class="set2-add" type="button" data-map-add>+ Map another field</button>
+        ${bad ? `<div class="set2-note is-err" style="margin-top:0.5rem">${bad} path no longer exists in ${esc(c.crm)}. Fix or remove it.</div>` : ''}
+      </section>
+
+      <section class="set2-sec">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">How far back to read</h2></div>
+        <div class="set2-inline">
+          <span>Read records from the past</span>
+          <input class="set2-fld set2-fld-n set2-num" type="number" min="1" max="3650"
+                 value="${c.window}" data-dirty="window" aria-label="Days of history to read">
+          <span>days</span>
+        </div>
+      </section>
+
+      <section class="set2-sec">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">Which records to pull</h2></div>
+        ${criteriaEditor(c)}
+        <div class="set2-blast">
+          <span class="set2-blast-n set2-num">${n.toLocaleString()}</span>
+          <span class="set2-blast-l">record${n === 1 ? '' : 's'} match right now, of ${c.records.toLocaleString()}</span>
+          <span class="set2-blast-end">
+            <button class="btn btn-ghost btn-sm" type="button" data-test>Preview 20</button>
+            <button class="btn btn-brand btn-sm" type="button" data-run>Run sync</button>
+          </span>
+        </div>
+      </section>
+
+      <section class="set2-sec">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">Recent runs</h2></div>
+        ${c.runs.length ? `<div class="set2-runs">
+          ${c.runs.map((r) => `
+            <div class="set2-run">
+              <span class="set2-run-when set2-num">${esc(r[0])}</span>
+              <span class="set2-run-crit">${r[1].map((k) => `<span class="set2-chip">${esc(k[0])} <b>${esc(k[1])}</b></span>`).join('')}</span>
+              <span class="set2-run-n set2-num">${r[4] ? r[4].toLocaleString() : ''}</span>
+              <span class="set2-run-st">${pill(r[2] === 'ok' ? 'is-ok' : r[2] === 'err' ? 'is-err' : 'is-info',
+                r[3])}</span>
+            </div>`).join('')}
+        </div>` : `<div class="set2-empty"><b>No runs yet</b>The first sync will appear here with what it matched.</div>`}
+      </section>`;
+  }
+
+  /* One mapping. The path is segments, not a string: picking an object-typed
+     key reveals the next segment, which is why there is no separate "add
+     subfield" control. The console has one, and it is the same act. */
+  function mapRow(c, m, i) {
+    const res = walkPath(c.crmId, m.path);
+    /* A path that resolves but stops on an object points at a structure, not a
+       value. `requester.organization` is a real key and still maps nothing, so
+       it is incomplete rather than broken, and it says so in those words: the
+       fix is to keep going, not to start over. */
+    const incomplete = res.ok && (m.path.length === 0 || keysAt(c.crmId, m.path).length > 0);
+    const transforms = []
+      .concat(m.values ? [{ k: 'values', label: m.values.length + ' values mapped' }] : [])
+      .concat(m.idres ? [{ k: 'idres', label: 'ID resolved to name' }] : []);
+    return `
+      <div class="set2-map-row${res.ok ? (incomplete ? ' is-partial' : '') : ' is-broken'}" data-map="${i}">
+        <span class="set2-map-ctx">${esc(m.ctx)}</span>
+        <span class="set2-map-path">
+          ${m.path.map((seg, j) => `
+            ${j ? '<span class="set2-map-dot">.</span>' : ''}
+            <button class="set2-seg${!res.ok && res.at === j ? ' is-bad' : ''}" type="button"
+                    data-seg="${i}:${j}">${esc(seg)}</button>`).join('')}
+          ${incomplete
+            ? `${m.path.length ? '<span class="set2-map-dot">.</span>' : ''}
+               <button class="set2-seg is-more" type="button" data-seg="${i}:${m.path.length}">Choose a key</button>` : ''}
+        </span>
+        <span class="set2-map-end">
+          ${transforms.map((t) => `<button class="set2-chip is-act" type="button" data-tf="${i}:${t.k}">${esc(t.label)}</button>`).join('')}
+          ${!res.ok ? pill('is-err', 'Not in ' + c.crm) : incomplete ? pill('is-warn', 'Incomplete') : ''}
+          <button class="set2-x" type="button" data-map-del="${i}" aria-label="Remove ${esc(m.ctx)} mapping">${I.x}</button>
+        </span>
+      </div>`;
+  }
+
+  /* Criteria read as a sentence, and every one of them narrows. The console
+     shows the same chips with no conjunction stated anywhere, so whether two
+     criteria mean AND or OR is left to the reader. */
+  function criteriaEditor(c) {
+    return `
+      <div class="set2-crit" data-crit>
+        ${c.criteria.length
+          ? c.criteria.map((k, i) => `
+              ${i ? '<span class="set2-crit-and">and</span>' : ''}
+              <span class="set2-chip">${esc(k[0])} is <b>${esc(k[1])}</b>
+                <button type="button" data-crit-del="${i}" aria-label="Remove ${esc(k[0])} filter">${I.x}</button>
+              </span>`).join('')
+          : '<span class="set2-crit-all">Every record. Add a filter to narrow it.</span>'}
+        <button class="set2-add is-inline" type="button" data-crit-add>+ Filter</button>
+      </div>`;
+  }
+
+  /* ── Retention ──
+     The console renders the most dangerous control on the whole surface as a
+     bare number input beside a trash icon, under a red sentence saying the
+     action cannot be undone. It never says how many records the number
+     currently selects, so "90" and "9" look equally harmless.
+
+     Here the threshold computes its own consequence, and the confirmation is
+     graded by that consequence rather than by which page you are on: typing
+     the connector's name is required only because the records are gone. */
+  const RETENTION = [
+    { id: 'freshdesk', name: 'FreshDesk', days: 90, matched: 4210 },
+    { id: 'zendesk', name: 'ZenDesk', days: 90, matched: 1180 }
+  ];
+  /* Fewer days selects MORE records for deletion. Getting this backwards is
+     how a retention control becomes an incident. */
+  const wouldDelete = (r) => Math.max(0, Math.round(r.matched * (180 - r.days) / 180));
+
+  M.retention = () => `
+    <section class="set2-sec">
+      <div class="set2-sec-h"><h2 class="set2-sec-t">Delete synced records</h2></div>
+      <div class="set2-rows">${RETENTION.map((r) => {
+        const n = wouldDelete(r);
+        return `<div class="set2-row">
+          ${I.plug}
+          <span class="set2-row-main">
+            <span class="set2-row-n">${esc(r.name)}</span>
+            <span class="set2-row-d">Older than ${r.days} days</span>
+          </span>
+          <span class="set2-row-end">
+            <input class="set2-fld set2-fld-n set2-num" type="number" min="1" max="3650"
+                   value="${r.days}" data-ret="${esc(r.id)}" aria-label="${esc(r.name)} retention in days">
+            <span class="set2-from set2-num">${n.toLocaleString()} affected</span>
+            <button class="btn btn-ghost btn-sm" type="button" data-ret-go="${esc(r.id)}">Delete now</button>
+          </span>
+        </div>`;
+      }).join('')}</div>
+      <div class="set2-note is-warn" style="margin-top:0.75rem">Deleted records cannot be recovered. Lowering a threshold widens what the next run removes.</div>
+    </section>`;
+
+  M.webhooks = () => `
+    <section class="set2-sec">
+      <div class="set2-sec-h"><h2 class="set2-sec-t">Knowledge enablement</h2>
+        <span class="set2-sec-end">${pill('is-ok', 'Last call succeeded')}</span></div>
+      <div class="set2-field">
+        <label class="set2-lbl" for="whUrl">Endpoint</label>
+        <input class="set2-fld set2-mono" id="whUrl" data-dirty="webhooks"
+               value="https://api.aimy.ai/webhooks/knowledge-enablement/cxs">
+        <div class="set2-hint">Called when enrichment is triggered from your side. Last call 6 Jun 2026, 14:02.</div>
+      </div>
+      <div class="set2-field">
+        <label class="set2-lbl" for="whTok">Auth token</label>
+        <div class="set2-inline">
+          <input class="set2-fld set2-mono" id="whTok" type="password" data-dirty="webhooks"
+                 value="eyJhbGciOiJIUzI1NiIsInR5cCI6" autocomplete="off">
+          <button class="btn btn-ghost btn-sm" type="button" data-reveal="whTok">Reveal</button>
+          <button class="btn btn-ghost btn-sm" type="button" data-rotate>Rotate</button>
+        </div>
+        <div class="set2-hint">Rotated 4 Mar 2026 by A. Mahfouz. Rotating invalidates the current token immediately.</div>
+      </div>
+    </section>`;
+
+  M.audit = () => `
+    <section class="set2-sec">
+      <div class="set2-sec-h"><h2 class="set2-sec-t">Audit trail</h2></div>
+      <div class="set2-rows">${[
+        ['Nour Wael', 'Edited skill “Draft a refund response”', '20m ago'],
+        ['Ahmed Samy', 'Added exception on Client CXS', '3 Sep'],
+        ['A. Mahfouz', 'Locked tone at Product level', '11 Aug']
+      ].map((a) => row({ ico: I.user, name: a[0], d: a[1], locked: true,
+        end: `<span class="set2-from">${esc(a[2])}</span>` })).join('')}</div>
+      <div class="set2-tier">${I.lock}<span>Enterprise plan. You are seeing the last three entries.</span>
+        <span class="set2-tier-end"><button class="btn btn-brand btn-sm" type="button">Talk to us</button></span></div>
+    </section>`;
+
+  /* ═══ THE SKILL FILE ═══
+     A skill IS a file. The write form's three fields are its frontmatter and
+     its body, which is what lets the upload route accept the same object the
+     write route produces. Serialise and parse have to round-trip or the two
+     routes are quietly making different things. */
+  /* The file's vocabulary and the code's are not the same word. `manual` reads
+     better in a switch; `on-demand` reads better in a file. Serialising the
+     internal word made download -> upload -> download emit a DIFFERENT file
+     from the one it took in, which is the round trip quietly failing while
+     every screen still looked right. */
+  const TRIGGER_FILE = { always: 'always', auto: 'automatic', manual: 'on-demand' };
+
+  function toMarkdown(s) {
+    return '---\n'
+      + 'name: ' + s.id + '\n'
+      + 'description: ' + s.desc + '\n'
+      + 'trigger: ' + TRIGGER_FILE[s.trigger] + '\n'
+      + 'sources: [' + s.sources.join(', ') + ']\n'
+      + 'targets: [' + Array.from(SEL[s.id]).join(', ') + ']\n'
+      + '---\n\n'
+      + '# ' + s.name + '\n\n'
+      + s.body + '\n';
+  }
+
+  /* The other direction. Deliberately forgiving about shape and unforgiving
+     about the two fields that decide whether the thing is a skill at all: a
+     file with no `name` cannot be addressed and a file with no `description`
+     cannot be matched on, so an automatic skill without one silently never
+     fires. Both errors NAME the missing field -- "invalid file" tells the
+     author nothing they can act on. */
+  function parseSkillFile(text) {
+    const m = String(text).replace(/\r\n/g, '\n').match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+    if (!m) throw new Error('No YAML frontmatter. The file must open with a line of three dashes.');
+
+    const meta = {};
+    let key = null;
+    m[1].split('\n').forEach((line) => {
+      if (/^\s*#/.test(line) || !line.trim()) return;
+      const kv = line.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
+      if (kv) { key = kv[1]; meta[key] = kv[2].trim(); }
+      /* A wrapped value: YAML continues a scalar on an indented line, which is
+         how any description longer than a breath actually arrives. */
+      else if (key && /^\s+\S/.test(line)) meta[key] += ' ' + line.trim();
+    });
+
+    ['name', 'description'].forEach((k) => {
+      if (!meta[k]) throw new Error('Missing `' + k + '` in the frontmatter.');
+    });
+
+    const list = (v) => !v ? [] : v.replace(/^\[|\]$/g, '').split(',')
+      .map((x) => x.trim()).filter(Boolean);
+    const trig = (meta.trigger || 'automatic').toLowerCase().replace('on-demand', 'manual').replace('automatic', 'auto');
+
+    /* The body is everything under the frontmatter, minus a leading H1 --
+       that heading is the display name, not part of the instruction. */
+    let body = m[2].replace(/^\s*\n/, '');
+    const h1 = body.match(/^#\s+(.+)\n+/);
+    let title = meta.name;
+    if (h1) { title = h1[1].trim(); body = body.slice(h1[0].length); }
+
+    return {
+      id: meta.name, name: title, desc: meta.description,
+      trigger: TRIGGER[trig] ? trig : 'auto',
+      sources: list(meta.sources), targets: list(meta.targets),
+      body: body.trim()
+    };
+  }
+
+  /* Accepting an uploaded skill is the same act as creating one, so it lands
+     in the same place with the same defaults rather than in a parallel list. */
+  function acceptSkill(parsed) {
+    const dup = skillById(parsed.id);
+    if (dup) throw new Error('A skill named `' + parsed.id + '` already exists. Rename it, or edit that one.');
+    const s = {
+      id: parsed.id, name: parsed.name, from: 'Yours', trigger: parsed.trigger, on: true,
+      desc: parsed.desc, by: USER.name, when: 'just now', v: 1,
+      sources: parsed.sources, targets: parsed.targets, body: parsed.body,
+      lock: null, chain: [{}, {}, {}, {}, {}, { on: USER.name, val: parsed.desc, by: 'You', when: 'just now' }]
+    };
+    SKILLS.push(s);
+    SEL[s.id] = new Set(s.targets);
+    return s;
+  }
+
+  function readSkillFile(file) {
+    const err = $('#upErr');
+    if (!/\.(md|markdown)$/i.test(file.name)) {
+      if (err) err.textContent = 'Only .md is wired in this build. A .zip needs a server to unpack it.';
+      return;
+    }
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const s = acceptSkill(parseSkillFile(r.result));
+        closeModal();
+        patch({ m: 'skills', skill: s.id });
+      } catch (ex) {
+        if (err) err.textContent = ex.message;
+      }
+    };
+    r.readAsText(file);
+  }
+
+  const EXAMPLE =
+    '---\n'
+    + '# The name is how the skill is addressed. Lower case, hyphens, no spaces.\n'
+    + 'name: draft-refund-response\n'
+    + '\n'
+    + '# The description is what the agent MATCHES ON when trigger is automatic,\n'
+    + '# so a vague one costs accuracy rather than tidiness. Say what the skill\n'
+    + '# does and when to reach for it.\n'
+    + 'description: Turn a refund question into a reply that cites the policy and\n'
+    + '  flags the contested clause.\n'
+    + '\n'
+    + '# always    - applies to every turn. This is what an instruction is.\n'
+    + '# automatic - the agent picks it, by matching the description above.\n'
+    + '# on-demand - a person picks it.\n'
+    + 'trigger: automatic\n'
+    + '\n'
+    + '# Which collections this skill may stand on. Leave empty for all of them.\n'
+    + 'sources: [policies, support]\n'
+    + '\n'
+    + '# What it reaches. Any level of the hierarchy: a client, a business unit,\n'
+    + '# a product, a team or one person. Empty means it reaches nothing and\n'
+    + '# will never fire, which the interface will tell you about.\n'
+    + 'targets: [interfax, kapost]\n'
+    + '---\n'
+    + '\n'
+    + '# Draft a refund response\n'
+    + '\n'
+    + 'Everything below the frontmatter is the instruction itself. Write it the\n'
+    + 'way you would brief a new colleague: what to do, in what order, what to\n'
+    + 'refuse, and which source settles a disagreement.\n'
+    + '\n'
+    + 'Answer from the EU refund article first, and name it. If the Returns FAQ\n'
+    + 'disagrees about what happens after activation, say the clause is contested\n'
+    + 'rather than picking a side. Never quote a figure that is not in a cited\n'
+    + 'source.\n';
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     POPOVERS
+
+     Anchored to the control they change, not centred over the page. GAPS 25
+     records that the library has one dialog shape and it assumes the decision
+     was already made before it opened. Picking a CRM key IS the decision, and
+     it is a decision about one cell, so it belongs beside that cell.
+     ═══════════════════════════════════════════════════════════════════════ */
+  function popover(anchor, html) {
+    closePop();
+    const p = document.createElement('div');
+    p.className = 'set2-pop';
+    p.id = 'setPop';
+    p.innerHTML = html;
+    document.body.appendChild(p);
+    const r = anchor.getBoundingClientRect();
+    const w = p.offsetWidth, h = p.offsetHeight;
+    /* `documentElement.clientWidth/Height` is the layout viewport and is what
+       `position: fixed` is measured against. `window.innerWidth` includes the
+       scrollbar and, in an embedded or backgrounded frame, can report 0 --
+       which made every clamp below evaluate against nothing and pushed the
+       panel to the top-left corner. Guarded so a zero reading falls back to
+       placing the panel under its anchor rather than somewhere arbitrary. */
+    const vw = document.documentElement.clientWidth || w + 16;
+    const vh = document.documentElement.clientHeight || r.bottom + h + 16;
+    /* Flip up only when there is genuinely no room below AND there is room
+       above, so a tall panel in a short viewport does not jump somewhere worse
+       than where it started. */
+    let top = r.bottom + 6;
+    if (top + h > vh - 8 && r.top - h - 6 >= 8) top = r.top - h - 6;
+    p.style.top = Math.max(8, Math.min(top, vh - h - 8)) + 'px';
+    p.style.left = Math.max(8, Math.min(r.left, vw - w - 8)) + 'px';
+    const f = p.querySelector('input');
+    if (f) f.focus();
+    return p;
+  }
+  function closePop() { const p = document.getElementById('setPop'); if (p) p.remove(); }
+
+  function openSegPicker(anchor, c, mi, si) {
+    const m = c.maps[mi];
+    const opts = keysAt(c.crmId, m.path.slice(0, si));
+    if (!opts.length) return;
+    const p = popover(anchor, `
+      <div class="set2-pop-hd"><input class="set2-fld" type="search" placeholder="Filter keys" data-pop-f aria-label="Filter keys"></div>
+      <div class="set2-pop-bd" data-pop-list>
+        ${opts.map((k) => {
+          const node = keysAt(c.crmId, m.path.slice(0, si).concat([k]));
+          return `<button class="set2-pop-i" type="button" data-pick="${esc(k)}">
+            <span>${esc(k)}</span>${node.length ? '<span class="set2-pop-t">object</span>' : ''}</button>`;
+        }).join('')}
+      </div>`);
+    p.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      $$('.set2-pop-i', p).forEach((b) => {
+        b.style.display = b.textContent.toLowerCase().indexOf(q) < 0 ? 'none' : '';
+      });
+    });
+    p.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-pick]');
+      if (!b) return;
+      m.path = m.path.slice(0, si).concat([b.dataset.pick]);
+      DIRTY.add('maps'); closePop(); render();
+    });
+  }
+
+  function openCritPicker(anchor, c) {
+    const keys = Object.keys(CRITERIA_VOCAB);
+    const p = popover(anchor, `
+      <div class="set2-pop-bd">
+        ${keys.map((k) => `<button class="set2-pop-i" type="button" data-ck="${esc(k)}"><span>${esc(k)}</span></button>`).join('')}
+      </div>`);
+    p.addEventListener('click', (e) => {
+      const k = e.target.closest('[data-ck]');
+      if (k) {
+        const key = k.dataset.ck;
+        p.innerHTML = `<div class="set2-pop-bd">${CRITERIA_VOCAB[key].map((v) =>
+          `<button class="set2-pop-i" type="button" data-cv="${esc(v)}"><span>${esc(v)}</span></button>`).join('')}</div>`;
+        p.dataset.key = key;
+        return;
+      }
+      const v = e.target.closest('[data-cv]');
+      if (v) { c.criteria.push([p.dataset.key, v.dataset.cv]); DIRTY.add('criteria'); closePop(); render(); }
+    });
+  }
+
+  function openTransform(anchor, c, mi, kind) {
+    const m = c.maps[mi];
+    popover(anchor, kind === 'values'
+      ? `<div class="set2-pop-hd set2-pop-t">Value mapping</div>
+         <div class="set2-pop-bd">${m.values.map((v) =>
+           `<div class="set2-pop-row"><code>${esc(v[0])}</code><span>reads as</span><b>${esc(v[1])}</b></div>`).join('')}</div>`
+      : `<div class="set2-pop-hd set2-pop-t">ID resolution</div>
+         <div class="set2-pop-bd"><div class="set2-pop-row"><code>ticket.id</code><span>resolves to</span><b>Display name</b></div></div>`);
+  }
+
+  /* ── The confirmation ladder ──
+     Friction is graded by consequence, not by which page you are on. A toggle
+     applies on the tick. A deletion that cannot be undone asks you to type the
+     name, and states the number it is about to remove. */
+  function confirmDelete(r) {
+    const n = wouldDelete(r);
+    MODAL = { kind: 'delete', r: r, n: n };
+    paintModal();
+  }
+
+  /* ═══ MODALS ═══ */
+  let MODAL = null;
+  function closeModal() { MODAL = null; paintModal(); }
+  function paintModal() {
+    const host = $('#setModal');
+    if (!MODAL) { host.innerHTML = ''; return; }
+    host.innerHTML = MODAL === 'new' ? newSkillModal()
+                   : MODAL === 'upload' ? uploadModal()
+                   : deleteModal(MODAL);
+    const f = $('.set2-modal input, .set2-modal textarea', host);
+    if (f) f.focus();
+  }
+
+  function deleteModal(m) {
+    return `
+      <div class="set2-scrim" data-scrim>
+        <div class="set2-modal" role="dialog" aria-modal="true" aria-labelledby="dlT">
+          <div class="set2-modal-hd">
+            <h2 class="set2-modal-t" id="dlT">Delete ${esc(m.r.name)} records</h2>
+            <button class="set2-modal-x" type="button" data-close aria-label="Close">${I.x}</button>
           </div>
-          <div class="set2-actions">
-            <button class="btn btn-ghost btn-sm" type="button" data-ground-cancel>Cancel, leave it off</button>
-            <button class="btn btn-brand btn-sm" type="button" data-ground-ok data-col="${esc(col)}" data-agent="${esc(agent.id)}" disabled>Yes, let ${esc(agent.name)} answer</button>
+          <div class="set2-modal-bd">
+            <div class="set2-blast is-err" style="margin:0 0 1rem">
+              <span class="set2-blast-n set2-num">${m.n.toLocaleString()}</span>
+              <span class="set2-blast-l">records older than ${m.r.days} days will be removed and cannot be recovered</span>
+            </div>
+            <div class="set2-field">
+              <label class="set2-lbl" for="dlType">Type <b>${esc(m.r.name)}</b> to confirm</label>
+              <input class="set2-fld" id="dlType" autocomplete="off" data-confirm="${esc(m.r.name)}">
+            </div>
+          </div>
+          <div class="set2-modal-ft">
+            <span class="set2-modal-end">
+              <button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button>
+              <button class="btn btn-err btn-sm" type="button" data-close disabled data-confirm-go>Delete ${m.n.toLocaleString()} records</button>
+            </span>
           </div>
         </div>
       </div>`;
-    const field = $('#groundType', host);
-    const ok = $('[data-ground-ok]', host);
-    field.addEventListener('input', () => { ok.disabled = field.value.trim().toLowerCase() !== COLLECTIONS[col].toLowerCase(); });
-    field.focus();
+  }
+
+  function newSkillModal() {
+    return `
+      <div class="set2-scrim" data-scrim>
+        <div class="set2-modal" role="dialog" aria-modal="true" aria-labelledby="nsT">
+          <div class="set2-modal-hd">
+            <h2 class="set2-modal-t" id="nsT">Write a skill</h2>
+            <button class="set2-modal-x" type="button" data-close aria-label="Close">${I.x}</button>
+          </div>
+          <div class="set2-modal-bd">
+            <div class="set2-field"><label class="set2-lbl" for="nsName">Name</label>
+              <input class="set2-fld set2-mono" id="nsName" placeholder="weekly-status-report" autocomplete="off"></div>
+            <div class="set2-field"><label class="set2-lbl" for="nsDesc">Description</label>
+              <textarea class="set2-fld" id="nsDesc" style="min-height:4rem" placeholder="Generate weekly status reports from recent work. Use when asked for updates or progress summaries."></textarea>
+              <div class="set2-hint">This is what the agent matches on when the trigger is automatic.</div></div>
+            <div class="set2-field"><label class="set2-lbl" for="nsBody">Instructions</label>
+              <textarea class="set2-fld" id="nsBody" placeholder="Summarize my recent work in three sections: wins, blockers, and next steps…"></textarea></div>
+          </div>
+          <div class="set2-modal-ft">
+            <button class="btn btn-ghost btn-sm" type="button" data-open-upload>Upload a file instead</button>
+            <span class="set2-modal-end">
+              <button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button>
+              <button class="btn btn-brand btn-sm" type="button" data-close>Create</button>
+            </span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function uploadModal() {
+    return `
+      <div class="set2-scrim" data-scrim>
+        <div class="set2-modal" role="dialog" aria-modal="true" aria-labelledby="upT">
+          <div class="set2-modal-hd">
+            <h2 class="set2-modal-t" id="upT">Upload a skill</h2>
+            <button class="set2-modal-x" type="button" data-close aria-label="Close">${I.x}</button>
+          </div>
+          <div class="set2-modal-bd">
+            <div class="set2-up">
+              <div>
+                <ul class="set2-up-req" style="padding-left:1rem;margin:0 0 0.875rem">
+                  <li><code>.md</code> must carry <code>name</code> and <code>description</code> as YAML frontmatter</li>
+                  <li><code>.zip</code> or <code>.skill</code> must contain a <code>SKILL.md</code></li>
+                  <li>Everything below the frontmatter is the instruction</li>
+                </ul>
+                <button class="btn btn-ghost btn-sm" type="button" data-example>Download an example</button>
+              </div>
+              <label class="set2-drop" data-drop>
+                ${I.up}
+                <span>Drag a file here, or click to choose</span>
+                <input type="file" accept=".md,.markdown,.zip,.skill" hidden data-file>
+              </label>
+            </div>
+            <div class="set2-note is-err" id="upErr" style="margin-top:0.875rem;display:block;min-height:0;background:transparent;padding:0"></div>
+          </div>
+          <div class="set2-modal-ft">
+            <button class="btn btn-ghost btn-sm" type="button" data-open-new>Write one instead</button>
+            <span class="set2-modal-end">
+              <button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button>
+            </span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function downloadExample() {
+    const blob = new Blob([EXAMPLE], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'aimy-skill-example.md';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   /* ═══ RENDER ═══ */
-  /* ═══════════════════════════════════════════════
-     MODULE: SKILLS
+  const RAW = new Set();
+  const FILTER = {};
 
-     Mirrors AI instructions deliberately. A skill and a rule are the same kind
-     of object with a different job — both are written text, both are scoped by
-     the same Org > Client > Product > Agent chain, both have a reach, and both
-     have to be confirmed before they can shape what a customer-facing agent
-     says. Building a second vocabulary for that would have been the mistake.
+  function rail(st) {
+    return GROUPS.map((g) => `
+      <div class="set2-rail-group">
+        <div class="set2-rail-label">${esc(g)}</div>
+        ${MODULES.filter((m) => m.g === g).map((m) => `
+          <button class="set2-rail-item${m.id === st.m ? ' is-on' : ''}" type="button" data-m="${esc(m.id)}"
+            ${m.id === st.m ? 'aria-current="page"' : ''}>
+            <span>${esc(m.name)}</span>
+            ${m.tier ? I.lock : m.n ? `<span class="set2-rail-n">${m.n()}</span>` : ''}
+          </button>`).join('')}
+      </div>`).join('');
+  }
 
-     What a skill has that a rule does not: a TRIGGER, a set of sources it is
-     permitted to stand on, and an on/off state that is not the same thing as
-     deleting it.
-  ═══════════════════════════════════════════════ */
-  const skillReach = (k) => SKILL_SEL[k.id].size;
-
-  function skillRow(k) {
-    const [tCls, tLabel] = TRIGGER_LABEL[k.trigger];
-    const reach = skillReach(k);
-    return `<div class="set2-rule${k.on ? '' : ' is-beaten'}">
-      <div class="set2-card-row">
-        <div class="set2-grow">
-          <div class="set2-name">${esc(k.name)}</div>
-          <div class="set2-sub">${esc(k.desc)}</div>
+  function head(st) {
+    const m = moduleById(st.m);
+    /* Scope reads. The lens is the only control in this bar, which is why it
+       is the only thing in it that looks like one. */
+    return `
+      <h1 class="set2-title">${esc(m.name)}</h1>
+      <div class="set2-bar">
+        <div class="set2-scope">
+          <span class="set2-scope-i">Org <b>FlairsTech</b></span><span class="set2-scope-s">&rsaquo;</span>
+          <span class="set2-scope-i">Client <b>CXS</b></span><span class="set2-scope-s">&rsaquo;</span>
+          <span class="set2-scope-i">Product <b>Support Copilot</b></span>
         </div>
-        <button class="set2-agent" type="button" data-skill-on="${esc(k.id)}"
-                aria-pressed="${k.on ? 'true' : 'false'}">${k.on ? 'On' : 'Off'}</button>
-        <button class="btn btn-ghost btn-sm" type="button" data-skill="${esc(k.id)}">Open</button>
-      </div>
-      <div class="set2-rule-meta">
-        ${pill(tCls, tLabel)}
-        ${tok('origin', k.origin)}
-        <span class="set2-reach${reach === 0 ? ' is-zero' : ''}"><b>${reach}</b> of ${TARGET_TOTAL} products</span>
-        <span>${esc(k.by)}, ${esc(k.when)}, v${k.v}</span>
-      </div>
-    </div>`;
-  }
-
-  function skillsModule(st) {
-    if (st.skill && SKILLS.some((k) => k.id === st.skill)) return skillDetail(st.skill);
-    const off = SKILLS.filter((k) => !k.on).length;
-    const untargeted = SKILLS.filter((k) => skillReach(k) === 0).length;
-    return `<div class="set2-module">
-      <div class="set2-head">
-        ${backLink}
-        <h1 class="set2-title">Skills <span class="set2-fixture">Fixture data</span></h1>
-        <p class="set2-lede">A skill is a written procedure an agent can apply \u2014 what to do, in what
-          order, what to refuse, and which sources it may stand on. Scoped by the same chain as AI
-          instructions, because a skill that reaches further than the rule governing it is a skill
-          nobody is governing.</p>
-      </div>
-
-      <div class="set2-scope" style="border:0;padding:0">
-        <span class="set2-label">Precedence</span>
-        ${tok('1', 'Org')}<span class="set2-scope-sep">\u203a</span>
-        ${tok('2', 'Client')}<span class="set2-scope-sep">\u203a</span>
-        ${tok('3', 'Product')}<span class="set2-scope-sep">\u203a</span>
-        ${tok('4', 'Agent')}
-      </div>
-
-      ${untargeted ? `<div class="set2-note is-info"><b>${untargeted} skill targets nothing.</b>
-        It is defined and switched on, and it will never run \u2014 reach is what decides that, not
-        the toggle.</div>` : ''}
-
-      <div class="set2-card">${SKILLS.map(skillRow).join('')}</div>
-
-      <div class="set2-note is-warn"><b>${off} of ${SKILLS.length} are off.</b> Off is not deleted:
-        a skill keeps its targeting and its text so it can be switched back on without being
-        rebuilt, which is the whole reason this is a toggle rather than a bin.</div>
-
-      <div class="set2-actions">
-        <button class="btn btn-brand btn-sm" type="button" disabled>New skill</button>
-        <button class="btn btn-ghost btn-sm" type="button" disabled>Browse the library</button>
-      </div>
-    </div>`;
-  }
-
-  /* The tree, per skill. `targetGroups()` is reused unchanged; what differs is
-     which Set it is read against, and that the nodes carry data- IDS rather
-     than being matched on their display name. The instructions tree resolves
-     identity by comparing `aria-label` to a group's name, which works only for
-     as long as no two things are called the same thing. */
-  function skillTree(id) {
-    const sel = SKILL_SEL[id];
-    const groups = targetGroups();
-    const state = (g) => {
-      const on = g.kids.filter((k) => sel.has(k.id)).length;
-      return on === 0 ? 'false' : on === g.kids.length ? 'true' : 'mixed';
-    };
-    return `<div class="set2-tree" role="tree" aria-multiselectable="true" aria-label="What this skill targets">
-      <div class="set2-tree-body">
-        ${groups.map((g) => {
-          const open = SKILL_OPEN.has(g.id);
-          const on = g.kids.filter((k) => sel.has(k.id)).length;
-          return `<div class="set2-node" role="treeitem" aria-expanded="${open}">
-              ${ck(state(g), g.name).replace('<button class="set2-ck"', `<button class="set2-ck" data-sk-group="${esc(g.id)}"`)}
-              <span data-sk-exp="${esc(g.id)}">${esc(g.name)}</span>
-              <span class="set2-node-ct">${on} of ${g.kids.length}</span>
-            </div>` + (open ? g.kids.map((k) =>
-              `<div class="set2-node is-child" role="treeitem">
-                ${ck(sel.has(k.id) ? 'true' : 'false', k.name).replace('<button class="set2-ck"', `<button class="set2-ck" data-sk-kid="${esc(k.id)}"`)}${esc(k.name)}
-              </div>`).join('') : '');
-        }).join('')}
-      </div>
-      <div class="set2-tree-foot">
-        <span>${sel.size} of ${TARGET_TOTAL} selected</span>
-        <span>Across ${groups.filter((g) => g.kids.some((k) => sel.has(k.id))).length} of ${groups.length} groups</span>
-      </div>
-    </div>`;
-  }
-
-  function skillDetail(id) {
-    const k = SKILLS.find((x) => x.id === id);
-    const [tCls, tLabel] = TRIGGER_LABEL[k.trigger];
-    return `<div class="set2-module">
-      <div class="set2-head">
-        <button class="set2-back" type="button" data-back-skill>&larr; Skills</button>
-        <h1 class="set2-title">${esc(k.name)} <span class="set2-fixture">Fixture data</span></h1>
-        <p class="set2-lede">${esc(k.desc)}</p>
-      </div>
-
-      <div class="set2-card set2-card-pad">
-        <div class="set2-card-row">
-          <div class="set2-grow">
-            <div class="set2-label">Trigger</div>
-            <div class="set2-sub">${k.trigger === 'auto'
-              ? 'Chosen by the agent when the description matches what was asked. The description is the match, so vagueness there costs accuracy.'
-              : 'Only when somebody asks for it by name, with a slash in the composer.'}</div>
+        <div class="set2-bar-end">
+          <div class="seg" role="group" aria-label="Whose settings">
+            ${[['yours', 'Yours'], ['org', 'Organization'], ['eff', 'Effective']].map(([v, l]) =>
+              `<button class="seg-btn${st.lens === v ? ' active' : ''}" type="button" data-lens="${v}">${l}</button>`).join('')}
           </div>
-          ${pill(tCls, tLabel)}
-          <button class="set2-agent" type="button" data-skill-on="${esc(k.id)}"
-                  aria-pressed="${k.on ? 'true' : 'false'}">${k.on ? 'On' : 'Off'}</button>
         </div>
-      </div>
-
-      <div class="set2-card set2-card-pad">
-        <div class="set2-label">The procedure</div>
-        <div class="set2-code">${esc(k.body)}</div>
-        <div class="set2-actions">
-          <button class="btn btn-ghost btn-sm" type="button" disabled>Edit</button>
-          <button class="btn btn-ghost btn-sm" type="button" disabled>History, v${k.v}</button>
-        </div>
-      </div>
-
-      <div class="set2-card set2-card-pad">
-        <div class="set2-label">Sources it may stand on</div>
-        <div class="set2-sub">An answer this skill shapes can cite these and nothing else. A source
-          that is failing is still listed \u2014 what it does to the answer is disclosed at the citation,
-          not hidden by removing it here.</div>
-        <div class="set2-agents">
-          ${Object.keys(COLLECTIONS).map((c) => `<button class="set2-agent" type="button"
-            data-skill-src="${esc(k.id)}:${esc(c)}"
-            aria-pressed="${k.sources.indexOf(c) > -1 ? 'true' : 'false'}">${esc(COLLECTIONS[c])}</button>`).join('')}
-        </div>
-      </div>
-
-      <div class="set2-card set2-card-pad">
-        <div class="set2-label">What this skill targets</div>
-        ${skillTree(k.id)}
-      </div>
-    </div>`;
+      </div>`;
   }
 
   function render() {
     const st = readURL();
-    const host = $('#setPage');
-    if (!host) return;
-    const body = st.module === 'sources' ? sourcesModule(st)
-      : st.module === 'instructions' ? instructionsModule()
-      : st.module === 'skills' ? skillsModule(st)
-      : st.module === 'access' ? accessModule()
-      : ledger();
-    host.innerHTML = scopeBar(st) + body;
-    document.title = st.module ? 'AiMY Settings, ' + (MODULES.find((m) => m.id === st.module) || {}).name : 'AiMY Settings';
+    const m = moduleById(st.m);
+    document.title = 'AiMY Settings, ' + m.name;
+    $('#setRail').innerHTML = rail(st);
+    const body = (M[st.m] || (() => '<div class="set2-empty"><b>Not built yet</b>This module carries its state only.</div>'))(st);
+    /* A detail view brings its own header. Rendering the module header above it
+       stacked two titles and two scope lines on one page, and the outer one
+       named the list you had just left. */
+    $('#setCol').innerHTML = ((st.skill || st.conn) ? '' : head(st)) + body + `
+      <div class="set2-save${DIRTY.size ? ' is-on' : ''}" data-save>
+        <span class="set2-save-n"><b class="set2-num">${DIRTY.size}</b> unsaved in ${esc(m.name)}</span>
+        <span class="set2-save-end">
+          <button class="btn btn-ghost btn-sm" type="button" data-discard>Discard</button>
+          <button class="btn btn-brand btn-sm" type="button" data-save-go>Save</button>
+        </span>
+      </div>`;
+    seatTabindex();
   }
 
-  /* ═══ WIRING ═══
-     One delegated listener on the document, dispatching on data-*, which is the
-     house rule and the reason nesting resolves without stopPropagation. */
-  function wire() {
-    document.addEventListener('click', (e) => {
-      const t = e.target;
-      let el;
-
-      if ((el = t.closest('[data-go]'))) { patch({ module: el.getAttribute('data-go'), src: '' }); return; }
-      if (t.closest('[data-back]')) { patch({ module: '', src: '', skill: '' }); return; }
-
-      /* ── Skills ── */
-      if ((el = t.closest('[data-skill]'))) { patch({ skill: el.getAttribute('data-skill') }); return; }
-      if (t.closest('[data-back-skill]')) { patch({ skill: '' }); return; }
-
-      if ((el = t.closest('[data-skill-on]'))) {
-        const k = SKILLS.find((x) => x.id === el.getAttribute('data-skill-on'));
-        if (!k) return;
-        /* Turning a skill ON is the direction that can change what a customer
-           is told, so it is the direction that confirms — the same asymmetry
-           the grounding toggle uses, and for the same reason. */
-        k.on = !k.on;
-        render();
-        return;
-      }
-
-      if ((el = t.closest('[data-skill-src]'))) {
-        const [id, col] = el.getAttribute('data-skill-src').split(':');
-        const k = SKILLS.find((x) => x.id === id);
-        if (!k) return;
-        const i = k.sources.indexOf(col);
-        if (i > -1) k.sources.splice(i, 1); else k.sources.push(col);
-        render();
-        return;
-      }
-
-      if ((el = t.closest('[data-sk-exp]'))) {
-        const g = el.getAttribute('data-sk-exp');
-        if (SKILL_OPEN.has(g)) SKILL_OPEN.delete(g); else SKILL_OPEN.add(g);
-        render();
-        return;
-      }
-
-      /* BY ID, not by display name. The instructions tree matches a checkbox
-         to its group by comparing `aria-label` against the group's name, which
-         holds only until two things are called the same thing. */
-      if ((el = t.closest('[data-sk-group]'))) {
-        const st0 = readURL();
-        const sel = SKILL_SEL[st0.skill];
-        const grp = targetGroups().find((g) => g.id === el.getAttribute('data-sk-group'));
-        if (!sel || !grp) return;
-        const all = grp.kids.every((k) => sel.has(k.id));
-        grp.kids.forEach((k) => { if (all) sel.delete(k.id); else sel.add(k.id); });
-        render();
-        return;
-      }
-
-      if ((el = t.closest('[data-sk-kid]'))) {
-        const st0 = readURL();
-        const sel = SKILL_SEL[st0.skill];
-        const id = el.getAttribute('data-sk-kid');
-        if (!sel) return;
-        if (sel.has(id)) sel.delete(id); else sel.add(id);
-        render();
-        return;
-      }
-      if (t.closest('[data-back-src]')) { patch({ src: '' }); return; }
-      if ((el = t.closest('[data-src]'))) { patch({ src: el.getAttribute('data-src') }); return; }
-
-      if ((el = t.closest('[data-ground]'))) {
-        const id = el.getAttribute('data-ground'), col = el.getAttribute('data-col');
-        const agent = AGENTS.find((a) => a.id === id);
-        const on = el.getAttribute('aria-pressed') === 'true';
-        if (!on && agent.external) {
-          /* The rung. The control does not move yet. */
-          groundConfirm(agent, col);
-          return;
-        }
-        COLLECTION_META[col].grounding[id] = !on;
-        el.setAttribute('aria-pressed', String(!on));
-        const host = $('#groundConfirm'); if (host) host.innerHTML = '';
-        return;
-      }
-
-      if (t.closest('[data-ground-cancel]')) { $('#groundConfirm').innerHTML = ''; return; }
-
-      if ((el = t.closest('[data-ground-ok]'))) {
-        const col = el.getAttribute('data-col'), id = el.getAttribute('data-agent');
-        COLLECTION_META[col].grounding[id] = true;
-        render();
-        return;
-      }
-
-      /* Expanding is not selecting. Clicking the label opens a branch; only the
-         checkbox changes what the rule targets. */
-      if ((el = t.closest('[data-texp]'))) {
-        const id = el.getAttribute('data-texp');
-        if (treeOpen.has(id)) treeOpen.delete(id); else treeOpen.add(id);
-        render();
-        return;
-      }
-
-      if ((el = t.closest('.set2-ck'))) {
-        const node = el.closest('.set2-node');
-        const label = el.getAttribute('aria-label');
-        const groups = targetGroups();
-        const grp = groups.find((g) => g.name === label);
-        if (grp) {
-          /* The cascade we own: a parent takes its whole branch, or releases it. */
-          const all = groupState(grp) === 'true';
-          grp.kids.forEach((k) => { if (all) targetSel.delete(k.id); else targetSel.add(k.id); });
-        } else {
-          const kid = groups.reduce((f, g) => f || g.kids.find((k) => k.name === label), null);
-          if (kid) { if (targetSel.has(kid.id)) targetSel.delete(kid.id); else targetSel.add(kid.id); }
-        }
-        if (node) render();
-        else el.setAttribute('aria-checked', el.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
-        return;
-      }
+  function seatTabindex() {
+    $$('[role="tree"]').forEach((t) => {
+      const rows = $$('[data-node]', t);
+      if (rows.length) rows[0].setAttribute('tabindex', '0');
     });
-
-    /* Space toggles a focused checkbox, per the treeview contract. Keyboard
-       driven changes do not animate: a power user hits these hundreds of times
-       a day and motion on a repeated action reads as lag, not as polish. */
-    document.addEventListener('keydown', (e) => {
-      if (e.key !== ' ' && e.key !== 'Enter') return;
-      const el = e.target.closest && e.target.closest('.set2-ck');
-      if (!el) return;
-      e.preventDefault();
-      el.setAttribute('aria-checked', el.getAttribute('aria-checked') === 'true' ? 'false' : 'true');
-    });
-
-    window.addEventListener('popstate', render);
   }
 
-  function init() {
-    const u = $('#userName'), r = $('#userRole'), a = $('#userAvatar');
-    if (u) u.textContent = USER.name;
-    if (r) r.textContent = USER.role;
-    if (a) a.textContent = USER.initials;
+  function repaintPicker(sid, focusId) {
+    const p = $(`[data-pick="${sid}"]`);
+    if (!p) return;
+    const s = skillById(sid);
+    p.outerHTML = picker(s, FILTER[sid]);
+    const np = $(`[data-pick="${sid}"]`);
+    const rows = $$('[data-node]', np);
+    if (!rows.length) return;
+    const want = focusId ? rows.filter((r) => r.dataset.node === focusId)[0] : null;
+    (want || rows[0]).setAttribute('tabindex', '0');
+    if (want) want.focus();
+  }
 
-    /* The pill's menu, copied from knowledge.js rather than shared, for the
-       same reason the fixtures are: this page does not load the corpus. */
-    const btn = $('#userPill'), panel = $('#userMenu');
-    if (btn && panel) {
-      const close = (returnFocus) => {
-        if (panel.hidden) return;
-        panel.hidden = true;
-        btn.setAttribute('aria-expanded', 'false');
-        if (returnFocus) btn.focus();
-      };
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (panel.hidden) {
-          panel.hidden = false;
-          btn.setAttribute('aria-expanded', 'true');
-          const first = $('.menu-item', panel);
-          if (first) first.focus();
-        } else close(true);
-      });
-      document.addEventListener('click', (e) => {
-        if (panel.hidden || panel.contains(e.target) || btn.contains(e.target)) return;
-        close();
-      });
-      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(true); });
+  function toggleNode(id, sel) {
+    const node = findNode(id);
+    if (!node) return;
+    const lv = leavesOf(node);
+    const all = lv.every((l) => sel.has(l.id));
+    lv.forEach((l) => { if (all) sel.delete(l.id); else sel.add(l.id); });
+  }
+
+  /* ═══ WIRING ═══ */
+  document.addEventListener('click', (e) => {
+    const st = readURL();
+
+    const railBtn = e.target.closest('[data-m]');
+    if (railBtn) { patch({ m: railBtn.dataset.m, skill: '' }); return; }
+
+    const lens = e.target.closest('[data-lens]');
+    if (lens) { patch({ lens: lens.dataset.lens }); return; }
+
+    const go = e.target.closest('[data-go]');
+    if (go && go.dataset.go.indexOf('skill:') === 0) { patch({ skill: go.dataset.go.slice(6) }); return; }
+    if (go && go.dataset.go.indexOf('conn:') === 0) { patch({ conn: go.dataset.go.slice(5) }); return; }
+
+    if (e.target.closest('[data-back]')) { patch({ skill: '', conn: '' }); return; }
+
+    /* ── Path segment picker ──
+       Choosing a key at depth N truncates everything deeper, because the
+       subtree below it just changed. Keeping the old tail would leave a path
+       that reads fine and resolves to nothing. */
+    const seg = e.target.closest('[data-seg]');
+    if (seg) {
+      const [mi, si] = seg.dataset.seg.split(':').map(Number);
+      openSegPicker(seg, connById(st.conn), mi, si);
+      return;
+    }
+    const tf = e.target.closest('[data-tf]');
+    if (tf) { openTransform(tf, connById(st.conn), +tf.dataset.tf.split(':')[0], tf.dataset.tf.split(':')[1]); return; }
+
+    const mdel = e.target.closest('[data-map-del]');
+    if (mdel) {
+      const c = connById(st.conn);
+      c.maps.splice(+mdel.dataset.mapDel, 1);
+      DIRTY.add('maps'); render(); return;
+    }
+    const madd = e.target.closest('[data-map-add]');
+    if (madd) {
+      const c = connById(st.conn);
+      const used = c.maps.map((m) => m.ctx);
+      const free = CTX_FIELDS.filter((f) => used.indexOf(f) < 0);
+      if (!free.length) return;
+      c.maps.push({ ctx: free[0], path: [] });
+      DIRTY.add('maps'); render(); return;
     }
 
-    wire();
-    render();
-  }
+    /* ── Criteria ── */
+    const cdel = e.target.closest('[data-crit-del]');
+    if (cdel) { const c = connById(st.conn); c.criteria.splice(+cdel.dataset.critDel, 1);
+                DIRTY.add('criteria'); render(); return; }
+    const cadd = e.target.closest('[data-crit-add]');
+    if (cadd) { openCritPicker(cadd, connById(st.conn)); return; }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
+    /* ── The consequential ones ── */
+    const retGo = e.target.closest('[data-ret-go]');
+    if (retGo) {
+      const r = RETENTION.filter((x) => x.id === retGo.dataset.retGo)[0];
+      confirmDelete(r); return;
+    }
+    const rev = e.target.closest('[data-reveal]');
+    if (rev) {
+      const f = document.getElementById(rev.dataset.reveal);
+      const shown = f.type === 'text';
+      f.type = shown ? 'password' : 'text';
+      rev.textContent = shown ? 'Reveal' : 'Hide';
+      return;
+    }
+    if (e.target.closest('[data-run]') || e.target.closest('[data-test]')) return;
+
+    if (e.target.closest('[data-new]')) { MODAL = 'new'; paintModal(); return; }
+    if (e.target.closest('[data-open-upload]')) { MODAL = 'upload'; paintModal(); return; }
+    if (e.target.closest('[data-open-new]')) { MODAL = 'new'; paintModal(); return; }
+    if (e.target.closest('[data-example]')) { downloadExample(); return; }
+    if (e.target.closest('[data-close]')) { closeModal(); return; }
+    if (e.target.classList && e.target.hasAttribute && e.target.hasAttribute('data-scrim')) { closeModal(); return; }
+
+    const view = e.target.closest('[data-view]');
+    if (view) {
+      if (view.dataset.view === 'raw') RAW.add(view.dataset.sid); else RAW.delete(view.dataset.sid);
+      render(); return;
+    }
+
+    const ladT = e.target.closest('[data-lad-t]');
+    if (ladT) {
+      const box = ladT.closest('[data-lad]');
+      const open = box.classList.toggle('is-open');
+      ladT.setAttribute('aria-expanded', String(open));
+      return;
+    }
+
+    if (e.target.closest('[data-discard]')) { DIRTY.clear(); render(); return; }
+    if (e.target.closest('[data-save-go]')) { DIRTY.clear(); render(); return; }
+
+    const node = e.target.closest('[data-node]');
+    if (node) {
+      const pick = node.closest('[data-pick]');
+      const id = node.dataset.node;
+      if (e.target.closest('.set2-exp')) {
+        if (OPEN.has(id)) OPEN.delete(id); else OPEN.add(id);
+      } else if (pick) {
+        toggleNode(id, SEL[pick.dataset.pick]);
+        DIRTY.add('targets:' + pick.dataset.pick);
+      } else { return; }
+      if (pick) { repaintPicker(pick.dataset.pick, id); $('[data-save]').classList.toggle('is-on', DIRTY.size > 0);
+                  $('[data-save] .set2-num').textContent = DIRTY.size; }
+      else render();
+    }
+  });
+
+  document.addEventListener('input', (e) => {
+    const f = e.target.closest('[data-pfilter]');
+    if (f) {
+      const pick = f.closest('[data-pick]');
+      FILTER[pick.dataset.pick] = f.value.toLowerCase().trim();
+      const sel = f.selectionStart;
+      repaintPicker(pick.dataset.pick);
+      const nf = $(`[data-pick="${pick.dataset.pick}"] [data-pfilter]`);
+      if (nf) { nf.focus(); nf.setSelectionRange(sel, sel); }
+      return;
+    }
+    /* Type-to-confirm. The button stays dead until the name matches, so the
+       gate is the typing rather than the clicking. */
+    const cf = e.target.closest('[data-confirm]');
+    if (cf) {
+      const ok = $('[data-confirm-go]');
+      if (ok) ok.disabled = cf.value.trim().toLowerCase() !== cf.dataset.confirm.toLowerCase();
+      return;
+    }
+    /* Retention threshold. The consequence recomputes as you type, because a
+       number whose effect you cannot see is a number you cannot judge. */
+    const ret = e.target.closest('[data-ret]');
+    if (ret) {
+      const r = RETENTION.filter((x) => x.id === ret.dataset.ret)[0];
+      const v = parseInt(ret.value, 10);
+      if (r && v > 0) { r.days = v; DIRTY.add('retention:' + r.id);
+        const rowEl = ret.closest('.set2-row');
+        $('.set2-row-d', rowEl).textContent = 'Older than ' + v + ' days';
+        $('.set2-from', rowEl).textContent = wouldDelete(r).toLocaleString() + ' affected';
+        const go = $('[data-ret-go]', rowEl);
+        if (go) go.textContent = 'Delete now';
+      }
+    }
+    if (e.target.hasAttribute && e.target.hasAttribute('data-dirty')) {
+      DIRTY.add(e.target.id);
+      const bar = $('[data-save]');
+      if (bar) { bar.classList.add('is-on'); $('.set2-num', bar).textContent = DIRTY.size; }
+    }
+  });
+
+  /* A popover is dismissed by anything that is not itself. */
+  document.addEventListener('mousedown', (e) => {
+    const p = document.getElementById('setPop');
+    if (p && !p.contains(e.target) && !e.target.closest('[data-seg],[data-tf],[data-crit-add]')) closePop();
+  });
+
+  document.addEventListener('change', (e) => {
+    const t = e.target.closest('[data-skill-on]');
+    if (t) { const s = skillById(t.dataset.skillOn); s.on = t.checked; render(); return; }
+    const f = e.target.closest('[data-file]');
+    if (f && f.files && f.files[0]) readSkillFile(f.files[0]);
+  });
+
+  /* Drag and drop on the zone. `dragover` must be cancelled or the browser
+     navigates to the file instead of handing it over. */
+  document.addEventListener('dragover', (e) => {
+    const z = e.target.closest && e.target.closest('[data-drop]');
+    if (!z) return;
+    e.preventDefault(); z.classList.add('is-over');
+  });
+  document.addEventListener('dragleave', (e) => {
+    const z = e.target.closest && e.target.closest('[data-drop]');
+    if (z) z.classList.remove('is-over');
+  });
+  document.addEventListener('drop', (e) => {
+    const z = e.target.closest && e.target.closest('[data-drop]');
+    if (!z) return;
+    e.preventDefault(); z.classList.remove('is-over');
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) readSkillFile(file);
+  });
+
+  /* ═══ KEYBOARD ═══
+     The ARIA treeview map, which is the spec's. The tri-state cascade under it
+     is ours -- the spec defines `mixed` and says nothing about parent-to-child
+     propagation -- and it is the same cascade the mouse gets, because two
+     selection models on one widget is how a picker disagrees with itself. */
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && MODAL) { closeModal(); return; }
+    const node = e.target.closest && e.target.closest('[data-node]');
+    if (!node) return;
+    const tree = node.closest('[role="tree"]');
+    const pick = node.closest('[data-pick]');
+    const rows = $$('[data-node]', tree);
+    const i = rows.indexOf(node);
+    const id = node.dataset.node;
+    const open = node.getAttribute('aria-expanded');
+    const move = (j) => {
+      const t = rows[Math.max(0, Math.min(rows.length - 1, j))];
+      if (!t) return;
+      rows.forEach((r) => r.setAttribute('tabindex', '-1'));
+      t.setAttribute('tabindex', '0'); t.focus();
+    };
+    switch (e.key) {
+      case ' ': case 'Enter':
+        e.preventDefault();
+        if (!pick) return;
+        toggleNode(id, SEL[pick.dataset.pick]);
+        DIRTY.add('targets:' + pick.dataset.pick);
+        repaintPicker(pick.dataset.pick, id);
+        break;
+      case 'ArrowDown': e.preventDefault(); move(i + 1); break;
+      case 'ArrowUp':   e.preventDefault(); move(i - 1); break;
+      case 'Home':      e.preventDefault(); move(0); break;
+      case 'End':       e.preventDefault(); move(rows.length - 1); break;
+      case 'ArrowRight':
+        e.preventDefault();
+        if (open === 'false') { OPEN.add(id); pick ? repaintPicker(pick.dataset.pick, id) : render(); }
+        else if (open === 'true') move(i + 1);
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        if (open === 'true') { OPEN.delete(id); pick ? repaintPicker(pick.dataset.pick, id) : render(); }
+        else {
+          const lvl = +node.getAttribute('aria-level');
+          for (let j = i - 1; j >= 0; j--)
+            if (+rows[j].getAttribute('aria-level') < lvl) { move(j); break; }
+        }
+        break;
+      default: return;
+    }
+  });
+
+  window.addEventListener('popstate', render);
+  render();
 })();
