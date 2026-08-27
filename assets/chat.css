@@ -189,20 +189,27 @@ body[data-rail="collapsed"] .gate-body { grid-template-columns: 0rem minmax(0, 1
   100% { transform: translate3d(var(--dx), var(--t), 0);     opacity: 0; }
 }
 
-/* ══ IN A CONVERSATION: THE SAME GROUND, HELD STILL ════════════════════
-   This used to fade the bloom to nothing, on the reasoning that a transcript
-   reads better against a flat surface. What it actually did was change the
-   colour of the page the moment you asked a question — you land on one
-   background and get a different one for answering, which reads as a bug
-   rather than as focus.
+/* ══ IN A CONVERSATION: THE SAME GROUND, STILL MOVING ══════════════════
+   Two rules stood here in turn and both are gone.
 
-   So the bloom stays exactly as it was and only stops moving. `paused` freezes
-   each layer wherever its cycle had reached, so the still frame is one the eye
-   was already looking at rather than a jump to a keyframe boundary. Motion is
-   what belongs to the empty state; the colour belongs to the page. */
-body[data-thread="active"] .gate-bloom-a,
-body[data-thread="active"] .gate-bloom-b,
-body[data-thread="active"] .gate-mote { animation-play-state: paused; will-change: auto; }
+   The first faded the bloom to nothing once a thread started, on the reasoning
+   that a transcript reads better against a flat surface. What it actually did
+   was change the colour of the page the moment you asked a question — you land
+   on one background and get a different one for answering, which reads as a
+   bug rather than as focus.
+
+   The second kept the colour and only stopped the motion, freezing each layer
+   with `animation-play-state: paused`. It fixed the colour change and left a
+   subtler version of the same fault: the ground is alive on the page you
+   arrive at and dead on the page you work on, so asking a question still
+   visibly costs you something. A frozen mote is also a mote that has stopped
+   for no reason a reader can name.
+
+   Neither is here now. The bloom and the motes run in the empty state and in a
+   conversation, at the same rate, because it is ONE ground and nothing about
+   asking a question is a reason for it to change. Reduced motion is still
+   honoured where it is declared, which is the one case where stopping is
+   something the reader asked for rather than something inferred for them. */
 
 /* ═══════════════════════════════════════════════
    CONVERSATIONS

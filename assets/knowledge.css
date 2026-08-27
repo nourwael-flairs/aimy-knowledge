@@ -725,6 +725,55 @@ button {
   overflow-y: auto;
   border-right: 0.0625rem solid var(--glass-border);
 }
+
+/* ── THE SCROLLBAR IS HIDDEN AT REST, NOT ABSENT ──
+
+   This column was the one scrolling surface in the build with no scrollbar
+   rule on it at all, so it drew the raw OS bar — a wide, opaque, differently
+   coloured strip down the edge of a 240px column, against the four thin ones
+   the rest of the product already agrees on (.brief, .sidebar-nav, .ntf-panel,
+   .new-menu). The thread beside it does not have this problem because it does
+   not use a bar: it fades its last 28px instead.
+
+   THE TRACK STILL RESERVES ITS WIDTH. `scrollbar-width: thin` stays on at all
+   times and only the THUMB goes transparent, so appearing costs nothing —
+   `scrollbar-width: none` would hand the 4px back to the content and every
+   title in the column would re-wrap under the pointer. Hidden, not gone, is
+   the whole of the difference.
+
+   It comes back on hover AND on focus-within: keyboard-walking the list with
+   Tab scrolls it too, and a scrollbar that only answers a mouse tells half the
+   people using it nothing.
+
+   TWO SPELLINGS, ONE BEHAVIOUR, AND ONLY ONE OF THEM RUNS. Where
+   `scrollbar-width` is supported the engine uses it and IGNORES the
+   ::-webkit-scrollbar pseudo-elements entirely — measured here at a 11px
+   reserved gutter rather than the 4px the pseudo asks for. The pseudos are
+   kept for the engines that predate that and are dead weight everywhere else,
+   which is why neither spelling carries a transition: a fade that happens on
+   one browser and not the next is worse than no fade, and `scrollbar-color` is
+   not animatable anyway. It appears and it goes. */
+.overlay-chats {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.overlay-chats:hover, .overlay-chats:focus-within {
+  scrollbar-color: rgba(255, 255, 255, 0.06) transparent;
+}
+.overlay-chats::-webkit-scrollbar { width: 0.25rem; }
+.overlay-chats::-webkit-scrollbar-track { background: transparent; }
+.overlay-chats::-webkit-scrollbar-thumb { background: transparent; border-radius: 0.125rem; }
+.overlay-chats:hover::-webkit-scrollbar-thumb,
+.overlay-chats:focus-within::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.06); }
+
+:root[data-theme="light"] .overlay-chats:hover,
+:root[data-theme="light"] .overlay-chats:focus-within {
+  scrollbar-color: rgba(16, 24, 40, 0.12) transparent;
+}
+:root[data-theme="light"] .overlay-chats:hover::-webkit-scrollbar-thumb,
+:root[data-theme="light"] .overlay-chats:focus-within::-webkit-scrollbar-thumb {
+  background: rgba(16, 24, 40, 0.12);
+}
 .overlay-main {
   flex: 1; min-width: 0; position: relative;
   display: flex; flex-direction: column;
