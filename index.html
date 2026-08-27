@@ -145,6 +145,30 @@
       </svg>
     </button>
 
+    <!-- Notifications. Identical markup on all three shells because it is the
+         same control reading the same queue -- what is still waiting on a
+         person, derived from the corpus rather than hard-coded. What differs
+         is where a row LANDS: see "One finding, two routes" in knowledge.js. -->
+    <div class="ntf-anchor">
+      <button class="topnav-bell" id="ntfBell" type="button"
+              aria-haspopup="dialog" aria-expanded="false" aria-controls="ntfPanel"
+              aria-label="Notifications">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        <span class="bell-dot" id="ntfDot" hidden></span>
+      </button>
+      <div class="ntf-panel" id="ntfPanel" hidden role="dialog" aria-label="Needs you">
+        <div class="ntf-head">
+          <b>Needs you</b>
+          <span class="ntf-count" id="ntfCount" hidden>0</span>
+          <button class="ntf-clear" id="ntfClear" type="button">Mark all read</button>
+        </div>
+        <ul class="ntf-list" id="ntfList"></ul>
+        <div class="ntf-foot">
+          <button class="ntf-foot-btn" id="ntfAskAll" type="button">Ask AiMY what to do first</button>
+        </div>
+      </div>
+    </div>
+
     <div class="user-anchor">
       <button class="topnav-user" id="userPill" type="button"
               aria-haspopup="menu" aria-expanded="false" aria-controls="userMenu">
@@ -322,6 +346,6 @@
 
 <script src="assets/aimy-ds.js"></script>
 <script src="assets/chat.js?v=6"></script>
-<script src="assets/knowledge.js?v=157"></script>
+<script src="assets/knowledge.js?v=159"></script>
 </body>
 </html>

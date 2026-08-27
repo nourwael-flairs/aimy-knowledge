@@ -23,6 +23,20 @@
   /* ═══════════════════════════════════════════════
      HELPERS
   ═══════════════════════════════════════════════ */
+  /* ── Which shell this script is running in ──
+
+     Read at LOAD, not in init(), because a handful of listeners below are
+     armed at module scope and one of them must not arm on settings: that page
+     ships a command palette of its own on the same key, and two palettes
+     answering one chord is one too many. The script is at the end of <body>,
+     so the attribute is already there to read.
+
+     The rest of the module-scope listeners are guarded by an id or a class
+     that settings does not have and are inert there on their own; only the
+     ones that would COST something — a stolen chord, a `closest()` on every
+     mouse move over a page with nothing to cite — are gated by hand. */
+  const CHROME_ONLY = !!(document.body && document.body.getAttribute('data-page') === 'settings');
+
   const $  = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
@@ -2324,6 +2338,47 @@
      about the set in front of you rather than about the corpus in general.
      Called with nothing it behaves exactly as before, which is what the bell
      and the briefing still do. */
+  /* ── One finding, two routes ──
+
+     The bell is on all three shells now, and only ONE of them can act on a row
+     where it stands: the workbench has the grid a filter steers and the canvas
+     an answer lands in. The gate has a canvas but no grid; settings has
+     neither. A row that called `patch()` on either would rewrite the address
+     bar and change nothing on screen — an inert control, which is the exact
+     defect the bell was built to remove.
+
+     So every row declares three things: `needs` is the surface its in-place
+     route requires, `go` is that route, and `nav` is where it lands when the
+     surface is absent. All three are written side by side on the row itself
+     rather than switched on `id` further down, so a finding cannot be added
+     later with only half a route. `go` and `nav` carry the same state, because
+     the URL is the state — `nav` writes what `go` would have written.
+
+     `needs` is what makes this two shells rather than one-and-the-rest. The
+     gate has a CANVAS and no grid, and that is the whole of its difference: a
+     row that asks a question is answered there, in the conversation, which is
+     what the gate is for — and the answer's Apply button already carries its
+     documents across to the Console rather than promising a grid that is not
+     there. A row that FILTERS has nothing to steer, so it leaves. Settings has
+     neither surface, so everything leaves.
+
+     The two questions the console asks itself on arrival, `ask` and `stage`,
+     are the only params here that are not filters: they are consumed and
+     stripped the moment they land, so a reload does not re-ask. */
+  const askHref  = (q) => 'console.html?ask=' + encodeURIComponent(q);
+  const TRIAGE_Q = 'Across everything waiting on me right now, what should I do first and why?';
+  const filtHref = (qs) => 'console.html?' + qs;
+
+  /* Named once because each is asked by two routes, and a question that drifts
+     between them is two findings wearing one label. */
+  const NTF_Q = {
+    source:      'Which sources stopped syncing, and what has it cost?',
+    conflicting: 'Which documents contradict each other, and which one should win?',
+    outdated:    'Which documents are out of date against their source?',
+    unowned:     'Which documents are unowned, and who should own each one?',
+    unused:      'Which documents has nobody used, and are any worth keeping?'
+  };
+
   function needsYou(scope) {
     const out = [];
     const SET = scope || LIVE;
@@ -2352,7 +2407,9 @@
         why: 'It is the only one that keeps getting worse while you read the rest.',
         cta: 'Why it stopped',
         ids: starved.map((o) => o.id),
-        go: () => submit('Which sources stopped syncing, and what has it cost?')
+        needs: 'canvas',
+        go: () => submit(NTF_Q.source),
+        nav: askHref(NTF_Q.source)
       });
     }
 
@@ -2372,9 +2429,13 @@
         why: 'A person put it there, so nothing but a person will clear it.',
         cta: reported.length === 1 ? 'Open the report' : 'Show them',
         ids: reported.map((o) => o.id),
+        needs: 'grid',
         go: () => reported.length === 1
           ? patch({ doc: reported[0].id })
-          : patch({ ids: reported.map((o) => o.id) })
+          : patch({ ids: reported.map((o) => o.id) }),
+        nav: filtHref(reported.length === 1
+          ? 'doc=' + reported[0].id
+          : 'ids=' + reported.map((o) => o.id).join(','))
       });
     }
 
@@ -2390,7 +2451,9 @@
         why: 'Two answers to one question is worse than none, because both look confident.',
         cta: 'Compare them',
         ids: conflicting.map((o) => o.id),
-        go: () => submit('Which documents contradict each other, and which one should win?')
+        needs: 'canvas',
+        go: () => submit(NTF_Q.conflicting),
+        nav: askHref(NTF_Q.conflicting)
       });
     }
 
@@ -2406,7 +2469,9 @@
         why: 'Wrong, but not getting wronger — and a blocked source is why some of it is.',
         cta: 'Re-sync them',
         ids: outdated.map((o) => o.id),
-        go: () => submit('Which documents are out of date against their source?')
+        needs: 'canvas',
+        go: () => submit(NTF_Q.outdated),
+        nav: askHref(NTF_Q.outdated)
       });
     }
 
@@ -2425,7 +2490,9 @@
         ids: drafted.map((o) => o.id),
         /* Status is a LIST key — a bare string writes nothing and the row
            becomes a button that quietly does not work. */
-        go: () => patch({ status: ['draft'] })
+        needs: 'grid',
+        go: () => patch({ status: ['draft'] }),
+        nav: filtHref('status=draft')
       });
     }
 
@@ -2441,7 +2508,9 @@
         why: 'Every other line on this list needs somebody to send it to.',
         cta: is(unowned.length, 'Who should own it', 'Who should own them'),
         ids: unowned.map((o) => o.id),
-        go: () => submit('Which documents are unowned, and who should own each one?')
+        needs: 'canvas',
+        go: () => submit(NTF_Q.unowned),
+        nav: askHref(NTF_Q.unowned)
       });
     }
 
@@ -2461,7 +2530,11 @@
         why: 'Nothing on the surface would ever have said so — an absence has no card.',
         cta: 'Draft the answer',
         ids: [],
-        go: () => canvas.stage(lead.prompt, ['Coverage gap', asked + ' unanswered questions', 'Nothing to filter to'])
+        needs: 'canvas',
+        go: () => canvas.stage(lead.prompt, ['Coverage gap', asked + ' unanswered questions', 'Nothing to filter to']),
+        /* A gap stages a write rather than running one, so the route that
+           lands from elsewhere has to stage it too, not ask it. */
+        nav: 'console.html?stage=' + encodeURIComponent(lead.prompt)
       });
     }
 
@@ -2477,7 +2550,9 @@
         why: 'Either dead weight or a gap in how people find things, and both are worth a look.',
         cta: is(unused.length, 'Triage it', 'Triage them'),
         ids: unused.map((o) => o.id),
-        go: () => submit('Which documents has nobody used, and are any worth keeping?')
+        needs: 'canvas',
+        go: () => submit(NTF_Q.unused),
+        nav: askHref(NTF_Q.unused)
       });
     }
 
@@ -2511,7 +2586,16 @@
   const bell = {
     btn: null, panel: null, list: null, dot: null, count: null, open: false, read: {},
 
+    /* What THIS shell can do with a row where it stands, matched against the
+       row's own `needs`. Read once at init rather than per click, because the
+       shell does not change under a page. See "One finding, two routes"
+       above needsYou(). */
+    can: { canvas: false, grid: false },
+
     init() {
+      const page = document.body.getAttribute('data-page');
+      this.can = { canvas: page === 'workbench' || page === 'gate',
+                   grid:   page === 'workbench' };
       this.btn = $('#ntfBell');
       this.panel = $('#ntfPanel');
       this.list = $('#ntfList');
@@ -2531,7 +2615,11 @@
       const askAll = $('#ntfAskAll');
       if (askAll) askAll.addEventListener('click', () => {
         this.close();
-        canvas.ask('Across everything waiting on me right now, what should I do first and why?',
+        /* The triage answer ends in an Apply button over a set, so it is only
+           an answer where there is a set to apply it to. Elsewhere it takes
+           the same road its rows do. */
+        if (!this.can.canvas) { location.href = askHref(TRIAGE_Q); return; }
+        canvas.ask(TRIAGE_Q,
           ['Source health', 'Reported problems', 'Every status in the library'], () => triageAnswer());
       });
 
@@ -2605,7 +2693,10 @@
     start(t) {
       this.read[t.id] = true;
       this.close();
-      t.go();
+      /* Where the surface a row needs is absent, the row is a link in button's
+         clothing: it carries the same state to the one shell that has that
+         surface, instead of steering something that is not on the page. */
+      if (this.can[t.needs]) t.go(); else location.href = t.nav;
     },
 
     toggle() { if (this.open) this.close(true); else this.show(); },
@@ -12663,6 +12754,7 @@
      either surface's Escape ladder, because the palette belongs to the product
      and not to a page. */
   document.addEventListener('keydown', (e) => {
+    if (CHROME_ONLY) return;
     if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
       e.preventDefault();
       palette.open ? palette.close() : palette.show();
@@ -12815,10 +12907,12 @@
     : null;
 
   document.addEventListener('mouseover', (e) => {
+    if (CHROME_ONLY) return;
     const w = citeFrom(e.target);
     if (w) openCite(w); else if (citeOut) closeCite();
   });
   document.addEventListener('focusin', (e) => {
+    if (CHROME_ONLY) return;
     const w = citeFrom(e.target);
     if (w) openCite(w); else if (citeOut) closeCite();
   });
@@ -13064,7 +13158,38 @@
        It is the seam now: the gate boots a conversation and a shell, and none
        of the grid, filters, briefing, bell, drop layer or document machinery,
        because none of that has anywhere to render on it. */
-    const gate = document.body.getAttribute('data-page') === 'gate';
+    const page = document.body.getAttribute('data-page');
+    const gate = page === 'gate';
+
+    /* ══ SETTINGS TAKES THE CHROME AND NOTHING ELSE ═════════════════════
+       The topnav is shared markup, and settings shipped it without the script
+       behind it: the account pill was focusable, announced `aria-haspopup` and
+       did nothing when pressed — the same inert control this build removed
+       from the other two shells, still sitting on the third. It gets the bell
+       for the same reason, and both are wired here rather than copied into
+       settings.js, because a second implementation of one dropdown is the way
+       the two drift.
+
+       Nothing else boots. There is no grid to render, no overlay to open and
+       no conversation to restore, so every line below this point would be
+       machinery addressing elements that are not on the page. */
+    if (page === 'settings') {
+      const nm = $('#userName'), rl = $('#userRole'), av = $('#userAvatar');
+      if (nm) nm.textContent = USER.name;
+      if (rl) rl.textContent = USER.role;
+      if (av) av.textContent = USER.initials;
+      userMenu.init();
+      bell.init();
+      /* The other two shells order Escape once, inside the canvas's chain of
+         dismissable layers. There is no canvas here, so the two layers that do
+         exist order themselves — shallowest first, same as there. */
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        if (bell.open) { bell.close(true); return; }
+        if (userMenu.open) { userMenu.close(true); return; }
+      });
+      return;
+    }
 
     canvas.init();
     /* Before the first render, so the column has something in it the moment the
@@ -13084,6 +13209,10 @@
 
     if (gate) {
       if (window.AIMY_GATE) window.AIMY_GATE.init(GATE_API);
+      /* The gate has the canvas but not the grid, so the bell's answering rows
+         land in place and its filtering rows leave for the Console. `needs` is
+         what tells the two apart. */
+      bell.init();
       paintThread();
       return;
     }
@@ -13094,7 +13223,31 @@
     wireDrop();
     renderAiState();
 
+    /* ── What another shell sent here ──
+
+       A bell row on the gate or in settings cannot steer a grid that is not on
+       the page, so it arrives as a URL instead. `ask` is a question to answer,
+       `stage` a write to prepare — neither is a filter, so both are read and
+       STRIPPED before the first render: left in the address bar they would
+       re-fire on reload and on every Back, and they would sit in a filter URL
+       that is meant to be legible and pasteable. */
+    const inbound = new URLSearchParams(location.search);
+    const asked = inbound.get('ask'), staged = inbound.get('stage');
+    if (asked || staged) {
+      inbound.delete('ask'); inbound.delete('stage');
+      const rest = inbound.toString().replace(/%2C/g, ',').replace(/%3A/g, ':');
+      history.replaceState(null, '', location.pathname + (rest ? '?' + rest : ''));
+      /* The back-button guard compares against this. Rewriting the address bar
+         without it leaves the guard defending a URL that no longer exists. */
+      hereURL = location.pathname + location.search;
+    }
+
     render();
+
+    /* After the render, so the answer opens over a surface that is already
+       drawn rather than over an empty one. */
+    if (asked) submit(asked);
+    else if (staged) canvas.stage(staged, ['Coverage gap', 'Sent from another shell', 'Nothing to filter to']);
 
     /* The loading state resolves into the real surface, so the skeleton is a
        stage rather than a dead end. */
