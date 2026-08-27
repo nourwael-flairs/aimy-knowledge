@@ -736,6 +736,24 @@ button {
   padding: 0 0 1.5rem;
 }
 
+/* ── THE COLUMN SITS ON THE DENSITY SCALE, NOT UNDER IT ──
+
+   This list was set in raw --fs-xs/--fs-2xs: an 11px title over 10px meta, in
+   a 255px column. THE DENSITY TYPE SCALE above says what is wrong with that in
+   its own words -- "--fs-2xs will hand you 10px without comment, and 10px in a
+   320px column is decoration wearing the clothes of information" -- and names
+   --ty-micro the floor precisely so a narrow column cannot fall through it.
+
+   The column was already half on the scale and did not agree with itself: the
+   menu that hangs off a row (.ov-chat-mi) and the box that REPLACES a title
+   when you rename it (.ov-chat-rename) are both --ty-meta, so the menu read
+   larger than the row it belonged to and a title grew 2px the moment it became
+   editable. Everything here is --ty-meta over --ty-micro now, which is one
+   step up for the titles and the search box, and lands the rest on the floor.
+
+   Hierarchy is unchanged and still carried the way the scale says -- step AND
+   weight AND ink -- because every rung moved together. */
+
 /* Starting one, then finding one. The column's only filled control, because
    starting is the verb and everything under it is the qualifier. */
 .ov-chat-new { width: 100%; justify-content: center; margin-bottom: 0.5rem; }
@@ -747,7 +765,7 @@ button {
   width: 100%; min-height: 1.5rem; padding: 0.5rem;
   border-radius: var(--r-sm);
   border: 0.0625rem solid var(--glass-border); background: transparent;
-  font-family: inherit; font-size: var(--fs-xs); color: var(--d100);
+  font-family: inherit; font-size: var(--ty-meta); color: var(--d100);
 }
 .ov-chat-input::placeholder { color: var(--d600); }
 .ov-chat-input:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -1px; }
@@ -756,7 +774,7 @@ button {
 /* 8 under the label, 20 between groups — the ratio rule, and it is what makes
    a group read as a group rather than as a list with a heading in it. */
 .ov-chat-cap {
-  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
   letter-spacing: var(--ls-wide); text-transform: uppercase;
   color: var(--d500); padding: 0 0.5rem; margin-bottom: 0.5rem;
 }
@@ -765,7 +783,7 @@ button {
      turn count against the middle of a wrapped question. */
   display: flex; align-items: flex-start; gap: 0.5rem;
   min-height: 1.5rem; padding: 0.5rem; border-radius: var(--r-sm);
-  font-size: var(--fs-xs); color: var(--d300);
+  font-size: var(--ty-meta); color: var(--d300);
   cursor: pointer; text-align: left; width: 100%;
   transition: background-color var(--t-fast), color var(--t-fast);
 }
@@ -931,13 +949,13 @@ button {
 /* Who answered. One rung quieter than the title and one step smaller, which is
    the whole hierarchy — it is read after the title or not at all. */
 .ov-chat-agent {
-  font-size: var(--fs-2xs); color: var(--d500);
+  font-size: var(--ty-micro); color: var(--d500);
   line-height: var(--lh-snug); letter-spacing: var(--ls-wide);
 }
 .ov-chat.is-here .ov-chat-agent { color: var(--d400); }
 .ov-chat-n {
   margin-left: auto; flex-shrink: 0;
-  font-size: var(--fs-2xs); color: var(--d500); font-variant-numeric: tabular-nums;
+  font-size: var(--ty-micro); color: var(--d500); font-variant-numeric: tabular-nums;
 }
 .ov-chat-none { font-size: var(--fs-base); color: var(--d500); line-height: var(--lh-relaxed); padding: 0 0.5rem; }
 
