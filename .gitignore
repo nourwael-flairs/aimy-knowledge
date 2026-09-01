@@ -2,7 +2,7 @@
 GAPS.md
 readme.md
 design-system/
-
+.impeccable
 # wrangler files
 .wrangler
 .dev.vars*
