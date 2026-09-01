@@ -13,7 +13,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Poppins:wght@700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <link rel="stylesheet" href="assets/aimy-ds.css" />
-  <link rel="stylesheet" href="assets/knowledge.css?v=161" />
+  <link rel="stylesheet" href="assets/knowledge.css?v=202" />
+  <!-- The settings modules render into this page's stage now, so their
+       stylesheet loads with it. Nothing in it paints console markup: every
+       rule is namespaced `.set2-`, apart from `kbd` and `.w-lock`, neither of
+       which the console renders. -->
+  <link rel="stylesheet" href="assets/settings.css?v=342" />
 
   <script>
     /* Apply saved theme before paint to avoid flash. Default = dark. */
@@ -182,7 +187,9 @@
            item; search inside settings does what the shortcuts were for. -->
       <div class="menu user-menu" id="userMenu" role="menu" aria-label="Account" hidden>
         <div class="menu-label">Signed in as Nour Wael</div>
-        <a class="menu-item" role="menuitem" href="settings.html">Settings</a>
+        <!-- Settings left this menu. A dropdown under a face is where you put
+             things you need to FIND once; settings is used, and what is used
+             belongs on the rail. It is two rows down and to the left. -->
         <button class="menu-item" role="menuitem" type="button">Viewing as&hellip;</button>
         <div class="menu-sep"></div>
         <!-- The way back to the gate. Without it the Console is a one-way
@@ -273,9 +280,6 @@
          can be linked to like everything else here. ══ -->
     <div class="doc-overlay" id="setOverlay" role="dialog" aria-modal="true" aria-label="Settings" hidden>
       <div class="doc-sheet is-settings" id="setSheet"></div>
-    </div>
-
-    
     </div>
 
     <!-- ══ The input. Not a chat box — it drives the page. Four routes.
@@ -417,6 +421,17 @@
 <div id="commitHost"></div>
 <div id="toastHost"></div>
 
+<!-- Where the settings modals mount: the dry run, the typed-count deletions,
+     the new-skill sheet, the file upload, adding people. It lives at the body
+     for the same reason the peek does — a dialog anchored inside the scroll
+     port inherits that port's clipping and its stacking context, and neither
+     is something a modal should be subject to.
+
+     This was missing when settings moved off its own page, and nothing said
+     so: `paintModal` writes into `$('#setModal')`, which was null, so every
+     modal in the file failed silently on a host that was never there. -->
+<div id="setModal"></div>
+
 <!-- ══════════════════════════════════════════════
      PROTOTYPE CONTROLS — not product UI.
 
@@ -444,6 +459,12 @@
 
 
 <script src="assets/aimy-ds.js"></script>
-<script src="assets/knowledge.js?v=159"></script>
+<!-- BEFORE knowledge.js, the way chat.js loads before it on the gate. Two
+     reasons, both about order: this file registers its Escape handler at parse
+     time and the settings modal is the shallowest layer on the page, so it has
+     to answer first; and knowledge.js hands it `patch` and `readURL` from
+     inside its own `init`, which waits for DOMContentLoaded either way. -->
+<script src="assets/settings.js?v=340"></script>
+<script src="assets/knowledge.js?v=310"></script>
 </body>
 </html>

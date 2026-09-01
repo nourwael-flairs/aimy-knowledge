@@ -73,6 +73,10 @@
       --warn-bg: rgba(247,144,9,0.12);
       --err:     #f04438;
       --err-bg:  rgba(240,68,56,0.12);
+      /* The border that goes with that fill. It was written only as a
+         fallback inside settings.css, so a failure card kept one hard-coded
+         alpha in both themes while its background switched around it. */
+      --err-line: rgba(240,68,56,0.28);
       --err-glow:rgba(240,68,56,0.2);
       --info:    #0ea5e9;
       --info-bg: rgba(14,165,233,0.12);
@@ -225,6 +229,7 @@
       --ok-bg:   rgba(23,178,106,0.14);
       --warn-bg: rgba(247,144,9,0.14);
       --err-bg:  rgba(240,68,56,0.14);
+      --err-line: rgba(240,68,56,0.32);
       --info-bg: rgba(14,165,233,0.14);
 
       /* Surfaces */

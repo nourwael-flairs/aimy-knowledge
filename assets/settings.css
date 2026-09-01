@@ -1,96 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════════════════
-   settings.css — AiMY Settings
-
-   Loaded after aimy-ds.css and knowledge.css, so every token, the topnav and
-   the whole component library are already here. This file positions a page and
-   defines the four shapes settings needs that the library does not have. It
-   does not restyle a library component: `.toggle`, `.seg`, `.btn` and the menu
-   are used as they ship.
-
-   Prefix stays `set2-`. The `set-` namespace belongs to the settings SHEET in
-   knowledge.css (the per-source overlay), a different surface with a different
-   job, and two things sharing a prefix is how a rule written for one silently
-   repaints the other.
-
-   Everything is rem. The lever in knowledge.css (`font-size: max(1rem,
-   calc(100vw / 96))`) makes 1rem === 16px at and below the 1536 reference, so
-   a px value here would be the only thing that does not scale.
-
-   ── The three rules this file is most likely to break ──
-   T1  Layout carries meaning, copy does not. There is no `lede` class any
-       more. A heading followed by a paragraph explaining the heading was the
-       old shape and it is gone: the ladder, the reach counter and the row's
-       own right-hand cluster say what those paragraphs used to say.
-   T2  Separators are a smell. There is not one `border-bottom` between rows
-       below. Rows are separated by a SURFACE STEP and a 2px gap, so the page
-       ground shows through as the line.
-   T3  No harsh drop shadows. Elevation is card-bg vs card-bg-raised. The only
-       shadow in the file is on the one element that floats over content.
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* ══ SHELL ═══════════════════════════════════════════════════════════════
-   body is `height: 100dvh; display: flex; flex-direction: column; overflow:
-   hidden` from knowledge.css:1161. That is the app shell's contract and this
-   page keeps it rather than opting out, because the topnav should stay put
-   while the settings body scrolls under it.
-
-   The previous build did NOT do this: it hung a plain `<main>` in that flex
-   column with no scroll container, so anything past the viewport was clipped
-   with nothing to scroll. At 1536x900 the ledger lost 195px and its last rows,
-   Audit trail among them, could not be reached at all. `min-height: 0` on the
-   shell is the load-bearing line — without it a flex child refuses to shrink
-   below its content and the overflow moves back up to the clipped body. */
-.set2-shell {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  align-items: stretch;
-}
-
-/* ── Rail ──
-   Text only. Icons here would be sixteen more objects competing with the one
-   thing the rail has to say, which is where you are. */
-.set2-rail {
-  flex: 0 0 15rem;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 1.75rem 0.75rem 3rem 1.5rem;
-  scrollbar-width: thin;
-}
-.set2-rail-group + .set2-rail-group { margin-top: 1.5rem; }
-.set2-rail-label {
-  padding: 0 0.625rem 0.5rem;
-  font-size: var(--ty-micro);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--ls-wider);
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
-.set2-rail-item {
-  display: flex; align-items: center; gap: 0.5rem;
-  width: 100%;
-  appearance: none; border: 0; background: transparent;
-  padding: 0.375rem 0.625rem;
-  border-radius: var(--r-md);
-  font: inherit; font-size: var(--ty-meta);
-  color: var(--ink-quiet); text-align: left; cursor: pointer;
-  transition: color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
-}
-.set2-rail-item:hover { color: var(--ink-primary); background: var(--card-bg); }
-.set2-rail-item.is-on { color: var(--ink-primary); background: var(--card-bg-raised); font-weight: var(--fw-semibold); }
-.set2-rail-item:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
-/* A count sits at the end of the row rather than after the word, so the names
-   stay a readable column instead of a ragged sentence. */
-.set2-rail-n {
-  margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint);
-  font-variant-numeric: tabular-nums;
-}
-.set2-rail-item .w-lock { width: 0.75rem; height: 0.75rem; margin-left: auto; color: var(--ink-faint); }
-
-/* ── Main ──
-   This is the scroll port. One per page. */
-.set2-main { flex: 1 1 0; min-width: 0; min-height: 0; overflow-y: auto; }
-
 /* The column is narrow on purpose. A settings row read at 1100px wide puts a
    toggle a hand's width from the label it belongs to, and the eye stops
    pairing them. 46rem is the widest this stays legible. */
@@ -98,9 +5,24 @@
 
 /* ══ HEAD ════════════════════════════════════════════════════════════════ */
 
+/* ── WHY THE TITLE STOPPED SHOUTING ──
+   It was `--ty-display` at bold — the size and weight reserved for a DOCUMENT
+   title, on a page whose title is one word. Across the surveyed set (Plain,
+   Obvious, Arcade, GitBook) the settings title is set at roughly body-plus-one
+   and semibold; none of them are heavy. The reason is structural: on a
+   document the title is the content, and on a settings page the CONTROLS are
+   the content and the title is a label for where you are.
+
+   The size is kept and the weight comes off. Hierarchy here is carried by the
+   scope line directly beneath it, which is the thing that actually changes.
+
+   NO LEDE PARAGRAPH under it, deliberately — every surveyed screen has one and
+   this file's own T1 rule removed them on the grounds that layout carries
+   meaning and copy does not. That decision stands; it is not overturned by
+   five products agreeing with each other. */
 .set2-title {
   font-size: var(--ty-display);
-  font-weight: var(--fw-bold);
+  font-weight: var(--fw-semibold);
   letter-spacing: var(--ls-tight);
   color: var(--ink-primary);
   line-height: var(--lh-tight);
@@ -140,35 +62,120 @@
 
 /* ══ SECTION ═════════════════════════════════════════════════════════════ */
 
-.set2-sec { margin-top: 2.25rem; }
-.set2-sec-h { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
-.set2-sec-t { font-size: var(--ty-body); font-weight: var(--fw-semibold); color: var(--ink-primary); }
-.set2-sec-end { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+/* ── WHY SECTIONS GOT FURTHER APART AND QUIETER ──
+   Once the rows lost their boxes, the only thing separating one group of
+   settings from the next is space — so the space has to be big enough to read
+   as a break rather than as a wide gap between two rows. 3.5rem is the
+   distance at which the eye stops looking for a relationship.
+
+   The header itself is the reverse move: uppercase micro rather than body
+   semibold. A section head is a SIGNPOST, not a heading — it is read once, on
+   the way past, and every surveyed product sets theirs quieter than the
+   content beneath. Making it smaller and letting tracking do the work leaves
+   the row names as the largest thing in the column, which is correct: the
+   names are what you came to find. */
+/* ── THE HOLE IN THE SCALE ──
+   These were micro uppercase at `--ink-faint`, on the reasoning that a section
+   head is a signpost read once on the way past. Held up against the rendered
+   page that was wrong: the title is 28px and the next thing down was 12px, so
+   nothing carried the middle and every section floated unanchored above its
+   own content.
+
+   `--ty-title` restores the step. Four levels now, each a readable distance
+   from the last: title 28 -> section 17 -> row name 13 -> meta 12. */
+.set2-sec { margin-top: 3rem; }
+.set2-sec:first-child { margin-top: 2rem; }
+.set2-sec-h {
+  display: flex; align-items: baseline; gap: 0.75rem;
+  margin-bottom: 0.875rem; padding-bottom: 0.6875rem;
+  border-bottom: 0.0625rem solid var(--hairline);
+}
+.set2-sec-t {
+  font-size: var(--ty-title); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-tight); color: var(--ink-primary);
+  line-height: var(--lh-snug);
+}
+.set2-sec-end {
+  font-size: var(--ty-micro);
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
 
 /* ══ ROW ═════════════════════════════════════════════════════════════════
    The atom that repeats everywhere: a skill, a connector, a person, a policy.
-   Icon, name, one line under it, and the state cluster hard right.
 
-   Rows are their own surfaces with a 2px gap, so the page ground shows between
-   them. That gap IS the separator and it costs no ink (T2). */
-.set2-rows { display: flex; flex-direction: column; gap: 0.125rem; }
+   ── WHY THIS IS NOT A CARD ────────────────────────────────────────────────
+   It used to be: a filled surface with a radius, stacked with a 2px gap so the
+   page ground showed between them. That is the right treatment for a list of
+   OBJECTS you might pick one of. A settings row is not an object — it is a
+   STATEMENT WITH A CONTROL ATTACHED, and boxing it makes twelve statements
+   read as twelve things to choose between.
+
+   Surveyed the pattern across Arcade, Obvious, Plain, Grain, Sketch and
+   Langdock: not one of them boxes a settings row. All six use the same shape —
+   name and description hard left, control hard right, a hairline between. The
+   line does the separating and costs one pixel instead of a whole surface.
+
+   The gain is not decorative. Removing the fill removes a rounded rectangle
+   per row from the page, which is what lets the vertical rhythm open up: rows
+   are TALLER now and the page still reads shorter, because the eye follows one
+   column of names instead of scanning a stack of tiles. */
+.set2-rows { display: flex; flex-direction: column; }
 .set2-row {
-  display: flex; align-items: center; gap: 0.75rem;
-  padding: 0.6875rem 0.875rem;
-  background: var(--card-bg);
-  border-radius: var(--r-md);
+  display: flex; align-items: center; gap: 0.875rem;
+  padding: 0.875rem 0.25rem;
+  border-bottom: 0.0625rem solid var(--hairline);
   text-align: left; width: 100%;
-  appearance: none; border: 0; font: inherit;
+  appearance: none; border-left: 0; border-right: 0; border-top: 0;
+  background: none; font: inherit;
   transition: background var(--t-fast) var(--ease-out);
 }
-.set2-row:first-child { border-radius: var(--r-lg) var(--r-lg) var(--r-md) var(--r-md); }
-.set2-row:last-child  { border-radius: var(--r-md) var(--r-md) var(--r-lg) var(--r-lg); }
-.set2-row:only-child  { border-radius: var(--r-lg); }
+/* The last row's line would be a lid on a section that has already ended. */
+.set2-row:last-child { border-bottom: 0; }
 .set2-row[data-go] { cursor: pointer; }
-.set2-row[data-go]:hover { background: var(--card-bg-raised); }
-.set2-row:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+/* A hover tint that bleeds past the text is the only thing left standing in
+   for the old surface, so it takes the padding back as a negative inset. */
+.set2-row[data-go]:hover { background: var(--card-bg); box-shadow: -0.5rem 0 0 var(--card-bg), 0.5rem 0 0 var(--card-bg); }
+.set2-row:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; border-radius: var(--r-xs); }
 .set2-row.is-off .set2-row-n,
 .set2-row.is-off .set2-row-ico { opacity: 0.5; }
+
+/* ── The settings row proper ──
+   Label and help text on the left, control on the right. This is the single
+   most repeated shape in the surveyed set and it did not exist here: values
+   like the relevance window were written as inline sentences, which reads
+   well once and cannot be scanned at all when there are six of them.
+
+   The left column is FIXED, not fluid. Ragged control edges are what make a
+   settings page feel assembled rather than designed, and a fixed label column
+   is the cheapest way to guarantee one vertical line for every control. */
+.set2-set { display: flex; flex-direction: column; }
+.set2-set-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
+  align-items: start; gap: 1.5rem;
+  padding: 1.125rem 0.25rem;
+  border-bottom: 0.0625rem solid var(--hairline);
+}
+.set2-set-row:last-child { border-bottom: 0; }
+.set2-set-l { min-width: 0; }
+.set2-set-n {
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
+}
+.set2-set-d {
+  font-size: var(--ty-micro); color: var(--ink-quiet);
+  line-height: var(--lh-snug); margin-top: 0.1875rem; max-width: 52ch;
+}
+.set2-set-c { display: flex; align-items: center; gap: 0.5rem; justify-content: flex-end; }
+.set2-set-c .set2-fld { min-width: 0; }
+
+/* One column below the fold, because a 20rem control beside a 12rem label is
+   two columns of nothing on a phone. */
+@media (max-width: 52rem) {
+  .set2-set-row { grid-template-columns: 1fr; gap: 0.625rem; }
+  .set2-set-c { justify-content: flex-start; }
+}
 
 .set2-row-ico { width: 1rem; height: 1rem; flex-shrink: 0; color: var(--ink-faint); }
 .set2-row-main { flex: 1 1 0; min-width: 0; }
@@ -176,10 +183,23 @@
   font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
   display: flex; align-items: center; gap: 0.5rem;
 }
+/* -- AN INLINE BOX CANNOT CLIP --
+   This is a `<span>`, so it computed to `display: inline` -- and on an inline
+   box `overflow`, `text-overflow` and `width` do nothing at all. All three
+   rules below were inert, so the sentence ignored its 494px column and ran
+   56px past it, straight through "nothing read" on the right.
+
+   Blocked, it obeys the column. And it WRAPS rather than truncating: these
+   sentences say what a setting does and where it stops, which is not something
+   to cut mid-clause at an arbitrary character. */
 .set2-row-d {
-  font-size: var(--ty-micro); color: var(--ink-faint); margin-top: 0.0625rem;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: block;
+  font-size: var(--ty-micro); color: var(--ink-quiet); margin-top: 0.0625rem;
+  white-space: normal; line-height: var(--lh-snug);
 }
+/* The name is a span too and carries a pill after it, so it wraps inside its
+   own column rather than over the control at the end of the row. */
+.set2-row-n { flex-wrap: wrap; }
 .set2-row-end { display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
 
 /* Where a row's value came from. A word, not a badge -- five coloured chips in
@@ -281,16 +301,6 @@
 }
 .set2-node.is-open > .set2-exp { transform: rotate(90deg); }
 .set2-exp.is-none { visibility: hidden; }
-
-/* `mixed` takes the DIM fill. A solid fill with a dash in it reads as checked
-   at a glance, which defeats the only job the third state has. */
-.set2-ck {
-  appearance: none; border: 0.0938rem solid var(--ink-rule); background: transparent;
-  width: 0.875rem; height: 0.875rem; border-radius: 0.1875rem;
-  flex-shrink: 0; padding: 0; cursor: pointer;
-  display: grid; place-items: center;
-  transition: background var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
-}
 .set2-ck svg { width: 0.625rem; height: 0.625rem; color: #fff; opacity: 0; }
 .set2-ck[aria-checked="true"]  { background: var(--brand); border-color: var(--brand); }
 .set2-ck[aria-checked="true"] svg  { opacity: 1; }
@@ -308,30 +318,48 @@
 .set2-fld::placeholder { color: var(--ink-faint); }
 .set2-fld:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.0625rem; border-color: transparent; }
 textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-base); }
-.set2-lbl {
-  display: block; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
-  color: var(--ink-quiet); margin-bottom: 0.375rem;
-}
 .set2-field + .set2-field { margin-top: 1rem; }
 .set2-hint { font-size: var(--ty-micro); color: var(--ink-faint); margin-top: 0.375rem; }
 .set2-mono { font-family: var(--font-mono); }
 
 /* ══ EMPTY / NOTE ════════════════════════════════════════════════════════ */
 
+/* An empty state is a heading, a sentence and, when there is one, the single
+   thing worth doing. It was a text block with a button dropped inline, so the
+   action ran on from the sentence as though it were part of it. */
 .set2-empty {
-  padding: 2.5rem 1rem; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 0.375rem;
+  padding: 3rem 1.5rem; text-align: center;
   background: var(--card-bg); border-radius: var(--r-lg);
   font-size: var(--ty-meta); color: var(--ink-faint);
 }
-.set2-empty b { display: block; color: var(--ink-secondary); font-weight: var(--fw-semibold); margin-bottom: 0.25rem; }
+.set2-empty b {
+  color: var(--ink-primary); font-weight: var(--fw-semibold);
+  font-size: var(--ty-body); margin-bottom: 0.125rem;
+}
+.set2-empty .btn { align-self: center; margin-top: 0.875rem; }
 
 /* One line, one accent edge, no icon-and-paragraph. Used where a fact about
    the whole section cannot be carried by a row. */
+/* ── WHY THE NEUTRAL NOTE LOST ITS BOX ──
+   Once the rows stopped being surfaces, a filled note became the loudest thing
+   on the page — a paragraph of context outranking every control on screen.
+   A note that merely EXPLAINS is prose and gets set as prose. It keeps a rule
+   on its left so it still reads as an aside rather than as body copy.
+
+   The two that WARN keep their fill, and that is the point of the split:
+   colour now means consequence and nothing else. When every note was a box,
+   the irreversible one looked like the informational one wearing red. */
 .set2-note {
   display: flex; gap: 0.625rem; align-items: baseline;
-  padding: 0.625rem 0.875rem; border-radius: var(--r-md);
-  background: var(--card-bg-raised);
+  padding: 0 0 0 0.75rem;
+  border-left: 0.125rem solid var(--hairline);
   font-size: var(--ty-micro); color: var(--ink-quiet);
+  line-height: var(--lh-snug);
+}
+.set2-note.is-warn,
+.set2-note.is-err {
+  padding: 0.625rem 0.875rem; border-left: 0; border-radius: var(--r-md);
 }
 .set2-note.is-warn { color: var(--ink-warn); background: var(--warn-bg); }
 .set2-note.is-err  { color: var(--ink-err);  background: var(--err-bg); }
@@ -356,22 +384,10 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
    Each module owns its own. It rises from the bottom of the scroll port with
    the count of what is unsaved, and it belongs to ONE module -- a global save
    bar is how an edit in one place commits an edit in another. */
-.set2-save {
-  position: sticky; bottom: 0; z-index: 5;
-  display: flex; align-items: center; gap: 0.75rem;
-  margin-top: 1.25rem;
-  padding: 0.6875rem 0.875rem;
-  border-radius: var(--r-lg);
-  background: var(--card-bg-raised);
-  /* The one shadow in this file. It is the only element that floats over
-     content, and without a lift it reads as part of the list it covers. */
-  box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.18);
-  transform: translateY(0.75rem); opacity: 0; pointer-events: none;
-  transition: transform var(--t-base) var(--ease-out), opacity var(--t-base) var(--ease-out);
-}
-.set2-save.is-on { transform: translateY(0); opacity: 1; pointer-events: auto; }
+/* The floating bar is gone. What replaced it is below, under THE UNSAVED
+   BLOCK -- it sits in the layout instead of over it. `.set2-save-n` survives
+   because the preview modal's footer still uses it for a count line. */
 .set2-save-n { font-size: var(--ty-micro); color: var(--ink-quiet); }
-.set2-save-end { margin-left: auto; display: flex; gap: 0.5rem; }
 
 /* ══ DETAIL ══════════════════════════════════════════════════════════════ */
 
@@ -379,6 +395,10 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
   appearance: none; border: 0; background: transparent; padding: 0;
   font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
   color: var(--ink-faint); cursor: pointer; margin-bottom: 0.75rem;
+  /* 40x16 before. The way back out of a detail view is not the control to
+     make people aim at — same 24px floor as everything else here. */
+  display: inline-flex; align-items: center; gap: 0.3125rem;
+  min-height: 1.75rem; padding-right: 0.375rem;
 }
 .set2-back:hover { color: var(--ink-primary); }
 
@@ -390,6 +410,7 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
   appearance: none; border: 0; background: transparent; cursor: pointer;
   padding: 0.25rem 0.5rem; border-radius: var(--r-sm);
   color: var(--ink-faint); display: grid; place-items: center;
+  min-width: 1.75rem; min-height: 1.75rem;
 }
 .set2-view-b svg { width: 0.875rem; height: 0.875rem; }
 .set2-view-b.is-on { background: var(--card-bg); color: var(--ink-primary); }
@@ -413,52 +434,19 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
    The console renders this as a bordered grid with a hairline under every row
    plus alternating tinted fills, which is three separating devices doing one
    job. */
-.set2-map { display: flex; flex-direction: column; gap: 0.125rem; }
+.set2-map { display: flex; flex-direction: column; }
 .set2-map-hd {
   display: grid; grid-template-columns: 9rem 1fr auto;
-  gap: 0.75rem; padding: 0 0.875rem 0.375rem;
+  gap: 0.75rem; padding: 0 0.25rem 0.5rem;
   font-size: var(--ty-micro); letter-spacing: var(--ls-wide);
   text-transform: uppercase; color: var(--ink-faint);
 }
-.set2-map-row {
-  display: grid; grid-template-columns: 9rem 1fr auto;
-  gap: 0.75rem; align-items: center;
-  padding: 0.5rem 0.875rem;
-  background: var(--card-bg); border-radius: var(--r-md);
-}
-.set2-map-row:first-of-type { border-radius: var(--r-lg) var(--r-lg) var(--r-md) var(--r-md); }
-.set2-map-row:last-of-type  { border-radius: var(--r-md) var(--r-md) var(--r-lg) var(--r-lg); }
+.set2-map-row:last-of-type { border-bottom: 0; }
 .set2-map-ctx {
   font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.set2-map-path { display: flex; align-items: center; gap: 0.125rem; flex-wrap: wrap; min-width: 0; }
-/* `--ink-rule` is the library's NON-TEXT ink, for hairlines and dots that carry
-   no meaning. This dot does carry meaning -- it is what makes the segments read
-   as one dotted path rather than three separate values -- so it takes the
-   ambient TEXT ink and meets the text floor. Measured 3.99:1 on rule, 5.33 on
-   faint. */
-.set2-map-dot { color: var(--ink-faint); font-family: var(--font-mono); font-size: var(--ty-micro); }
-.set2-map-end { display: flex; align-items: center; gap: 0.375rem; justify-content: flex-end; }
-
-/* Each segment is its own control. The path is the structure, so extending it
-   IS adding a subfield and there is no second affordance for that. */
-.set2-seg {
-  appearance: none; border: 0; background: var(--card-bg-raised);
-  padding: 0.1875rem 0.4375rem; border-radius: var(--r-sm);
-  font-family: var(--font-mono); font-size: var(--ty-micro);
-  color: var(--ink-secondary); cursor: pointer;
-}
-.set2-seg:hover { color: var(--ink-primary); }
-.set2-seg:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
-.set2-seg.is-more { color: var(--ink-faint); font-family: var(--font-sans); font-weight: var(--fw-semibold); }
-.set2-seg.is-bad { background: var(--err-bg); color: var(--ink-err); text-decoration: line-through; }
 .set2-map-row.is-broken .set2-map-ctx { color: var(--ink-err); }
-/* Incomplete is not broken. The path is valid so far and simply does not reach
-   a value yet, so it prompts forward instead of shouting. */
-.set2-seg.is-more { background: transparent; color: var(--ink-action); }
-.set2-seg.is-more:hover { background: var(--card-bg-raised); }
-
 .set2-x {
   appearance: none; border: 0; background: transparent; padding: 0.1875rem;
   cursor: pointer; color: var(--ink-faint); display: grid; place-items: center; border-radius: var(--r-sm);
@@ -475,18 +463,6 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
 }
 .set2-add:hover { background: var(--card-bg); }
 .set2-add.is-inline { padding: 0.1875rem 0.4375rem; margin: 0; }
-
-/* The row now carries two lines: the path, and what that path returns. The
-   sample is the load-bearing half. A path that resolves cleanly and returns
-   the wrong column passes every other check on this page, and the values are
-   the only place it shows. */
-.set2-map-row { grid-template-columns: 9rem 1fr auto; align-items: center; }
-.set2-map-mid { min-width: 0; }
-.set2-sample {
-  display: flex; gap: 0.5rem; margin-top: 0.1875rem;
-  font-family: var(--font-mono); font-size: var(--ty-micro);
-  color: var(--ink-faint); min-width: 0; overflow: hidden;
-}
 .set2-sample i { font-style: normal; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .set2-sample i + i::before { content: "·"; margin-right: 0.5rem; color: var(--ink-rule); }
 .set2-sample.is-none { color: var(--ink-warn); font-style: italic; }
@@ -501,34 +477,6 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
 .set2-tally .is-info b { color: var(--ink-info); }
 .set2-tally .is-err b  { color: var(--ink-err); }
 .set2-tally .is-mute b { color: var(--ink-faint); }
-
-/* ══ SETUP CHECKLIST ═════════════════════════════════════════════════════
-   Scaffolding, and it removes itself. A checklist that outlives the job it
-   describes becomes furniture nobody can dismiss. */
-.set2-setup { background: var(--card-bg); border-radius: var(--r-lg); padding: 0.875rem 1rem 1rem; }
-.set2-setup-hd { display: flex; align-items: center; gap: 0.625rem; }
-.set2-setup-t { font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary); }
-.set2-setup-n { margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint); }
-.set2-setup-bar { height: 0.1875rem; border-radius: 0.125rem; background: var(--card-bg-raised); margin: 0.625rem 0 0.75rem; overflow: hidden; }
-.set2-setup-bar i { display: block; height: 100%; background: var(--brand); border-radius: inherit; }
-.set2-setup-list { display: flex; flex-direction: column; gap: 0.125rem; }
-.set2-setup-i {
-  display: flex; align-items: center; gap: 0.625rem;
-  padding: 0.375rem 0.5rem; border-radius: var(--r-sm);
-  font-size: var(--ty-micro); color: var(--ink-secondary);
-}
-.set2-setup-i.is-done { color: var(--ink-faint); }
-.set2-setup-ck {
-  width: 0.875rem; height: 0.875rem; flex-shrink: 0;
-  border-radius: var(--r-pill); border: 0.0938rem solid var(--ink-rule);
-  display: grid; place-items: center;
-}
-.set2-setup-i.is-done .set2-setup-ck { background: var(--ok); border-color: var(--ok); }
-.set2-setup-ck svg { width: 0.5rem; height: 0.5rem; color: #fff; }
-/* An honest estimate per step. HoneyBook's, and it is the detail that makes a
-   four-step list feel finishable rather than open-ended. */
-.set2-setup-m { margin-left: auto; color: var(--ink-faint); }
-
 /* ══ ROLE MATRIX ═════════════════════════════════════════════════════════
    Words, not ticks. A checkbox encodes a binary and permissions here are
    ternary: "can read it but not change it" is the most common answer and a
@@ -595,21 +543,6 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
 }
 .set2-pv tbody tr:nth-child(odd) td { background: var(--card-bg-raised); }
 .set2-pv td i { color: var(--ink-faint); }
-
-/* ══ SEARCH ══════════════════════════════════════════════════════════════
-   Indexes leaf settings, not modules. "retention" finds the FreshDesk
-   threshold, not the page holding it. */
-.set2-search {
-  display: flex; align-items: center; gap: 0.5rem; width: 100%;
-  appearance: none; background: var(--card-bg);
-  border: 0.0625rem solid var(--card-border);
-  padding: 0.4375rem 0.625rem; margin-bottom: 1.5rem;
-  border-radius: var(--r-md);
-  font: inherit; font-size: var(--ty-micro);
-  color: var(--ink-faint); cursor: pointer; text-align: left;
-}
-.set2-search:hover { color: var(--ink-secondary); }
-.set2-search-k { margin-left: auto; display: flex; gap: 0.1875rem; }
 kbd {
   font-family: var(--font-mono); font-size: var(--ty-micro);
   background: var(--card-bg-raised); color: var(--ink-faint);
@@ -617,40 +550,8 @@ kbd {
 }
 
 .set2-scrim.is-top { align-items: flex-start; padding-top: 12vh; }
-.set2-pal {
-  width: 100%; max-width: 34rem; max-height: 60vh;
-  display: flex; flex-direction: column;
-  background: var(--body-bg);
-  border: 0.0625rem solid var(--card-border);
-  border-radius: var(--r-lg); overflow: hidden;
-}
-.set2-pal-f {
-  appearance: none; border: 0; background: transparent;
-  padding: 0.875rem 1rem; font: inherit; font-size: var(--ty-body);
-  color: var(--ink-primary); width: 100%;
-}
-.set2-pal-f:focus-visible { outline: 0; }
-.set2-pal-f::placeholder { color: var(--ink-faint); }
-.set2-pal-bd { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.25rem; scrollbar-width: thin; }
-.set2-pal-i {
-  display: flex; align-items: baseline; gap: 0.75rem; width: 100%;
-  appearance: none; border: 0; background: transparent;
-  padding: 0.5rem 0.75rem; border-radius: var(--r-md);
-  font: inherit; text-align: left; cursor: pointer;
-}
-.set2-pal-i:hover, .set2-pal-i.is-on { background: var(--card-bg); }
-.set2-pal-n { font-size: var(--ty-meta); color: var(--ink-primary); font-weight: var(--fw-semibold); }
-/* The path is what makes a result specific. Without it "Endpoint" could be
-   any of four things. */
-.set2-pal-p { margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint); white-space: nowrap; }
 .set2-pal-empty { padding: 1.5rem 0.75rem; text-align: center; font-size: var(--ty-meta); color: var(--ink-faint); }
 .set2-pal-empty b { color: var(--ink-secondary); }
-.set2-pal-ft {
-  display: flex; gap: 1rem; padding: 0.5rem 1rem;
-  background: var(--card-bg); font-size: var(--ty-micro); color: var(--ink-faint);
-}
-.set2-pal-ft span { display: flex; align-items: center; gap: 0.25rem; }
-
 /* ══ CHIPS ═══════════════════════════════════════════════════════════════ */
 
 .set2-chip {
@@ -714,16 +615,11 @@ kbd {
 .set2-run-when { color: var(--ink-quiet); }
 .set2-run-crit { display: flex; gap: 0.25rem; flex-wrap: wrap; min-width: 0; }
 .set2-run-n { color: var(--ink-secondary); text-align: right; }
-
-/* ══ INLINE FIELD ROW ════════════════════════════════════════════════════ */
-
-.set2-inline {
-  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
-  font-size: var(--ty-meta); color: var(--ink-secondary);
-}
+/* The run's outcome, last in the row. It is a grid cell wrapping a pill, so it
+   says only that the pill keeps its own width instead of stretching to the
+   column — but it says it, rather than being a class with no rule anywhere. */
+.set2-run-st { justify-self: end; display: flex; align-items: center; }
 .set2-fld-n { width: 5rem; flex: 0 0 auto; text-align: right; }
-.set2-inline .set2-fld:not(.set2-fld-n) { flex: 1 1 14rem; }
-
 /* ══ POPOVER ═════════════════════════════════════════════════════════════
    Anchored beside the cell it changes. GAPS 22 and 25 note the library has one
    dialog and it assumes the decision was made before it opened; choosing a CRM
@@ -818,14 +714,1630 @@ kbd {
 .set2-drop:hover, .set2-drop.is-over { border-color: var(--brand); color: var(--ink-secondary); }
 .set2-drop svg { width: 1.25rem; height: 1.25rem; }
 
-@media (max-width: 52rem) {
-  .set2-rail { display: none; }
-  .set2-col { padding: 1.5rem 1.25rem 5rem; }
+@media (max-width: 52rem) {  .set2-col { padding: 1.5rem 1.25rem 5rem; }
   .set2-up { grid-template-columns: 1fr; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .set2-save, .set2-lad-ch, .set2-exp, .set2-ck, .set2-row, .set2-rail-item {
+@media (prefers-reduced-motion: reduce) {.set2-lad-ch,
+.set2-exp,
+.set2-ck,
+.set2-row {
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE CONNECTION SCOPE
+
+   One control where the console had three: a product picker in the page
+   chrome, a CRM picker in a section header, and a disabled third copy of the
+   product inside the sync form. It sits in the module bar, so Config and Sync
+   are visibly describing the same pair.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-scope-pick {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  appearance: none; border: 0.0625rem solid var(--hairline);
+  background: var(--card-bg); cursor: pointer;
+  padding: 0.25rem 0.5rem; border-radius: var(--r-sm);
+  font: inherit; font-size: var(--ty-micro); color: var(--ink-quiet);
+  transition: border-color var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+}
+.set2-scope-pick b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.set2-scope-pick:hover { border-color: var(--ink-rule); color: var(--ink-primary); }
+.set2-scope-pick:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+.set2-scope-pick .set2-lad-ch { width: 0.75rem; height: 0.75rem; opacity: 0.7; }
+
+/* The picker's own rows are names, not paths, so they take the sans face back
+   off `.set2-pop-i`, which is mono for the segment pickers.
+
+   Two LINES, not two columns. Side by side, `.set2-pop-p` took its width first
+   (nowrap, margin-left:auto) and left the name to wrap under it, so the row
+   that mattered least set the row that mattered most. */
+.set2-pop-i:has(.set2-pop-n) { flex-direction: column; align-items: flex-start; gap: 0.0625rem; }
+.set2-pop-i .set2-pop-n {
+  font-family: var(--font-sans); font-size: var(--ty-meta);
+  font-weight: var(--fw-semibold); color: var(--ink-primary);
+  flex: 0 0 auto; white-space: nowrap;
+}
+.set2-pop-i .set2-pop-p {
+  font-family: var(--font-sans); font-size: var(--ty-micro);
+  color: var(--ink-faint); white-space: nowrap;
+}
+.set2-pop-i.is-on { background: var(--card-bg-raised); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FAILURES
+
+   Not a table. A failed run has to answer four things — what broke, when, why,
+   and what it cost — and a row of cells makes the reason the narrowest column
+   on the page when it is the only one anybody reads.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-fails { display: flex; flex-direction: column; gap: 0.625rem; }
+.set2-fail {
+  border: 0.0625rem solid var(--err-line);
+  background: var(--err-bg);
+  border-radius: var(--r-lg);
+  padding: 0.75rem 0.875rem;
+}
+.set2-fail-hd { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.set2-fail-w { font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary); }
+.set2-fail-when { margin-left: auto; }
+.set2-fail-why {
+  margin: 0.375rem 0 0; font-size: var(--ty-meta); line-height: var(--lh-snug);
+  color: var(--ink-secondary); max-width: 52ch;
+}
+.set2-fail-ft {
+  display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap;
+  margin-top: 0.625rem; padding-top: 0.625rem;
+  border-top: 0.0625rem solid var(--hairline);
+}
+.set2-fail-n { font-size: var(--ty-micro); color: var(--ink-err); font-weight: var(--fw-semibold); }
+.set2-fail-do { margin-left: auto; display: flex; align-items: center; gap: 0.625rem; }
+/* Why THIS button and not another one — the difference between an action and
+   a guess. Its own line: it is a sentence, and `.set2-from` is nowrap, so
+   sharing the footer with the button ran it underneath. */
+.set2-fail-note {
+  margin: 0.25rem 0 0; font-size: var(--ty-micro); color: var(--ink-faint);
+  line-height: var(--lh-snug); max-width: 52ch;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   USER & ACCESS
+
+   A card per person, because a grant is a role ON A SCOPE and a list that
+   prints only the role name is lying by omission. Two columns: wide enough for
+   `Super Admin` beside `Product InterFAX Support` without either wrapping.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-team {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 0.75rem;
+}
+.set2-person:hover { border-color: var(--ink-rule); }
+.set2-av {
+  width: 2rem; height: 2rem; flex-shrink: 0; border-radius: var(--r-pill);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-dim); color: var(--ink-action);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold); letter-spacing: 0.02em;
+}
+.set2-person-lines { display: flex; flex-direction: column; min-width: 0; }
+.set2-person-n {
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.set2-person-m {
+  font-size: var(--ty-micro); color: var(--ink-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.set2-grant { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
+.set2-grant.is-none {
+  font-size: var(--ty-micro); color: var(--ink-faint); line-height: var(--lh-snug);
+}
+.set2-grant-add {
+  align-self: flex-start; margin-top: 0.125rem;
+  appearance: none; background: none; cursor: pointer;
+  border: 0.0625rem dashed var(--ink-rule); border-radius: var(--r-sm);
+  padding: 0.1875rem 0.5rem;
+  font: inherit; font-size: var(--ty-micro); color: var(--ink-quiet);
+}
+.set2-grant-add:hover { border-color: var(--brand); color: var(--ink-action); }
+.set2-grant-add:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE FILTER BAR
+
+   A search that narrows and three dropdowns that narrow, all of them writing
+   to the URL under one `f` key. Native `<select>` on purpose: it is the only
+   control in this file a phone renders as a native wheel, and a filter is the
+   last place to spend a custom popover.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-fbar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.set2-fbar-q { flex: 1 1 12rem; min-width: 0; }
+.set2-fbar-end { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; margin-left: auto; }
+
+.set2-fsel { position: relative; display: inline-flex; align-items: center; }
+.set2-fsel-s {
+  appearance: none; -webkit-appearance: none;
+  border: 0.0625rem solid var(--hairline); border-radius: var(--r-sm);
+  background: var(--card-bg); color: var(--ink-quiet);
+  font: inherit; font-size: var(--ty-micro);
+  padding: 0.3125rem 1.625rem 0.3125rem 0.625rem;
+  cursor: pointer;
+}
+.set2-fsel-s:hover { border-color: var(--ink-rule); color: var(--ink-primary); }
+.set2-fsel-s:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+/* A chosen filter has to look different from an unchosen one, or the row reads
+   as "no filters" while it is hiding half the list. */
+.set2-fsel-s:valid { color: var(--ink-primary); border-color: var(--ink-rule); }
+.set2-fsel-s option[value=""] { color: var(--ink-faint); }
+.set2-fsel .set2-lad-ch {
+  position: absolute; right: 0.4375rem; width: 0.75rem; height: 0.75rem;
+  pointer-events: none; color: var(--ink-faint);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ROLE GROUPS
+
+   A role, the KIND of scope it is granted on, and a chip per scope it reaches.
+   Collapsed by default — the header alone answers "what can this person do and
+   over what", and the chips are the detail behind that.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-gr { position: relative; }
+.set2-gr + .set2-gr { margin-top: 0.25rem; padding-top: 0.25rem; border-top: 0.0625rem solid var(--hairline); }
+.set2-gr-hd:hover { color: var(--ink-primary); }
+.set2-gr-hd:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+.set2-gr-hd .set2-lad-ch {
+  width: 0.75rem; height: 0.75rem; flex-shrink: 0; color: var(--ink-faint);
+  transform: rotate(-90deg); transition: transform var(--t-fast) var(--ease-out);
+}
+.set2-gr.is-open .set2-gr-hd .set2-lad-ch { transform: none; }
+.set2-gr-n {
+  margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.set2-person:hover .set2-gr-del, .set2-gr-del:focus-visible { opacity: 1; }
+.set2-gr-del:hover { color: var(--ink-err); }
+.set2-gr-del:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+.set2-tr { width: 0.875rem; height: 0.875rem; display: block; }
+.set2-gr.is-open .set2-gr-bd { display: flex; }
+
+.set2-chip.is-type {
+  background: var(--accent-dim); color: var(--ink-action);
+  border-color: transparent; font-weight: var(--fw-semibold);
+}
+.set2-chip.is-scope { display: inline-flex; align-items: center; gap: 0.25rem; padding-right: 0.25rem; }
+.set2-chip-x {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  padding: 0; display: inline-flex; color: var(--ink-faint); line-height: 0;
+}
+.set2-chip-x svg { width: 0.625rem; height: 0.625rem; }
+.set2-chip-x:hover { color: var(--ink-err); }
+.set2-chip-x:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+
+.set2-gr-new {
+  align-self: center; appearance: none; background: none; cursor: pointer; border: 0;
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-action); padding: 0.125rem 0.25rem; border-radius: var(--r-xs);
+}
+.set2-gr-new:hover { text-decoration: underline; }
+.set2-gr-new:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+
+.set2-kebab {
+  margin-left: auto; flex-shrink: 0; appearance: none; border: 0; background: none;
+  cursor: pointer; padding: 0.25rem 0.375rem; border-radius: var(--r-xs);
+  display: flex; flex-direction: column; gap: 0.125rem; align-items: center;
+}
+.set2-kebab span { width: 0.1875rem; height: 0.1875rem; border-radius: 50%; background: var(--ink-faint); }
+.set2-kebab:hover span { background: var(--ink-primary); }
+.set2-kebab:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+
+/* ── The picker's own back row and search ── */
+.set2-pop-back {
+  display: flex; align-items: center; gap: 0.375rem; width: 100%;
+  appearance: none; border: 0; background: none; cursor: pointer;
+  padding: 0.375rem 0.5rem; margin-bottom: 0.125rem;
+  border-bottom: 0.0625rem solid var(--hairline);
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-quiet); text-align: left;
+}
+.set2-pop-back:hover { color: var(--ink-primary); }
+.set2-pop-back .set2-lad-ch { width: 0.75rem; height: 0.75rem; }
+.set2-pop-f {
+  width: 100%; appearance: none; border: 0; border-bottom: 0.0625rem solid var(--hairline);
+  background: none; padding: 0.5rem; font: inherit; font-size: var(--ty-meta);
+  color: var(--ink-primary); margin-bottom: 0.125rem;
+}
+.set2-pop-f:focus { outline: none; border-bottom-color: var(--brand); }
+.set2-pop-i.is-err .set2-pop-n { color: var(--ink-err); }
+.set2-pop-i .set2-pop-p svg { width: 0.75rem; height: 0.75rem; color: var(--ink-action); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE DATE RANGE, AND THE RETENTION ROWS
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.set2-range-d { flex: 0 0 auto; width: 10rem; font-variant-numeric: tabular-nums; }
+.set2-range-a { color: var(--ink-faint); font-size: var(--ty-meta); }
+/* ══════════════════════════════════════════════════════════════════════════
+   THE SKILLS TABLE
+
+   Three columns and a lot of rows. Grid rather than <table> so the row can be
+   a single <button> — the whole row is the destination, and a table cell
+   wrapping a link puts the target on the words instead of the row.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-tbl { margin-top: 0.875rem; border-top: 0.0625rem solid var(--hairline); }
+.set2-tbl-hd { border-bottom: 0.0625rem solid var(--hairline); }
+.set2-th:hover { color: var(--ink-primary); }
+.set2-th:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+/* The arrow is always there, so pressing a header is never a guess about
+   whether it does anything. It lights up only for the column doing the work. */
+.set2-th-a { color: var(--ink-rule); font-size: var(--ty-micro); }
+.set2-th-a.is-on { color: var(--ink-action); }
+
+.set2-tbl-r {
+  width: 100%; appearance: none; border: 0; background: none; cursor: pointer;
+  text-align: left; font: inherit;
+  border-bottom: 0.0625rem solid var(--hairline);
+  transition: background-color var(--t-fast) var(--ease-out);
+}
+.set2-tbl-r:hover { background: var(--card-bg); }
+.set2-tbl-r:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+/* A skill that is off still occupies its row, because a skill you cannot see
+   is one you will re-create by accident. It reads as switched off, not gone. */
+.set2-tbl-r.is-off { opacity: 0.55; }
+
+.set2-tbl-n { display: flex; align-items: baseline; gap: 0.4375rem; min-width: 0; }
+.set2-tbl-n b {
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.set2-tbl-n .set2-row-ico { flex-shrink: 0; color: var(--ink-faint); }
+/* Below the point where three columns stop being three columns, the row
+   becomes two lines and the description leads. */
+@media (max-width: 52rem) {
+  .set2-tbl-hd { display: none; }
+  .set2-tbl-r { grid-template-columns: 1fr auto; row-gap: 0.25rem; }
+  .set2-tbl-d { grid-column: 1 / -1; white-space: normal; }
+}
+
+/* The unit beside a numeric input. Not a label — the label is on the left —
+   so it stays at the faint level and never competes with the value. */
+.set2-set-u { font-size: var(--ty-micro); color: var(--ink-faint); flex-shrink: 0; }
+/* ── WHY LONG VALUES BREAK THE TWO-COLUMN RULE ──
+   Label-left / control-right is right for a value you can read at a glance: a
+   threshold, a toggle, a picked option. It is wrong for a 50-character URL or
+   a JWT, which get squeezed into a 20rem gutter and truncate mid-path — and a
+   truncated endpoint is one somebody will mis-copy.
+
+   So the rule has an exception with a stated boundary: SHORT VALUES SIT
+   BESIDE THEIR LABEL, LONG VALUES SIT UNDER IT AND TAKE THE FULL COLUMN. Same
+   pattern Plain uses for Workspace ID and domain names, and the same one it
+   abandons for its short toggles. */
+.set2-set-row.is-stacked { grid-template-columns: 1fr; gap: 0.5rem; }
+.set2-set-row.is-stacked .set2-set-c { justify-content: flex-start; }
+.set2-set-row.is-stacked .set2-set-c .set2-fld { flex: 1 1 auto; min-width: 0; }
+.set2-set-row.is-stacked .set2-set-d { max-width: 68ch; }
+/* ── STRUCTURE IS NOT STATE ──
+   The child row and the "add subfield" button were the same accent wash, so
+   "this came out of the row above" and "press this" read as one class of
+   thing. Depth is now carried by the INDENT and a rule; the wash is gone.
+
+   Fill is reserved for state — broken, suggested — which is the only thing on
+   this table worth a colour, and it could not be seen while eight rows were
+   already tinted. */
+.set2-map-row.is-sub {
+  box-shadow: inset 0.125rem 0 0 var(--ink-rule);
+}
+.set2-map-row {
+  display: grid;
+  grid-template-columns: 9rem 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.6875rem 0.25rem;
+  border-bottom: 0.0625rem solid var(--hairline);
+  padding-left: calc(0.25rem + var(--d, 0) * 1.375rem);
+  min-height: 3.25rem;
+}
+.set2-key:hover { border-color: var(--ink-rule); background: var(--card-bg); }
+.set2-key:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+.set2-key.is-derived { cursor: default; font-family: var(--font-sans); }
+.set2-key-s.is-bad { color: var(--ink-err); text-decoration: line-through; }
+/* An empty mapping asks for what it needs in words, not with a blank box. */
+.set2-key-none { font-family: var(--font-sans); color: var(--ink-faint); font-style: italic; }
+.set2-key-d { font-weight: var(--fw-semibold); color: var(--ink-primary); }
+.set2-key-h { color: var(--ink-faint); margin-left: 0.375rem; }
+.set2-adv:hover { color: var(--ink-primary); }
+.set2-adv:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+.set2-adv .set2-exp { width: 0.6875rem; height: 0.6875rem; transition: transform var(--t-fast) var(--ease-out); }
+.set2-adv.is-open .set2-exp { transform: rotate(90deg); }
+
+.set2-adv-bd {
+  display: flex; flex-wrap: wrap; gap: 1.5rem;
+  padding: 0.75rem 0.25rem 0.875rem calc(0.25rem + (var(--d, 0) + 1) * 1.375rem);
+  border-bottom: 0.0625rem solid var(--hairline);
+  background: var(--card-bg);
+}
+.set2-adv-g { min-width: 0; }
+.set2-adv-t {
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--ink-faint); margin-bottom: 0.375rem;
+}
+.set2-adv-pairs { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
+.set2-pair {
+  display: inline-flex; align-items: center; gap: 0.3125rem;
+  padding: 0.125rem 0.5rem; border-radius: var(--r-pill);
+  border: 0.0625rem solid var(--hairline);
+  font-size: var(--ty-micro); color: var(--ink-secondary);
+}
+.set2-pair b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+
+/* ── Adding ──
+   Indented to the level of the thing it would create, so where it lands is
+   visible before it is pressed. */
+.set2-map-add, .set2-map-new {
+  display: flex; align-items: center; gap: 0.4375rem; width: 100%;
+  appearance: none; border: 0; background: none; cursor: pointer;
+  padding: 0.4375rem 0.25rem;
+  font: inherit; font-size: var(--ty-micro); color: var(--ink-action);
+  text-align: left;
+}
+/* An affordance, not a row. It was a full-width tinted bar with an accent
+   rule — four of them striping the table, each louder than the field it
+   offered to extend. It is a small text button at the child's indent now. */
+.set2-map-add {
+  width: auto; padding-left: calc(0.25rem + var(--d, 0) * 1.375rem);
+  color: var(--ink-quiet); font-size: var(--ty-micro);
+}
+.set2-map-add:hover { color: var(--ink-action); text-decoration: none; }
+.set2-map-add .set2-map-add-i { background: none; color: var(--ink-faint); }
+.set2-map-add:hover .set2-map-add-i { color: var(--ink-action); }
+.set2-map-new { margin-top: 0.75rem; width: auto; font-weight: var(--fw-semibold); }
+.set2-map-add:hover, .set2-map-new:hover { text-decoration: underline; }
+.set2-map-add:focus-visible, .set2-map-new:focus-visible {
+  outline: 0.125rem solid var(--brand); outline-offset: -0.125rem;
+}
+.set2-map-add-i {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 0.875rem; height: 0.875rem; border-radius: var(--r-xs);
+  background: var(--accent-dim); color: var(--ink-action);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold); flex-shrink: 0;
+}
+
+/* ── The picker's rows ──
+   Path on the left, what it returns on the right. The values are the whole
+   point: a path that resolves and returns the wrong column passes every other
+   check there is, and this is the only place you can catch it before you
+   commit rather than after. */
+.set2-pop-i.is-path { flex-direction: column; align-items: flex-start; gap: 0.0625rem; }
+.set2-pop-i.is-path .set2-pop-n { font-size: var(--ty-micro); color: var(--ink-primary); }
+.set2-pop-s {
+  font-family: var(--font-mono); font-size: var(--ty-micro); color: var(--ink-faint);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SELECTION, AND THE BAR THAT ANSWERS IT
+
+   The bar only exists while a selection does, and it offers only what applies
+   to what is ticked — so it can never present an action that would do nothing
+   to the people selected. Docked to the foot of the column rather than
+   floating over the middle of the page: it belongs to the list above it.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-ck2 {
+  width: 1.0625rem; height: 1.0625rem; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  appearance: none; cursor: pointer;
+  border: 0.0625rem solid var(--ink-rule); border-radius: var(--r-xs);
+  background: none; color: transparent; padding: 0;
+  transition: background var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+}
+.set2-ck2:hover { border-color: var(--brand); }
+.set2-ck2:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+.set2-ck2[aria-checked="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+.set2-ck2 svg { width: 0.6875rem; height: 0.6875rem; }
+/* The picked card says so on its edge, so the state survives scrolling past
+   the checkbox. */
+.set2-person.is-picked { border-color: var(--brand); box-shadow: inset 0 0 0 0.0625rem var(--brand); }
+
+.set2-bulk {
+  position: sticky; bottom: 0; z-index: 6;
+  display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+  margin-top: 1.25rem; padding: 0.6875rem 0.875rem;
+  border-radius: var(--r-lg);
+  background: var(--card-bg-raised);
+  border: 0.0625rem solid var(--hairline);
+  box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,0.18);
+}
+.set2-bulk-n { font-size: var(--ty-meta); color: var(--ink-secondary); }
+.set2-bulk-n b { color: var(--ink-primary); }
+.set2-bulk-end { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+body.is-settings .set2-bulk { bottom: 4.75rem; }
+
+/* A word that acts. Not a button — it sits inside a sentence. */
+.set2-lnk {
+  appearance: none; border: 0; background: none; cursor: pointer; padding: 0;
+  font: inherit; font-size: var(--ty-micro); color: var(--ink-action);
+}
+.set2-lnk:hover { text-decoration: underline; }
+.set2-lnk:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+
+/* ── The wide column ──
+   46rem is the widest a settings ROW stays legible. A card grid capped at
+   46rem gives two cramped columns, which is what made this surface feel
+   condensed in the first place. Per-module, not global. */
+.set2-col.is-wide { max-width: 72rem; }
+.set2-col.is-wide .set2-team {
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+}
+.set2-lbl {
+  display: flex;
+  font-size: var(--ty-micro);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-quiet);
+  margin-bottom: 0.375rem;
+  align-items: baseline;
+  gap: 0.375rem;
+}
+/* A select styled as a field, for the places a native menu is the easiest
+   control there is: few options, no search, and a phone renders it natively. */
+.set2-fld-s {
+  appearance: none; -webkit-appearance: none; cursor: pointer;
+  padding-right: 1.75rem;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 0.875rem) 55%, calc(100% - 0.625rem) 55%;
+  background-size: 0.25rem 0.25rem, 0.25rem 0.25rem;
+  background-repeat: no-repeat;
+}
+
+
+/* ── The address box ──
+   A field that grows chips. The input is the last child and takes the rest of
+   the row, so typing always happens where the caret already is rather than in
+   a separate box below the ones already added. */
+.set2-tags {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.3125rem;
+  padding: 0.375rem 0.4375rem;
+  border: 0.0625rem solid var(--hairline); border-radius: var(--r-md);
+  background: var(--card-bg);
+  transition: border-color var(--t-fast) var(--ease-out);
+}
+.set2-tags:focus-within { border-color: var(--brand); }
+.set2-tags.is-bad { border-color: var(--ink-err); }
+.set2-tags-i {
+  flex: 1 1 8rem; min-width: 0;
+  appearance: none; border: 0; background: none; outline: none;
+  font: inherit; font-size: var(--ty-meta); color: var(--ink-primary);
+  padding: 0.1875rem 0.125rem;
+}
+.set2-tags-i::placeholder { color: var(--ink-faint); }
+.set2-hint .is-err { color: var(--ink-err); }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CRAFT PASS — TARGET SIZE
+
+   Audited at 1536 and nearly every small control failed: the selection
+   checkbox at 17x17, remove-a-scope at 10x10, delete-a-mapping at 18x18, the
+   kebab at 15x21, "Advanced" at 18 tall. WCAG 2.5.8 sets the floor at 24x24
+   CSS px; Apple asks 44pt and Material 48dp. Under the floor is not a taste
+   question, it is a control people miss.
+
+   THE GLYPH DOES NOT GROW. A 10px x is the right size for an x — what was
+   wrong was the box around it. Every one of these keeps its drawn size and
+   gains hit area, so the page looks the same and stops being a dexterity
+   test. 1.75rem (28px) clears the floor with room for the focus ring.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-x,
+.set2-chip-x,
+.set2-gr-del,
+.set2-kebab,
+.set2-ck2,
+.set2-modal-x {
+  min-width: 1.75rem; min-height: 1.75rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+/* The chip's own x sat inside the chip's padding, so growing it would have
+   grown the chip. Negative margin gives the hit area back without moving a
+   pixel of what is drawn. */
+.set2-chip-x { margin: -0.5rem -0.375rem -0.5rem -0.25rem; }
+.set2-gr-del {
+  position: absolute;
+  top: 0.1875rem;
+  right: 0;
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0.1875rem;
+  border-radius: var(--r-xs);
+  color: var(--ink-faint);
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+  margin: -0.25rem;
+}
+
+/* Text-shaped controls get their height from line-box padding rather than a
+   min-height, so they stay on the baseline they share with their row. */
+.set2-adv,
+.set2-gr-new,
+.set2-grant-add,
+.set2-lnk,
+.set2-map-add,
+.set2-map-new,
+.set2-th {
+  min-height: 1.75rem;
+  display: inline-flex; align-items: center;
+}
+.set2-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0.3125rem 0;
+  font: inherit;
+  font-size: var(--ty-micro);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: left;
+}
+.set2-map-add, .set2-map-new { display: flex; }
+
+/* One focus ring for everything in this file. It was written eleven times
+   with three different offsets, which is how a keyboard pass ends up looking
+   like three different products. */
+.set2-col :focus-visible,
+.set2-modal :focus-visible,
+.set2-pop :focus-visible {
+  outline: 0.125rem solid var(--brand);
+  outline-offset: 0.125rem;
+  border-radius: var(--r-xs);
+}
+
+/* ── The save bar stops covering the last row ──
+   It is sticky at the foot of the scroll port, so the column has to end above
+   it. It was overlapping content on EVERY module — the audit caught it over
+   person cards, mapping rows and settings rows alike. The reserve is
+   unconditional: a little empty space at the bottom of a clean page costs
+   nothing, and content hidden under a bar costs the edit somebody was making. */
+/* 10rem of dead foot existed only so the last row could clear a bar that
+   floated over it. Nothing floats now, so the page ends where it ends. */
+body.is-settings .set2-col { padding-bottom: 5rem; }
+.set2-map-mid {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+  overflow: hidden;
+}
+.set2-sample-n { font-style: normal; color: var(--ink-rule); flex-shrink: 0; }
+.set2-key {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.0625rem;
+  appearance: none;
+  border: 0.0625rem solid transparent;
+  background: none;
+  padding: 0.1875rem 0.4375rem;
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--ty-meta);
+  color: var(--ink-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+  line-height: var(--lh-snug);
+  /* The segments are flex items, so `overflow-wrap: anywhere` broke them from
+     the inside — "requester.organizati / on.domai / n". A path wraps BETWEEN
+     its segments or not at all: wrap the line, and let no segment shrink. */
+  flex-wrap: wrap;
+  overflow-wrap: normal;
+}
+.set2-key > * { flex: 0 0 auto; }
+.set2-key-s {
+  color: var(--ink-primary);
+}
+.set2-key-dot {
+  color: var(--ink-faint);
+  margin: 0 0.125rem;
+}
+.set2-sample {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0;
+  font-family: var(--font-mono);
+  font-size: var(--ty-micro);
+  color: var(--ink-faint);
+  min-width: 0;
+  overflow: hidden;
+  opacity: 0.85;
+}
+.set2-map-end {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+.set2-adv {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1875rem;
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0.125rem 0.25rem;
+  margin-left: 0;
+  font: inherit;
+  font-size: var(--ty-micro);
+  color: var(--ink-quiet);
+}
+.set2-tbl-hd,
+.set2-tbl-r {
+  display: grid;
+  the description is
+     what they read once the row is found. */
+  grid-template-columns: minmax(13rem, 1.15fr) minmax(0, 1.3fr) minmax(6.5rem, auto);
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.5rem;
+  /* The earlier rule said "the name gets the room" and then this one gave the
+     description the larger share, which pinned the name to its own minimum.
+     Two rows clipped their name AND the scope chip beside it — the identifier
+     you scan for was the thing being cut. Ratio inverted, and the status
+     column stops reserving 11rem for its longest label. */
+  grid-template-columns: minmax(14.5rem, 1.35fr) minmax(0, 1.15fr) 9.5rem;
+  padding-top: 0.6875rem;
+  padding-bottom: 0.6875rem;
+  /* Every row is the height of a two-line description, so a short one does not
+     make the row it sits in shorter than its neighbours. */
+  min-height: 3.5rem;
+}
+.set2-tbl-n .set2-from {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--ty-micro);
+  opacity: 0.8;
+}
+.set2-ck2.is-void { border: 0; background: none; cursor: default; }
+
+/* The count line under the filter row. One sentence, and the number that
+   matters most in it is the one nobody wants to be non-zero. */
+.set2-lede {
+  margin: 0.875rem 0 0; font-size: var(--ty-micro); color: var(--ink-faint);
+}
+.set2-lede b.is-warn { color: var(--ink-warn); }
+
+@media (max-width: 62rem) {}
+.set2-ck {
+  appearance: none;
+  border: 0.0938rem solid var(--ink-rule);
+  background: transparent;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 0.1875rem;
+  flex-shrink: 0;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  place-items: center;
+  transition: background var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+}
+.set2-node .set2-ck { margin: -0.25rem 0; }
+.set2-chip.is-act,
+.set2-add,
+.set2-chip button {
+  min-height: 1.5rem;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.set2-chip button { min-width: 1.5rem; margin: -0.375rem -0.25rem -0.375rem -0.125rem; }
+/* The library ships `.seg-btn` at 20px tall. Raised only inside settings so
+   the change cannot reach the filter row on the corpus, which is not ours. */
+.set2-col .seg-btn { min-height: 1.75rem; padding-inline: 0.625rem; }
+/* -- THE CARD SIZES TO ITS CONTENT --
+   A fixed 15.5rem kept the grid even, and at 12px it fitted. At 14px it does
+   not: the densest record needs 127px of grants port and has 108, so two of
+   Alex Smith's roles were behind a scrollbar in a card whose whole job is
+   showing what somebody can reach.
+   A floor instead of a ceiling. Cards in one grid ROW already stretch to the
+   tallest of them, so the rhythm survives without hiding anything -- the
+   evenness came from the grid, not from the magic number. */
+.set2-person {
+  border: 0.0625rem solid var(--hairline);
+  border-radius: var(--r-lg);
+  padding: 0.875rem 0.875rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  transition: border-color var(--t-fast) var(--ease-out);
+  min-height: 15.5rem;
+  overflow: hidden;
+}
+.set2-person-hd {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.set2-person-tags {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  margin-top: 0.625rem;
+  padding-bottom: 0.75rem;
+}
+.set2-grants {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+  padding-top: 0.625rem;
+  border-top: 0.0625rem solid var(--hairline);
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: visible;
+  overflow-x: hidden;
+  padding: 0.75rem 0 0;
+  scrollbar-width: thin;
+}
+.set2-gr-bd {
+  display: none;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem 0 0.375rem 1.125rem;
+  min-width: 0;
+}
+.set2-gr-bd .set2-chip { max-width: 100%; overflow: hidden; }
+.set2-gr-hd {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0.25rem 1.5rem 0.25rem 0;
+  border-radius: var(--r-sm);
+  font: inherit;
+  text-align: left;
+  color: var(--ink-secondary);
+  min-width: 0;
+}
+.set2-gr-r {
+  font-size: var(--ty-micro);
+  font-weight: var(--fw-semibold);
+  color: var(--ink-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.set2-grants::-webkit-scrollbar { width: 0.25rem; }
+.set2-grants::-webkit-scrollbar-thumb { background: var(--ink-rule); border-radius: 0.125rem; }
+
+/* Pinned, so the primary action sits on one line across the whole grid
+   instead of wherever each person's roles happen to end. */
+.set2-person-ft {
+  flex-shrink: 0; display: flex;
+  padding: 0.5rem 0; margin-top: 0.125rem;
+  border-top: 0.0625rem solid var(--hairline);
+}
+
+/* A count line under the filter row, replacing the tally that used to fight
+   the section heading from the right-hand side. */
+.set2-lede b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ENABLEMENT
+
+   Four rows each carrying an identical placeholder glyph — a document icon
+   repeated four times, distinguishing nothing and costing 1rem of the row's
+   left edge. An icon that is the same on every row is decoration wearing an
+   information's clothes. Gone; the names line up with everything else on the
+   page instead.
+
+   What each source has produced moves next to the switch that governs it, so
+   turning something off states its own cost.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-en .set2-row-ico { display: none; }
+.set2-en .set2-row-end { gap: 1rem; }
+.set2-en .set2-from { font-variant-numeric: tabular-nums; min-width: 6.5rem; text-align: right; }
+/* A source that reads nothing is not an error, but it is not neutral either —
+   it is the only row where the number and the switch disagree about intent.
+   It sat at `--ink-rule`, 4.02:1, under the floor: the one row whose state you
+   most need to read was the one below the contrast minimum. */
+.set2-en .set2-row.is-off .set2-from { color: var(--ink-faint); font-style: italic; }
+.set2-tbl-d {
+  font-size: var(--ty-micro);
+  color: var(--ink-quiet);
+  line-height: var(--lh-snug);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.set2-tbl-s {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: space-between;
+}
+.set2-tbl-s .set2-pill {
+  white-space: normal;
+  text-align: left;
+  min-width: 0;
+}
+
+
+/* The scope pickers name what they choose. Two adjacent dropdowns showing only
+   their values is a puzzle — "CXS" and "Knowledge Search" do not say which is
+   the client and which is the product until you already know the answer. */
+.set2-scope-k {
+  font-size: var(--ty-micro); color: var(--ink-faint);
+  font-weight: var(--fw-regular); margin-right: 0.3125rem;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE SPINE
+
+   `.set2-col` is 46rem inside a 1160px frame — 212px of dead gutter on each
+   side. The spine is 11.25rem + a 2rem gap = exactly 212px, so it fills the
+   left gutter and the content column keeps the x it has always had. Left
+   edge at 512 on every module, spine or no spine.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-stage {
+  display: grid;
+  grid-template-columns: 11.25rem minmax(0, 1fr);
+  gap: 2rem;
+  /* NOT `align-items: start`. A sticky element can only travel inside its own
+     containing block, and `start` shrank this column to the height of the
+     spine — about 400px of a 2700px page — so the spine stopped following
+     after the first screen and the unsaved block went with it. Stretched, the
+     column is as tall as the content beside it and sticky has somewhere to
+     go. */
+}
+/* The column's auto margins centred it in the frame. Inside the grid the
+   track does that job, so the margins would double-count. */
+.set2-stage > .set2-col { margin: 0; }
+
+/* At rest the spine starts level with the FIRST SECTION, not with the module
+   title -- 01 should sit beside the thing it names. That offset lives on the
+   wrapper rather than on the sticky element itself, or it would travel up with
+   the nav and hold it 6rem below the top of the page for the whole scroll. */
+.set2-spine-w { padding-top: 9.75rem; }
+/* The nav AND what sits under it follow the scroll together. With sticky on
+   the nav alone, the unsaved block was a static sibling below it and scrolled
+   away — the one element that must never be out of reach was the one that
+   left. */
+.set2-spine-stick { position: sticky; top: 1.5rem; }
+.set2-spine { display: flex; flex-direction: column; }
+
+.set2-spine-i {
+  position: relative;
+  display: grid;
+  /* Two columns, not three. The numeral column went with the numerals. */
+  grid-template-columns: 1rem minmax(0, 1fr);
+  align-items: start; gap: 0.5rem;
+  padding: 0.4375rem 0.5rem 0.4375rem 0;
+  appearance: none; border: 0; background: none; cursor: pointer;
+  text-align: left; font: inherit;
+  border-radius: var(--r-sm);
+  transition: background-color var(--t-fast) var(--ease-out);
+}
+.set2-spine-i:hover { background: var(--card-bg); }
+.set2-spine-i:focus-visible {
+  outline: 0.125rem solid var(--brand); outline-offset: -0.125rem;
+}
+
+/* The thread. Drawn per item down to the next one rather than as one rule
+   behind the whole list, so it starts and stops at a dot instead of floating
+   past the first and last. */
+/* Centred on the dot column rather than measured to it. `left: 1.90625rem`
+   was 30.5px — the file's only sub-pixel value, and it only existed because
+   the offset was hand-computed from a numeral column that no longer exists. */
+.set2-spine-i::before {
+  content: ""; position: absolute;
+  left: 0.5rem; transform: translateX(-50%);
+  top: 1.375rem; bottom: -0.3125rem;
+  width: 0.0625rem; background: var(--hairline);
+}
+.set2-spine-i:last-child::before { display: none; }
+
+.set2-spine-dot {
+  width: 0.5rem; height: 0.5rem; border-radius: 50%;
+  margin-top: 0.3125rem; justify-self: center;
+  background: var(--ink-rule);
+  /* The page's own background, so the thread passes behind the dot and stops
+     at its edge rather than through it. */
+  box-shadow: 0 0 0 0.1875rem var(--body-bg);
+}
+.set2-spine-dot.sd-ok   { background: var(--ok); }
+.set2-spine-dot.sd-warn { background: var(--warn); }
+.set2-spine-dot.sd-err  { background: var(--err); }
+
+.set2-spine-l { display: flex; flex-direction: column; gap: 0.0625rem; min-width: 0; }
+.set2-spine-name {
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--ink-quiet); line-height: 1.35;
+  transition: color var(--t-fast) var(--ease-out);
+}
+.set2-spine-note {
+  font-size: var(--ty-micro); color: var(--ink-faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── WHERE YOU ARE ──
+   Reading position is not a selection, so it does not get a fill or a border.
+   The name comes up to full contrast and the mark goes brand: the two things
+   that were deliberately quiet are the two that speak. */
+.set2-spine-i.is-here .set2-spine-name { color: var(--ink-primary); }
+/* The ring is BRAND, like the mark beside it. It was `--accent-rgb`, which put
+   a purple halo next to a blue numeral and made one state read as two. */
+.set2-spine-i.is-here .set2-spine-dot {
+  box-shadow: 0 0 0 0.1875rem var(--body-bg),
+              0 0 0 0.3125rem color-mix(in srgb, var(--brand) 38%, transparent);
+}
+
+/* Below the point where the gutter stops existing, the spine goes horizontal
+   and scrolls: the same map, laid along the top of the page it describes. */
+@media (max-width: 78rem) {
+  .set2-stage { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .set2-stage > .set2-col { margin: 0 auto; }
+  .set2-spine-w { padding-top: 0; }
+  .set2-spine-stick { position: static; }
+  .set2-spine {
+    padding: 0 2rem; margin-bottom: -0.5rem;
+    flex-direction: row; gap: 0.25rem;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .set2-spine::-webkit-scrollbar { display: none; }
+  .set2-spine-i { flex: 0 0 auto; grid-template-columns: auto auto auto; align-items: center; }
+  .set2-spine-i::before { display: none; }
+  .set2-spine-dot { margin-top: 0; box-shadow: none; }
+  .set2-spine-l { flex-direction: row; align-items: baseline; gap: 0.375rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .set2-spine-i, .set2-spine-name { transition-duration: 0.01ms !important; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE UNSAVED BLOCK
+
+   Two shapes, one component. `is-stack` is the narrow column at the foot of
+   the spine — sticky with it, in the gutter, covering nothing. `is-flat` is
+   the wide row under a header, for the pages short enough to have no spine,
+   where the header never leaves view anyway.
+
+   Neither is fixed to the window and neither has a shadow, because neither is
+   over anything now.
+   ══════════════════════════════════════════════════════════════════════════ */
+/* `display: flex` from an author sheet outranks the UA's `[hidden]`, so the
+   attribute has to be honoured explicitly or a clean page shows an empty box. */
+
+/* ── Under a header, on a page with no spine ── */
+
+/* A text button, so the two reversible exits do not read as three equal
+   choices beside the one that publishes. */
+.set2-lnk.is-err { color: var(--ink-err); }
+
+/* A section with no head of its own starts flush with where a head would
+   have put its first row, so removing the heading does not also remove the
+   space the page was breathing with. */
+.set2-sec.is-headless { margin-top: 1.5rem; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ONE RULE FOR THE 12px TIER
+
+   Measured across a module, SIX of the twelve type roles resolved to the same
+   12px / 400 / rgb(139,154,170): row help, section notes, tallies, spine
+   notes, scope labels, row descriptions. The scale offers nothing between
+   --ty-micro and --ty-meta, so size cannot separate them — and it should not,
+   because they are not different in importance. They are different in KIND.
+
+   PROSE is written to be read: help text, descriptions, the sentence under a
+   heading. It reads at --ink-quiet.
+   DATA is written to be scanned: counts, tallies, states. It stays at
+   --ink-faint, one step back, and its figures are tabular.
+
+   Contrast was never the problem — every one of them passes AA at 6.08:1.
+   Telling them apart was.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-tally, .set2-spine-note, .set2-from { font-variant-numeric: tabular-nums; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE SPINE MARKS WHAT YOU CHANGED
+
+   Reading position and unsaved state are different facts, so they get
+   different marks. `is-here` raises the name to full contrast — where you are.
+   `is-dirty` rings the dot in brand and leaves the fill alone — what you
+   touched. A section can be both, and reads as both.
+   ══════════════════════════════════════════════════════════════════════════ */
+/* Both at once: the ring of the current stage, plus the hollow brand fill of
+   an edited one. Neither cancels the other. */
+
+/* The grants port is focusable now, so it needs a focus ring like anything
+   else that can hold focus — a scroll region a keyboard reaches but cannot
+   see it has reached is worse than one it cannot reach. */
+.set2-grants:focus-visible {
+  outline: 0.125rem solid var(--brand); outline-offset: -0.125rem;
+  border-radius: var(--r-xs);
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE FIELD TABLE, READ AT A GLANCE
+
+   Measured before this: the AiMY field and the CRM key were both 13px and both
+   rgb(238,242,246) — the same size and the same colour, separated only by
+   weight. Two columns shouting equally, so nothing led and the eye had nowhere
+   to land. The key looked LARGER because monospace is wider at equal px, which
+   put the loudest voice on the value rather than on the thing it belongs to.
+
+   And the nesting step was 22px. At 13px semibold that is not a step, it is a
+   nudge — "Email domain" sat almost flush with the top-level rows it hangs
+   under, so a tree rendered as a flat list.
+
+   Three moves, in order of what the eye needs:
+     1. The AiMY FIELD is the row's identity and keeps full contrast.
+     2. The KEY is what the field is set to. Only its LAST segment identifies
+        it — `requester.organization.domain` is "domain, from an organisation,
+        from a requester" — so the ancestors step back and the leaf stays lit.
+     3. The SAMPLES are evidence. They go quietest of all, and they stop
+        clipping: a truncated value proves nothing.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 2. The path reads to its leaf ── */
+.set2-key-s { color: var(--ink-faint); font-weight: var(--fw-regular); }
+.set2-key-s:last-of-type { color: var(--ink-primary); font-weight: var(--fw-medium); }
+.set2-key-dot { color: var(--ink-rule); margin: 0 0.0625rem; }
+.set2-map-row.is-broken .set2-key-s:last-of-type { color: var(--ink-err); }
+
+/* ── 3. Evidence, not content — but still content ──
+   These were set to `--ink-rule`, which is the SEPARATOR token: rgb(107,123,139)
+   at 4.02:1 on this background, under the 4.5 floor. A hairline colour is fine
+   for a hairline and wrong for a word, and four text roles were wearing it —
+   samples, Advanced, Add subfield, the +N count. They read at `--ink-faint`
+   now: still the quietest text on the row, at 6.08:1. */
+.set2-sample { color: var(--ink-faint); }
+.set2-sample i {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── 1 & the tree ──
+   A wider step, and a guide so the step is read as descent rather than as a
+   margin someone chose. The rows are flat siblings carrying `--d`, so the
+   guide is drawn per row at its parent's gutter rather than by nesting. */
+.set2-map-row, .set2-adv-bd, .set2-map-add {
+  --step: 1.75rem;
+}
+.set2-map-row { padding-left: calc(0.25rem + var(--d, 0) * var(--step)); }
+.set2-map-add { padding-left: calc(0.25rem + var(--d, 0) * var(--step)); }
+.set2-adv-bd  { padding-left: calc(0.25rem + (var(--d, 0) + 1) * var(--step)); }
+
+/* ── The actions stop competing with the data ──
+   Four identical "Advanced" links down the column read as content. They step
+   back to the level of a caption and come forward on approach — the row is
+   still one tab stop away, so nothing is hidden from the keyboard. */
+.set2-adv { color: var(--ink-faint); }
+.set2-map-row:hover .set2-adv,
+.set2-map-row:focus-within .set2-adv { color: var(--ink-primary); }
+.set2-map-add { color: var(--ink-faint); }
+.set2-map-add:hover, .set2-map-add:focus-visible { color: var(--ink-action); }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   VALUE MAPPING
+
+   The panel rendered `<b></b>` over values seeded with an empty name, so every
+   row read "Refund not received reads as" and stopped. There was no input.
+   The code is fixed — it is what the connector sent, and editing it would
+   break the match it exists to perform. The NAME is the field.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-pop.is-wide { width: 21rem; }
+.set2-vm { display: flex; flex-direction: column; gap: 0.375rem; }
+.set2-vm-row {
+  display: grid;
+  grid-template-columns: minmax(3.5rem, auto) 0.75rem minmax(0, 1fr) 1.75rem;
+  align-items: center; gap: 0.375rem;
+}
+.set2-vm-k {
+  font-family: var(--font-mono); font-size: var(--ty-micro);
+  color: var(--ink-quiet); background: var(--card-bg);
+  padding: 0.25rem 0.375rem; border-radius: var(--r-xs);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.set2-vm-ar { color: var(--ink-rule); text-align: center; font-size: var(--ty-micro); }
+.set2-vm-v { min-width: 0; }
+.set2-vm-none { font-size: var(--ty-micro); color: var(--ink-faint); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE SETTINGS LAYER SITS ABOVE THE PAGE CHROME
+
+   `.set2-pop` was z-index 80 and `.set2-scrim` 90, both UNDER `.app-topnav`
+   at 100 — so a popover anchored high on the page had the AiMY logo painted
+   through it, and a modal's backdrop dimmed everything except the one bar it
+   most needed to cover.
+
+   There is no z-index scale in this project (31 ad hoc values from -1 to 9999,
+   zero tokens), so these two say what band they belong to rather than adding
+   two more numbers: above the topnav, below the app-level chat surfaces
+   (`.aimy-float-wrap` 550, `.aimy-overlay` 600) which own the whole window.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-pop   { z-index: 120; }
+.set2-scrim { z-index: 130; }
+
+
+/* The "+2" is a count, not a separator — same floor as the value it follows. */
+.set2-sample-n { color: var(--ink-faint); }
+.set2-adv-none { font-size: var(--ty-micro); color: var(--ink-faint); }
+
+/* "e.g." marks the values as examples rather than as the field's content. It
+   is the quietest thing on the line because it is a label, not a value. */
+.set2-sample-l { color: var(--ink-rule); font-style: italic; flex-shrink: 0; }
+
+/* The middot separates VALUES from each other. It has no business after the
+   "e.g." label or before "and 2 more", which are prose, not list items. */
+.set2-sample .set2-sample-l + i::before,
+.set2-sample .set2-sample-n::before { content: none; }
+.set2-sample-n { font-style: italic; }
+
+/* The draft name sits exactly where the committed name will, so the row does
+   not jump when it settles. */
+.set2-map-name {
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
+  padding: 0.25rem 0.5rem; width: 100%; min-width: 0;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A SUBFIELD LOOKS LIKE A SUBFIELD
+
+   I had this as a 1px guide with an elbow — a drawing of a tree, on top of an
+   indent that was too small to read. The design does it with a tinted band per
+   level: the row steps right AND the surface behind it lifts, so depth is
+   legible from the shape of the block before you read a word of it. Two
+   signals agreeing beat one signal drawn carefully.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-map-row.is-d1 { background: var(--card-bg); }
+.set2-map-row.is-d2 { background: var(--card-bg-raised); }
+/* The add-row under a group belongs to the band above it. */
+.set2-map-add.is-open { background: var(--card-bg); }
+
+/* Nothing else needs a colour: the indent and the band carry it. */
+.set2-map-row.is-sub .set2-map-ctx { color: var(--ink-primary); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE CRM DROPDOWN
+
+   It was a 150x24 run of text at the right edge of the section head, reading
+   "Fields from Zendesk" and sitting between the heading and a count — a
+   control dressed as a caption, which is why it could not be found. The design
+   has it as a select: bordered, its own height, unmistakably something you
+   press. It scopes this section only, which the column head beneath it already
+   states.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-crm-pick {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  min-height: 2rem; padding: 0.25rem 0.625rem;
+  appearance: none; cursor: pointer; font: inherit;
+  font-size: var(--ty-micro);
+  color: var(--ink-primary);
+  background: var(--card-bg-raised);
+  border: 0.0625rem solid var(--card-border);
+  border-radius: var(--r-md);
+  transition: border-color var(--t-fast) var(--ease-out);
+}
+.set2-crm-pick b { font-weight: var(--fw-semibold); }
+.set2-crm-pick svg { width: 0.75rem; height: 0.75rem; color: var(--ink-faint); }
+.set2-crm-pick:hover { border-color: var(--ink-rule); }
+.set2-crm-pick:focus-visible {
+  outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem;
+}
+
+/* The relevance control carries its number and its unit together — "30 Days"
+   is one choice, not a figure plus a label to read separately. A select
+   because the ranges that matter are a short list, and a free number box
+   invites 1,247 days. */
+.set2-fld-sel {
+  appearance: none;
+  /* Sized to its content, not to the row. The control cell stretches its
+     children, which turned a 110px choice into a 260px box reaching for the
+     page edge. */
+  width: auto; flex: 0 0 auto;
+  padding-right: 2rem; min-width: 7.5rem; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%),
+                    linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+  background-position: calc(100% - 1.0625rem) 55%, calc(100% - 0.75rem) 55%;
+  background-size: 0.3125rem 0.3125rem, 0.3125rem 0.3125rem;
+  background-repeat: no-repeat;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TRIGGER SYNC + SYNC HISTORY, to the frame
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-card {
+  background: var(--card-bg); border: 0.0625rem solid var(--hairline);
+  border-radius: var(--r-lg); padding: 0.875rem;
+}
+.set2-card-t {
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-quiet); margin-bottom: 0.625rem;
+}
+
+/* The typeahead. The list hangs under the field rather than in a popover: it
+   belongs to this box, and a floating layer for eight rows is a layer to
+   dismiss for no reason. */
+.set2-ta { position: relative; }
+.set2-ta-f { width: 100%; }
+.set2-ta-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 0.25rem); z-index: 4;
+  display: flex; flex-direction: column;
+  max-height: 13rem; overflow-y: auto;
+  background: var(--card-bg-raised);
+  border: 0.0625rem solid var(--card-border);
+  border-radius: var(--r-md);
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.22);
+}
+.set2-ta-list[hidden] { display: none; }
+.set2-ta-i {
+  display: flex; align-items: baseline; gap: 0.375rem;
+  padding: 0.4375rem 0.625rem; min-height: 1.75rem;
+  appearance: none; border: 0; background: none; cursor: pointer;
+  text-align: left; font: inherit; font-size: var(--ty-micro);
+  color: var(--ink-primary);
+}
+.set2-ta-i:hover { background: var(--card-bg); }
+.set2-ta-i:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+.set2-ta-k { color: var(--ink-faint); }
+.set2-ta-none { padding: 0.5rem 0.625rem; font-size: var(--ty-micro); color: var(--ink-faint); }
+
+/* Product and date range share a row: they scope the same run. */
+.set2-up { display: grid; grid-template-columns: 1fr 1.4fr; gap: 0.875rem; }
+
+/* The history table gets a head, because three columns of mixed content need
+   naming — a date, a set of chips and a state do not announce themselves. */
+.set2-run-hd {
+  background: none; font-size: var(--ty-micro); color: var(--ink-faint);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  padding-bottom: 0.375rem;
+}
+.set2-run-hd:first-child { border-radius: 0; }
+/* A failed run keeps its reason on the row rather than in a section of its
+   own. */
+.set2-run-why {
+  display: block; width: 100%; margin-top: 0.25rem;
+  font-size: var(--ty-micro); color: var(--ink-err);
+}
+/* No row tint. The frame keeps a failed run on the same ground as every other
+   and lets the pill and the reason carry the state -- and washing the row red
+   dropped the chips sitting on it below the contrast floor, which is the
+   failure state costing legibility exactly where it is needed. */
+.set2-retry {
+  appearance: none; border: 0; background: none; cursor: pointer; font: inherit;
+  font-size: var(--ty-micro); color: var(--ink-err);
+  text-decoration: underline; text-underline-offset: 0.125rem;
+  min-height: 1.75rem; padding: 0 0.25rem;
+}
+.set2-retry:hover { color: var(--ink-primary); }
+.set2-retry:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TRIGGER SYNC — UI FIXES
+
+   Measured: the two field labels sat 16px apart (Product y=1501, Date range
+   y=1517) because only one of the two fields carried a label of its own
+   height; the read-only Product input was pixel-identical to the editable one,
+   same background and same ink, so nothing said it was fixed; and the section
+   subtitle wore `.set2-note`, which carries a 2px left rule and reads as a
+   pulled-out callout rather than as the sentence under a heading.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* A subtitle is prose under a heading. No rule, no indent, no quoting. */
+.set2-sub {
+  font-size: var(--ty-micro); color: var(--ink-quiet);
+  line-height: var(--lh-snug); margin-bottom: 0.875rem;
+  max-width: 60ch;
+}
+
+/* Both columns start at the same line, and the label reserves the same height
+   whatever sits under it. */
+.set2-up { align-items: start; }
+/* `.set2-field` carries a top margin so stacked fields breathe. Inside this
+   two-column grid the second one inherited it and started 16px below the
+   first, so two labels on one row sat on different lines. The grid's own gap
+   is the spacing here. */
+.set2-up > .set2-field {
+  display: flex; flex-direction: column; gap: 0.375rem;
+  margin-top: 0;
+}
+.set2-up .set2-lbl { margin: 0; line-height: 1.2; }
+
+/* ── A FIXED VALUE IS NOT AN EMPTY FIELD ──
+   It is here because the run belongs to this product, and offering it again
+   would be a second place to set the same thing. So it reads as a statement:
+   flat, quieter ink, no caret, out of the tab order. */
+.set2-fld.is-fixed {
+  background: transparent;
+  border-color: transparent;
+  border-bottom-color: var(--hairline);
+  border-radius: 0;
+  color: var(--ink-quiet);
+  padding-left: 0; padding-right: 0;
+  cursor: default;
+}
+.set2-fld.is-fixed:focus { outline: none; }
+
+/* The hint belongs to the dates above it. */
+.set2-up .set2-hint { margin-top: 0.0625rem; }
+
+/* The count and its two buttons get room from the row above rather than
+   sitting 16px under a caption. */
+.set2-blast { margin-top: 1.25rem; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE DATE RANGE
+
+   A native date input prints "mm/dd/yyyy" when it is empty, in the same ink as
+   a real value — so an unset range read as though it held something, and the
+   something it appeared to hold was a US format string. It cannot be given a
+   placeholder, so the empty state is dimmed to placeholder weight and the
+   filled state comes back to full contrast.
+
+   The picker button is the browser's, and it arrives as a grey square that
+   matches nothing. It is tinted to the surface instead.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-range-d { min-width: 0; }
+.set2-range-d.is-empty::-webkit-datetime-edit { color: var(--ink-rule); }
+.set2-range-d::-webkit-datetime-edit { padding: 0; }
+.set2-range-d::-webkit-calendar-picker-indicator {
+  opacity: 0.45; cursor: pointer; padding: 0.125rem;
+  border-radius: var(--r-xs);
+  filter: invert(var(--cal-invert, 1));
+}
+.set2-range-d::-webkit-calendar-picker-indicator:hover { opacity: 1; }
+/* The icon ships black; it is inverted on the dark ground and left alone on
+   the light one. */
+:root { --cal-invert: 1; }
+:root[data-theme="light"] { --cal-invert: 0; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) { --cal-invert: 0; }
+}
+
+/* Both ends the same width, and the arrow between them stays put rather than
+   being pushed around by whichever side has a value. */
+.set2-range { display: flex; align-items: center; gap: 0.5rem; }
+.set2-range-d { flex: 1 1 0; }
+.set2-range-a { flex: 0 0 auto; color: var(--ink-faint); }
+
+/* A run in flight is not a finished run. The pill says so, and the row it sits
+   on says nothing else different — a sync that is working is the normal case,
+   not an alert. */
+.set2-run .set2-pill.is-info { font-variant-numeric: tabular-nums; }
+
+/* The dry run shows the filter it used, above the rows it produced. */
+.set2-pv-crit {
+  display: flex; flex-wrap: wrap; gap: 0.375rem; align-items: center;
+  margin-bottom: 0.875rem;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TRIGGER DELETE
+
+   To the frame: a banner that states the irreversibility once, then a card of
+   one row per CRM — name, threshold, days, and the red trash that starts it.
+   The row's own figure sits in the gap the frame leaves between the name and
+   the control, because a threshold that cannot state what it would destroy is
+   a threshold nobody can judge.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-danger {
+  display: flex; align-items: flex-start; gap: 0.5rem;
+  padding: 0.6875rem 0.875rem; margin-bottom: 0.875rem;
+  border: 0.0625rem solid var(--err-line);
+  border-radius: var(--r-md);
+  background: var(--err-bg);
+  font-size: var(--ty-micro); color: var(--ink-err);
+}
+.set2-danger-i { flex-shrink: 0; display: flex; }
+.set2-danger-i svg { width: 0.9375rem; height: 0.9375rem; }
+
+.set2-ret-card {
+  border: 0.0625rem solid var(--hairline);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.set2-ret-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, auto) minmax(0, 1fr) auto 2rem;
+  align-items: center; gap: 0.875rem;
+  padding: 0.875rem 1rem;
+}
+.set2-ret-row + .set2-ret-row { border-top: 0.0625rem solid var(--hairline); }
+.set2-ret-n {
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
+}
+/* The consequence, in the frame's empty middle. Quiet until it is alarming. */
+.set2-ret-says { font-size: var(--ty-micro); color: var(--ink-faint); }
+.set2-ret-c { display: flex; align-items: center; gap: 0.5rem; }
+
+/* The trash is the destructive act and the only red control on the row. It
+   still opens the typed confirmation — the icon starts the ladder, it does not
+   skip it. */
+.set2-ret-del {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 2rem; min-height: 2rem; border-radius: var(--r-sm);
+  color: var(--ink-err);
+}
+.set2-ret-del svg { width: 1rem; height: 1rem; }
+.set2-ret-del:hover { background: var(--err-bg); }
+.set2-ret-del:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+
+@media (max-width: 46rem) {
+  .set2-ret-row { grid-template-columns: 1fr auto 2rem; }
+  .set2-ret-says { grid-column: 1 / -1; order: 3; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   KNOWLEDGE ENABLEMENT WEBHOOK SETTINGS
+
+   To the frame: a blue note naming who calls these, then a labelled row per
+   credential — the field with a help affordance inside it, a copy button, and
+   its own Save.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-info {
+  display: flex; align-items: flex-start; gap: 0.5rem;
+  padding: 0.6875rem 0.875rem; margin-bottom: 1rem;
+  border: 0.0625rem solid color-mix(in srgb, var(--ink-info) 28%, transparent);
+  border-radius: var(--r-md);
+  background: var(--info-bg);
+  font-size: var(--ty-micro); color: var(--ink-info);
+}
+.set2-info-i { flex-shrink: 0; display: flex; }
+.set2-info-i svg { width: 0.9375rem; height: 0.9375rem; }
+
+.set2-wh { display: flex; flex-direction: column; gap: 1.125rem; }
+/* Label left, control right, and the note under the control it belongs to —
+   not under the whole row, where it would sit below the label instead. */
+.set2-wh-row {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  align-items: center; gap: 0.375rem 1rem;
+}
+.set2-wh-l {
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
+}
+.set2-wh-c { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.set2-wh-note {
+  grid-column: 2; font-size: var(--ty-micro); color: var(--ink-faint);
+  display: flex; align-items: baseline; gap: 0.5rem;
+}
+
+/* The help sits INSIDE the field, as the frame has it, so the field keeps its
+   full width and the affordance does not become a fourth control in the row. */
+.set2-wh-f { position: relative; flex: 1 1 auto; min-width: 0; display: flex; }
+.set2-wh-f .set2-fld { width: 100%; padding-right: 2.25rem; }
+.set2-wh-help {
+  position: absolute; right: 0.25rem; top: 50%; transform: translateY(-50%);
+  appearance: none; border: 0; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.75rem; min-height: 1.75rem; border-radius: var(--r-sm);
+  color: var(--ink-faint);
+}
+.set2-wh-help svg { width: 0.875rem; height: 0.875rem; }
+.set2-wh-help:hover { color: var(--ink-primary); }
+.set2-wh-help:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+
+.set2-wh-copy {
+  appearance: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 2rem; min-height: 2rem; flex-shrink: 0;
+  border: 0.0625rem solid var(--card-border); border-radius: var(--r-md);
+  background: var(--card-bg-raised); color: var(--ink-quiet);
+}
+.set2-wh-copy svg { width: 0.875rem; height: 0.875rem; }
+.set2-wh-copy:hover { color: var(--ink-primary); border-color: var(--ink-rule); }
+.set2-wh-copy:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+
+@media (max-width: 46rem) {
+  .set2-wh-row { grid-template-columns: minmax(0, 1fr); }
+  .set2-wh-note { grid-column: 1; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE FLOOR IS 14px, IN SETTINGS
+
+   The console's scale runs down to a 12px micro, and its rail drops --ty-body
+   to 14 while holding micro at 12 -- "a floor that bends is not a floor," as
+   the comment there says. That floor is right for a corpus view read at a
+   glance and wrong for a settings surface read closely, where micro was
+   carrying help text, counts, notes and every table caption.
+
+   So the scale is re-pointed for this surface only, on `body.is-settings`.
+   Nothing outside settings moves: the grid and document views keep the scale
+   they were measured at, which is what the 1536 invariant protects.
+
+   The steps stay four wide and keep their ratios; the whole scale shifts up.
+   Recession that used to come from size now comes from colour, which the
+   prose/data split already established.
+   ══════════════════════════════════════════════════════════════════════════ */
+body.is-settings .set2-col,
+body.is-settings .set2-stage,
+body.is-settings .set2-scrim,
+body.is-settings .set2-pop {
+  --ty-micro:   0.875rem;   /* 14 - FLOOR: counts, captions, help */
+  --ty-meta:    0.9375rem;  /* 15 - label, row name               */
+  --ty-body:    1rem;       /* 16 - prose, a value you read for    */
+  --ty-title:   1.25rem;    /* 20 - section head                   */
+}
+
+/* `.btn-sm` ships at 10.5px from the shared chrome and settings uses it for
+   Test sync, Run sync, Save, Confirm and Delete now -- the most consequential
+   controls on the surface were the smallest text on it. */
+body.is-settings .set2-col .btn-sm,
+body.is-settings .set2-stage .btn-sm,
+body.is-settings .set2-scrim .btn-sm,
+body.is-settings .set2-pop .btn-sm { font-size: 0.875rem; }
+
+/* Mono runs visually smaller than the sans at the same size, so the key paths
+   and tokens take the next step up rather than reading a size below their
+   neighbours. */
+body.is-settings .set2-mono,
+body.is-settings .set2-key { font-size: var(--ty-meta); }
+
+/* The compact way to start a group. It sits with the row's other actions, so
+   a field that has no subfields yet costs no vertical space to offer one. */
+.set2-map-plus {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.75rem; min-height: 1.75rem; border-radius: var(--r-sm);
+  font: inherit; font-size: var(--ty-meta); line-height: 1;
+  color: var(--ink-rule);
+}
+.set2-map-row:hover .set2-map-plus,
+.set2-map-row:focus-within .set2-map-plus { color: var(--ink-quiet); }
+.set2-map-plus:hover, .set2-map-plus:focus-visible { color: var(--ink-action); }
+.set2-map-plus:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+
+/* The parent's name is the part that tells two stacked add rows apart. */
+.set2-map-add b { color: var(--ink-quiet); font-weight: var(--fw-semibold); }
+
+/* A failed run has more to say than a successful one, so its row is taller —
+   but bounded. Unclamped, three lines of reason put a 100px row next to a 31px
+   one and the table lost its rhythm entirely. */
+.set2-run-why {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
 }

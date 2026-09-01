@@ -2693,6 +2693,59 @@ span.topnav-tab:hover { background: none; }
    fix while five live dropdowns went on standing over every document. */
 body.is-doc .app-sidebar,
 body.is-doc .filter-row { display: none; }
+
+/* ══ SETTINGS AS A VIEW ═══════════════════════════════════════════════════
+   The same deal the document above already has: the stage becomes something
+   else, and the controls that describe a working set stop describing anything.
+
+   One difference, and it is the point of the whole change: THE RAIL STAYS. A
+   document is read and the rail is 268px of something else; settings is
+   NAVIGATED, and the rail is what navigates it. */
+body.is-settings #filterBar,
+body.is-settings #chipBar { display: none; }
+
+/* ── The settings rows in the briefing rail ──
+   `.rail-set-row` was a <div> holding two controls: a name that opened a sheet
+   and a Reconnect button beside it. Each of these rows has ONE destination, so
+   the ROW is the control — reading it and using it are the same act, which is
+   the one thing worth taking from QA's rail wholesale. Hence the button resets:
+   the class was written for a div. */
+button.rail-set-row {
+  border: 0; background: none; font-family: var(--font-sans); cursor: pointer;
+  text-align: left;
+}
+button.rail-set-row:focus-visible {
+  outline: 0.125rem solid var(--brand); outline-offset: -0.125rem;
+}
+/* Where a dot would be. Without it the names of the rows that have nothing to
+   report hang 1.125rem left of the ones that do, and the column stops being a
+   column. */
+.rail-cfg-nodot { width: 0.5rem; flex-shrink: 0; }
+
+/* The one you are standing in reads as settled rather than offered — QA's
+   word for it. `aria-current="page"` carries the same fact for anything not
+   reading the colour. */
+.rail-cfg-row.is-on { background: var(--card-bg-raised); }
+.rail-cfg-row.is-on .rail-set-name { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+
+/* The way back out of settings, at the head of the section rather than in the
+   foot: you left from this rail, so this is where you look to return. */
+.rail-cfg-back { color: var(--ink-faint); margin-bottom: 0.25rem; }
+.rail-cfg-back svg { flex-shrink: 0; opacity: 0.8; }
+.rail-cfg-back:hover .rail-set-name { color: var(--ink-primary); }
+
+/* `.set2-save` is `position: sticky; bottom: 0`, written for a page whose
+   scroll port ended at the window. Here the float bar owns that band, so the
+   save bar stops above it. `.page-scroll` already reserves 6rem below, so
+   nothing is clipped by moving it up. */
+body.is-settings .set2-save { bottom: 4.75rem; }
+
+/* A <button> wearing `.rail-back`. The class was written for an <a>, so the
+   handful of user-agent styles a button brings have to come back off. */
+button.rail-back {
+  width: 100%; border: 0; background: none; font: inherit;
+  text-align: left; cursor: pointer;
+}
 /* `max-width: none` let a document run to the full window: 2496px at 2560,
    which is ~180 characters a line. Capped at the width the reference viewport
    already gives it, so nothing changes at 1x and it stops growing after that —
@@ -4392,6 +4445,10 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
    atomic, which at 260px dropped the whole clause onto its own line instead of
    letting it continue the sentence. */
 .ins-clause { display: inline; }
+/* The clause that is NOT a control. It carries no affordance on purpose — the
+   underline and the cursor below belong to `[role="button"]` — so this rule
+   exists to say that the plain state is deliberate rather than unstyled. */
+.ins-clause.is-flat { text-decoration: none; }
 /* ── The underline is the size of the target ──
 
    It was on the FIGURE while the whole clause was the control, which is the

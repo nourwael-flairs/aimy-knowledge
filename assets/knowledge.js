@@ -1118,6 +1118,11 @@
   const FLAG_KEYS = ['mine', 'archived'];
   const ALL_KEYS  = LIST_KEYS.concat(DATE_KEYS, FLAG_KEYS, ['q', 'prop']);
 
+  /* The settings view's own keys, kept apart from ALL_KEYS on purpose: those
+     are FILTERS, and changing one re-composes the working set. These are a
+     PLACE YOU ARE. The two clear each other in `patch` for that reason. */
+  const SET_KEYS  = ['m', 'skill', 'sc', 'sp', 'crm', 'f', 'who'];
+
   /* Parse a query string into the full state object. Split out from `readURL`
      so a stored conversation can be turned back into state by the same code
      that reads the address bar — a session's snapshot IS a query string, and
@@ -1157,7 +1162,56 @@
                     set, recency for a filtered one — so `recent` has to be
                     writable or the toggle would be dead in the one place the
                     default is already on. */
-                 sort: /^(attention|recent)$/.test(p.get('sort') || '') ? p.get('sort') : '' };
+                 sort: /^(attention|recent)$/.test(p.get('sort') || '') ? p.get('sort') : '',
+                 /* ══ SETTINGS IS A VIEW OF THIS SURFACE ══════════════════
+                    Not a page beside it, so its state belongs in the one
+                    query string this file already owns. `m` is the module;
+                    EMPTY MEANS THE CORPUS, which is what lets the way out of
+                    settings be `patch({ m: '' })` — state removal, the same
+                    move as closing a document — rather than a link that would
+                    reload the shell you are already standing in.
+
+                    These live here rather than in settings.js because that
+                    file's own writer rebuilt the query string from scratch
+                    and would have dropped every filter on the way past. One
+                    writer, or the two disagree about what the URL says. */
+                 m: p.get('m') || '',
+                 skill: p.get('skill') || '',
+                 /* ── The settings scope ──
+                    `sp` is the PRODUCT and it is the page's scope, picked once
+                    in the module bar and carried across every Client module —
+                    the way the design puts one product dropdown in the chrome
+                    and scopes the whole page under it. `crm` is a sub-choice
+                    inside Config only, because a product can read from more
+                    than one connector and only the field mapping differs per
+                    connector.
+
+                    Both are absent by default and BOTH DEFAULT TO SOMETHING
+                    REAL when read. Nobody should meet a page that asks which
+                    product before it will show them anything. */
+                 /* The CLIENT. It was hard-coded text in the scope bar while
+                    only the product was pickable — which hid a real mismatch:
+                    the bar read "Client CXS > FileBound Support" and FileBound
+                    Support belongs to Upland. A scope you cannot change is a
+                    scope nobody checks. */
+                 sc: p.get('sc') || '',
+                 sp: p.get('sp') || '',
+                 crm: p.get('crm') || '',
+                 /* Which record the detail panel is showing. A place you are,
+                    so it is addressable: a link to someone's access opens on
+                    them. The SELECTION beside it is deliberately not here —
+                    ticking three rows is a gesture mid-operation, and
+                    restoring it on a fresh load would restore an intention the
+                    reader no longer has. */
+                 who: p.get('who') || '',
+                 /* One key for every in-module filter set, as `key:value`
+                    pairs — `f=role:Admin,status:Active`. One key rather than
+                    one per control, because these are scoped to whichever
+                    module is open and a dedicated key per filter would put
+                    six dead parameters in the address bar of the five modules
+                    that do not have them. Cleared whenever `m` changes. */
+                 f: p.get('f') || '',
+                 lens: ['yours', 'org', 'eff'].indexOf(p.get('lens')) >= 0 ? p.get('lens') : 'eff' };
     LIST_KEYS.forEach((k) => { st[k] = (p.get(k) || '').split(',').filter(Boolean); });
     DATE_KEYS.forEach((k) => { st[k] = p.get(k) || ''; });
     FLAG_KEYS.forEach((k) => { st[k] = p.get(k) === '1'; });
@@ -1199,6 +1253,16 @@
     if (st.by && st.by !== 'col') p.set('by', st.by);
     if (st.sort) p.set('sort', st.sort);
     if (st.chat) p.set('chat', st.chat);
+    if (st.m) p.set('m', st.m);
+    if (st.skill) p.set('skill', st.skill);
+    if (st.sc) p.set('sc', st.sc);
+    if (st.sp) p.set('sp', st.sp);
+    if (st.crm) p.set('crm', st.crm);
+    if (st.who) p.set('who', st.who);
+    if (st.f) p.set('f', st.f);
+    /* `eff` is the default, so writing it would put a key in every settings
+       URL that means the same as its absence. */
+    if (st.lens && st.lens !== 'eff') p.set('lens', st.lens);
     /* Prototype affordance, carried so a forced state survives a filter change
        and the degraded case can actually be driven rather than just looked at. */
     if (forcedState) p.set('state', forcedState);
@@ -1242,7 +1306,10 @@
        looked at, so it has to be the one being written. Hooking the funnel also
        means every path gets it — a typed phrase, a chip, a card's tag link and
        an insight's figure all land here. */
-    if (!restoring) keepRecent(st);
+    /* `keepRecent` feeds the briefing's "Recent filters". A settings view is a
+       place, not a set, so offering it back under that heading would be naming
+       something that cannot be re-applied as a filter. */
+    if (!restoring && !st.m) keepRecent(st);
     const url = location.pathname + (qs ? '?' + qs : '');
     if (opt && opt.replace) history.replaceState(null, '', url);
     else history.pushState(null, '', url);
@@ -1260,6 +1327,31 @@
        again, and leaving one document open on top of a set you can no longer
        see is the classic lost-place bug. */
     if (Object.keys(changes).some((k) => ALL_KEYS.indexOf(k) > -1)) st.doc = '';
+
+    /* ── A filter and a settings module are two different places ──
+       Changing a filter means you asked for the corpus again, so it drops the
+       module for exactly the reason it drops the open document one line up.
+       Opening a module drops the document, because both want the same stage.
+
+       Changing module also clears what was open INSIDE the last one: a skill
+       id left standing while `m` moved to `sync` addresses nothing, and the
+       module would render its list with a detail param it cannot use. */
+    if (Object.keys(changes).some((k) => ALL_KEYS.indexOf(k) > -1))
+      SET_KEYS.forEach((k) => { st[k] = ''; });
+    if (changes.m !== undefined) {
+      st.doc = '';
+      if (changes.skill === undefined) st.skill = '';
+      /* `sp` deliberately SURVIVES a module change — it is the page's scope,
+         not the module's, and re-asking which product on every rail click is
+         the flow this replaced. `crm` does not: it means nothing outside
+         Config. */
+      if (changes.crm === undefined) st.crm = '';
+      if (changes.who === undefined) st.who = '';
+      /* A filter set belongs to the module that drew the controls. Carrying
+         `role:Admin` from People into Skills would narrow a list by a key it
+         has never heard of, invisibly. */
+      if (changes.f === undefined) st.f = '';
+    }
     /* ── Nothing leaves a document with unsaved changes ──
 
        Every way out of a document ends up here — the back button in the top
@@ -2249,6 +2341,10 @@
     const host = $('#brief');
     if (!host) return;
 
+    /* The settings section, in place of "Sources & data". Same rail, same
+       shape, one section further on: see `nav()` in settings.js. */
+    const SET = window.AIMY_SETTINGS;
+
     host.innerHTML = `
       <!-- No identity block and no findings block. Who you are is in the
            topnav; what needs a person is in AiMY noticed, one column to the
@@ -2264,7 +2360,13 @@
            repeat moves to the top rather than taking a second slot, and the
            sixth pushes the first out. It replaces "Resume your last filter",
            which was this with one slot. -->
-      ${recentFilters.length && isComposed(st) ? `
+      ${/* Not in settings. The list is five ways back into a filtered SET of
+            documents, and settings has no set and no filters -- so every row
+            in it would leave the page you are configuring, which is the one
+            thing the rail's settings section exists to keep you on. It comes
+            back the moment `m` is empty; nothing is forgotten, it is just not
+            offered where it means nothing. */ ''}
+      ${!st.m && recentFilters.length && isComposed(st) ? `
         <div class="brief-section-label">Recent filters</div>
         <div class="brief-recents">
           ${recentFilters.map((qs) => `<button class="brief-recent" data-recent="${esc(qs)}">
@@ -2272,37 +2374,18 @@
           </button>`).join('')}
         </div>` : ''}
 
-      <!-- Where the settings are. Not a destination: each row opens the
-           conversation that already carries the controls, which is what stopped
-           schedules, retention, grounding and deletion from being reachable
-           only by happening to filter to exactly one collection or source. -->
-      <div class="brief-section-label">Sources &amp; data</div>
-      <div class="rail-set">
-        ${Object.keys(SRC).filter((k) => k !== 'upload').map((k) => {
-          const src = SRC[k];
-          const ok = src.health === 'ok';
-          /* The row states its condition and carries the fix. A source that is
-             not syncing is not a fact to go and read about — it is one button,
-             and pressing it changes this row. The name still opens the
-             conversation, which is where the settings that need a form live. */
-          return `<div class="rail-set-row${ok ? '' : ' is-bad'}">
-            <span class="status-dot ${ok ? 'sd-ok' : src.health === 'warn' ? 'sd-warn' : 'sd-err'}"></span>
-            <button class="rail-set-name" data-settings="source:${k}">${esc(src.label)}</button>
-            ${ok
-              ? `<span class="rail-set-note">${esc(src.queued ? 'sync queued'
-                    : src.last === 0 ? 'synced today' : 'synced ' + src.last + 'd ago')}</span>`
-              : `<button class="rail-set-do" data-reconnect="${k}">${src.health === 'warn' ? 'Re-run' : 'Reconnect'}</button>`}
-          </div>`;
-        }).join('')}
-        <div class="rail-set-row">
-          <button class="rail-set-name" data-settings="collection:${USER.collections[0]}">Collections</button>
-          <span class="rail-set-note">${USER.collections.length}</span>
-        </div>
-        <div class="rail-set-row">
-          <button class="rail-set-name" data-settings="data">Archiving &amp; deleting</button>
-          <span class="rail-set-note">${CORPUS.filter((o) => o.arch).length} archived</span>
-        </div>
-      </div>`;
+      <!-- ══ WHERE THE SETTINGS ARE ═══════════════════════════════════════
+           This was "Sources & data": one row per connector, its health, and a
+           Reconnect button, each name opening the per-source sheet. It is the
+           settings NAVIGATION now — same rail, same section shape, same row
+           density — because the sheet it opened only ever held a fraction of
+           what a source needs, and eleven destinations were still sitting
+           behind a dropdown under the account pill.
+
+           Nothing is lost by the swap, it moves one level up: a connector that
+           is down reads as "1 not connected" on Connections, and the row is the
+           way to the screen that fixes it rather than to a sheet beside it. -->
+      ${SET ? SET.nav(st) : ''}`;
   }
 
 
@@ -8987,7 +9070,12 @@
     const base = canvas.inline ? 'AiMY' : 'AiMY Console';
     const st = readURL();
     let sub = '';
-    if (!canvas.inline && st.doc && byId(st.doc)) sub = byId(st.doc).title;
+    const SET = window.AIMY_SETTINGS;
+    if (st.m && SET && SET.has(st.m)) {
+      const mod = SET.modules.filter((m) => m.id === st.m)[0];
+      sub = mod ? mod.name : '';
+    }
+    else if (!canvas.inline && st.doc && byId(st.doc)) sub = byId(st.doc).title;
     else { const k = threadKey(); if (SESSIONS[k] && !SESSIONS[k].blank) sub = SESSIONS[k].title; }
     document.title = sub ? base + ' \u2014 ' + sub : base;
   }
@@ -9035,13 +9123,31 @@
        what changed on the workbench since your last visit; while you are
        reading one document it is 268px of something else, and the measure the
        body needs is worth more than it. */
-    const isDoc = !!(st.doc && byId(st.doc));
+    /* ══ THREE STAGES, ONE AT A TIME ═══════════════════════════════════
+       Grid, document, settings. Settings arrived last and takes the same deal
+       the document already had: it renders INSTEAD of the grid, in the stage
+       the grid was using, so the chrome never moves and the filter state sits
+       untouched in the URL waiting for you to come back to it.
+
+       `inSet` is false when AIMY_SETTINGS has not loaded — a module id in the
+       address bar with no script to render it should fall through to the grid
+       rather than paint an empty column. */
+    const SET = window.AIMY_SETTINGS;
+    const inSet = !!(st.m && SET && SET.has(st.m));
+    document.body.classList.toggle('is-settings', inSet);
+
+    const isDoc = !inSet && !!(st.doc && byId(st.doc));
     document.body.classList.toggle('is-doc', isDoc);
     /* Opening a document hides the rail at every width, so a drawer still open
        over it would be presenting a surface the layout has withdrawn — and its
        toggle goes with it, leaving nothing on screen to close it with. */
     if (isDoc && drawers.rail) drawers.rail.close();
-    if (st.doc && byId(st.doc)) { renderDoc(st); }
+    if (inSet) {
+      $('#wbStage').removeAttribute('data-doc');
+      $('#wbStage').innerHTML = SET.body(st);
+      SET.painted();
+    }
+    else if (isDoc) { renderDoc(st); }
     else { $('#wbStage').removeAttribute('data-doc'); renderGrid(st); }
 
     if (st.settings) renderSettings(st);
@@ -10598,6 +10704,11 @@
         });
         return;
       }
+      /* The settings rail, and the way out of it. `data-m=""` is not a special
+         case — an empty module IS the console, so leaving settings is state
+         removal exactly like closing a document, and the back button unwinds
+         it for free. */
+      if ((el = t.closest('[data-m]'))) { patch({ m: el.getAttribute('data-m') }); return; }
       if ((el = t.closest('[data-view]'))) { patch({ view: el.getAttribute('data-view') }); return; }
       /* An insight's action belongs to the insight. needsYou() attaches a go()
          to every finding it returns, and each one already terminates in one of
@@ -13222,6 +13333,19 @@
     drawers.init();
     wireDrop();
     renderAiState();
+
+    /* ══ THE SETTINGS VIEWS ═════════════════════════════════════════════
+       settings.js renders the modules; this file owns the URL, the rail and
+       the stage they land in. Handing over `patch` and `readURL` is the whole
+       contract: two scripts, one writer, so a module click and a filter chip
+       are the same kind of event and the back button unwinds both.
+
+       Same shape as the gate's `AIMY_GATE.init(GATE_API)` above. Guarded
+       because the file is optional — the console still renders its grid on a
+       page that does not load it. */
+    if (window.AIMY_SETTINGS) {
+      window.AIMY_SETTINGS.init({ patch: patch, readURL: readURL, render: render });
+    }
 
     /* ── What another shell sent here ──
 
