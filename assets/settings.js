@@ -1470,12 +1470,9 @@
 
     return `
       <section class="set2-sec" id="st-people">
-        <div class="set2-sec-h">
-          <h2 class="set2-sec-t">People</h2>
-          <span class="set2-sec-end">
-            <button class="btn btn-brand btn-sm" type="button" data-add-user>+ Add user</button>
-          </span>
-        </div>
+        <div class="set2-sec-h"><h2 class="set2-sec-t">People</h2></div>
+
+        ${inviteBar()}
 
         <div class="set2-fbar">
           <button class="set2-ck2" type="button" role="checkbox" aria-checked="${allOn}"
@@ -1552,8 +1549,10 @@
             client admin clicks, gets nothing, and concludes the product is
             broken rather than that the table is a reference. It says what it
             is. */ ''}
-      <div class="set2-sec-h"><h2 class="set2-sec-t">Roles</h2>
-        <span class="set2-sec-end"><button class="btn btn-ghost btn-sm" type="button">New role</button></span></div>
+      ${/* No "New role" button. The note under the table says nothing here
+            is editable; a button in the head offering to add a row to it was
+            the table contradicting itself, and it did nothing when pressed. */ ''}
+      <div class="set2-sec-h"><h2 class="set2-sec-t">Roles</h2></div>
       <div class="set2-matrix-wrap">
         <table class="set2-matrix" aria-label="What each role can do — reference only, not editable">
           <thead><tr><th></th>${ROLES.map((r) => `<th>${esc(r[0])}</th>`).join('')}</tr></thead>
@@ -1580,8 +1579,10 @@
     TREE.forEach((n) => walk(n, 1, rows, new Set(), ''));
     return `
       <section class="set2-sec" id="st-scopes">
-        <div class="set2-sec-h"><h2 class="set2-sec-t">Scopes</h2>
-          <span class="set2-sec-end"><button class="btn btn-ghost btn-sm" type="button">Create client</button></span></div>
+        ${/* "Create client" had no handler. A control that does nothing is
+              worse than none: it teaches that buttons here are not to be
+              trusted. It returns with the flow that makes it real. */ ''}
+        <div class="set2-sec-h"><h2 class="set2-sec-t">Scopes</h2></div>
         <div class="set2-pick">
           <div class="set2-pick-bd" style="max-height:24rem" role="tree" aria-label="Hierarchy">${rows.join('')}</div>
           <div class="set2-pick-ft"><span><b class="set2-num">${LEAF_TOTAL}</b> addressable units across six levels</span></div>
@@ -1678,6 +1679,9 @@
             ${k.unmapped ? `<span class="set2-num is-mute"><b>${k.unmapped}</b> not mapped</span>` : ''}
             ${k.broken ? `<span class="set2-num is-err"><b>${k.broken}</b> broken</span>` : ''}
           </span></div>
+        ${/* Every other section on the page opens with one sentence saying
+              what it governs; this one opened with a table. */ ''}
+        <div class="set2-sub">What each AiMY field reads from ${esc(c.crm)} for this product. A subfield takes its value from the field above it.</div>
         <div class="set2-map">
           <div class="set2-map-hd"><span>AiMY field</span><span>${esc(c.crm)} key</span><span></span></div>
           ${c.maps.length ? mapBranch(c, c.maps, '', 0, null)
@@ -1752,7 +1756,7 @@
                     one behaviour the save bar existed to serve. */ ''}
               <select class="set2-fld set2-fld-sel" data-window
                       aria-label="How far back to retrieve data">
-                ${opts.map((d) => `<option value="${d}"${d === now ? ' selected' : ''}>${d} Days</option>`).join('')}
+                ${opts.map((d) => `<option value="${d}"${d === now ? ' selected' : ''}>${d} days</option>`).join('')}
               </select>
             </div>
           </div>
@@ -2310,22 +2314,34 @@
               <span class="set2-run-crit">
                 <span class="set2-chip is-type">${esc(c.crm)}</span>
                 ${r[1].map((k) => `<span class="set2-chip">${esc(k[0])}: <b>${esc(k[1])}</b></span>`).join('')}
-                ${/* The reason travels with the run rather than living in a
-                      separate Failures section. A failed run IS a run, and the
-                      two lists were the same rows read twice. */ ''}
-                ${/* `r[5]` is the failure OBJECT, not a string -- it carries
-                      the code, the reason, the fix and how many runs in a row.
-                      Printing it whole gave "[object Object]" on every failed
-                      row. The reason is the half a person reads. */ ''}
-                ${r[2] === 'err' && r[5] && r[5].why
-                  ? `<span class="set2-run-why"><b class="set2-mono">${esc(r[5].code || 'FAILED')}</b> ${esc(r[5].why)}</span>` : ''}
+                ${/* ── The reason is no longer ON the row ──
+
+                      It lived here as a code and a two-line clamp, and the
+                      clamp is what gave it away: a reason cut mid-word — "on
+                      every record in the windo…" — is not an explanation, it
+                      is the shape of one. It also doubled the row's height, so
+                      a table whose whole job is to be scanned had two rhythms
+                      in it, one for runs that worked and one for runs that did
+                      not.
+
+                      A failed run IS a run and its row still says so — the
+                      pill, and a way in underneath it. What broke, and what to
+                      press about it, is one click away in a panel with room
+                      for the whole sentence. */ ''}
               </span>
               <span class="set2-run-n set2-num">${r[4] ? r[4].toLocaleString() : ''}</span>
               <span class="set2-run-st">
                 ${pill(state, r[3])}
-                ${r[2] === 'err'
-                  ? `<button class="set2-retry" type="button" data-retry="${esc(c.id)}"
-                             aria-label="Retry the run from ${esc(r[0])}">Retry</button>` : ''}
+                ${/* Not "Retry". That button was a no-op, and on two of the
+                      three failures here it also named the wrong move —
+                      `FIXES` says retrying a revoked token or a dead mapping
+                      path cannot work. The row no longer guesses at the fix;
+                      it opens the thing that knows it. */ ''}
+                ${r[2] === 'err' && r[5] && r[5].why
+                  ? `<button class="set2-why" type="button"
+                             data-why="${esc(c.id)}|${c.runs.indexOf(r)}"
+                             aria-haspopup="dialog"
+                             aria-label="Why the run from ${esc(r[0])} failed">Why it failed</button>` : ''}
               </span>
             </div>`;
           }).join('')}
@@ -2361,7 +2377,11 @@
     if (!rows.length) return '';
     return `
       <section class="set2-sec" id="st-retention">
-        <div class="set2-sec-h"><h2 class="set2-sec-t">Trigger delete \u2014 older than X days</h2></div>
+        ${/* "\u2014 older than X days" came off the heading. The X was the frame's
+              placeholder for a value, and a shipped heading that still says X
+              reads as unfinished; the sentence under it says the same thing
+              in words and the rows say it in numbers. */ ''}
+        <div class="set2-sec-h"><h2 class="set2-sec-t">Trigger delete</h2></div>
         <div class="set2-sub">Remove synced data older than a set threshold, per CRM.</div>
         <div class="set2-danger" role="note">
           <span class="set2-danger-i" aria-hidden="true">${I.warn}</span>
@@ -2405,47 +2425,48 @@
     mapping:   ['Open Config', 'The mapping points at something the connector no longer returns.']
   };
 
-  /* A section of Sync, not a page. It renders NOTHING when nothing is broken —
-     an empty state here would be a permanent heading announcing the absence of
-     news, which is the kind of furniture a settings page accumulates and never
-     sheds. The history below already says every run succeeded. */
-  function secFailures(st) {
-    const ids = connsOf(prodOf(st)).map((c) => c.id);
-    const list = failures().filter((f) => ids.indexOf(f.conn.id) > -1);
-    if (!list.length) return '';
-    return `
-      <section class="set2-sec" id="st-failures">
-        <div class="set2-sec-h"><h2 class="set2-sec-t">Failures</h2>
-          <span class="set2-sec-end set2-tally">
-            <span class="set2-num is-err"><b>${list.length}</b> run${list.length > 1 ? 's' : ''}</span>
-            <span class="set2-num is-err"><b>${list.reduce((a, f) => a + f.affected, 0).toLocaleString()}</b> records lost</span>
-          </span></div>
-        <div class="set2-fails">
-          ${list.map((f) => {
-            const [label, note] = FIXES[f.fix] || FIXES.retry;
-            return `
-            <div class="set2-fail">
-              <div class="set2-fail-hd">
-                <span class="set2-fail-w">${esc(f.conn.product)} <span class="set2-scope-s">&rsaquo;</span> ${esc(f.conn.crm)}</span>
-                <span class="set2-fail-when set2-from">${esc(f.when)}</span>
-                ${pill('is-err', f.code)}
-              </div>
-              <p class="set2-fail-why">${esc(f.why)}</p>
-              <p class="set2-fail-note">${esc(note)}</p>
-              <div class="set2-fail-ft">
-                <span class="set2-fail-n set2-num">${f.affected
-                  ? f.affected.toLocaleString() + ' records read then dropped'
-                  : 'Nothing was read'}</span>
-                ${f.runs > 1 ? `<span class="set2-from">${f.runs} runs in a row</span>` : ''}
-                <span class="set2-fail-do">
-                  <button class="btn btn-brand btn-sm" type="button"
-                    ${f.fix === 'mapping' ? `data-fail-go="${esc(f.conn.id)}"` : 'data-fail-fix'}>${esc(label)}</button>
-                </span>
-              </div>
-            </div>`;
-          }).join('')}
+  /* ── The failure, where the failure is ──
+
+     This was `secFailures`, a section of its own listing every broken run — and
+     it had been dead code since the runs table absorbed it. What the absorption
+     kept was the sentence; what it dropped was everything that made the
+     sentence actionable: which fix the CAUSE calls for, why that one and not
+     another, how many records went missing, and how many runs have failed the
+     same way in a row. The row inherited half a Failures section and a Retry
+     button that did nothing.
+
+     So the card comes back, per run, anchored to the row it is about. Same
+     markup it always had — `.set2-fail*` is styled for exactly this — with the
+     code as the panel's title, which is the one place somebody would copy it
+     from for a support ticket. It renders nothing when nothing is broken by
+     construction now: there is no trigger on a run that worked. */
+  function openFailPop(anchor, c, r) {
+    const f = r[5];
+    const [label, note] = FIXES[f.fix] || FIXES.retry;
+    const pop = popover(anchor, `
+      <div class="set2-fail" role="dialog" aria-label="Why the run failed">
+        <div class="set2-fail-hd">
+          <span class="set2-fail-w">${esc(c.product)} <span class="set2-scope-s">&rsaquo;</span> ${esc(c.crm)}</span>
+          <span class="set2-fail-when set2-from">${esc(r[0])}</span>
         </div>
-      </section>`;
+        ${pill('is-err', f.code || 'FAILED')}
+        <p class="set2-fail-why">${esc(f.why)}</p>
+        <p class="set2-fail-note">${esc(note)}</p>
+        <div class="set2-fail-ft">
+          <span class="set2-fail-n set2-num">${f.affected
+            ? f.affected.toLocaleString() + ' records read then dropped'
+            : 'Nothing was read'}</span>
+          ${f.runs > 1 ? `<span class="set2-from">${f.runs} runs in a row</span>` : ''}
+          <span class="set2-fail-do">
+            <button class="btn btn-brand btn-sm" type="button"
+              ${f.fix === 'mapping' ? `data-fail-go="${esc(c.id)}"` : 'data-fail-fix'}>${esc(label)}</button>
+          </span>
+        </div>
+      </div>`);
+    pop.classList.add('is-wide');
+    const btn = pop.querySelector('.btn');
+    if (btn) btn.focus();
+    return pop;
   }
 
   /* ── Knowledge enablement ══════════════════════════════════════════════
@@ -2497,39 +2518,63 @@
 
      Still one section per connector, because a product with two connectors has
      two endpoints and two secrets, and the frame's "per data source" says so. */
+  /* ── ONE SECTION, A GROUP PER CONNECTOR ──
+     This rendered a full section per connector -- heading, the same sentence,
+     the same blue note, then the two rows -- so a product with two connectors
+     read the identical paragraph twice, 300px apart, with only the word
+     "Zendesk" or "FreshDesk" changed. The frame has ONE heading over this,
+     and the frame is right: what differs between two connectors is two URLs
+     and two tokens, and that is all that should repeat. The connector name
+     becomes a sub-head over its own pair of rows; the spine still lands on
+     each group by id, so nothing it pointed at has moved out of reach.
+
+     THE SAVE SLEEPS. Four brand Save buttons sat on this page at rest, beside
+     fields nobody had touched -- more primary actions than the page has
+     primary acts, and none of them could say whether anything had changed.
+     Each is quiet and inert until its field differs from what is stored,
+     lights when it does, and goes back to quiet the moment it has saved. */
   M.apis = function (st) {
     if (!prodOf(st)) return '';
-    return connsOf(prodOf(st)).map((c, i) => {
-      const e = ENDPOINTS[c.id];
-      const sid = 'st-api-' + c.id;
-      if (!e) return '';
-      const last = e.last[0]
-        ? 'Last call: ' + e.last[0] + ' \u2014 ' + e.last[2]
-        : 'Never called \u2014 live, but nothing has reached it yet.';
-      return `
-      <section class="set2-sec" id="${sid}">
-        <div class="set2-sec-h"><h2 class="set2-sec-t">${esc(c.crm)} webhook settings</h2>
-          <span class="set2-sec-end">${pill(e.last[1], e.last[2])}</span></div>
-        <div class="set2-sub">Configure endpoints to activate the knowledge enrichment workflow for this data source.</div>
+    const list = connsOf(prodOf(st)).filter((c) => !!ENDPOINTS[c.id]);
+    if (!list.length) return '';
+    const one = list.length === 1;
+    const e0 = ENDPOINTS[list[0].id];
+    return `
+      <section class="set2-sec" id="st-webhooks">
+        <div class="set2-sec-h"><h2 class="set2-sec-t">Webhook settings</h2>
+          ${one ? `<span class="set2-sec-end">${pill(e0.last[1], e0.last[2])}</span>` : ''}</div>
+        <div class="set2-sub">Configure endpoints to activate the knowledge enrichment workflow for ${one ? 'this data source' : 'each data source'}.</div>
         <div class="set2-info" role="note">
           <span class="set2-info-i" aria-hidden="true">${I.info}</span>
           <span>These webhooks are called when knowledge enrichment is triggered from your side.</span>
         </div>
+        ${list.map((c, i) => whGroup(c, i, !one)).join('')}
+      </section>`;
+  };
 
+  function whGroup(c, i, named) {
+    const e = ENDPOINTS[c.id];
+    const last = e.last[0]
+      ? 'Last call: ' + e.last[0] + ' \u2014 ' + e.last[2]
+      : 'Never called \u2014 live, but nothing has reached it yet.';
+    return `
+      <div class="set2-wh-grp" id="st-api-${esc(c.id)}">
+        ${named ? `<div class="set2-wh-hd"><h3 class="set2-wh-t">${esc(c.crm)}</h3>${pill(e.last[1], e.last[2])}</div>` : ''}
         <div class="set2-wh">
           <div class="set2-wh-row">
             <label class="set2-wh-l" for="apUrl${i}">Webhook URL</label>
             <div class="set2-wh-c">
               <span class="set2-wh-f">
                 <input class="set2-fld set2-mono" id="apUrl${i}" value="${esc(e.url)}"
-                       spellcheck="false" autocomplete="off">
+                       spellcheck="false" autocomplete="off" data-wh-in="${esc(c.id)}:url">
                 <button class="set2-wh-help" type="button"
                         title="Where AiMY posts when enrichment runs for ${esc(c.crm)}"
                         aria-label="What this endpoint is for">${I.info}</button>
               </span>
               <button class="set2-wh-copy" type="button" data-copy="${esc(e.url)}"
                       aria-label="Copy the webhook URL">${I.copy}</button>
-              <button class="btn btn-brand btn-sm" type="button" data-wh-save="${esc(c.id)}:url">Save</button>
+              <button class="btn btn-ghost btn-sm set2-wh-save" type="button"
+                      data-wh-save="${esc(c.id)}:url" disabled>Save</button>
             </div>
             <div class="set2-wh-note">${esc(last)}</div>
           </div>
@@ -2539,30 +2584,26 @@
             <div class="set2-wh-c">
               <span class="set2-wh-f">
                 <input class="set2-fld set2-mono" id="apTok${i}" type="password" value="${esc(e.token)}"
-                       spellcheck="false" autocomplete="off">
-                <button class="set2-wh-help" type="button" data-reveal="apTok${i}"
+                       spellcheck="false" autocomplete="off" data-wh-in="${esc(c.id)}:token">
+                <button class="set2-wh-help" type="button" data-reveal="apTok${i}" aria-pressed="false"
                         title="Show the token" aria-label="Show the token">${I.eye}</button>
               </span>
               <button class="set2-wh-copy" type="button" data-copy="${esc(e.token)}"
                       aria-label="Copy the auth token">${I.copy}</button>
-              <button class="btn btn-brand btn-sm" type="button" data-wh-save="${esc(c.id)}:token">Save</button>
+              <button class="btn btn-ghost btn-sm set2-wh-save" type="button"
+                      data-wh-save="${esc(c.id)}:token" disabled>Save</button>
             </div>
-            ${/* Rotating is not saving. It invalidates every caller on the next
-                  request, so it keeps the confirmation it already had rather
-                  than hiding behind the Save beside it. */ ''}
-            ${/* "Rotate" is what the security world calls this and not what
-                  anyone else does. The action is generating a replacement, and
-                  the consequence -- the old one stops working -- is the whole
-                  reason it needs confirming, so the label says the act and the
-                  dialog says the cost. */ ''}
+            ${/* Generating a replacement is not saving. It invalidates every
+                  caller on their next request, so it keeps its confirmation.
+                  The link itself is quiet: the dialog states the cost, and a
+                  red link at rest on every connector was spending the alarm
+                  colour on a thing nobody had pressed. */ ''}
             <div class="set2-wh-note">Last changed ${esc(e.rotated[0])} by ${esc(e.rotated[1])}.
-              <button class="set2-lnk is-err" type="button" data-rotate>Generate a new token</button></div>
+              <button class="set2-lnk" type="button" data-rotate="${esc(c.id)}">Generate a new token</button></div>
           </div>
         </div>
-      </section>`;
-    }).join('');
-  };
-
+      </div>`;
+  }
 
   M.audit = () => `
     <section class="set2-sec">
@@ -2724,8 +2765,12 @@
      was already made before it opened. Picking a CRM key IS the decision, and
      it is a decision about one cell, so it belongs beside that cell.
      ═══════════════════════════════════════════════════════════════════════ */
+  /* What opened the panel, so Escape can put focus back on it. */
+  let POP_OPENER = null;
+
   function popover(anchor, html) {
     closePop();
+    POP_OPENER = anchor;
     const p = document.createElement('div');
     p.className = 'set2-pop';
     p.id = 'setPop';
@@ -2752,7 +2797,11 @@
     if (f) f.focus();
     return p;
   }
-  function closePop() { const p = document.getElementById('setPop'); if (p) p.remove(); }
+  function closePop() {
+    const p = document.getElementById('setPop');
+    if (p) p.remove();
+    POP_OPENER = null;
+  }
 
   /* `openSegPicker` stood here — the level-by-level walk through the schema.
      `openPathPicker` replaced it: one search over every leaf, with the values
@@ -2798,7 +2847,6 @@
     host.innerHTML = MODAL === 'new' ? newSkillModal()
                    : MODAL === 'upload' ? uploadModal()
                    : MODAL.kind === 'preview' ? previewModal(MODAL.c)
-                   : MODAL === 'adduser' ? addUserModal()
                    : MODAL.kind === 'rmpeople' ? removePeopleModal(MODAL)
                    : MODAL.kind === 'rotate' ? rotateModal(MODAL)
                    : deleteModal(MODAL);
@@ -2863,80 +2911,79 @@
      `--- ` Anyone still holding a grant is called out separately: removing a
      person with live access takes the access with them, and that is the part
      nobody reads the count for. */
-  /* ── Adding somebody ──
+  /* ── Inviting somebody ──
      EMAIL AND NOTHING ELSE. The form asked for full name and job title as
      well, which is asking a person to type what the directory already knows
      and will overwrite — two fields that can only be entered wrong. The
-     address is the one fact the adder actually has.
+     address is the one fact the inviter actually has.
 
      Several at once, because adding a team is the common case and doing it one
-     modal at a time is the same decision six times. Role and scope apply to
-     all of them: a batch you are adding together almost always shares one, and
-     the card can still differ afterwards.
+     at a time is the same decision six times.
 
-     Role and scope stay OPTIONAL and say why they are here. Adding somebody
-     ahead of a decision about their access is real; adding them and forgetting
-     is what this form is trying to prevent. */
-  const NEWU = { mails: [], draft: '', role: '', scope: '' };
+     ── INLINE, NOT A MODAL ──
+     It was a button in the section head that opened a dialog: addresses, then
+     an optional role, then an optional scope. Three decisions to get one
+     address in, and the two optional ones were the very act the card offers a
+     moment later with "+ Grant a role" — so the dialog asked for the same
+     thing twice, once blind and once in place. The frame puts one field at the
+     top of the list with a Send beside it, and the frame is right: the field
+     takes addresses, Enter or a comma adds another, Send does the lot, and the
+     roles are granted where the person is.
+
+     `bad` is set only when a commit is ATTEMPTED on something that is not an
+     address. Flagging the draft as wrong while it is still being typed marks
+     every address wrong for its first eight characters. */
+  const NEWU = { mails: [], draft: '', bad: false };
   const MAIL_RE = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/;
 
-  function addUserModal() {
+  function inviteBar() {
     const n = NEWU.mails.length;
-    const draftOk = MAIL_RE.test(NEWU.draft.trim());
-    const ready = n > 0 || draftOk;
+    const draft = NEWU.draft.trim();
+    const draftOk = MAIL_RE.test(draft);
+    const total = n + (draftOk ? 1 : 0);
     return `
-      <div class="set2-scrim" data-scrim>
-        <div class="set2-modal" role="dialog" aria-modal="true" aria-labelledby="auT">
-          <div class="set2-modal-hd">
-            <h2 class="set2-modal-t" id="auT">Add ${n > 1 ? n + ' people' : 'a user'}</h2>
-            <button class="set2-modal-x" type="button" data-close aria-label="Close">${I.x}</button>
-          </div>
-          <div class="set2-modal-bd">
-            <div class="set2-field">
-              <label class="set2-lbl" for="auMail">Email addresses</label>
-              <div class="set2-tags${draftOk || !NEWU.draft ? '' : ' is-bad'}">
-                ${NEWU.mails.map((m, i) => `
-                  <span class="set2-chip is-scope">${esc(m)}
-                    <button class="set2-chip-x" type="button" data-au-rm="${i}"
-                            aria-label="Remove ${esc(m)}">${I.x}</button>
-                  </span>`).join('')}
-                <input class="set2-tags-i" id="auMail" type="email" data-au-mail
-                       value="${esc(NEWU.draft)}" autocomplete="off"
-                       placeholder="${n ? 'and another\u2026' : 'name@company.com'}">
-              </div>
-              <div class="set2-hint">${NEWU.draft && !draftOk
-                ? '<b class="is-err">' + esc(NEWU.draft) + '</b> is not an email address.'
-                : 'Enter or a comma adds another. Their name and job title come from your directory \u2014 nothing to type twice.'}</div>
-            </div>
-
-            <div class="set2-note" style="margin:1.25rem 0 0.75rem">An account with no role can sign in and reach nothing. Granting one now saves finding them again later.</div>
-            <div class="set2-field">
-              <label class="set2-lbl" for="auRole">Role <span class="set2-from">optional</span></label>
-              <select class="set2-fld set2-fld-s" id="auRole" data-au="role">
-                <option value="">No role yet</option>
-                ${ROLES.map((r) => `<option${r[0] === NEWU.role ? ' selected' : ''}>${esc(r[0])}</option>`).join('')}
-              </select>
-            </div>
-            ${NEWU.role ? `
-            <div class="set2-field">
-              <label class="set2-lbl" for="auScope">On</label>
-              <select class="set2-fld set2-fld-s" id="auScope" data-au="scope">
-                <option value="">Choose a scope\u2026</option>
-                ${SCOPE_TYPES.map((t) => `<optgroup label="${esc(t)}">${
-                  nodesOfType(t).map((v) => `<option${v === NEWU.scope ? ' selected' : ''}>${esc(v)}</option>`).join('')}</optgroup>`).join('')}
-              </select>
-              <div class="set2-hint">${NEWU.scope
-                ? esc(NEWU.role) + ' on ' + esc(NEWU.scope) + ' for ' + (n > 1 ? 'all ' + n : 'them') + ', from the moment they accept.'
-                : 'A role with no scope reaches nothing, same as no role at all.'}</div>
-            </div>` : ''}
-          </div>
-          <div class="set2-modal-ft">
-            <button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button>
-            <button class="btn btn-brand btn-sm" type="button" data-au-go${ready ? '' : ' disabled'}>Add${
-              n > 1 ? ' all ' + n : ''}</button>
-          </div>
+      <div class="set2-invite" data-invite>
+        <div class="set2-tags set2-invite-f${NEWU.bad ? ' is-bad' : ''}">
+          ${NEWU.mails.map((m, i) => `
+            <span class="set2-chip is-scope">${esc(m)}
+              <button class="set2-chip-x" type="button" data-au-rm="${i}"
+                      aria-label="Remove ${esc(m)}">${I.x}</button>
+            </span>`).join('')}
+          ${/* `type="text"`, not `email`: an email input refuses
+                `setSelectionRange`, which is how the caret is put back after
+                the bar repaints. `inputmode` still brings up the @ keyboard. */ ''}
+          <input class="set2-tags-i" type="text" inputmode="email" data-au-mail
+                 value="${esc(NEWU.draft)}" autocomplete="off" spellcheck="false" autocapitalize="off"
+                 aria-label="Email addresses to invite"
+                 placeholder="${n ? 'and another\u2026' : 'Type email addresses to invite \u2014 Enter adds another'}">
         </div>
+        <button class="btn btn-brand btn-sm set2-invite-go" type="button" data-au-go${total ? '' : ' disabled'}>
+          Send invite${total > 1 ? 's' : ''}</button>
+        ${NEWU.bad
+          ? `<div class="set2-hint set2-invite-h"><b class="is-err">${esc(draft)}</b> is not an email address.</div>` : ''}
       </div>`;
+  }
+
+  /* The bar repaints itself in place. A full render on every chip would
+     rebuild the page under the field being typed into and take the caret with
+     it. */
+  function repaintInvite() {
+    const el = $('[data-invite]');
+    if (!el) return;
+    el.outerHTML = inviteBar();
+    const f = $('[data-au-mail]');
+    if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
+  }
+
+  /* One address in, whichever key put it there. */
+  function commitMail() {
+    const t = NEWU.draft.trim();
+    if (!t) return false;
+    if (!MAIL_RE.test(t)) { NEWU.bad = true; repaintInvite(); return false; }
+    if (NEWU.mails.indexOf(t) < 0) NEWU.mails.push(t);
+    NEWU.draft = ''; NEWU.bad = false;
+    repaintInvite();
+    return true;
   }
 
   /* Until the directory answers, the name is the address made readable —
@@ -3388,29 +3435,33 @@
     },
 
     /* Enablement is a switchboard and then the endpoints those switches fire
-       at. Two connectors means two endpoints, so the spine is as long as the
-       page is -- it is not a fixed list dressed up as one. */
+       at. The spine indexes the page's two SECTIONS, not one entry per
+       connector: the webhooks became one section with a group per connector,
+       and on a page this short a third entry could never become current --
+       there is not enough scroll below it to bring its heading to the line,
+       so it stood in the map as a place you could not arrive at. The worst
+       endpoint outcome is what you need from across the page, and it is what
+       the one entry reports. */
     enable: (st) => {
       if (!prodOf(st)) return null;
       const on = ENABLE.filter((e) => e.on).length;
-      return [{ id: 'enrichment', name: 'Enrichment',
-                note: on + ' of ' + ENABLE.length + ' on',
-                s: on ? 'ok' : 'warn' }]
-        .concat(connsOf(prodOf(st)).map((c) => {
-          /* `last` is [when, pillClass, label, extra] -- an empty first slot
-             means the endpoint is live and nothing has reached it yet, which
-             is a real state and not a failure. */
-          /* `last` is [when, pillClass, outcome, ms]. The OUTCOME goes in the
-             spine -- "401 Unauthorised" is what you need from across the page;
-             "26 Jul 2026, 09:02" is a timestamp you can only use once you have
-             already arrived. */
-          const e = ENDPOINTS[c.id];
-          const cls = e && e.last && e.last[1];
-          return { id: 'api-' + c.id, name: c.crm,
-                   note: (e && e.last && e.last[2]) || 'never called',
-                   s: cls === 'is-err' ? 'err' : cls === 'is-warn' ? 'warn'
-                    : cls === 'is-ok' ? 'ok' : '' };
-        }));
+      const list = connsOf(prodOf(st)).filter((c) => !!ENDPOINTS[c.id]);
+      /* `last` is [when, pillClass, outcome, ms] -- an empty first slot means
+         the endpoint is live and nothing has reached it yet, which is a real
+         state and not a failure. */
+      const cls = (c) => ENDPOINTS[c.id].last[1];
+      const bad = list.filter((c) => cls(c) === 'is-err').length;
+      const warn = list.filter((c) => cls(c) === 'is-warn').length;
+      return [
+        { id: 'enrichment', name: 'Enrichment',
+          note: on + ' of ' + ENABLE.length + ' on',
+          s: on ? 'ok' : 'warn' },
+        { id: 'webhooks', name: 'Webhooks',
+          note: bad ? bad + ' endpoint' + (bad > 1 ? 's' : '') + ' down'
+              : list.length === 1 ? (ENDPOINTS[list[0].id].last[2] || 'never called')
+              : list.length + ' endpoints live',
+          s: bad ? 'err' : warn ? 'warn' : list.length ? 'ok' : '' }
+      ];
     },
 
     /* Only the DETAIL. The skills list is one table under one heading -- a
@@ -3829,21 +3880,33 @@
        this writes the value and says so on the row it belongs to. */
     const whs = e.target.closest('[data-wh-save]');
     if (whs) {
-      const [cid, which] = whs.getAttribute('data-wh-save').split(':');
+      const key = whs.getAttribute('data-wh-save');
+      const [cid, which] = key.split(':');
       const ep = ENDPOINTS[cid];
-      const box = $('#' + (which === 'url' ? 'apUrl' : 'apTok')
-        + connsOf(prodOf(st)).findIndex((x) => x.id === cid));
+      const box = $('[data-wh-in="' + key + '"]');
       if (ep && box) {
-        if (which === 'url') ep.url = box.value.trim(); else ep.token = box.value.trim();
-        whs.textContent = 'Saved';
-        setTimeout(() => { const b = $('[data-wh-save="' + cid + ':' + which + '"]');
-                           if (b) b.textContent = 'Save'; }, 1600);
+        const v = box.value.trim();
+        if (!v) return;
+        if (which === 'url') ep.url = v; else ep.token = v;
+        box.value = v;
+        /* Back to rest: quiet, inert, and saying what just happened. */
+        whs.classList.remove('is-dirty'); whs.disabled = true; whs.textContent = 'Saved';
+        setTimeout(() => { const b = $('[data-wh-save="' + key + '"]');
+                           if (b && b.disabled) b.textContent = 'Save'; }, 1600);
       }
       return;
     }
 
-    const rtry = e.target.closest('[data-retry]');
-    if (rtry) { return; }
+    /* Was `[data-retry]`, and its whole body was `return` — a button that
+       rendered on every failed row and did nothing when pressed. */
+    const why = e.target.closest('[data-why]');
+    if (why) {
+      const [cid, i] = why.getAttribute('data-why').split('|');
+      const c = connById(cid);
+      const r = c && c.runs[+i];
+      if (r && r[5]) openFailPop(why, c, r);
+      return;
+    }
 
     const cadd = e.target.closest('[data-crit-add]');
     if (cadd) { openCritPicker(cadd, primaryOf(st)); return; }
@@ -4013,30 +4076,41 @@
       return;
     }
 
-    /* ── Adding somebody ── */
-    if (e.target.closest('[data-add-user]')) {
-      NEWU.mails = []; NEWU.draft = ''; NEWU.role = ''; NEWU.scope = '';
-      MODAL = 'adduser'; paintModal(); return;
-    }
+    /* ── Inviting somebody ── */
     const auRm = e.target.closest('[data-au-rm]');
-    if (auRm) { NEWU.mails.splice(+auRm.getAttribute('data-au-rm'), 1); paintModal(); return; }
+    if (auRm) { NEWU.mails.splice(+auRm.getAttribute('data-au-rm'), 1); repaintInvite(); return; }
 
     if (e.target.closest('[data-au-go]')) {
       /* Whatever is still in the box counts — nobody should lose the address
-         they just typed because they pressed the button instead of Enter. */
+         they just typed because they pressed the button instead of Enter. And
+         a draft that is NOT an address stops the send rather than being
+         dropped on the floor: silently inviting two of three is the kind of
+         partial success nobody notices until the third person asks. */
+      if (NEWU.draft.trim() && !commitMail()) return;
       const all = NEWU.mails.slice();
-      if (MAIL_RE.test(NEWU.draft.trim())) all.push(NEWU.draft.trim());
-      const scopeType = SCOPE_TYPES.filter((t) => nodesOfType(t).indexOf(NEWU.scope) > -1)[0];
+      if (!all.length) return;
       all.forEach((mail, i) => {
         PEOPLE.push({
           id: 'p' + (Date.now() % 100000) + i,
           name: nameFromMail(mail), mail: mail,
           title: 'From your directory',
           s: ['is-warn', 'Invite pending'],
-          grants: (NEWU.role && scopeType) ? [{ r: NEWU.role, t: scopeType, v: [NEWU.scope] }] : []
+          grants: []
         });
       });
-      DIRTY.add('people'); closeModal(); render(); return;
+      NEWU.mails = []; NEWU.draft = ''; NEWU.bad = false;
+      DIRTY.add('people'); render();
+      /* The card arriving with its Pending pill is the real confirmation; the
+         button says so too, under the cursor, and the field is ready for the
+         next batch. */
+      const go = $('[data-au-go]');
+      if (go) {
+        go.textContent = all.length > 1 ? 'Sent ' + all.length + ' invites' : 'Invite sent';
+        setTimeout(() => { const b = $('[data-au-go]');
+                           if (b && b.disabled) b.textContent = 'Send invite'; }, 1800);
+      }
+      const f = $('[data-au-mail]'); if (f) f.focus();
+      return;
     }
 
     /* ── Filters ── */
@@ -4075,7 +4149,7 @@
         sec.scrollIntoView({ behavior: quiet ? 'auto' : 'smooth', block: 'start' });
         /* Send focus where the eye went. Without this the jump is visual only
            and the next Tab resumes from the spine, which is behind you now. */
-        const h = sec.querySelector('h2');
+        const h = sec.querySelector('h2, h3');
         if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
       }
       return;
@@ -4167,7 +4241,12 @@
       const f = document.getElementById(rev.dataset.reveal);
       const shown = f.type === 'text';
       f.type = shown ? 'password' : 'text';
-      rev.textContent = shown ? 'Reveal' : 'Hide';
+      /* The glyph stays and the label flips. Writing a word into the button
+         replaced the eye with the text "Hide" and widened the control. */
+      rev.setAttribute('aria-pressed', String(!shown));
+      rev.setAttribute('aria-label', shown ? 'Show the token' : 'Hide the token');
+      rev.title = shown ? 'Show the token' : 'Hide the token';
+      rev.classList.toggle('is-on', !shown);
       return;
     }
     /* ── RUN SYNC ──
@@ -4250,9 +4329,12 @@
       return;
     }
 
-    if (e.target.closest('[data-rotate]')) {
-      const st0 = readURL();
-      MODAL = { kind: 'rotate', crm: (crmOf(st0) || {}).crm || 'this' };
+    const rot = e.target.closest('[data-rotate]');
+    if (rot) {
+      /* Named from the row that was pressed, not from the Fields picker --
+         with two connectors on the page those are different CRMs. */
+      const c0 = connById(rot.getAttribute('data-rotate')) || crmOf(readURL());
+      MODAL = { kind: 'rotate', crm: (c0 || {}).crm || 'this' };
       paintModal(); return;
     }
     if (e.target.closest('[data-rotate-go]')) { closeModal(); return; }
@@ -4284,18 +4366,26 @@
     const auM = e.target.closest('[data-au-mail]');
     if (auM) {
       if (auM.value.indexOf(',') > -1) {
+        /* A pasted list: every valid address becomes a chip, and whatever did
+           not parse stays in the box to be looked at rather than vanishing. */
+        const rest = [];
         auM.value.split(',').forEach((part) => {
           const t = part.trim();
-          if (MAIL_RE.test(t) && NEWU.mails.indexOf(t) < 0) NEWU.mails.push(t);
+          if (!t) return;
+          if (MAIL_RE.test(t)) { if (NEWU.mails.indexOf(t) < 0) NEWU.mails.push(t); }
+          else rest.push(t);
         });
-        NEWU.draft = '';
-        paintModal();
-        const f = $('[data-au-mail]'); if (f) f.focus();
+        NEWU.draft = rest.join(', ');
+        NEWU.bad = false;
+        repaintInvite();
         return;
       }
       NEWU.draft = auM.value;
+      /* Typing retracts the complaint: it was about the previous attempt. */
+      if (NEWU.bad) { NEWU.bad = false; repaintInvite(); return; }
       const go = $('[data-au-go]');
-      if (go) go.disabled = !(NEWU.mails.length || MAIL_RE.test(NEWU.draft.trim()));
+      if (go) { go.disabled = !(NEWU.mails.length || MAIL_RE.test(NEWU.draft.trim()));
+                go.textContent = 'Send invite' + (NEWU.mails.length + (MAIL_RE.test(NEWU.draft.trim()) ? 1 : 0) > 1 ? 's' : ''); }
       return;
     }
 
@@ -4380,6 +4470,22 @@
 
        One call to `wouldDelete(r)`, one sentence, written by the same code
        that renders it — so the row and the dialog cannot drift again. */
+    /* A credential field wakes its own Save, and only its own, and only when
+       the value actually differs from what is stored. Clearing the field puts
+       the button back to sleep: an empty endpoint is not a setting. */
+    const whi = e.target.closest('[data-wh-in]');
+    if (whi) {
+      const key = whi.getAttribute('data-wh-in');
+      const [cid, which] = key.split(':');
+      const ep = ENDPOINTS[cid];
+      const b = $('[data-wh-save="' + key + '"]');
+      if (ep && b) {
+        const v = whi.value.trim();
+        const dirty = !!v && v !== (which === 'url' ? ep.url : ep.token);
+        b.disabled = !dirty; b.classList.toggle('is-dirty', dirty); b.textContent = 'Save';
+      }
+      return;
+    }
     const ret = e.target.closest('[data-ret]');
     if (ret) {
       const r = RETENTION.filter((x) => x.id === ret.dataset.ret)[0];
@@ -4457,13 +4563,6 @@
   });
 
   document.addEventListener('change', (e) => {
-    const auS = e.target.closest('[data-au]');
-    if (auS && (auS.getAttribute('data-au') === 'role' || auS.getAttribute('data-au') === 'scope')) {
-      NEWU[auS.getAttribute('data-au')] = auS.value;
-      if (auS.getAttribute('data-au') === 'role') NEWU.scope = '';
-      paintModal(); return;
-    }
-
     const fs = e.target.closest('[data-f]');
     if (fs) { const st = readURL();
       patch({ f: withF(st, fs.getAttribute('data-f'), fs.value) }); return; }
@@ -4518,19 +4617,36 @@
        form — the common case is a second address, not the end of the task. */
     if (e.key === 'Enter' && e.target.closest && e.target.closest('[data-au-mail]')) {
       e.preventDefault();
-      const t = (e.target.value || '').trim();
-      if (MAIL_RE.test(t) && NEWU.mails.indexOf(t) < 0) {
-        NEWU.mails.push(t); NEWU.draft = ''; paintModal();
-        const f = $('[data-au-mail]'); if (f) f.focus();
-      }
+      NEWU.draft = e.target.value || '';
+      /* Enter on an empty box with chips waiting is the end of the list, so
+         it sends — the same Enter that added them finishes the job. */
+      if (!NEWU.draft.trim() && NEWU.mails.length) { const go = $('[data-au-go]'); if (go) go.click(); return; }
+      commitMail();
       return;
     }
     /* Backspace on an empty box takes the last chip back. */
     if (e.key === 'Backspace' && e.target.closest && e.target.closest('[data-au-mail]')
         && !e.target.value && NEWU.mails.length) {
-      NEWU.mails.pop(); paintModal();
-      const f = $('[data-au-mail]'); if (f) f.focus();
+      NEWU.mails.pop(); repaintInvite();
       return;
+    }
+    /* A credential field commits on Enter and reverts on Escape, so the
+       common case never has to leave the keyboard for the Save beside it. */
+    const whIn = e.target.closest && e.target.closest('[data-wh-in]');
+    if (whIn) {
+      const key = whIn.getAttribute('data-wh-in');
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const b = $('[data-wh-save="' + key + '"]'); if (b && !b.disabled) b.click();
+        return;
+      }
+      if (e.key === 'Escape') {
+        const [cid, which] = key.split(':');
+        const ep = ENDPOINTS[cid];
+        if (ep) { whIn.value = which === 'url' ? ep.url : ep.token;
+                  whIn.dispatchEvent(new Event('input', { bubbles: true })); }
+        return;
+      }
     }
 
     /* The modal is the only layer this file still owns. It is unambiguously the
@@ -4538,6 +4654,22 @@
        canvas under it, so it does not need a place in the console's ladder —
        it just has to answer first, and registering later achieves that. */
     if (e.key === 'Escape' && MODAL) { closeModal(); return; }
+    /* ── A panel you can open with the keyboard, you can leave with it ──
+
+       The popover is dismissed by a mousedown anywhere else, which is the whole
+       story for a pointer and none of it for a keyboard. It matters here more
+       than for the pickers: this one moves focus to its action button on open,
+       so without Escape somebody who pressed "Why it failed" is standing inside
+       a panel with no key that gets them out of it.
+
+       Focus goes back to what opened it. Returning it to the body would drop a
+       reader at the top of the page they were already halfway down. */
+    if (e.key === 'Escape' && document.getElementById('setPop')) {
+      const back = POP_OPENER;
+      closePop();
+      if (back && document.contains(back)) back.focus();
+      return;
+    }
     const node = e.target.closest && e.target.closest('[data-node]');
     if (!node) return;
     const tree = node.closest('[role="tree"]');

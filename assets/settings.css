@@ -603,22 +603,71 @@ kbd {
 
 /* ══ RUNS ════════════════════════════════════════════════════════════════ */
 
-.set2-runs { display: flex; flex-direction: column; gap: 0.125rem; }
+/* ── The history was one dense block, at every scale at once ──
+
+   2px between rows, 8px of padding inside them, 4px between the chips and 4px
+   under them to the failure reason — four different gaps, none of them large
+   enough to separate anything from anything else. A failed run's code, its
+   reason, its chips and the row below it all sat inside the same 8px band, so
+   the eye had no way to tell which of those belonged together.
+
+   The numbers are now on one ladder rather than picked per property: 6px
+   between rows, 8px between chips, 12px inside the row vertically, 16px in
+   from the edges, 20px between columns. Each step is meaningfully bigger than
+   the one below it, which is what makes a gap read as a level. */
+.set2-runs { display: flex; flex-direction: column; gap: 0.375rem; }
 .set2-run {
-  display: grid; grid-template-columns: 7.5rem 1fr auto auto;
-  gap: 0.75rem; align-items: center;
-  padding: 0.5rem 0.875rem; background: var(--card-bg); border-radius: var(--r-md);
+  /* ── The date column was 120px for 77px of date ──
+
+     43px of dead space in the narrowest column on the page, paid for by the
+     one column that actually runs out: widening the chips pushed a run's third
+     criterion onto a second line while a fifth of the row sat empty to its
+     left. 88px fits the longest date here with room, and the 32px it gives
+     back goes where the content is. */
+  display: grid; grid-template-columns: 5.5rem 1fr auto auto;
+  gap: 1rem; align-items: center;
+  padding: 0.75rem 1rem; background: var(--card-bg); border-radius: var(--r-md);
   font-size: var(--ty-micro);
 }
-.set2-run:first-child { border-radius: var(--r-lg) var(--r-lg) var(--r-md) var(--r-md); }
-.set2-run:last-child  { border-radius: var(--r-md) var(--r-md) var(--r-lg) var(--r-lg); }
+/* ── One radius, because these are cards now ──
+
+   The rounder outer corners were the treatment for a LIST: rows a hairline
+   apart, shaped so the stack reads as one table with a top and a bottom. At a
+   gap you can actually see, every row is its own card and two of them being a
+   different shape from the other four is just an inconsistency. */
 .set2-run-when { color: var(--ink-quiet); }
-.set2-run-crit { display: flex; gap: 0.25rem; flex-wrap: wrap; min-width: 0; }
+/* Both axes. The row gap was inherited from the 4px column gap, so criteria
+   wrapping to a second line — which is what every failed run does — put the
+   two lines closer together than the chips on either line. */
+.set2-run-crit { display: flex; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+/* A chip whose text is "Status: Closed" needs room around the words to read as
+   one object. Scoped to the run rows: the criteria builder above uses the same
+   chip as an editable control with its own hit-target rules, and widening
+   those is a different decision nobody asked for. */
+.set2-run .set2-chip { padding: 0.25rem 0.5rem; }
 .set2-run-n { color: var(--ink-secondary); text-align: right; }
 /* The run's outcome, last in the row. It is a grid cell wrapping a pill, so it
    says only that the pill keeps its own width instead of stretching to the
    column — but it says it, rather than being a class with no rule anywhere. */
-.set2-run-st { justify-self: end; display: flex; align-items: center; }
+/* ── The outcome, and the way into it ──
+
+   The pill says a run failed; the button under it says why. Stacked rather
+   than side by side because they are not peers — one is the state, the other
+   is a route out of it — and because side by side they pushed the criteria
+   column into wrapping on exactly the rows that had the most to say. */
+.set2-run-st {
+  justify-self: end; display: flex; flex-direction: column;
+  align-items: flex-end; gap: 0.375rem;
+}
+/* ── One height for every row ──
+
+   The point of taking the reason off the row was the rhythm: a table read by
+   scanning cannot have two row heights, one for runs that worked and one for
+   runs that did not. The failed rows are now the taller of the two by the
+   height of one small button, so the height they need becomes the height they
+   all get. 15px of air on a succeeded row is not waste — it is the succeeded
+   row agreeing to be the same shape as its neighbour. */
+.set2-run:not(.set2-run-hd) { min-height: 4.25rem; }
 .set2-fld-n { width: 5rem; flex: 0 0 auto; text-align: right; }
 /* ══ POPOVER ═════════════════════════════════════════════════════════════
    Anchored beside the cell it changes. GAPS 22 and 25 note the library has one
@@ -773,7 +822,14 @@ kbd {
    and what it cost — and a row of cells makes the reason the narrowest column
    on the page when it is the only one anybody reads.
    ══════════════════════════════════════════════════════════════════════════ */
-.set2-fails { display: flex; flex-direction: column; gap: 0.625rem; }
+/* ── The failure card, now anchored rather than listed ──
+
+   It rendered in a `.set2-fails` column in a section of its own. That section
+   is gone — a run's failure belongs on the run — so the card is what the
+   popout holds, one at a time. The rules below are unchanged; the two that
+   follow the block strip the chrome it no longer needs, because inside a
+   popover the panel already IS the bordered surface and drawing a second
+   border inside the first is just a line. */
 .set2-fail {
   border: 0.0625rem solid var(--err-line);
   background: var(--err-bg);
@@ -801,6 +857,21 @@ kbd {
   margin: 0.25rem 0 0; font-size: var(--ty-micro); color: var(--ink-faint);
   line-height: var(--lh-snug); max-width: 52ch;
 }
+/* Inside the popout the card is the content, not a surface of its own: the
+   popover already drew the border, the radius and — importantly — the opaque
+   ground. The card keeps none of the three.
+
+   It kept the error TINT for one build, and the tint was `--err-bg`, which is
+   a 12% red. Setting it as the panel's background replaced an opaque
+   `--card-bg-raised` with something 88% see-through, so the rows underneath
+   read straight through the explanation sitting on top of them. A panel is a
+   surface. The red pill and the red records-lost line carry the state, which
+   is what "one red per failed row" asks for anyway. */
+.set2-pop .set2-fail { border: 0; background: none; border-radius: 0; }
+/* The code, under the header rather than jammed into it. In the row it led the
+   line and pushed the first readable word 22 characters in; here it is a label
+   on the panel that names it, which is the one place somebody copies it from. */
+.set2-pop .set2-fail > .set2-pill { margin-top: 0.5rem; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    USER & ACCESS
@@ -2027,27 +2098,27 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 .set2-run-hd {
   background: none; font-size: var(--ty-micro); color: var(--ink-faint);
   letter-spacing: var(--ls-wide); text-transform: uppercase;
-  padding-bottom: 0.375rem;
-}
-.set2-run-hd:first-child { border-radius: 0; }
-/* A failed run keeps its reason on the row rather than in a section of its
-   own. */
-.set2-run-why {
-  display: block; width: 100%; margin-top: 0.25rem;
-  font-size: var(--ty-micro); color: var(--ink-err);
+  /* The head is a label for the column, not the first row of it. At 6px it was
+     closer to the run below than that run was to its own contents. */
+  padding: 0 1rem 0.625rem;
+  /* Same track as the rows it labels. */
 }
 /* No row tint. The frame keeps a failed run on the same ground as every other
-   and lets the pill and the reason carry the state -- and washing the row red
-   dropped the chips sitting on it below the contrast floor, which is the
-   failure state costing legibility exactly where it is needed. */
-.set2-retry {
+   and lets the pill carry the state -- and washing the row red dropped the
+   chips sitting on it below the contrast floor, which is the failure state
+   costing legibility exactly where it is needed. */
+/* Was `.set2-retry`, which was underlined in error red and sat beside the
+   pill. Two red things touching read as one alarm; this is the quiet half of
+   the pair — the pill carries the state, and this only offers to explain it. */
+.set2-why {
   appearance: none; border: 0; background: none; cursor: pointer; font: inherit;
-  font-size: var(--ty-micro); color: var(--ink-err);
-  text-decoration: underline; text-underline-offset: 0.125rem;
-  min-height: 1.75rem; padding: 0 0.25rem;
+  font-size: var(--ty-micro); color: var(--ink-quiet); white-space: nowrap;
+  text-decoration: underline; text-decoration-color: var(--ink-rule);
+  text-underline-offset: 0.125rem;
+  padding: 0;
 }
-.set2-retry:hover { color: var(--ink-primary); }
-.set2-retry:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+.set2-why:hover { color: var(--ink-primary); text-decoration-color: currentColor; }
+.set2-why:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; border-radius: var(--r-xs); }
 
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -2334,10 +2405,102 @@ body.is-settings .set2-key { font-size: var(--ty-meta); }
 /* The parent's name is the part that tells two stacked add rows apart. */
 .set2-map-add b { color: var(--ink-quiet); font-weight: var(--fw-semibold); }
 
-/* A failed run has more to say than a successful one, so its row is taller —
-   but bounded. Unclamped, three lines of reason put a 100px row next to a 31px
-   one and the table lost its rhythm entirely. */
-.set2-run-why {
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   INVITE, INLINE
+
+   The frame's shape: one field across the top of the list, a Send beside it.
+   It reuses the address box the modal had -- chips grow inside the field and
+   the caret stays where typing happens -- and the button stretches to the
+   field's height so the two read as one control, not a box with a button
+   parked next to it.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-invite {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.375rem 0.5rem; align-items: stretch;
+  margin-bottom: 0.875rem;
+}
+.set2-invite-f { min-height: 2.375rem; }
+.set2-invite-go { white-space: nowrap; align-self: stretch; }
+.set2-invite-h { grid-column: 1 / -1; margin-top: 0; }
+@media (max-width: 46rem) {
+  .set2-invite { grid-template-columns: minmax(0, 1fr); }
+  .set2-invite-go { justify-self: start; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ROW ACTIONS COME FORWARD ON APPROACH
+
+   Every mapping row carried a plus, an Advanced and a bin at full time -- on
+   eight rows, twenty-four controls standing in a column beside the data they
+   act on, so the actions read as a second table. The two that CHANGE the
+   structure step out of sight until the row is approached by pointer or by
+   keyboard; Advanced, which only discloses, stays where it was. Nothing is
+   removed from the tab order, and a touch screen, which has no hover to
+   approach with, keeps them visible.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-map-row .set2-map-plus,
+.set2-map-row .set2-x {
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out),
+              background var(--t-fast) var(--ease-out);
+}
+.set2-map-row:hover .set2-map-plus, .set2-map-row:focus-within .set2-map-plus,
+.set2-map-row:hover .set2-x,        .set2-map-row:focus-within .set2-x { opacity: 1; }
+@media (hover: none) {
+  .set2-map-row .set2-map-plus, .set2-map-row .set2-x { opacity: 1; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ONE RED PER FAILED ROW
+
+   A failed run painted its code, its reason, its pill and its Retry all in the
+   error colour -- four alarms on one row, three rows deep, so the history read
+   as an incident board rather than a log with three failures in it. Only the
+   pill is red now, because it is the only one of the four still on the row:
+   the code and the reason moved into the panel, and the link that opens it is
+   deliberately the quiet half of the pair.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   WEBHOOKS: ONE SECTION, A GROUP PER CONNECTOR, A SAVE THAT SLEEPS
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-wh-grp + .set2-wh-grp {
+  margin-top: 1.5rem; padding-top: 1.375rem;
+  border-top: 0.0625rem solid var(--hairline);
+}
+.set2-wh-hd { display: flex; align-items: center; gap: 0.625rem; margin-bottom: 0.875rem; }
+.set2-wh-t {
+  margin: 0; font-size: var(--ty-meta); font-weight: var(--fw-semibold);
+  color: var(--ink-primary); letter-spacing: var(--ls-tight);
+}
+/* Asleep: legible, plainly inert. The library's 0.38 made "Saved" unreadable
+   in the second it is shown. */
+.set2-col .set2-wh-save:disabled { opacity: 0.55; cursor: default; }
+/* Awake: the one primary action for the field that changed, and only that
+   field. */
+.set2-col .set2-wh-save.is-dirty {
+  background: var(--brand); color: #fff; border-color: var(--brand); opacity: 1;
+}
+.set2-col .set2-wh-save.is-dirty:hover { background: #4d7fff; border-color: #4d7fff; color: #fff; }
+.set2-wh-help.is-on { color: var(--ink-primary); }
+.set2-wh-note .set2-lnk {
+  color: var(--ink-quiet);
+  text-decoration: underline; text-underline-offset: 0.125rem;
+  text-decoration-color: var(--ink-rule);
+}
+.set2-wh-note .set2-lnk:hover { color: var(--ink-err); text-decoration-color: currentColor; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PRESS FEEDBACK
+
+   The library's buttons change colour on hover and nothing on press. One
+   pixel down on the click is the whole of the physical cue, and it stays off
+   disabled controls, which have nothing to press.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-col .btn:active:not(:disabled),
+.set2-scrim .btn:active:not(:disabled),
+.set2-invite-go:active:not(:disabled) { transform: translateY(0.0625rem); }
+@media (prefers-reduced-motion: reduce) {
+  .set2-map-row .set2-map-plus, .set2-map-row .set2-x { transition-duration: 0.01ms !important; }
 }
