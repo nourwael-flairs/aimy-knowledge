@@ -2950,6 +2950,19 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
 }
 .doc-by-ent:hover { color: var(--ink-action); border-bottom-color: var(--ink-action); }
 .doc-by-ent:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; border-radius: var(--r-xs); }
+/* ── The run that leaves the product ──
+
+   Every other entity on this line opens a peek — same dotted rule, same
+   hover — so the one that opens Confluence has to differ before it is
+   pressed, not after. It keeps the line's ink and its dotted rule, because it
+   is still attribution and still L4, and it takes the arrow. One glyph at
+   10px is the whole difference, which is the right size of difference: this
+   is not a more important fact than "Filed in Policies", it is a differently
+   shaped one. */
+.doc-by-out { display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: none; }
+.doc-by-out:visited { color: var(--ink-quiet); }
+.doc-by-out-ico { width: 0.625rem; height: 0.625rem; opacity: 0.7; flex-shrink: 0; }
+.doc-by-out:hover .doc-by-out-ico { opacity: 1; }
 .doc-note { font-size: var(--ty-meta); color: var(--ink-warn); margin: 0 0 1rem; }
 
 /* The measure sits on the TEXT, not on the container. Capping the block would
@@ -3102,6 +3115,28 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
 .rail-facts { display: flex; flex-direction: column; gap: 0.25rem; }
 .rail-facts p { margin: 0; font-size: var(--ty-body); line-height: 1.5; color: var(--ink-secondary); }
 .rail-facts p.is-overdue { color: var(--ink-err); }
+
+/* ── The ingestion date is the block's headline, not its first item ──
+
+   Four facts set in one grey at one size, so "how old is the copy I am
+   reading" — the question the block is opened to answer — ranked level with
+   the three that qualify it. It is L2 now against their L4: 15/14, 600/400,
+   primary/secondary. Three axes of difference where the scale asks for two,
+   because this one has to be readable from across the column.
+
+   The duration sits beside the date rather than replacing it. A date alone
+   makes the reader subtract; a duration alone loses the thing they would
+   quote in a ticket. Both, and neither has to be looked up. */
+.rail-facts p.rail-lead-fact {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 0.5rem;
+  font-size: var(--ty-title); font-weight: var(--fw-semibold);
+  color: var(--ink-primary); line-height: var(--lh-snug);
+  margin-bottom: 0.25rem;
+}
+.rail-lead-age {
+  font-size: var(--ty-micro); font-weight: var(--fw-regular);
+  color: var(--ink-faint); font-variant-numeric: tabular-nums;
+}
 /* ── The rail has no primary action ──
 
    `em-direct` renders filled in brand blue, so *Re-sync from Confluence* sat in
@@ -3116,6 +3151,27 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
   font-size: var(--ty-meta); font-weight: var(--fw-semibold);
 }
 .rail-act .entry-action:hover { background: none; border-color: var(--card-border-hover); color: var(--ink-primary); }
+/* An <a> in a row of <button>s. The geometry is `.entry-action`'s already; what
+   an anchor brings and a button does not is an underline and a visited colour,
+   and both of them would make one pill in the row look like a different
+   component. */
+.rail-act a.entry-action { text-decoration: none; }
+.rail-act a.entry-action:visited { color: var(--ink-action); }
+.rail-act a.entry-action:visited:hover { color: var(--ink-primary); }
+
+/* ── em-out: the fifth affordance ──
+
+   §3's four modes all describe something that happens HERE — direct completes
+   in place, investigate and prompt open the canvas, review proposes a change.
+   Opening the original in Confluence does none of that: it hands you to another
+   product. So it gets its own mode rather than borrowing one that promises
+   undo, and it is quiet — outlined, never filled — because leaving is a normal
+   move and not the loudest thing in a 320px column. */
+.em-out {
+  background: none; border-color: var(--card-border); color: var(--ink-action);
+  text-decoration: none;
+}
+.em-out:hover { background: none; border-color: var(--card-border-hover); color: var(--ink-primary); }
 .rail-empty { margin: 0; font-size: var(--ty-body); color: var(--ink-secondary); line-height: 1.5; }
 /* One row. Two short buttons stacked wasted a line each and read as a list of
    two unrelated things; side by side they read as what they are — the actions

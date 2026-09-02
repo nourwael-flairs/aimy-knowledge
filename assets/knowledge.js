@@ -84,6 +84,10 @@
     plus:     svg('<path d="M12 5v14M5 12h14"/>', 2.4),
     tag:      svg('<path d="M20.6 13.4L12 22l-9-9V3h10l7.6 7.6a2 2 0 010 2.8z"/><path d="M7.5 7.5h.01"/>'),
     plug:     svg('<path d="M9 2v6M15 2v6"/><path d="M6 8h12v3a6 6 0 01-12 0z"/><path d="M12 17v5"/>'),
+    /* The arrow leaves the box. Every other glyph here draws something that
+       happens on this page; this one has to say "and then you are somewhere
+       else", which is the only reason a link out needs a picture at all. */
+    external: svg('<path d="M15 3h6v6"/><path d="M21 3l-9 9"/><path d="M19 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"/>'),
     box:      svg('<path d="M21 8v13H3V8"/><rect x="1" y="3" width="22" height="5" rx="1"/><path d="M10 12h4"/>'),
     send:     svg('<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>'),
     /* The same picture the drop layer draws, so choosing a file and dropping
@@ -306,6 +310,83 @@
   };
 
   /* ═══════════════════════════════
+     THE UPSTREAM, AS AN ADDRESS
+
+     A document that came from Confluence has a page in Confluence, and the
+     product knew that and would not say where. Every route out of the
+     provenance block acted on OUR copy — re-sync it, reconnect the connector,
+     go find a different source — and not one of them opened THEIRS. Somebody
+     who wants to fix the wrong sentence has to leave, open Confluence, and
+     search for a title they can only retype by hand.
+
+     Two of the five sources already carry a real address, because a crawled
+     page IS its address: `x.url` on a webpage, `x.canonical` on a blog. Those
+     are used verbatim — never invented over.
+
+     The other two upstreams are record systems, and the corpus carries no
+     external id for them, because these objects were written to exercise
+     filters rather than deep links. `extRef` stands in for one: derived from
+     the document id, so it is stable across repaints and identical between the
+     byline and the rail, and computed in ONE place so the seam where a real
+     ingestion id arrives is a single function to replace.
+
+     `upload` returns nothing on purpose. A file somebody dropped has no
+     upstream to open, and a link that resolves to the uploader's own laptop is
+     worse than no link. `noUpstream` already states that in words.
+  ═══════════════════════════════ */
+  const extRef = (o) => {
+    let h = 0;
+    for (let i = 0; i < o.id.length; i++) h = (h * 31 + o.id.charCodeAt(i)) % 90000;
+    return 10000 + h;
+  };
+
+  /* A crawled address is stored without a scheme — "aimy.app/security" — because
+     that is how it reads on the page. An href needs one. */
+  const httpsify = (u) => 'https://' + String(u).replace(/^https?:\/\//, '');
+
+  const SRC_ORIGIN = {
+    /* Space key from the collection, so the link lands in the space the
+       document is actually filed under rather than a generic search. */
+    confluence: (o) => 'https://aimy.atlassian.net/wiki/spaces/'
+      + String(o.col).toUpperCase() + '/pages/' + extRef(o),
+    /* A ticket already wears its number in its id — #48120 — so this one is
+       not invented at all. */
+    zendesk: (o) => 'https://aimy.zendesk.com/agent/tickets/'
+      + ((String(o.id).match(/\d+/) || [extRef(o)])[0]),
+    hubspot: (o) => 'https://app.hubspot.com/contacts/aimy/record/2-0/' + extRef(o),
+    web: (o) => {
+      const u = (o.x || {}).url || (o.x || {}).canonical;
+      return u && u !== '—' ? httpsify(u) : '';
+    },
+    upload: () => ''
+  };
+
+  /* The one accessor. The byline, the provenance block and the webpage subject
+     all ask this, so none of them can send you somewhere the others do not. */
+  function originHref(o) {
+    const mk = SRC_ORIGIN[o.src];
+    return mk ? mk(o) || '' : '';
+  }
+
+  /* A label names where you LAND, and for four of the five sources that is the
+     source's own name. `web` is the exception and reads badly as one: "Open in
+     Website crawl" names the crawler that fetched the copy rather than the page
+     you are about to open, and nobody has ever opened a crawl. */
+  const originLabel = (o) => o.src === 'web'
+    ? 'Open the live page' : 'Open in ' + SRC[o.src].label;
+
+  /* An entry-mode affordance for the fifth thing a control can do: none of the
+     four modes fits, because direct completes in place, investigate and prompt
+     open the canvas, and review proposes a change — and this one takes you off
+     the page entirely. So it is an <a>, with a target and the arrow that leaves
+     the box, and it says so before you press it. */
+  function entryLink(href, label, title) {
+    return `<a class="entry-action em-out" href="${esc(href)}" target="_blank"
+       rel="noopener noreferrer"${title ? ` title="${esc(title)}"` : ''}>`
+      + ICO.external.replace('<svg', '<svg class="em-ico"') + esc(label) + '</a>';
+  }
+
+  /* ═══════════════════════════════
      CLIENTS, AND THE PRODUCTS THEY OWN
 
      Three kinds of product, which is why one flat list could not hold them:
@@ -451,6 +532,16 @@
     dateOf(days).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
   const fmtShort = (days) =>
     dateOf(days).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  /* How long ago, in one vocabulary. Lifted out of `usedLabel` when the
+     ingestion date started saying it too: two copies of "27 days ago" that
+     round differently is the same disagreement `citedPhrase` exists to
+     prevent. `usedLabel` keeps the never-cited zero, which is an absence
+     rather than a duration and belongs to that phrase alone. */
+  const ageLabel = (d) => d === 0 ? 'Today'
+    : d === 1 ? 'Yesterday'
+    : d < 30 ? d + ' days ago'
+    : Math.round(d / 30) === 1 ? '1 month ago'
+    : Math.round(d / 30) + ' months ago';
   const WINDOWS = { '7d': 7, '30d': 30, '90d': 90, '1y': 365 };
   const WINDOW_LABEL = { '7d': 'last 7 days', '30d': 'last 30 days', '90d': 'last 90 days', '1y': 'last year' };
 
@@ -768,6 +859,221 @@
     'page-pricing':         { used: 7, uses: 88 }
   };
 
+  /* ═══════════════════════════════
+     THE WRITTEN NINE — one worked example of every type
+
+     `o.html` was empty on all forty objects, so every document in the corpus
+     rendered the same two lines: its summary, then the type's boilerplate
+     sentence out of BODY_COPY. That is enough to exercise a filter and not
+     nearly enough to review a TYPE — you cannot tell whether an ICP reads
+     correctly from a document whose entire body is "Fit is assessed on the
+     criteria above".
+
+     So nine documents are written out in full, one per entry in TYPES, and
+     they are the nine the landing surface leads with. They were picked for
+     their EDGES rather than at random: refund contradicts the returns FAQ,
+     answers #48120 and is referenced by the Nordwind story, which the Q3 blog
+     post cites, which the Q3 campaign runs, which sends the one-pager. Reading
+     the nine walks the graph rather than sampling nine unrelated things.
+
+     Bodies are HTML rather than markdown on purpose. `mdToHTML` is declared
+     four thousand lines below this and `mdInline` beside it is a `const`, so
+     calling it from the boot pass would read a binding in its temporal dead
+     zone. HTML is also what `o.html` holds everywhere else — `writeBody`
+     stores innerHTML — so the fixture and the running document are one format.
+
+     The tag vocabulary is the body's own: h3, h4, p, ul/ol, blockquote. No
+     tables — nothing styles one inside `#editBody`, and a fixture that renders
+     unstyled is a fixture that lies about the type.
+  ═══════════════════════════════ */
+  const BODIES = {
+
+    /* ARTICLE — prose IS the document, so this one is the longest. It is also
+       the corpus's out-of-date exemplar, and the body has to be worth the
+       banner above it: the policy in full, with the activation clause the
+       Returns FAQ contradicts stated plainly enough that the conflict is
+       legible when you open both. */
+    'article-refund': `
+      <p>A customer on the EU storefront may return a purchase for a full refund within <strong>30 days of the purchase date</strong>, provided the item has not been activated. The window runs from purchase, not from delivery, and it does not pause while an item is in transit.</p>
+      <h3>What counts as activation</h3>
+      <p>An item is activated the first time its licence key is redeemed, its seat is assigned to a named user, or its trial is converted. Activation is recorded against the order and is visible to support on the account timeline. Once it appears there, the refund window is closed regardless of how many days remain.</p>
+      <ul>
+        <li><strong>Licence keys</strong> — redeemed is activated, even if the customer never signed in afterwards.</li>
+        <li><strong>Seats</strong> — assigning a seat activates it. Unassigning does not reverse this.</li>
+        <li><strong>Trials</strong> — a converted trial is activated on the conversion date, not on the trial start.</li>
+      </ul>
+      <h3>What happens after activation</h3>
+      <p>An activated item is out of scope for a refund and in scope for warranty. If the customer's complaint is that the product does not work, route it to the warranty process rather than declining it — the two are different remedies for different problems, and declining a fault as a late refund is the most common mishandling of this policy.</p>
+      <h3>Exceptions</h3>
+      <p>Support may grant a goodwill credit outside the window without approval up to the value of one seat-month. Anything above that needs the policy owner. Every exception is logged against the account so the pattern is visible at renewal — an account with three goodwill credits is a signal, not three unrelated incidents.</p>
+      <blockquote>An exception is a decision about one customer. It does not change the policy, and it must not be cited back as though it did.</blockquote>
+      <h3>What support may confirm</h3>
+      <ol>
+        <li>The purchase date, and therefore the last day of the window.</li>
+        <li>Whether the item shows as activated, and on what date.</li>
+        <li>That an activated item is handled under warranty instead.</li>
+      </ol>
+      <p>Support may not confirm whether an exception will be granted before it has been. Saying "that should be fine" and then declining is the single largest driver of escalation on this policy.</p>`,
+
+    /* TICKET — the record leads and this is evidence beneath it, so it reads
+       as a transcript rather than as guidance. The resolution field says the
+       exception was granted; the body says what was actually said, which is
+       the thing an owner needs when they are deciding whether the article is
+       at fault. */
+    'ticket-48120': `
+      <p><strong>Raised 3 Mar 2026 · Nordwind GmbH · via email</strong></p>
+      <p>Customer bought 40 seats on the EU storefront on 2 February and assigned twelve of them the same week. On 1 March they asked to return the unused twenty-eight, having decided to standardise on a different tool for that team.</p>
+      <h3>What the customer said</h3>
+      <blockquote>We are 27 days in and we have not touched 28 of these seats. We would like to return the ones we have not used.</blockquote>
+      <p>First response declined the request on the grounds that the order had been activated. The customer replied that the seats they were asking about had never been assigned to anyone, and that they had read the 30-day window as applying per seat.</p>
+      <h3>Where it went wrong</h3>
+      <p>The policy is written per <em>order</em> and the storefront sells per <em>seat</em>. Nothing in the refund article says which one activation attaches to, and the agent's reading — order-level — is the one the billing system implements. The customer's reading is the one the purchase flow implies.</p>
+      <h3>How it was closed</h3>
+      <p>A goodwill credit was issued for the twenty-eight unassigned seats, above the one-seat-month ceiling, approved by the policy owner. The exception is logged against the account. The customer accepted and renewed in April.</p>
+      <p>Flagged to the policy owner: the article needs to say whether activation is per order or per seat. Two further tickets have arrived on the same ambiguity since.</p>`,
+
+    /* ICP — the criteria are the record above; this is the part sellers get
+       wrong, which is the disqualifier half. Written as instructions to a
+       person mid-call rather than as a description of a segment. */
+    'icp-bpo': `
+      <h3>Who this is</h3>
+      <p>Outsourced contact-centre operators running between 200 and 2,000 seats across EMEA, serving several client programmes from the same floor. They sell quality as part of their contract, which means quality is a line item somebody defends in a QBR rather than an internal aspiration.</p>
+      <h3>Why they buy</h3>
+      <p>Their client contracts carry review obligations — a percentage of interactions scored, evidence retained, results reported monthly. Meeting that with human reviewers costs roughly one reviewer per twenty agents, and it does not scale past the point where a new client programme lands. They buy coverage, and they buy the evidence trail that comes with it.</p>
+      <h4>What a good conversation sounds like</h4>
+      <ul>
+        <li>They can name the person who owns QA, and that person is on the call.</li>
+        <li>They talk about client audits, not about internal quality scores.</li>
+        <li>They already sample manually and can tell you the percentage.</li>
+      </ul>
+      <h3>Reading the disqualifiers</h3>
+      <p>The two disqualifiers above are hard, not advisory. A single-client captive centre has no client audit to satisfy and buys on internal budget, which is a different sale with a different cycle — those deals close at roughly a third of the rate and take twice as long. Under 200 seats there is usually no named QA owner at all, and the deal stalls in the gap between operations and finance.</p>
+      <p>A prospect failing either one is out, regardless of how well it scores elsewhere. A high fit score on a disqualified account is the profile telling you the account looks right, not that it is.</p>
+      <h3>Where to take it next</h3>
+      <p>APAC is a separate profile with a lower score and a different residency conversation — do not run this one there. For proof, the Orbit and Nordwind stories are the two that were measured against a customer's own baseline.</p>`,
+
+    /* CAMPAIGN — operational, not promotional, which the boilerplate has been
+       claiming since the type existed. So: what ran, what it returned, and the
+       one thing that went wrong. */
+    'campaign-q3': `
+      <h3>What ran</h3>
+      <p>Three-month pipeline campaign against the mid-market BPO segment in EMEA, opening 1 July. Six assets across three landing pages, an outbound sequence to a 1,400-contact list built from the ICP, and two webinars co-run with a partner.</p>
+      <h4>The sequence</h4>
+      <ol>
+        <li><strong>Weeks 1–4</strong> — the quality-at-scale one-pager into cold outbound, landing page A.</li>
+        <li><strong>Weeks 5–8</strong> — the Nordwind story to anyone who opened twice, landing page B.</li>
+        <li><strong>Weeks 9–12</strong> — webinar invitations to the engaged half, landing page C.</li>
+      </ol>
+      <h3>What it returned</h3>
+      <ul>
+        <li>1,400 contacts, 312 opens on the second touch, 71 landing-page conversions.</li>
+        <li>19 qualified meetings, of which 14 matched the ICP on both disqualifiers.</li>
+        <li>4 opportunities still open at the close of the window.</li>
+      </ul>
+      <p>The five meetings that did not match the profile all came from the same list segment — operators under 200 seats who had been included because the seat-count field was empty rather than because it was low. The list build now treats an empty field as a fail.</p>
+      <h3>What we learned</h3>
+      <p>The story outperformed the one-pager by a factor of three on the second touch, and the effect was almost entirely in reply rate rather than open rate. People opened both and answered the one with a customer's name on it. Q4 leads with proof.</p>
+      <blockquote>The asset list above is the authority on what may be sent. Two assets circulated during this campaign that are not on it, both pulled from an old shared drive.</blockquote>`,
+
+    /* ASSET — prose is 'absent' for this type, meaning it does not INVITE
+       writing, not that writing is impossible. So this is short and it is
+       about the file: what is in it, who it is for, and the one clause that
+       decides whether it may be sent. */
+    'asset-onepager': `
+      <p>Two-page PDF, A4, built for cold outbound into the BPO segment. Page one is the argument; page two is the Nordwind result and a single proof point per claim.</p>
+      <h3>What is in it</h3>
+      <ul>
+        <li><strong>Page 1</strong> — why reviewer headcount does not scale, the coverage gap illustrated at 2% and at 100%, and what changes for a client audit.</li>
+        <li><strong>Page 2</strong> — the Nordwind numbers, a two-line quote, and the contact block.</li>
+      </ul>
+      <h3>Using it</h3>
+      <p>Cleared for external use and customer-facing, so it may be attached to cold outbound without approval. It carries one measured claim — 31% faster first resolution — and that claim is sourced to the Nordwind story. If that story's approval ever lapses, this asset has to come out of circulation with it.</p>
+      <p>Do not edit the PDF locally to change the numbers for a specific prospect. Every version in circulation should be this one, so that a claim can be traced to a single file.</p>`,
+
+    /* PRESENTATION — a deck nobody can read in the browser, so the body is
+       the note beside it: what is on each run of slides, which ones to skip,
+       and what has gone stale since it was last shown. */
+    'asset-deck-security': `
+      <p>Fourteen slides, used in enterprise deals where security review starts before commercial terms. Cleared to present under NDA — not customer-facing without one, because slides 9 to 11 name sub-processors.</p>
+      <h3>How it runs</h3>
+      <ul>
+        <li><strong>1–3</strong> — the shape of the platform and where data sits. Always show.</li>
+        <li><strong>4–8</strong> — residency by region, with the EU and APAC split. This is the run that does the work.</li>
+        <li><strong>9–11</strong> — sub-processors and the DPA. Skip unless legal is in the room; it invites a line-by-line review that stalls the meeting.</li>
+        <li><strong>12–14</strong> — certifications, the audit trail, and the incident history.</li>
+      </ul>
+      <h3>What has moved since it was built</h3>
+      <p>Slides 5 and 6 restate the residency article, and that article is itself past its review date — the APAC half in particular has been flagged twice. Do not read those two slides out verbatim in an APAC deal until the article is settled; state the EU position, which is stable, and take APAC as a follow-up.</p>
+      <blockquote>A deck is cleared to present, not cleared to send. If somebody asks for the file afterwards, send the security page instead.</blockquote>`,
+
+    /* SUCCESS STORY — the record carries the outcome and the quote; this is
+       the sequence that produced them, which is what a seller needs when the
+       prospect asks "how long did that actually take". Approval is pending, so
+       the body says so where somebody about to quote it will see it. */
+    'story-nordwind': `
+      <p>Nordwind GmbH runs 800 seats across three client programmes from Hamburg and Kraków. Their contracts oblige them to score 2% of interactions and report monthly. They were meeting that with six reviewers and missing it in December every year.</p>
+      <h3>What they had before</h3>
+      <ul>
+        <li>2% sampled, chosen by whoever was reviewing that day.</li>
+        <li>Results in three spreadsheets, one per programme, reconciled by hand.</li>
+        <li>Roughly eleven days between an interaction and anyone looking at it.</li>
+      </ul>
+      <h3>What changed</h3>
+      <p>Full coverage from week three, with reviewers moved off sampling and onto the interactions that were actually flagged. The reporting pack that took two days a month became a view their client could be given directly.</p>
+      <h4>The measured result</h4>
+      <p><strong>31% faster first resolution</strong>, measured against their own pre-deployment baseline over the three months to March, on the same two programmes throughout. Reviewer headcount was unchanged — nobody was replaced, and the story should never be told as though anybody was.</p>
+      <blockquote>We stopped guessing which conversations to review.</blockquote>
+      <h3>Before you use this</h3>
+      <p>Approval is <strong>pending</strong>. The numbers are cleared internally and the quote is not yet cleared by Nordwind's marketing team, so it may be used in conversation and must not appear in anything published or sent. The 31% figure is the only measured claim here; everything else above is context and is not a claim.</p>`,
+
+    /* BLOG — prose is primary, so this is the post as published rather than
+       a note about it. It is the argument the Q3 campaign runs on, which is
+       why the campaign record above points at it. */
+    'blog-quality-scale': `
+      <p>Every contact centre that has ever tried to improve quality has started in the same place: hire more reviewers. It works, briefly, and then it stops working — and the reason it stops is arithmetic rather than effort.</p>
+      <h3>The arithmetic</h3>
+      <p>A reviewer can score somewhere between twenty and forty interactions a day, depending on channel and how much of the surrounding context they have to read. Call that thirty. A hundred agents handling forty contacts a day produce four thousand interactions. One reviewer covers 0.75% of them.</p>
+      <p>To reach 10% coverage you need thirteen reviewers for every hundred agents. To reach 100% you need a hundred and thirty-three, which is more reviewers than agents, which is not a plan.</p>
+      <h3>So everybody samples</h3>
+      <p>Sampling is a reasonable response to an impossible number, and it has one property nobody says out loud: <em>the sample is not random</em>. Reviewers pick the calls they can find, from the queues they know, at the times they are working. The interactions least likely to be reviewed are the ones from the busiest hour of the worst day — which are exactly the ones worth reviewing.</p>
+      <blockquote>A 2% sample tells you about 2% of your operation. It does not tell you about the other 98%, and it never claimed to.</blockquote>
+      <h3>What changes with full coverage</h3>
+      <p>The interesting part is not the score. It is that reviewers stop choosing what to look at and start being told. Their day shifts from finding problems to deciding what to do about the ones already found — which is the part of the job that needed a person in the first place.</p>
+      <p>Nordwind ran this and measured 31% faster first resolution against their own baseline, with the same six reviewers they started with. Nobody was replaced. The reviewers just stopped spending their mornings picking calls.</p>
+      <h3>The honest limitation</h3>
+      <p>Full coverage makes the sampling problem go away and does not make the calibration problem go away. If your scorecard is ambiguous, scoring everything with it produces a great deal of consistent ambiguity. Fix the scorecard first; it is a week of work and it is the week with the highest return in this entire exercise.</p>`,
+
+    /* WEB PAGE — a COPY we crawl, not writing of ours, so the body is what was
+       stored and the freshness claim above it is about this text. Written as
+       the page reads rather than as a note about the page. */
+    'page-security': `
+      <h3>Where your data is</h3>
+      <p>Customer data is stored in the region selected at the time the account is created. EU accounts are stored in Frankfurt with a failover replica in Dublin; APAC accounts are stored in Singapore. Data does not leave its region for processing, and backups are held in-region.</p>
+      <h3>Who can reach it</h3>
+      <p>Access is role-based and logged. Support staff can see account metadata and configuration by default; reading customer conversation content requires an explicit, time-boxed grant that the customer can see in their own audit log. Every such grant expires automatically after eight hours.</p>
+      <h3>Certifications</h3>
+      <ul>
+        <li>ISO 27001, current, scoped to the platform and the supporting infrastructure.</li>
+        <li>SOC 2 Type II, reported annually, available under NDA.</li>
+        <li>Annual third-party penetration test, summary available on request.</li>
+      </ul>
+      <h3>Sub-processors and terms</h3>
+      <p>The list of sub-processors is published and versioned, and customers on enterprise agreements are notified thirty days before any addition. The standard data processing addendum is offered to all enterprise customers and covers the residency commitments stated above.</p>
+      <h3>Reporting something</h3>
+      <p>Security reports go to security@aimy.app. Reports are acknowledged within one business day and triaged within three. We do not run a paid bounty programme and we do credit reporters who ask to be credited.</p>`
+  };
+
+  /* The two file-backed types are records ABOUT a file, and three of the four
+     had no file — so the subject region drew "No file attached" over a record
+     describing its format in detail. A Marketing Asset whose format field says
+     "PDF · A4 · 2pp" and whose subject says there is no PDF is the fixture
+     contradicting itself on one screen. */
+  const FILES = {
+    'asset-onepager':      { 'source-file': 'quality-at-scale-onepager.pdf', size: '1.1 MB' },
+    'asset-voice-demo':    { 'source-file': 'voice-handoff-demo-script.docx', size: '84 KB' },
+    'asset-pricing-sheet': { 'source-file': 'enterprise-pricing-2025.pdf', size: '640 KB' }
+  };
+
   /* Two archived objects. Archive is the mind map's manual-update branch, and it
      is not deletion: archived content stays addressable, stays restorable, and
      is excluded from the surface until you ask for it with `?archived=1`. */
@@ -794,6 +1100,12 @@
   const CLIENT_FACING = ['blog', 'webpage', 'asset', 'story', 'pptx'];
   CORPUS.forEach((o) => {
     Object.assign(o, EXTRA[o.id] || {});
+    /* The written nine, and the files the file-backed types are about. Merged
+       here rather than inlined above for the same reason EXTRA is: a 300-line
+       body sitting inside a record would bury the fields the record exists to
+       declare, and nobody would read the corpus again. */
+    if (BODIES[o.id]) o.html = BODIES[o.id].replace(/\n\s+/g, '');
+    if (FILES[o.id]) o.props = Object.assign({}, FILES[o.id], o.props);
     if (!o.region) {
       o.region = o.tags.indexOf('apac') > -1 ? 'apac'
         : (o.tags.indexOf('eu') > -1 || o.tags.indexOf('emea') > -1) ? 'emea' : 'global';
@@ -835,14 +1147,7 @@
      nobody has ever opened. A zero is not a date. */
   const neverCited = (o) => !o.uses;
 
-  const usedLabel = (o) => {
-    if (neverCited(o)) return 'Never';
-    if (o.used === 0) return 'Today';
-    if (o.used === 1) return 'Yesterday';
-    if (o.used < 30) return o.used + ' days ago';
-    const m = Math.round(o.used / 30);
-    return m + (m === 1 ? ' month ago' : ' months ago');
-  };
+  const usedLabel = (o) => neverCited(o) ? 'Never' : ageLabel(o.used);
 
   /* One phrase for "how much has anything used this", so the four places that
      say it cannot disagree — and so none of them has to special-case the zero. */
@@ -1084,14 +1389,42 @@
      Seeded here on the two documents the fixture was written about; everything
      else — and everything new — starts with none. */
   CORPUS.forEach((o) => { o.comments = []; seedVersions(o); });
-  (byId('article-refund') || {}).comments = [
-    { who: 'A. Mahfouz', initials: 'AM', when: '2 days ago',
-      text: 'The exception needs to name the warranty article explicitly — support keeps landing here and then having to search again.' }
-  ];
-  (byId('article-residency') || {}).comments = [
-    { who: 'O. Said', initials: 'OS', when: 'last week',
-      text: 'APAC is the half nobody has written. A ticket came in on it again yesterday.' }
-  ];
+  /* ── One remark on each of the written nine ──
+
+     Seeding two of forty was right while the fixture was two documents. Now
+     that a reader is expected to open one of every type in turn, a comment
+     thread that appears on the Article and on nothing else reads as a feature
+     the other eight types do not have. Each of these is a real remark about
+     the document it sits on — the kind that makes an owner do something —
+     rather than filler proving the region renders. */
+  const REMARKS = {
+    'article-refund':       ['A. Mahfouz', 'AM', '2 days ago',
+      'The exception needs to name the warranty article explicitly — support keeps landing here and then having to search again.'],
+    'article-residency':    ['O. Said', 'OS', 'last week',
+      'APAC is the half nobody has written. A ticket came in on it again yesterday.'],
+    'ticket-48120':         ['N. Wael', 'NW', '4 days ago',
+      'Third one this quarter on per-order vs per-seat. I am not raising a fourth — the article needs the sentence.'],
+    'icp-bpo':              ['Sales Ops', 'SO', 'last week',
+      'Two reps ran this at captive centres last month because the fit score looked good. The disqualifiers need to be louder than the number.'],
+    'campaign-q3':          ['Marketing', 'MK', '3 days ago',
+      'Can we get the two off-list assets named here? Nobody can pull something they cannot identify.'],
+    'asset-onepager':       ['Brand', 'BR', '2 weeks ago',
+      'This is sourced to a story whose approval is still pending. If that lapses we have outbound in flight carrying the claim.'],
+    'asset-deck-security':  ['O. Said', 'OS', 'last week',
+      'Slides 5 and 6 are the residency article verbatim. When it is fixed, this deck has to be re-exported — a note here will not travel with the file.'],
+    'story-nordwind':       ['Marketing', 'MK', '6 days ago',
+      'Chased Nordwind again on the quote. Until it clears, this is conversation-only and two decks already have it on a slide.'],
+    'blog-quality-scale':   ['A. Mahfouz', 'AM', 'last month',
+      'The 0.75% figure assumes thirty scored a day. Worth stating the assumption inline — somebody will check it.'],
+    'page-security':        ['O. Said', 'OS', '3 weeks ago',
+      'Crawled copy still lists the old triage window. The live page says three days; this says three. Fine now, but it drifts every time legal edits it.']
+  };
+  Object.keys(REMARKS).forEach((id) => {
+    const o = byId(id);
+    if (!o) return;
+    const r = REMARKS[id];
+    o.comments = [{ who: r[0], initials: r[1], when: r[2], text: r[3] }];
+  });
 
   /* `problem` marks a reported fault rather than a remark. The two read
      differently because they ask different things of the owner: one is a
@@ -1470,7 +1803,11 @@
   const needScore = (o) =>
     (NEED_SCORE[o.status] || 0) + (WORK_SCORE[o.work] || 0) + (responsible(o) === USER.owner ? 2 : 0);
 
-  const COMPOSED_CAP = 12;
+  /* Nine exemplars plus nine attention picks. It was 12, which is the right
+     number for a set that is only "what needs you" and three short of a set
+     that has to cover the taxonomy first. The cap is still STATED on the
+     surface rather than applied quietly — the count line prints the length. */
+  const COMPOSED_CAP = 18;
 
   function sortSet(list, sort) {
     const s = list.slice();
@@ -1487,16 +1824,48 @@
     return s.sort((a, b) => a.upd - b.upd);           // most recently updated first
   }
 
-  /* The landing set: what you own or touched, ranked by what needs you. The
-     cap is stated on the surface rather than applied quietly — a list that
-     hides its tail overstates how contained the problem is.
+  /* ── One of every kind, before anything else ──
+
+     The landing set was yours-first, attention-ranked, capped at twelve — and
+     it showed four of the nine types. Five kinds of document existed in the
+     product and could not be seen without typing a filter for a type you had
+     to already know was there. A taxonomy nobody can see is a taxonomy nobody
+     trusts.
+
+     So the set opens with one document of every type, in TYPES order, and the
+     ranked composition follows underneath it. Which document represents a type
+     is DERIVED, not a list of ids: whichever one of that type has a written
+     body, and among those the one the ordering already puts first. That keeps
+     the guarantee true when the corpus changes — write a fuller ICP tomorrow
+     and it becomes the ICP on the landing page without anybody editing this
+     function — and it degrades honestly, falling back to the best-ranked
+     document of the type when none of them has been written out.
+
+     `sort` still reaches both halves: it picks the exemplar within each type
+     and it orders the tail. The toggle stays a live control, which is what the
+     result line promises it is. */
+  const isWritten = (o) => !!(o.html || '').trim();
+
+  function typeExemplars(sort) {
+    return Object.keys(TYPES).map((t) => {
+      const of = sortSet(LIVE.filter((o) => o.t === t), sort);
+      return of.filter(isWritten)[0] || of[0];
+    }).filter(Boolean);
+  }
+
+  /* The landing set: one of every kind, then what you own or touched, ranked
+     by what needs you. The cap is stated on the surface rather than applied
+     quietly — a list that hides its tail overstates how contained the problem
+     is.
 
      The order is passed in rather than hard-coded, so one function decides it
      for every surface and the toggle is a live control here too. */
   function composedSet(sort) {
-    const mine = LIVE.filter((o) => responsible(o) === USER.owner || USER.recent.indexOf(o.id) > -1);
-    const rest = LIVE.filter((o) => mine.indexOf(o) === -1);
-    return sortSet(mine, sort).concat(sortSet(rest, sort)).slice(0, COMPOSED_CAP);
+    const lead = typeExemplars(sort);
+    const left = LIVE.filter((o) => lead.indexOf(o) === -1);
+    const mine = left.filter((o) => responsible(o) === USER.owner || USER.recent.indexOf(o.id) > -1);
+    const rest = left.filter((o) => mine.indexOf(o) === -1);
+    return lead.concat(sortSet(mine, sort), sortSet(rest, sort)).slice(0, COMPOSED_CAP);
   }
 
   /* Absent means "this surface's default": the composed set leads with what
@@ -3363,7 +3732,10 @@
         <span class="rm-count">${list.length}</span>
         <span class="rm-word">document${list.length === 1 ? '' : 's'}</span>
         ${composed
-          ? `<span class="rm-note">your work</span>`
+          /* "your work" described the whole set when the whole set was yours.
+             It now opens with one of every kind, so the note names both halves
+             — otherwise the count is right and the sentence under it is not. */
+          ? `<span class="rm-note">one of each kind, then your work</span>`
           : axis
             ? `<span class="rm-note">in <button class="rm-ask" data-settings="${axis.key}:${axis.value}">${esc(axisLabel)}</button></span>`
             : `<span class="rm-note">of ${LIVE.length}</span>`}
@@ -5167,8 +5539,23 @@
       <span class="doc-by-sep">·</span>
       <!-- "Came from Manual upload" is not where a document you typed came
            from. It came from you, here. -->
+      <!-- ── The one run on this line that names a place you can go ──
+
+           Owner, collection and source all opened the same kind of peek, so
+           "Came from Confluence" read as a filter — three documents, a sync
+           cadence, a health note — when what it plainly says is that the
+           original is in Confluence. It is that link now: same words, an
+           address behind them, and the arrow that says you are leaving. The
+           source's own record is still one click away on every card in the
+           grid, which is where a reader goes to ask about the CONNECTOR rather
+           than about this document. An upload has no upstream and stays a
+           peek, because there is nowhere to send anybody. -->
       ${bornHere(o)
         ? '<span>Written here</span>'
+        : originHref(o)
+        ? `<a class="doc-by-ent doc-by-out" href="${esc(originHref(o))}" target="_blank"
+             rel="noopener noreferrer" title="Opens ${esc(src.label)} in a new tab"
+             >Came from ${esc(src.label)}${ICO.external.replace('<svg', '<svg class="doc-by-out-ico"')}</a>`
         : `<button class="doc-by-ent" data-peek="source:${o.src}">Came from ${esc(src.label)}</button>`}
       <span class="doc-by-sep">·</span>
       <button class="doc-by-ent" data-peek="collection:${o.col}">Filed in ${esc(COLLECTIONS[o.col])}</button>
@@ -5409,9 +5796,13 @@
   const bornHere = (o) => /^new-/.test(o.id) && !o.props['source-file'];
   const noUpstream = (o) => o.src === 'upload';
 
-  /* `opt.skipSync` drops the re-sync action, for the one type that states its
-     crawl freshness on the document itself and therefore owns the button that
-     answers it. Everything else about the block is unchanged. */
+  /* `opt.skipSync` hands the whole upstream to the view, for the one type that
+     states its address and its crawl freshness on the document itself. That
+     type owns BOTH controls — the re-sync and the way out to the page — because
+     the address it would send you to is printed one line above them. A webpage
+     offered "Open the live page" in its subject and "Open in Website crawl"
+     three blocks below, which is one link, twice, under two names. Everything
+     else about the block is unchanged. */
   function provenanceBlock(o, opt) {
     const cfg = opt || {};
     const s = SRC[o.src];
@@ -5419,8 +5810,9 @@
     if (noUpstream(o)) {
       const file = o.props['source-file'];
       return `<div class="rail-facts">
-        <p>${bornHere(o) ? 'You wrote it here, ' + esc(fmtDate(o.ing))
-                         : 'You uploaded ' + esc(file || 'it') + ', ' + esc(fmtDate(o.ing))}</p>
+        <p class="rail-lead-fact">${bornHere(o) ? 'You wrote it here, ' + esc(fmtDate(o.ing))
+                         : 'You uploaded ' + esc(file || 'it') + ', ' + esc(fmtDate(o.ing))}
+          <span class="rail-lead-age">${esc(ageLabel(o.ing))}</span></p>
         <p>Nothing syncs into it — ${bornHere(o) ? 'it has no source'
                                                  : 'a dropped file is not a live source'}</p>
         <p>${esc(citedPhrase(o))}</p>
@@ -5431,12 +5823,27 @@
         </div>
       </div>`;
     }
+    const href = originHref(o);
     return `<div class="rail-facts">
-      <p>Ingested ${esc(fmtDate(o.ing))}</p>
+      <!-- ── The date this block exists to state ──
+
+           Four lines in one grey at one size, and the one fact a reader opens
+           the block FOR — how old the copy in front of them is — had to be
+           found by reading all four. It leads now, and it carries the duration
+           beside the date, because "17 Jun 2026" makes you do the arithmetic
+           and the arithmetic is the answer. -->
+      <p class="rail-lead-fact">Ingested ${esc(fmtDate(o.ing))}
+        <span class="rail-lead-age">${esc(ageLabel(o.ing))}</span></p>
       <p>Created in ${esc(s.label)} ${esc(fmtDate(o.xc))}</p>
       <p${behind ? ' class="is-overdue"' : ''}>${esc(s.label)} changed it ${esc(fmtDate(o.xu))}</p>
       <p>${esc(citedPhrase(o))}</p>
       <div class="rail-act">
+        <!-- The original leads. Every other action here is about our copy of
+             the document — pull it again, repair the connector, replace the
+             upstream — and this is the only one that reaches the thing all
+             three of them are talking about. -->
+        ${href && !cfg.skipSync
+          ? entryLink(href, originLabel(o), 'Opens in a new tab') : ''}
         <!-- Pulling a source is not a thing you look at, so it stops carrying
              the direct mode's eye. And finding one is AiMY's job, so it
              carries AiMY's mark. -->
@@ -5693,7 +6100,12 @@
         ${xFaced(o, 'url', 'Source URL', url && url !== '—'
           ? `<span class="tc-mono">${esc(url)}</span>` : '—')}
         <p class="dv-subject-state">${crawlPhrase(o)} · ${changePhrase(o)}</p>
-        <div class="rail-act">${SRC[o.src].health === 'ok'
+        <!-- This type owns the re-sync, so it owns the way out to the page
+             too — the address is stated one line above, and offering to open
+             it anywhere else would be offering it twice. -->
+        <div class="rail-act">${originHref(o)
+          ? entryLink(originHref(o), originLabel(o), 'Opens the page in a new tab') : ''}${
+          SRC[o.src].health === 'ok'
           ? entryAction('direct', 'Re-sync from ' + SRC[o.src].label,
               `data-act="resync" data-obj="${o.id}"`, ICO.refresh)
           : entryAction('review', 'Reconnect ' + SRC[o.src].label,
