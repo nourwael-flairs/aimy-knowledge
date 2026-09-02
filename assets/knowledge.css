@@ -2722,6 +2722,11 @@ button.rail-set-row:focus-visible {
    column. */
 .rail-cfg-nodot { width: 0.5rem; flex-shrink: 0; }
 
+/* A module with no pages of its own — Skills — is a leaf at the same level as
+   the expandable ones, so its name starts where theirs do rather than 4px
+   short of it. Its dot sits in the column the chevrons occupy. */
+.rail-tree > .rail-cfg-row { padding-left: 0.375rem; gap: 0.375rem; }
+
 /* The one you are standing in reads as settled rather than offered — QA's
    word for it. `aria-current="page"` carries the same fact for anything not
    reading the colour. */
@@ -2733,6 +2738,180 @@ button.rail-set-row:focus-visible {
 .rail-cfg-back { color: var(--ink-faint); margin-bottom: 0.25rem; }
 .rail-cfg-back svg { flex-shrink: 0; opacity: 0.8; }
 .rail-cfg-back:hover .rail-set-name { color: var(--ink-primary); }
+
+/* ═══════════════════════════════════════════════
+   THE SETTINGS TREE
+
+   One nav, not two. The in-page spine that used to map a module's sections
+   from the left gutter is gone; its sections are pages, and they are listed
+   here, under the module that holds them.
+
+   Shape from the consoles that solved this first — Twilio's, and on Mobbin
+   Supabase (the label-over-children contrast step) and Remote (expand to
+   nested children). Three levels, three weights:
+
+     group   micro, uppercase, --ink-faint     read once
+     module  body,  --ink-secondary            where you are
+     page    body,  --ink-primary when current  what you came for
+     state   micro, --ink-faint                 what it is carrying
+
+   The indent is a rule, not padding: a hairline down the children's left edge
+   says "these belong to that" without spending 1rem of a 267px rail on it.
+═══════════════════════════════════════════════ */
+.rail-tree { gap: 0.0625rem; }
+.rail-grp { display: flex; flex-direction: column; }
+
+/* ── ONE CONTROL, ONE JOB ──
+   The header was a chevron plus a title that navigated: two targets a
+   millimetre apart doing different things, and the bigger one took you off the
+   page you were reading just for pressing the name of the group you were in.
+   A group has no page of its own — going "to" it only ever meant going to the
+   first thing under it, which is listed directly beneath and one click away.
+   So the whole header opens and closes, and the pages are the only
+   destinations in the tree. */
+.rail-grp-h {
+  display: flex; align-items: center; gap: 0.375rem; width: 100%;
+  padding: 0.375rem 0.5rem 0.375rem 0;
+  border-radius: var(--r-sm);
+  background: none; border: 0; cursor: pointer; text-align: left;
+  font-family: var(--font-sans); font-size: var(--ty-body);
+  color: var(--ink-secondary);
+}
+.rail-grp-h:hover { background: rgba(255,255,255,0.04); }
+:root[data-theme="light"] .rail-grp-h:hover { background: rgba(16,24,40,0.04); }
+.rail-grp-h:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+
+/* ── THE LADDER, AND WHY IT WAS UPSIDE DOWN ──
+   Measured from the rail's left edge, the tree read: module name at 40px, page
+   name at 30. The children were indented LESS than the parent whose name they
+   belonged under, which is the one thing an indent exists to prevent — the
+   chevron and the status dot together were spending 40px before the module got
+   to say what it was.
+
+   The dot moved to the right, where the other status marks already are, and
+   the chevron narrowed. What is left is a real ladder in half the space:
+   group label 0, module 20, page 28. */
+.rail-grp-x {
+  flex-shrink: 0; display: grid; place-items: center;
+  width: 0.875rem; height: 0.875rem;
+  color: var(--ink-faint);
+}
+/* Status on the right, beside the count of what AiMY can do about it — the two
+   marks that report on a folded-away group, together. */
+.rail-grp-h .status-dot { order: 3; margin-left: auto; }
+.rail-grp-h .rail-cfg-nodot { display: none; }
+.rail-grp-h .rail-grp-acts { order: 4; }
+.rail-grp-h .rail-set-name { flex: 0 1 auto; }
+.rail-grp-x svg { transition: transform var(--t-fast) var(--ease-out); }
+.rail-grp.is-open .rail-grp-x svg { transform: rotate(90deg); }
+.rail-grp-h:hover .rail-grp-x { color: var(--ink-primary); }
+
+/* The module you are in is a PLACE, not a selection: it comes up to full
+   contrast and takes no fill, because the fill belongs to the page under it
+   and two filled rows in one column read as two current things. */
+.rail-grp-h.is-on .rail-set-name { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+
+/* ── WHAT A CLOSED GROUP STILL SAYS ──
+   Folded away, every quick action under it goes with it, and a fix nobody can
+   see is a fix nobody does. The dot says something is wrong; this says how
+   many things AiMY can act on in there, in AiMY's own mark — so the reason to
+   open the group is legible on the closed group. It is not on an open one:
+   the actions themselves are showing, and a count of what is already in front
+   of you is furniture. */
+.rail-grp-acts {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 0.1875rem;
+  padding: 0.0625rem 0.3125rem;
+  border-radius: var(--r-pill);
+  background: var(--accent-dim);
+  color: var(--ink-action);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── The children ──
+   Indented to sit under the module's NAME rather than under its chevron, so
+   the column of page names lines up with the column of module names one level
+   up. The rule is drawn on the container, not per row, or it would break at
+   every gap. */
+/* One step, and one that reads as one. Pulled to 7px first, which put the page
+   names 3px right of the module name above them — an indent nobody can see is
+   the same as none, and the tree flattened into a list. 8px is the smallest
+   step that still says "under". */
+.rail-pgs {
+  display: flex; flex-direction: column; gap: 0.0625rem;
+  margin: 0.125rem 0 0.375rem 0.625rem;
+  padding-left: 0.6875rem;
+  border-left: 0.0625rem solid var(--hairline);
+}
+
+/* ── STACKED, NOT SIDE BY SIDE ──
+   Name and state shared a line first. The rail is 267px wide and the indent
+   takes 21 of it, so "Data relevance" beside "2,695 queued to delete" left
+   both truncated — and a page name you cannot read is worse than a state you
+   have to look twice for. The state is meta and belongs under the thing it is
+   about, which is also what the spine did with the same two facts. */
+.rail-pg {
+  display: flex; flex-direction: column; gap: 0.0625rem; width: 100%;
+  padding: 0.3125rem 0.5rem 0.3125rem 0.4375rem; border-radius: var(--r-sm);
+  background: none; border: 0; cursor: pointer; text-align: left;
+  font-family: var(--font-sans); font-size: var(--ty-body);
+  color: var(--ink-secondary);
+}
+.rail-pg:hover { background: rgba(255,255,255,0.04); }
+:root[data-theme="light"] .rail-pg:hover { background: rgba(16,24,40,0.04); }
+.rail-pg:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+.rail-pg-n {
+  min-width: 0; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  line-height: var(--lh-snug);
+}
+/* The state, in meta. It carries its severity as INK rather than as a dot:
+   a dot plus a number is two marks for one fact, and at this indent there is
+   no room to spend on the duplicate. */
+.rail-pg-s {
+  min-width: 0; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--ty-micro); color: var(--ink-faint); line-height: 1.3;
+}
+.rail-pg-s.sd-ok   { color: var(--ink-faint); }
+.rail-pg-s.sd-warn { color: var(--ink-warn); }
+.rail-pg-s.sd-err  { color: var(--ink-err); }
+
+/* Where you are. A fill, because among the pages of one module this IS a
+   selection — one of them is open and the others are not. */
+.rail-pg.is-on { background: var(--card-bg-raised); }
+.rail-pg.is-on .rail-pg-n { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+
+/* Unsaved on a page you are not looking at. See markDirtyStage. */
+.rail-pg.is-dirty .rail-pg-n::after {
+  content: ""; display: inline-block; vertical-align: middle;
+  width: 0.3125rem; height: 0.3125rem; margin-left: 0.375rem;
+  border-radius: 50%; background: var(--brand);
+}
+
+/* ── The quick action ──
+   Under the row it belongs to, indented past the page name, and only present
+   when something is actually wrong — so the rail is quiet on a healthy
+   workspace and the one thing worth doing is the one thing that stands out.
+
+   It is NOT a pill and NOT brand-filled. Its job is to be found without
+   competing with the page names above it for the eye, and a filled chip in a
+   267px column beats everything else in the rail whatever it says. The mark
+   carries the attribution; the ink carries the urgency. */
+.rail-fix {
+  display: flex; align-items: center; gap: 0.375rem; width: 100%;
+  margin: 0.0625rem 0 0.25rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.4375rem; border-radius: var(--r-sm);
+  background: none; border: 0; cursor: pointer; text-align: left;
+  font-family: var(--font-sans); font-size: var(--ty-micro);
+  color: var(--ink-action);
+}
+.rail-fix:hover { background: var(--accent-dim); }
+.rail-fix:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+.rail-fix-m { flex-shrink: 0; }
+.rail-fix-l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-fix-go { flex-shrink: 0; opacity: 0.55; transition: transform var(--t-fast) var(--ease-out); }
+.rail-fix:hover .rail-fix-go { transform: translateX(0.125rem); opacity: 0.9; }
 
 /* `.set2-save` is `position: sticky; bottom: 0`, written for a page whose
    scroll port ended at the window. Here the float bar owns that band, so the
@@ -4232,8 +4411,15 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
 /* ══ THE WAY BACK TO THE CHAT ══════════════════════════════════════════
    Pinned to the foot of the briefing rail, opposite the gate's Console link,
    so the two surfaces point at each other from the same corner of the screen.
-   Quiet on purpose: it is a way out, not the thing you came here to do. */
-.rail-foot {
+   Quiet on purpose: it is a way out, not the thing you came here to do.
+
+   `brief-rail-foot`, not `rail-foot`: the document's rail has a foot of its
+   own — Report a problem and Archive — and the two shared a name. This rule
+   is the later of the two, so it won, and the document's foot was drawing a
+   border-top directly under the last rail block's border-bottom. Two hairlines,
+   two pixels apart, under a heading that needed no rule at all. The gate's
+   equivalent was already `gate-rail-foot`; this follows it. */
+.brief-rail-foot {
   flex-shrink: 0;
   padding: 0.5rem;
   border-top: 0.0625rem solid var(--hairline);
@@ -4274,11 +4460,22 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
 .brief-scope-link:hover { color: var(--ink-action); }
 .brief-withheld { color: var(--ink-warn); font-weight: var(--fw-semibold); }
 
+/* ── THE QUIETEST OF THREE LEVELS ──
+   It was `--ink-primary`, which was right while it labelled two sections of a
+   flat list. The settings rail is a tree now: group label, page name, page
+   state. The group is a signpost read once on the way past; the page name is
+   what somebody came to find. A label at full contrast over children at less
+   inverted that, so the eye landed on "CLIENT" before "Dynamic fields".
+
+   Same rule as `.set2-sec-t` on the page itself, and deliberately so — the
+   rail is a table of contents for that surface and the two should agree about
+   what is loud. */
 .brief-section-label {
-  font-size: var(--ty-meta); font-weight: var(--fw-bold);
+  font-size: var(--ty-micro); font-weight: var(--fw-bold);
   letter-spacing: var(--ls-wide); text-transform: uppercase;
-  color: var(--ink-primary); margin-top: 0.5rem;
+  color: var(--ink-faint); margin-top: 1rem;
 }
+.rail-cfg-back + .brief-section-label { margin-top: 0.25rem; }
 /* A bare shelf takes two ways in, and the second one needs naming: the file
    route existed as a drag gesture and nothing else, which is invisible until
    you are already doing it. */
@@ -5162,10 +5359,10 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
 .dv-subject-state { margin: 0; font-size: var(--ty-meta); line-height: 1.5; color: var(--d400); }
 .dv-subject .rail-act { margin-top: 0; }
 
-/* ── Linked documents as content, not as description ──
-   Same row the rail uses, so a linked article reads identically in both. */
-.dv-links { display: flex; flex-direction: column; gap: 0.25rem; }
-.dv-links .entry-action { align-self: flex-start; margin-top: 0.25rem; }
+/* `.dv-links` was here — the featured connection phrase rendered as content
+   inside `.dv-record`. It read as one more editable property row and was the
+   only thing in that column you could not type into. It is one block in the
+   rail again; see connectionsBlock for why it was ever two. */
 
 @media (max-width: 900px) {
   /* Two lists side by side stop comparing and start wrapping. */

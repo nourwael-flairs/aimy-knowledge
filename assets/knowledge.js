@@ -1454,7 +1454,7 @@
   /* The settings view's own keys, kept apart from ALL_KEYS on purpose: those
      are FILTERS, and changing one re-composes the working set. These are a
      PLACE YOU ARE. The two clear each other in `patch` for that reason. */
-  const SET_KEYS  = ['m', 'skill', 'sc', 'sp', 'crm', 'f', 'who'];
+  const SET_KEYS  = ['m', 'skill', 'sc', 'sp', 'crm', 'f', 'who', 'sec'];
 
   /* Parse a query string into the full state object. Split out from `readURL`
      so a stored conversation can be turned back into state by the same code
@@ -1528,6 +1528,12 @@
                     Support belongs to Upland. A scope you cannot change is a
                     scope nobody checks. */
                  sc: p.get('sc') || '',
+                 /* Which PAGE of a module. A module is a group of settings
+                    pages now, not one long page with a map down its side, so
+                    "Connections" names three destinations and this says which
+                    of them you are on. Absent means the first — a link to a
+                    module without one lands where opening it lands. */
+                 sec: p.get('sec') || '',
                  sp: p.get('sp') || '',
                  crm: p.get('crm') || '',
                  /* Which record the detail panel is showing. A place you are,
@@ -1589,6 +1595,7 @@
     if (st.m) p.set('m', st.m);
     if (st.skill) p.set('skill', st.skill);
     if (st.sc) p.set('sc', st.sc);
+    if (st.sec) p.set('sec', st.sec);
     if (st.sp) p.set('sp', st.sp);
     if (st.crm) p.set('crm', st.crm);
     if (st.who) p.set('who', st.who);
@@ -1680,6 +1687,10 @@
          Config. */
       if (changes.crm === undefined) st.crm = '';
       if (changes.who === undefined) st.who = '';
+      /* A page id belongs to the module that lists it. `sec=webhooks` carried
+         into Connections names nothing there, and the module would fall back
+         to its first page anyway — silently, with a dead key in the URL. */
+      if (changes.sec === undefined) st.sec = '';
       /* A filter set belongs to the module that drew the controls. Carrying
          `role:Admin` from People into Skills would narrow a list by a key it
          has never heard of, invisibly. */
@@ -5494,6 +5505,21 @@
   ═══════════════════════════════════════════════ */
   let railOpen = true;
 
+  /* ── Which rail blocks you shut ──
+
+     All three open on arrival. The `<details>` themselves cannot remember what
+     you did with them, because renderDoc rewrites the rail's markup on every
+     repaint and the browser has nothing to restore across a fresh element —
+     which the old comment on `railBlock` claimed the opposite of, for as long
+     as the rail has existed. Closing one held until the next keystroke
+     committed a field, and then it opened again by itself.
+
+     So the exception is ours, and it is stored as the exception: shut blocks
+     only, by name, module-level beside railOpen for the same reason — it is a
+     preference about the chrome, not a fact about a document, and it should
+     not reset because you opened a different one. */
+  const railShut = {};
+
   /* Some documents carry an ingestion marker in the owner field rather than a
      person. As a label over a value that read as odd data; as a sentence,
      "Owned by Ingested · Zendesk" reads as nonsense. The phrase treatment makes
@@ -5562,10 +5588,10 @@
     </div>`;
   }
 
-  /* The rail. Four blocks, each a `<details>` so the browser keeps what you
-     opened without any state of ours. */
-  const railBlock = (title, open, body, n) => `
-    <details class="rail-block"${open ? ' open' : ''}>
+  /* The rail. Four blocks, each a native `<details>`, open unless you shut
+     this one — see railShut, which is the only reason the key is passed. */
+  const railBlock = (key, title, body, n) => `
+    <details class="rail-block" data-rail-block="${key}"${railShut[key] ? '' : ' open'}>
       <summary>
         <svg class="tree-chev" width="11" height="11" viewBox="0 0 24 24" fill="none"
              stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
@@ -5589,26 +5615,49 @@
      work out for themselves. */
   const claimsOf = (o) => edgesOf('doc', o.id).filter((e) => ASSERTED_PHRASES.indexOf(e.phrase) > -1);
 
-  /* `skip` names phrases the DOCUMENT is already carrying as content — a
-     ticket's *Related to* renders beside its resolution, where it is the
-     evidence trail rather than a description of the object. Leaving it in both
-     places is 316px of the rail restating the page, which is the finding this
-     block was already cut down for. Defaults to skipping nothing. */
-  function connectionsBlock(o, skip) {
-    const drop = skip || [];
-    const edges = claimsOf(o).filter((e) => drop.indexOf(e.phrase) < 0);
+  /* ── ONE PLACE FOR WHAT A DOCUMENT IS CONNECTED TO ──
+
+     This took a `skip` list. One phrase per type — a ticket's *Answered by*, a
+     web page's *References* — was pulled OUT of here and rendered inside
+     `.dv-record`, in the run of the type's editable rows, on the grounds that
+     a resolution nobody can trace is evidence of one case only and the article
+     answering it should not be three blocks away behind a closed <details>.
+
+     THE <details> ARE NOT CLOSED ANY MORE. All three rail blocks open on
+     arrival, so the premise that split rested on is gone — and what the split
+     left behind is worse than the problem it solved: a read-only list of links
+     standing in a column of editable property rows, in their exact clothes,
+     with no control on it and nothing saying why. Everything around it could
+     be typed into; it could not.
+
+     So it comes back, and the spec that named a phrase now names the one to
+     FEATURE rather than the one to remove. Featured means two things: it leads
+     the block, and it renders even when it is empty — so a ticket with nothing
+     answering it still says why that is worth knowing instead of falling
+     silent about the one connection its type is defined by. */
+  function connectionsBlock(o, feature) {
     const groups = {};
-    edges.forEach((e) => { (groups[e.phrase] = groups[e.phrase] || []).push(e); });
+    claimsOf(o).forEach((e) => { (groups[e.phrase] = groups[e.phrase] || []).push(e); });
     const keys = Object.keys(groups);
-    return (keys.length
-      ? keys.map((phrase) => `<div class="rail-conn">
+    const lead = feature && feature.phrase;
+    /* Featured but unfilled: the group is still drawn, carrying the type's own
+       sentence about the absence. */
+    if (lead && keys.indexOf(lead) < 0) keys.unshift(lead);
+    else if (lead) keys.splice(keys.indexOf(lead), 1), keys.unshift(lead);
+
+    const group = (phrase) => `<div class="rail-conn">
           <span class="rail-conn-phrase">${esc(phrase)}</span>
-          ${groups[phrase].map((e) => `<button class="rail-conn-item"
-            ${e.kind === 'doc' ? `data-open-doc="${esc(e.id)}"` : `data-peek="${esc(e.kind)}:${esc(e.id)}"`}>
-            <span class="rail-conn-label">${esc(e.label)}</span>
-            ${e.by ? `<span class="rail-conn-by">${esc(e.by)}, ${esc(fmtShort(e.at))}</span>` : ''}
-          </button>`).join('')}
-        </div>`).join('')
+          ${(groups[phrase] || []).length
+            ? groups[phrase].map((e) => `<button class="rail-conn-item"
+                ${e.kind === 'doc' ? `data-open-doc="${esc(e.id)}"` : `data-peek="${esc(e.kind)}:${esc(e.id)}"`}>
+                <span class="rail-conn-label">${esc(e.label)}</span>
+                ${e.by ? `<span class="rail-conn-by">${esc(e.by)}, ${esc(fmtShort(e.at))}</span>` : ''}
+              </button>`).join('')
+            : `<p class="rail-empty">${esc((feature && feature.empty) || 'Nothing yet.')}</p>`}
+        </div>`;
+
+    return (keys.length
+      ? keys.map(group).join('')
       : '<p class="rail-empty">Nobody has connected this to anything yet.</p>')
       /* Finding a connection is a search over forty-two documents. It was in
          here — a neighbour list plus a picker holding thirty-four hidden rows
@@ -5869,11 +5918,11 @@
     return viewFor(o).ready(o);
   }
 
-  /* The rail's three blocks, addressed by name so a view can order them and
-     say which one opens. `railBlock` itself is untouched — still a native
-     `<details>`, so what you opened survives every repaint with no state of
-     ours. `view` is optional: without one every block behaves exactly as it
-     did when the order was hard-coded. */
+  /* The rail's three blocks, addressed by name so a view can order them.
+     `railBlock` itself is untouched — still a native `<details>`, so what you
+     closed survives every repaint with no state of ours. `view` is optional:
+     without one every block behaves exactly as it did when the order was
+     hard-coded. */
   /* The boilerplate second paragraph, suppressed for anything you made here —
      a document you just typed has no ingestion to describe. Lifted out of the
      body template unchanged. */
@@ -6007,14 +6056,22 @@
   }
 
 
+  /* ── All three open ──
+
+     The order below is still the view's — a ticket leads with where it came
+     from, because a ticket's identity IS its source record — but which one
+     STARTS open is no longer a question a view gets asked. It answered "one
+     of them", and the other two then read as three labels stacked at the
+     bottom of the column: a document whose owner, collection, audience and
+     sources are all one click from being visible at all.
+
+     The `<details>` stay, so closing one still survives every repaint with no
+     state of ours. They just do not start closed. */
   const RAIL_BLOCK = {
-    what: (o, open) => railBlock('What it is', open, propsPanel(o)),
-    connects: (o, open, view) => {
-      const skip = view && view.links ? [view.links.phrase] : [];
-      return railBlock('What it connects to', open, connectionsBlock(o, skip),
-        claimsOf(o).filter((e) => skip.indexOf(e.phrase) < 0).length);
-    },
-    came: (o, open, view) => railBlock('Where it came from', open,
+    what: (o) => railBlock('what', 'What it is', propsPanel(o)),
+    connects: (o, view) => railBlock('connects', 'What it connects to',
+      connectionsBlock(o, view && view.links), claimsOf(o).length),
+    came: (o, view) => railBlock('came', 'Where it came from',
       provenanceBlock(o, view && view.ownsSync ? { skipSync: true } : null))
   };
 
@@ -6028,26 +6085,9 @@
      contenteditable and `writeBody` writes its innerHTML back to `o.html` on
      the first edit, so anything rendered inside it becomes the document's own
      stored content the first time somebody types. */
-  /* The claims a type carries as CONTENT rather than as rail description. A
-     ticket's resolution that nobody can trace is evidence of one case only, so
-     the article that answers it belongs beside it rather than three blocks
-     away behind a closed <details>. The rail's own block still renders every
-     OTHER phrase — RAIL_BLOCK.connects is told which one it has lost. */
-  function recordLinks(o, spec) {
-    const rows = claimsOf(o).filter((e) => e.phrase === spec.phrase && e.kind === 'doc');
-    return `<div class="dv-links">
-      <span class="prop-lead">${esc(spec.lead)}</span>
-      ${rows.length
-        ? rows.map((e) => `<button class="rail-conn-item" data-open-doc="${esc(e.id)}">
-            ${byId(e.id) ? TYPES[byId(e.id).t].ico.replace('<svg', '<svg width="11" height="11"') : ''}
-            <span class="rail-conn-label">${esc(e.label)}</span>
-            ${e.by ? `<span class="rail-conn-by">${esc(e.by)}, ${esc(fmtShort(e.at))}</span>` : ''}
-          </button>`).join('')
-        : `<p class="rail-empty">${esc(spec.empty)}</p>`}
-      ${entryAction('investigate', 'Connect it to documents',
-        `data-act="connect" data-obj="${o.id}"`, AIMY_MARK(12, 14))}
-    </div>`;
-  }
+  /* `recordLinks` was here: the featured connection phrase, rendered inside
+     the record beside the editable rows. See connectionsBlock — it is one
+     block in the rail again, and the reason it was ever two is gone. */
 
   /* ── The record: what this kind of thing is, editable where it leads ──
 
@@ -6062,17 +6102,15 @@
   function docRecord(o, view) {
     const facts  = view.facts  ? view.facts(o)  : '';
     const fields = view.fields ? view.fields(o) : '';
-    const links  = view.links  ? recordLinks(o, view.links) : '';
     const note   = switchNote(o);
     /* A type with nothing to say renders no zone rather than an empty box
        still taking its padding — the rule typeBody already follows. */
-    if (!facts && !fields && !links && !note) return '';
+    if (!facts && !fields && !note) return '';
     return `<section class="dv-record" data-type="${esc(o.t)}"
                      aria-label="${esc(TYPES[o.t].label)} record">
       ${note}
       ${facts ? `<div class="dv-typed">${facts}</div>` : ''}
       ${fields ? `<div class="prop-rows">${fields}</div>` : ''}
-      ${links}
     </section>`;
   }
 
@@ -6224,7 +6262,7 @@
     article: {
       regions: ['prose', 'record'],
       prose:   'primary',
-      rail:    [['what', true], ['connects', false], ['came', false]],
+      rail:    ['what', 'connects', 'came'],
       fields:  (o) => typeFieldRows(o),
       start:   ['ai', 'file', 'connect'],
       ai:      { blank:  ['Write a first draft', 'Outline it'],
@@ -6244,11 +6282,14 @@
     ticket: {
       regions: ['record', 'prose'],
       prose:   'secondary',
-      rail:    [['came', true], ['what', false], ['connects', false]],
+      rail:    ['came', 'what', 'connects'],
       fields:  (o) => typeFieldRows(o),
       /* §6.3 names "linked articles" as a ticket's distinguishing CONTENT. The
          real edge is `answers`, so from this end it reads "Answered by". */
-      links:   { phrase: 'Answered by', lead: 'Answered by',
+      /* Featured in the rail's connections block: it leads, and it renders
+         even when empty, because a ticket with no traceable resolution is the
+         one thing §6.3 says a ticket cannot be. */
+      links:   { phrase: 'Answered by',
                  empty:  'Nothing answers it yet — a resolution nobody can trace is evidence of one case only.' },
       start:   ['ai', 'connect'],
       ai:      { blank:  ['Write a first draft'],
@@ -6274,7 +6315,7 @@
     icp: {
       regions: ['record', 'prose'],
       prose:   'secondary',
-      rail:    [['what', true], ['connects', false], ['came', false]],
+      rail:    ['what', 'connects', 'came'],
       /* Region and the service lines. Derived from o.region / o.services, not
          from o.x, so no field row restates them — and they are the two axes a
          seller filters a profile by. */
@@ -6299,9 +6340,11 @@
     campaign: {
       regions: ['record', 'prose'],
       prose:   'secondary',
-      rail:    [['what', true], ['connects', false], ['came', false]],
+      rail:    ['what', 'connects', 'came'],
       fields:  (o) => typeFieldRows(o),
-      links:   { phrase: 'References', lead: 'What it ran',
+      /* Featured in the rail's connections block, for the same reason: a
+         campaign whose asset list is empty is a campaign nobody can check. */
+      links:   { phrase: 'References',
                  empty:  'Nothing is linked to it yet — the asset list is the authority on what may be sent.' },
       start:   ['ai', 'connect'],
       ai:      { blank:  ['Write a first draft', 'Outline it'],
@@ -6321,7 +6364,7 @@
       /* The document is a record ABOUT a file, so picking a file replaces the
          one it is about rather than making a second document beside it. */
       ownsFile: true,
-      rail:    [['what', true], ['came', false], ['connects', false]],
+      rail:    ['what', 'came', 'connects'],
       fields:  (o) => typeFieldRows(o),
       /* No 'file': the subject already carries Attach/Replace, and it is the
          one control on the page that is about the actual content. Two buttons
@@ -6350,7 +6393,7 @@
       regions: ['subject', 'record', 'prose'],
       prose:   'absent',
       ownsFile: true,
-      rail:    [['what', true], ['came', false], ['connects', false]],
+      rail:    ['what', 'came', 'connects'],
       fields:  (o) => typeFieldRows(o),
       start:   ['ai', 'connect'],
       ai:      { blank:  ['Write a first draft'],
@@ -6366,7 +6409,7 @@
     story: {
       regions: ['record', 'prose'],
       prose:   'secondary',
-      rail:    [['what', true], ['connects', false], ['came', false]],
+      rail:    ['what', 'connects', 'came'],
       facts:   (o) => axisTags(o) + (o.client && CLIENTS[o.client] ? tcSum(CLIENTS[o.client]) : ''),
       fields:  (o) => typeFieldRows(o, ['quote']) +
                       xFaced(o, 'quote', 'They said', xVal(o, 'quote')
@@ -6390,7 +6433,7 @@
     blog: {
       regions: ['prose', 'record'],
       prose:   'primary',
-      rail:    [['what', true], ['came', false], ['connects', false]],
+      rail:    ['what', 'came', 'connects'],
       fields:  (o) => typeFieldRows(o, ['canonical']) +
                       xFaced(o, 'canonical', 'Canonical at', xVal(o, 'canonical') && xVal(o, 'canonical') !== '—'
                         ? `<span class="tc-mono">${esc(xVal(o, 'canonical'))}</span>` : '—'),
@@ -6416,7 +6459,7 @@
       regions: ['subject', 'record', 'prose'],
       prose:   'secondary',
       ownsSync: true,
-      rail:    [['came', true], ['what', false], ['connects', false]],
+      rail:    ['came', 'what', 'connects'],
       start:   ['ai', 'connect'],
       ai:      { blank:  ['Write a first draft'],
                  filled: ['Rewrite for readers', 'Shorten', 'Fill the gaps'] },
@@ -6449,8 +6492,21 @@
     const owns = responsible(o) === USER.owner;
     const keep = stage.dataset.doc === o.id ? $('#docCanvas') && $('#docCanvas').scrollTop : 0;
     const live = document.activeElement;
-    const armed = live && live.getAttribute && live.getAttribute('contenteditable') === 'true' && isEditable(live)
-      ? (live.id === 'editBody' ? '#editBody' : '[data-edit-title]') : null;
+    /* ── What was being typed into, across the paint that replaces it ──
+
+       `armedSel` first: see armEditable. activeElement is right when renderDoc
+       is called from anywhere but a focus transition, and wrong on the one
+       path — title to body — where losing it costs you the body.
+
+       Only for a paint of the SAME document. A different one opens read-first
+       like every other, and carrying an arming across the gap would open it
+       with the caret already in the text of a document nobody has touched. */
+    const same = stage.dataset.doc === o.id;
+    if (!same) { armedSel = null; armedAt = null; }
+    const armed = !same ? null : armedSel
+      || (live && live.getAttribute && live.getAttribute('contenteditable') === 'true' && isEditable(live)
+      ? (live.id === 'editBody' ? '#editBody' : '[data-edit-title]') : null);
+    const armedPoint = armedAt;
     /* ── A record field keeps its caret across the repaint that commits it ──
 
        For a list field the repaint IS the commit: `data-x-add` writes the
@@ -6581,7 +6637,7 @@
                The titles are the questions each one answers, in parallel, so
                the summary alone tells you whether to open it. "About it" was
                vague enough to mean any of the three. -->
-          ${rail.map(([k, open]) => RAIL_BLOCK[k](o, open, view)).join('')}
+          ${rail.map((k) => RAIL_BLOCK[k](o, view)).join('')}
           <div class="rail-foot">
             <!-- Not on a draft. Nobody else can read it, so there is nobody to
                  report it to and no thread for the report to land in — pressing
@@ -6630,8 +6686,34 @@
       const f = $(openInput);
       if (f) { f.focus(); if (f.select) f.select(); }
     }
-    else if (armed) { const el = $(armed); if (el) { armEditable(el); caretToEnd(el); } }
-    else if (blank) { const t = $('[data-edit-title]'); if (t) setTimeout(() => armEditable(t), 80); }
+    /* The point, when the repaint was caused by a click that had one: the
+       layout it lands in is the layout that was clicked, so the same
+       coordinates put the caret where the pointer is. caretToEnd is the
+       fallback for the repaints nobody pointed at — an AI accept, a field
+       commit — where the end of what you were writing is where you were. */
+    else if (armed) {
+      const el = $(armed);
+      if (el) {
+        if (armedPoint) armEditable(el, armedPoint.x, armedPoint.y);
+        else { armEditable(el); caretToEnd(el); }
+        /* Consumed. The point belongs to the gesture that armed the block and
+           this is that gesture's paint; a later one — an AI accept, a field
+           commit — belongs at the end of what has been written since, not back
+           at where the pointer first went down. */
+        armedAt = null;
+        /* A point outside the block it was taken in — the page reflowed, or
+           the click was on the padding — leaves the caret nowhere. */
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount || !el.contains(sel.anchorNode)) caretToEnd(el);
+      }
+    }
+    /* A new document opens with the caret in its title. Only if nothing else
+       is armed by the time the timer runs — otherwise a click that landed in
+       the body between the paint and the timer is undone 80ms after it. */
+    else if (blank) {
+      const t = $('[data-edit-title]');
+      if (t) setTimeout(() => { if (!armedSel && !$('.doc-page [contenteditable="true"]')) armEditable($('[data-edit-title]')); }, 80);
+    }
 
     /* Last, because it reads the body out of the page this function just put
        there. See bodyDrawn: what the renderer made of a stored summary is the
@@ -6672,12 +6754,34 @@
   function caretToStart(el) { const r = document.createRange(); r.selectNodeContents(el); r.collapse(true); putCaret(r); }
   function caretToEnd(el)   { const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); putCaret(r); }
 
+  /* ── What is armed, said by the code that armed it ──
+
+     renderDoc used to answer "what was being typed into" by reading
+     `document.activeElement`, and on the one path that matters most it read
+     the wrong thing. Moving from the title into the body fires `focusout` on
+     the title BEFORE the focus lands, and during that dispatch activeElement
+     is `<body>` — not the block we just armed. So the repaint the focusout
+     commits with saw nothing armed, drew a fresh un-armed body, and the blank
+     branch below put the caret back in the title 80ms later. On a new document
+     the title was the only thing you could ever type into.
+
+     `armedSel` is the intent, recorded where the intent is expressed. It
+     outlives the focus transition because it is not focus. `armedAt` carries
+     the point so the caret comes back where the pointer was and not at the end
+     of the prose. */
+  let armedSel = null;
+  let armedAt = null;
+  const selOf = (el) => el && el.id === 'editBody' ? '#editBody'
+    : el && el.hasAttribute && el.hasAttribute('data-edit-title') ? '[data-edit-title]' : null;
+
   function armEditable(el, x, y) {
     if (!el || el.getAttribute('contenteditable') === 'true') return;
     /* History is readable, never writable — the version banner says so and the
        attribute must agree with it. */
     if ($('.ver-preview')) return;
     el.setAttribute('contenteditable', 'true');
+    armedSel = selOf(el);
+    armedAt = typeof x === 'number' ? { x: x, y: y } : null;
     const page = el.closest('.doc-page');
     if (page && el.id === 'editBody') page.classList.add('is-writing');
     el.focus({ preventScroll: true });
@@ -6688,6 +6792,10 @@
 
   function disarmEditable(el) {
     if (!el || !el.removeAttribute) return;
+    /* Only the block that IS armed can disarm. The title's focusout arrives
+       after the body has already been armed by the same gesture, and clearing
+       unconditionally there is what threw the intent away. */
+    if (selOf(el) === armedSel) { armedSel = null; armedAt = null; }
     el.removeAttribute('contenteditable');
     const page = el.closest && el.closest('.doc-page');
     if (page) page.classList.remove('is-writing');
@@ -10609,8 +10717,22 @@
           /* A stepper button that takes focus blurs the input beside it, which
              commits and folds the row out from under the second click. */
           e.target.closest('[data-step]') ||
+          /* A blank document's starting moves — Draft with AiMY, Start from a
+             file, Connect it to documents — sit under a body, and a blank
+             document opens with its title armed. Every one of them therefore
+             blurred the title on mousedown, which committed it, which
+             repainted, which detached the button the click was still
+             travelling to: three dead controls on the one screen that has
+             nothing else on it. Same defect as the toolbar's, same fix. */
+          e.target.closest('.doc-start') ||
+          /* Accept, Edit and Reject on an AiMY proposal, for the same reason:
+             they sit under the body of a document whose title or body is
+             armed, so taking focus commits it, repaints, and detaches the
+             button mid-click. The foot only — the proposal's own <ins> is
+             editable while you are working on it, and that needs the caret
+             the default puts there. */
+          e.target.closest('.ai-suggestion-foot') ||
           e.target.closest('.dv-subject .entry-action') ||
-          e.target.closest('.dv-links .entry-action') ||
           /* Save and Discard are clicked FROM a field — that is the whole
              point of them — and a button there that takes focus blurs the
              field, which commits, which repaints, which detaches the button
@@ -10687,6 +10809,26 @@
       const t = e.target;
       const o = byId(readURL().doc);
       if (!o || !t.hasAttribute) return;
+      /* ── A repaint is not somebody leaving the field ──
+
+         Replacing the stage detaches whatever the caret was in, and the
+         browser reports that as a `focusout` on the detached element — one
+         frame later, indistinguishable at this listener from a click
+         somewhere else. So every paint was followed by a phantom commit of
+         the field it had just torn out, and that commit called the paint
+         again.
+
+         On a blank document that was the whole bug: clicking the body armed
+         it, which blurred the title, which repainted, which detached the body
+         and fired this handler on the corpse — disarming what had just been
+         armed and repainting once more, this time with nothing armed, so the
+         blank branch put the caret back in the title. The body could never be
+         typed into.
+
+         An element that is no longer in the document was not left by a
+         person. It was removed by us, and we have already written down
+         everything it held. */
+      if (!document.contains(t)) return;
       if (t.hasAttribute('data-x-val')) {
         commitXField(t);
         /* Every branch here ends in one of the two: a repaint, which settles
@@ -10754,11 +10896,47 @@
       if (e.target.hasAttribute && e.target.hasAttribute('data-report-what')) gateReport();
     });
 
+    /* Opening or shutting a rail block is remembered by name, so the next
+       repaint draws it the way you left it. `toggle` does not bubble, hence
+       the capture — and it never fires for the state an element is PARSED
+       with, so a repaint drawing the stored state cannot re-enter this. */
+    document.addEventListener('toggle', (e) => {
+      const d = e.target;
+      if (!d.matches || !d.matches('.rail-block[data-rail-block]')) return;
+      const k = d.getAttribute('data-rail-block');
+      if (d.open) delete railShut[k]; else railShut[k] = true;
+    }, true);
+
     /* Put the pointer in the text and the text becomes writable, at the point
        you touched. Nothing else on the page arms anything. */
     document.addEventListener('mousedown', (e) => {
       const el = e.target.closest && e.target.closest('[data-edit-title], #editBody');
-      if (el) armEditable(el, e.clientX, e.clientY);
+      if (!el) return;
+      const was = el.getAttribute('contenteditable') === 'true';
+      /* ── The browser's own focus arrives too late to be right ──
+
+         Its default for a mousedown is to focus the element the pointer went
+         down on, and it runs after this listener. If the caret is coming FROM
+         another field on this page, that is a blur, and every field here
+         commits on blur by repainting — so by the time the default runs, the
+         node it means to focus has been replaced. Focus lands on <body>
+         instead, blurring the block we just armed one frame after arming it,
+         and that blur commits and repaints AGAIN with nothing armed. The
+         second paint put the caret back in the title, which is why a new
+         document's body could never be typed into: it opens with the title
+         armed, so every first click into the body came from a field.
+
+         There is nothing for the default to do on that path. armEditable has
+         already focused the block and placed the caret at the point — it has
+         to, because the element was not editable when the pointer went down.
+
+         Only on that path. Arriving from outside the document repaints
+         nothing, so the default is left alone and a click-drag into unarmed
+         text selects, the way it does everywhere else. */
+      const from = document.activeElement;
+      const leaving = from && from !== el && from.closest && from.closest('.doc-page');
+      armEditable(el, e.clientX, e.clientY);
+      if (leaving && !was && el.getAttribute('contenteditable') === 'true') e.preventDefault();
     }, true);
 
     /* The keyboard cannot put a pointer anywhere, so the two blocks are
@@ -11119,8 +11297,23 @@
       /* The settings rail, and the way out of it. `data-m=""` is not a special
          case — an empty module IS the console, so leaving settings is state
          removal exactly like closing a document, and the back button unwinds
-         it for free. */
-      if ((el = t.closest('[data-m]'))) { patch({ m: el.getAttribute('data-m') }); return; }
+         it for free.
+
+         ── AND IT CARRIES THE PAGE ──
+         A module is a group of pages now and a rail row names both. This read
+         only the module, and settings.js had grown a second handler that read
+         both — so every click on a page row was patched twice, once correctly
+         and then once by this, which cleared `sec` because it did not know the
+         key existed. The result was a rail where the module rows worked and
+         every page row silently did nothing.
+
+         There is one router for a rail row, and it is this one: the rail lives
+         in this file's DOM and this file owns the URL. `data-sec` is read here
+         so the two facts on the row travel together. */
+      if ((el = t.closest('[data-m]'))) {
+        patch({ m: el.getAttribute('data-m'), sec: el.getAttribute('data-sec') || '' });
+        return;
+      }
       if ((el = t.closest('[data-view]'))) { patch({ view: el.getAttribute('data-view') }); return; }
       /* An insight's action belongs to the insight. needsYou() attaches a go()
          to every finding it returns, and each one already terminates in one of

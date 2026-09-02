@@ -74,25 +74,56 @@
    content beneath. Making it smaller and letting tracking do the work leaves
    the row names as the largest thing in the column, which is correct: the
    names are what you came to find. */
-/* ── THE HOLE IN THE SCALE ──
+/* ── THE HOLE IN THE SCALE, AND WHY IT CLOSED ──
    These were micro uppercase at `--ink-faint`, on the reasoning that a section
-   head is a signpost read once on the way past. Held up against the rendered
-   page that was wrong: the title is 28px and the next thing down was 12px, so
-   nothing carried the middle and every section floated unanchored above its
-   own content.
+   head is a signpost read once on the way past. That was overturned once,
+   correctly, for the page as it then stood: the title was 28px and the next
+   thing down was 12px, so nothing carried the middle and every section floated
+   unanchored above its own content. `--ty-title` restored the step.
 
-   `--ty-title` restores the step. Four levels now, each a readable distance
-   from the last: title 28 -> section 17 -> row name 13 -> meta 12. */
-.set2-sec { margin-top: 3rem; }
-.set2-sec:first-child { margin-top: 2rem; }
+   THE PAGE UNDER IT HAS CHANGED. That hole existed because a module was five
+   or six sections long and the title named the whole module — so the section
+   head was the only thing standing between a 28px page name and a 13px row,
+   and it had to carry the middle alone. A module is a group of PAGES now. The
+   title names the page, there is one section on most of them and two at most,
+   and the rail carries the map. There is no middle left to hold.
+
+   So the signpost reasoning applies again, and it is what was asked for: the
+   head goes quiet and the content gets the contrast. What is left is three
+   levels with the loud one in the middle, which is right — the row names are
+   what somebody came to read:
+
+     section head   micro uppercase, --ink-faint   read once
+     row name       13px, --ink-primary            what you came for
+     row detail     meta, --ink-quiet              why it matters
+
+   The rule under it does the separating the size used to. */
+.set2-sec { margin-top: 2.75rem; }
+.set2-sec:first-child { margin-top: 1.75rem; }
 .set2-sec-h {
   display: flex; align-items: baseline; gap: 0.75rem;
-  margin-bottom: 0.875rem; padding-bottom: 0.6875rem;
+  margin-bottom: 0.75rem; padding-bottom: 0.5rem;
   border-bottom: 0.0625rem solid var(--hairline);
 }
+/* ── QUIET, NOT SHOUTED ──
+   The first pass at "muted" reached for micro uppercase with wide tracking,
+   which is the treatment this file uses for a LABEL — the rail's group names,
+   a table's column heads. A section head is a heading, and setting it in the
+   label's clothes made it read as a column head over the whole section: all
+   caps, letter-spaced, and still the first thing your eye hit because caps
+   carry further than the size suggests.
+
+   Muted is a job for colour and weight. So the head keeps normal sentence
+   case and normal tracking like every other piece of running type on the
+   surface, and recedes by being quieter and smaller than the rows beneath it.
+   The rule under it does the separating.
+
+     section head   15px semibold, --ink-quiet    read once
+     row name       15px,          --ink-primary  what you came for */
 .set2-sec-t {
-  font-size: var(--ty-title); font-weight: var(--fw-semibold);
-  letter-spacing: var(--ls-tight); color: var(--ink-primary);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
+  letter-spacing: normal; text-transform: none;
+  color: var(--ink-quiet);
   line-height: var(--lh-snug);
 }
 .set2-sec-end {
@@ -1671,129 +1702,19 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 }
 
 
-/* ══════════════════════════════════════════════════════════════════════════
-   THE SPINE
+/* ── THE SPINE'S GUTTER, LEFT EMPTY ──
+   `.set2-stage`, `.set2-spine*` and their responsive fallback have gone with
+   the component. The map they drew now lives in the rail, beside the other
+   list of destinations it was duplicating.
 
-   `.set2-col` is 46rem inside a 1160px frame — 212px of dead gutter on each
-   side. The spine is 11.25rem + a 2rem gap = exactly 212px, so it fills the
-   left gutter and the content column keeps the x it has always had. Left
-   edge at 512 on every module, spine or no spine.
-   ══════════════════════════════════════════════════════════════════════════ */
-.set2-stage {
-  display: grid;
-  grid-template-columns: 11.25rem minmax(0, 1fr);
-  gap: 2rem;
-  /* NOT `align-items: start`. A sticky element can only travel inside its own
-     containing block, and `start` shrank this column to the height of the
-     spine — about 400px of a 2700px page — so the spine stopped following
-     after the first screen and the unsaved block went with it. Stretched, the
-     column is as tall as the content beside it and sticky has somewhere to
-     go. */
-}
-/* The column's auto margins centred it in the frame. Inside the grid the
-   track does that job, so the margins would double-count. */
-.set2-stage > .set2-col { margin: 0; }
+   Nothing took the space. The 11.25rem track plus its 2rem gap was dead gutter
+   before the spine existed, so `.set2-col` keeps its own auto margins and its
+   left edge is back where it was on a module that never had a spine — which
+   was the same place, which is why the column does not move. */
 
-/* At rest the spine starts level with the FIRST SECTION, not with the module
-   title -- 01 should sit beside the thing it names. That offset lives on the
-   wrapper rather than on the sticky element itself, or it would travel up with
-   the nav and hold it 6rem below the top of the page for the whole scroll. */
-.set2-spine-w { padding-top: 9.75rem; }
-/* The nav AND what sits under it follow the scroll together. With sticky on
-   the nav alone, the unsaved block was a static sibling below it and scrolled
-   away — the one element that must never be out of reach was the one that
-   left. */
-.set2-spine-stick { position: sticky; top: 1.5rem; }
-.set2-spine { display: flex; flex-direction: column; }
-
-.set2-spine-i {
-  position: relative;
-  display: grid;
-  /* Two columns, not three. The numeral column went with the numerals. */
-  grid-template-columns: 1rem minmax(0, 1fr);
-  align-items: start; gap: 0.5rem;
-  padding: 0.4375rem 0.5rem 0.4375rem 0;
-  appearance: none; border: 0; background: none; cursor: pointer;
-  text-align: left; font: inherit;
-  border-radius: var(--r-sm);
-  transition: background-color var(--t-fast) var(--ease-out);
-}
-.set2-spine-i:hover { background: var(--card-bg); }
-.set2-spine-i:focus-visible {
-  outline: 0.125rem solid var(--brand); outline-offset: -0.125rem;
-}
-
-/* The thread. Drawn per item down to the next one rather than as one rule
-   behind the whole list, so it starts and stops at a dot instead of floating
-   past the first and last. */
-/* Centred on the dot column rather than measured to it. `left: 1.90625rem`
-   was 30.5px — the file's only sub-pixel value, and it only existed because
-   the offset was hand-computed from a numeral column that no longer exists. */
-.set2-spine-i::before {
-  content: ""; position: absolute;
-  left: 0.5rem; transform: translateX(-50%);
-  top: 1.375rem; bottom: -0.3125rem;
-  width: 0.0625rem; background: var(--hairline);
-}
-.set2-spine-i:last-child::before { display: none; }
-
-.set2-spine-dot {
-  width: 0.5rem; height: 0.5rem; border-radius: 50%;
-  margin-top: 0.3125rem; justify-self: center;
-  background: var(--ink-rule);
-  /* The page's own background, so the thread passes behind the dot and stops
-     at its edge rather than through it. */
-  box-shadow: 0 0 0 0.1875rem var(--body-bg);
-}
-.set2-spine-dot.sd-ok   { background: var(--ok); }
-.set2-spine-dot.sd-warn { background: var(--warn); }
-.set2-spine-dot.sd-err  { background: var(--err); }
-
-.set2-spine-l { display: flex; flex-direction: column; gap: 0.0625rem; min-width: 0; }
-.set2-spine-name {
-  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
-  letter-spacing: 0.07em; text-transform: uppercase;
-  color: var(--ink-quiet); line-height: 1.35;
-  transition: color var(--t-fast) var(--ease-out);
-}
-.set2-spine-note {
-  font-size: var(--ty-micro); color: var(--ink-faint);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-/* ── WHERE YOU ARE ──
-   Reading position is not a selection, so it does not get a fill or a border.
-   The name comes up to full contrast and the mark goes brand: the two things
-   that were deliberately quiet are the two that speak. */
-.set2-spine-i.is-here .set2-spine-name { color: var(--ink-primary); }
-/* The ring is BRAND, like the mark beside it. It was `--accent-rgb`, which put
-   a purple halo next to a blue numeral and made one state read as two. */
-.set2-spine-i.is-here .set2-spine-dot {
-  box-shadow: 0 0 0 0.1875rem var(--body-bg),
-              0 0 0 0.3125rem color-mix(in srgb, var(--brand) 38%, transparent);
-}
-
-/* Below the point where the gutter stops existing, the spine goes horizontal
-   and scrolls: the same map, laid along the top of the page it describes. */
-@media (max-width: 78rem) {
-  .set2-stage { grid-template-columns: minmax(0, 1fr); gap: 0; }
-  .set2-stage > .set2-col { margin: 0 auto; }
-  .set2-spine-w { padding-top: 0; }
-  .set2-spine-stick { position: static; }
-  .set2-spine {
-    padding: 0 2rem; margin-bottom: -0.5rem;
-    flex-direction: row; gap: 0.25rem;
-    overflow-x: auto; scrollbar-width: none;
-  }
-  .set2-spine::-webkit-scrollbar { display: none; }
-  .set2-spine-i { flex: 0 0 auto; grid-template-columns: auto auto auto; align-items: center; }
-  .set2-spine-i::before { display: none; }
-  .set2-spine-dot { margin-top: 0; box-shadow: none; }
-  .set2-spine-l { flex-direction: row; align-items: baseline; gap: 0.375rem; }
-}
 
 @media (prefers-reduced-motion: reduce) {
-  .set2-spine-i, .set2-spine-name { transition-duration: 0.01ms !important; }
+  .rail-grp-x svg, .rail-fix-go { transition-duration: 0.01ms !important; }
 }
 
 
@@ -1839,7 +1760,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
    Contrast was never the problem — every one of them passes AA at 6.08:1.
    Telling them apart was.
    ══════════════════════════════════════════════════════════════════════════ */
-.set2-tally, .set2-spine-note, .set2-from { font-variant-numeric: tabular-nums; }
+.set2-tally, .rail-pg-s, .set2-from { font-variant-numeric: tabular-nums; }
 
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -2365,7 +2286,6 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
    prose/data split already established.
    ══════════════════════════════════════════════════════════════════════════ */
 body.is-settings .set2-col,
-body.is-settings .set2-stage,
 body.is-settings .set2-scrim,
 body.is-settings .set2-pop {
   --ty-micro:   0.875rem;   /* 14 - FLOOR: counts, captions, help */
@@ -2378,7 +2298,6 @@ body.is-settings .set2-pop {
    Test sync, Run sync, Save, Confirm and Delete now -- the most consequential
    controls on the surface were the smallest text on it. */
 body.is-settings .set2-col .btn-sm,
-body.is-settings .set2-stage .btn-sm,
 body.is-settings .set2-scrim .btn-sm,
 body.is-settings .set2-pop .btn-sm { font-size: 0.875rem; }
 
@@ -2504,3 +2423,36 @@ body.is-settings .set2-key { font-size: var(--ty-meta); }
 @media (prefers-reduced-motion: reduce) {
   .set2-map-row .set2-map-plus, .set2-map-row .set2-x { transition-duration: 0.01ms !important; }
 }
+
+/* ── WHERE THE QUICK ACTION LANDED ──
+   A fix from the rail navigates and then has to say WHICH row it meant. The
+   mark is a state of the arrival, not of the row: it fades on its own and does
+   not survive the next thing you do, because "this is the one" stops being
+   true the moment you have seen it.
+
+   A ring rather than a fill. The rows it lands on already carry their own
+   colour — a broken mapping is red, a failed run is red — and filling them
+   again would say the same thing twice while hiding the state underneath. */
+.is-found {
+  animation: setFound 2.4s var(--ease-out) forwards;
+  border-radius: var(--r-sm);
+}
+@keyframes setFound {
+  0%   { box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--brand) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--brand) 55%, transparent); }
+  100% { box-shadow: 0 0 0 0.1875rem transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-found { animation: none; box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--brand) 55%, transparent); }
+}
+
+/* ── A ONE-SECTION PAGE HAS ALREADY BEEN NAMED ──
+   See pageBody. The head's RULE stays, and so does whatever sits on its right
+   — the connector picker and the tallies are not the title and are not
+   repetition. Only the words that the page title just said come off. */
+.set2-solo .set2-sec:first-child > .set2-sec-h > .set2-sec-t { display: none; }
+.set2-solo .set2-sec:first-child { margin-top: 1.25rem; }
+/* With the title gone the row is whatever the right-hand side needs, and on a
+   page carrying nothing there it is a hairline under the header — which is the
+   separator the title used to sit on anyway. */
+.set2-solo .set2-sec:first-child > .set2-sec-h { min-height: 1.5rem; align-items: center; }

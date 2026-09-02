@@ -42,6 +42,10 @@
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   /* ═══ ICONS ═══ */
+  /* The same symbol knowledge.js uses, from the same sprite. A quick action is
+     AiMY's reading of a page, and it has to be recognisable as that from the
+     rail without a legend. */
+  const AIMY = '<svg class="rail-fix-m" width="11" height="12" viewBox="0 0 18 20" aria-hidden="true"><use href="#aimy-logo-small"/></svg>';
   const I = {
     warn: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.6 1.8 13.4h12.4z"/><path d="M8 6.6v3"/><path d="M8 11.6h.01"/></svg>',
     info: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.4v3.4"/><path d="M8 5.2h.01"/></svg>',
@@ -957,6 +961,13 @@
   const ALIAS = { connections: 'config', people: 'access', webhooks: 'enable',
                   apis: 'enable', failures: 'config', sync: 'config',
                   retention: 'config', roles: 'access', hierarchy: 'access' };
+  /* Several of those name a SECTION, and sections are pages now — so the ones
+     that do land on the page holding them rather than on the module's first.
+     `?m=retention` used to mean "Sync, scroll to find it"; it means the page
+     the threshold is on. */
+  const ALIAS_SEC = { webhooks: 'webhooks', apis: 'webhooks', failures: 'sync',
+                      sync: 'sync', retention: 'relevance', people: 'people',
+                      roles: 'roles', hierarchy: 'scopes' };
   const aliasOf = (id) => ALIAS[id] || id;
   const moduleById = (id) => MODULES.filter((m) => m.id === aliasOf(id))[0];
 
@@ -1414,7 +1425,12 @@
     const picked = PICKED.has(p.id);
     const n = reachCount(p);
     return `
-      <div class="set2-person${picked ? ' is-picked' : ''}" data-person="${esc(p.id)}">
+      ${/* Two facts a quick action needs to locate: an invite nobody accepted,
+             and somebody who can reach nothing. Both were readable on the card
+             and neither was addressable. */ ''}
+      <div class="set2-person${picked ? ' is-picked' : ''}${
+          !p.grants.length ? ' is-none' : p.s[0] === 'is-warn' ? ' is-warn' : ''
+        }" data-person="${esc(p.id)}">
         <div class="set2-person-hd">
           <button class="set2-ck2" type="button" role="checkbox" aria-checked="${picked}"
                   data-pick-p="${esc(p.id)}" aria-label="Select ${esc(p.name)}">${picked ? I.tick : ''}</button>
@@ -1450,6 +1466,10 @@
   }
 
   M.access = function (st) {
+    return pageBody(st);
+  };
+
+  function secPeople(st) {
     const f = readF(st);
     const q = (f.q || '').toLowerCase();
     const list = PEOPLE.filter((p) => {
@@ -1511,9 +1531,8 @@
           </span>
         </div>` : ''}
 
-      ${M.roles()}
-      ${M.hierarchy()}`;
-  };
+      `;
+  }
 
   const CAPS = [
     ['AI Controls', [
@@ -2148,31 +2167,48 @@
 
   M.config = function (st) {
     if (!prodOf(st)) return noProducts(st);
-    const c = crmOf(st);
-    /* -- THE ORDER IS THE PIPELINE --
-       It was mapping, window, criteria, runs, retention, which is not a
-       sequence -- it is the order the sections happened to be written in. The
-       826px field tree sat first, so anyone arriving to check a failed run
-       scrolled the entire mapping to reach it.
-
-       Now it reads as what it is: which records come in, over what span, what
-       their fields mean, what happened when we pulled them, and what gets
-       dropped afterwards. The spine to the left numbers those five, and the
-       numbers are only honest because the order is. */
-    /* ── GROUPED BY WHAT THEY ARE ABOUT ──
-       It ran Records, Relevance, Fields, Failures, History, Retention -- the
-       two READING settings split by a sync form, the two SYNC sections split
-       by a mapping table, and the history stranded at the bottom away from the
-       thing that produces it.
-
-       Three groups now, in the order the data moves: what we read from the
-       CRM, what we pull and what happened when we pulled it, and what we
-       delete afterwards. Failures folded into the history, because a failed
-       run is a run. */
-    return secMapping(c, st) + secWindow(st)
-         + secCriteria(primaryOf(st), st) + secRuns(st)
-         + secRetention(st);
+    return pageBody(st);
   };
+
+  /* ── THE SECTIONS, ADDRESSED BY NAME ──
+     A page names the sections it composes and this resolves them. One table,
+     so adding a page is a line in SUBPAGES and never a change here, and a page
+     naming a section that does not exist fails loudly at the point of the
+     typo rather than rendering a shorter page than intended. */
+  const SECTION = {
+    mapping:    (st) => secMapping(crmOf(st), st),
+    window:     (st) => secWindow(st),
+    retention:  (st) => secRetention(st),
+    criteria:   (st) => secCriteria(primaryOf(st), st),
+    runs:       (st) => secRuns(st),
+    enrichment: (st) => secEnrichment(st),
+    apis:       (st) => M.apis(st),
+    people:     (st) => secPeople(st),
+    roles:      () => M.roles(),
+    scopes:     () => M.hierarchy()
+  };
+
+  /* ── ONE SECTION, ONE TITLE ──
+     Every page built from a single section said its own name twice: once as
+     the page title and again, 40px below it, as the section head — "Dynamic
+     fields" over "FIELDS", "Enrichment" over "ENRICHMENT". The section head
+     earns its place on a page with two of them and is pure repetition on a
+     page with one.
+
+     Marked here rather than removed in each renderer, because the sections are
+     shared: `retention` is a head worth having on the Data relevance page and
+     would be the same repetition if it ever stood alone. What is redundant is
+     the pairing, not the head, so the pairing is what carries the class. */
+  function pageBody(st) {
+    const pg = pageOf(st);
+    if (!pg) return '';
+    const out = pg.secs.map((k) => {
+      const f = SECTION[k];
+      if (!f) throw new Error('No section renderer named ' + k);
+      return f(st);
+    }).join('');
+    return pg.secs.length > 1 ? out : `<div class="set2-solo">${out}</div>`;
+  }
 
   /* ── Sync ── which records, when, what happened, and what gets pruned ── */
   /* ── TRIGGER SYNC ──
@@ -2477,6 +2513,10 @@
      produced beside it so that turning one off has a stated cost. */
   M.enable = function (st) {
     if (!prodOf(st)) return noProducts(st);
+    return pageBody(st);
+  };
+
+  function secEnrichment(st) {
     const on = ENABLE.filter((e) => e.on).length;
     return `
       <section class="set2-sec" id="st-enrichment">
@@ -2493,8 +2533,8 @@
                + toggle(e.on, e.name, `data-enable="${esc(e.id)}"`)
           })).join('')}
         </div>
-      </section>` + M.apis(st);
-  };
+      </section>`;
+  }
 
   /* ── APIs ══════════════════════════════════════════════════════════════
      The endpoint and the secret that reaches it. Split out of the console's
@@ -2557,8 +2597,12 @@
     const last = e.last[0]
       ? 'Last call: ' + e.last[0] + ' \u2014 ' + e.last[2]
       : 'Never called \u2014 live, but nothing has reached it yet.';
+    /* The health was in the pill and only in the pill, which a selector cannot
+       read. A quick action has to be able to find the endpoint that is down,
+       so the group carries the same fact as a class. */
+    const bad = e.last[1] === 'is-err' ? ' is-err' : e.last[1] === 'is-warn' ? ' is-warn' : '';
     return `
-      <div class="set2-wh-grp" id="st-api-${esc(c.id)}">
+      <div class="set2-wh-grp${bad}" id="st-api-${esc(c.id)}">
         ${named ? `<div class="set2-wh-hd"><h3 class="set2-wh-t">${esc(c.crm)}</h3>${pill(e.last[1], e.last[2])}</div>` : ''}
         <div class="set2-wh">
           <div class="set2-wh-row">
@@ -3182,7 +3226,15 @@
     const out = [];
     const add = (path, name, go) => out.push({ path: path, name: name, go: go });
 
-    MODULES.forEach((m) => add([m.g], m.name, { m: m.id }));
+    /* A module is a group of pages, so the destinations are the PAGES. The
+       module still resolves — someone typing "Connections" means the group and
+       gets its first page — but "Webhook settings" is now a result of its own
+       rather than something you find by opening Enablement and scrolling. */
+    MODULES.forEach((m) => {
+      add([m.g], m.name, { m: m.id });
+      (pagesOf(m.id) || []).forEach((pg) =>
+        add([m.g, m.name], pg.name, { m: m.id, sec: pg.id }));
+    });
 
     SKILLS.forEach((s) => add(['Admin', 'Skills'], s.name, { m: 'skills', skill: s.id }));
     AGENTS.forEach((a) => add(['Admin', 'Agents and tools'], a.name, { m: 'agents' }));
@@ -3198,19 +3250,23 @@
        which is worse than not finding them at all. */
     CONNECTIONS.forEach((c) => {
       const at = ['Client', c.product, c.crm];
-      add(['Client', 'Config'], c.product + ' and ' + c.crm, { m: 'config', sp: c.product, crm: c.crmId });
-      add(at, 'How far back to read', { m: 'config', sp: c.product, crm: c.crmId });
-      add(at, 'Which records to pull', { m: 'sync', sp: c.product });
-      add(at, 'Recent runs', { m: 'sync', sp: c.product });
-      add(at, 'Endpoint URL', { m: 'enable', sp: c.product });
-      add(at, 'Auth token', { m: 'enable', sp: c.product });
+      add(['Client', 'Connections'], c.product + ' and ' + c.crm,
+          { m: 'config', sec: 'fields', sp: c.product, crm: c.crmId });
+      add(at, 'How far back to read', { m: 'config', sec: 'relevance', sp: c.product, crm: c.crmId });
+      add(at, 'Which records to pull', { m: 'config', sec: 'sync', sp: c.product });
+      add(at, 'Recent runs', { m: 'config', sec: 'sync', sp: c.product });
+      add(at, 'Endpoint URL', { m: 'enable', sec: 'webhooks', sp: c.product });
+      add(at, 'Auth token', { m: 'enable', sec: 'webhooks', sp: c.product });
       c.maps.filter((m) => m.state !== 'unmapped').forEach((m) =>
-        add(at, m.ctx, { m: 'config', sp: c.product, crm: c.crmId }));
-      failures(c.id).forEach((f) => add(at.concat('Failures'), f.code, { m: 'sync', sp: c.product }));
+        add(at, m.ctx, { m: 'config', sec: 'fields', sp: c.product, crm: c.crmId }));
+      failures(c.id).forEach((f) =>
+        add(at.concat('Failures'), f.code, { m: 'config', sec: 'sync', sp: c.product }));
     });
     RETENTION.forEach((r) =>
-      add(['Client', 'Sync'], r.name + ' retention threshold', { m: 'sync' }));
-    ENABLE.forEach((e) => add(['Client', 'Knowledge enablement'], e.name, { m: 'enable' }));
+      add(['Client', 'Connections', 'Data relevance'], r.name + ' retention threshold',
+          { m: 'config', sec: 'relevance' }));
+    ENABLE.forEach((e) =>
+      add(['Client', 'Enablement', 'Enrichment'], e.name, { m: 'enable', sec: 'enrichment' }));
     return out;
   }
 
@@ -3287,19 +3343,151 @@
 
   const DOT = { ok: 'sd-ok', warn: 'sd-warn', err: 'sd-err' };
 
+  /* ══════════════════════════════════════════════════════════════════════
+     THE RAIL — one tree, muted labels, expandable parents
+
+     Modelled on the Twilio console's left nav and every console that shares
+     its shape: a muted group label, a parent row you can expand, one page per
+     leaf, and the leaf you are on marked. The reference set is on Mobbin —
+     Supabase for the label-over-children contrast step, Remote for the
+     expand-to-children behaviour.
+
+     THREE THINGS SEPARATE, and the file already had a rule for two of them:
+     the GROUP is a signpost read once, the PAGE NAME is what you came to find,
+     and the STATE is what the page is carrying. So the group label is quietest,
+     the page name is the loudest thing in the column, and the state sits under
+     it in meta. That is the same ladder `.set2-sec-t` follows on the page
+     itself, and it should be — the rail is a table of contents for a surface
+     that has to read as one surface.
+
+     WHAT IS EXPANDED. Exactly one group, or none. An accordion rather than a
+     set of independent drawers, and for the reason accordions exist: the rail
+     also carries the briefing and a way back to chat, and three groups open at
+     once pushed the last of them past the fold on a 950px window — so the
+     structure this exists to show could not be seen all at once, which is the
+     one thing it had to do.
+
+     One at a time also makes the closed rows worth reading. A group's dot is
+     the worst state under it, and a dot only says something when the thing it
+     summarises is folded away.
+
+     It is a preference about the chrome, so it lives here rather than in the
+     URL — a link should open a page, not restore somebody else's idea of which
+     drawer was pulled out. */
+  let RAIL_OPEN = null;
+  /* Which module RAIL_OPEN was an answer about. Arriving at a module — by
+     click, by quick action, by pasted link or by Back — opens it, because you
+     cannot pick a page from a group you cannot see. Toggling after that is
+     yours and survives until you go somewhere else, INCLUDING shutting the
+     group you are standing in: every group collapses, and the page you are on
+     is still named by the title above the column. */
+  let RAIL_FOR = null;
+
+  function railSync(st) {
+    const here = aliasOf(st.m);
+    if (RAIL_FOR !== here) { RAIL_FOR = here; RAIL_OPEN = here; }
+  }
+
+  /* ── The quick action ──
+     A rail row says what is wrong. This says what to do about it, and doing it
+     is one click, and the click lands on the row rather than on the page that
+     contains it. It carries the AiMY mark because it is AiMY's reading of the
+     page, not a control the page itself offers — the same mark, meaning the
+     same thing, as everywhere else in the product. */
+  function quickFix(m, f) {
+    return `<button class="rail-fix" type="button"
+        data-fix-m="${esc(m.id)}" data-fix-sec="${esc(f.sec)}"
+        ${f.find ? `data-fix-find="${esc(f.find)}"` : ''}>
+        ${AIMY}<span class="rail-fix-l">${esc(f.label)}</span>
+        <svg class="rail-fix-go" viewBox="0 0 12 12" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+             width="10" height="10"><path d="M4.5 2.5 8 6l-3.5 3.5"/></svg>
+      </button>`;
+  }
+
+  /* A leaf. The page name, what it is carrying, and — only when something is
+     wrong — the one action that ends it. */
+  function pageRow(m, pg, st, here) {
+    const ps = pageState(st, pg, m);
+    return `<button class="rail-pg${here ? ' is-on' : ''}" type="button"
+        data-m="${esc(m.id)}" data-sec="${esc(pg.id)}"${here ? ' aria-current="page"' : ''}>
+        <span class="rail-pg-n">${esc(pg.name)}</span>
+        ${ps && ps.note ? `<span class="rail-pg-s${ps.s ? ' ' + DOT[ps.s] : ''}">${esc(ps.note)}</span>` : ''}
+      </button>`
+      + (ps && ps.fix ? quickFix(m, ps.fix) : '');
+  }
+
+  /* A parent. Its own note is the worst thing under it, because that is the
+     question someone scanning a collapsed tree is asking — and it is derived
+     from the pages rather than computed a second time, so a rail that says
+     "1 broken" always has a page under it that says which. */
+  function moduleNoteFrom(m, st, pages) {
+    if (!pages) return moduleNote(m.id);
+    const rank = { err: 3, warn: 2, ok: 1 };
+    let worst = null;
+    pages.forEach((pg) => {
+      const ps = pageState(st, pg, m);
+      if (ps && ps.s && (!worst || rank[ps.s] > rank[worst.s])) worst = ps;
+    });
+    return worst ? [worst.note, worst.s] : null;
+  }
+
   function navRow(m, st) {
-    const note = m.n === undefined && !moduleNote(m.id) ? null : moduleNote(m.id);
-    /* Against the RESOLVED id. `?m=retention` renders Sync, so the rail has to
-       say Sync — comparing against the raw key left the row you were standing
-       on unmarked on every aliased link. */
+    const pages = pagesOf(m.id);
     const on = m.id === aliasOf(st.m);
-    return `<button class="rail-set-row rail-cfg-row${on ? ' is-on' : ''}" type="button"
-      data-m="${esc(m.id)}"${on ? ' aria-current="page"' : ''}>
-      ${note && note[1] ? `<span class="status-dot ${DOT[note[1]]}"></span>` : '<span class="rail-cfg-nodot"></span>'}
-      <span class="rail-set-name">${esc(m.name)}</span>
-      ${m.tier ? `<span class="rail-set-note">${esc(m.tier)}</span>`
-               : note ? `<span class="rail-set-note">${esc(note[0])}</span>` : ''}
-    </button>`;
+    const note = moduleNoteFrom(m, st, pages);
+    const open = pages ? RAIL_OPEN === m.id : false;
+    const dot = note && note[1] ? `<span class="status-dot ${DOT[note[1]]}"></span>`
+                                : '<span class="rail-cfg-nodot"></span>';
+
+    /* No pages: the row IS the page, and it keeps exactly the shape it had. */
+    if (!pages) {
+      return `<button class="rail-set-row rail-cfg-row${on ? ' is-on' : ''}" type="button"
+        data-m="${esc(m.id)}"${on ? ' aria-current="page"' : ''}>
+        ${dot}
+        <span class="rail-set-name">${esc(m.name)}</span>
+        ${m.tier ? `<span class="rail-set-note">${esc(m.tier)}</span>`
+                 : note ? `<span class="rail-set-note">${esc(note[0])}</span>` : ''}
+      </button>`;
+    }
+
+    /* ── THE HEADER IS A DISCLOSURE, NOT A DESTINATION ──
+       It was two controls — a chevron that opened the group and a title that
+       went to its first page. Two things to press a millimetre apart that do
+       different things, and the larger of them navigated: pressing "Connections"
+       to see what is under it took you somewhere instead.
+
+       A group has no page of its own. Going "to" it only ever meant going to
+       the first thing in it, and that thing is listed directly underneath and
+       one click away. So the whole header does the one job the group actually
+       has, and the pages are the only destinations in the tree. */
+
+    /* ── WHAT A CLOSED GROUP STILL HAS TO SAY ──
+       Folded away, the pages under it are gone and so is every quick action on
+       them — and a fix you cannot see is a fix nobody does. The dot says
+       something is wrong; this says how many things AiMY can act on, in AiMY's
+       own mark, so the reason to open the group is on the closed group. */
+    const acts = pages.filter((pg) => {
+      const ps = pageState(st, pg, m);
+      return ps && ps.fix;
+    }).length;
+
+    return `<div class="rail-grp${open ? ' is-open' : ''}">
+        <button class="rail-grp-h${on ? ' is-on' : ''}" type="button" data-rail-x="${esc(m.id)}"
+                aria-expanded="${open}">
+          <span class="rail-grp-x" aria-hidden="true">
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round"
+                 width="11" height="11"><path d="M4.5 2.5 8 6l-3.5 3.5"/></svg>
+          </span>
+          ${dot}<span class="rail-set-name">${esc(m.name)}</span>
+          ${!open && acts ? `<span class="rail-grp-acts"
+             title="${acts} thing${acts === 1 ? '' : 's'} AiMY can fix in here">
+             ${AIMY}<b>${acts}</b></span>` : ''}
+        </button>
+        ${open ? `<div class="rail-pgs">${pages.map((pg) =>
+            pageRow(m, pg, st, on && pageOf(st) === pg)).join('')}</div>` : ''}
+      </div>`;
   }
 
   /* `off` modules are routable and stay in the search index — they are just
@@ -3313,11 +3501,12 @@
         </svg>
         <span class="rail-set-name">All documents</span>
       </button>` : '';
+    railSync(st);
     return back + GROUPS.map((g) => {
       const rows = MODULES.filter((m) => m.g === g && !m.off);
       if (!rows.length) return '';
       return `<div class="brief-section-label">${esc(g)}</div>
-        <div class="rail-set">${rows.map((m) => navRow(m, st)).join('')}</div>`;
+        <div class="rail-set rail-tree">${rows.map((m) => navRow(m, st)).join('')}</div>`;
     }).join('');
   }
 
@@ -3340,8 +3529,15 @@
        above every module regardless, which meant that on Retention, Webhooks
        and Connections it was a segmented control that changed nothing. It
        lives where it works now. */
+    /* ── THE TITLE IS THE PAGE, NOT THE MODULE ──
+       "Connections" is a group in the rail with three pages under it. Printing
+       it again over one of them named the folder rather than the file, and
+       left the page you were on unnamed anywhere except a rail row 500px to
+       the left. The module still says where you are — it is the parent row,
+       marked, directly above the child. */
+    const pg = pageOf(st);
     return `
-      <h1 class="set2-title">${esc(m.name)}</h1>
+      <h1 class="set2-title">${esc(pg ? pg.name : m.name)}</h1>
       <div class="set2-bar">
         ${scoped ? prodScope(st) : `
         <div class="set2-scope">
@@ -3357,164 +3553,170 @@
      The console decides WHERE this goes and WHEN it is painted; this file
      decides what is in it. It used to assign two innerHTMLs and a title, all of
      which belonged to a page that no longer exists. */
-  /* ======================================================================
-     THE SPINE -- a page long enough to need a map gets one
+  /* ══════════════════════════════════════════════════════════════════════
+     PAGES — a module is a group of pages, not one page with a map
 
-     Connections is 2178px over five sections and Access is 2114px over three.
-     The rail presents them as peers of Skills, which is 809px and one section,
-     so four rail rows stood for a 6.5:1 spread of weight -- and inside the two
-     heavy ones there was no navigation at all. You scrolled and hoped.
+     WHAT THIS REPLACES. Connections was 2178px of five sections with a spine
+     down the left gutter: a map, a reading position, and a state per section.
+     The spine was a good answer to the wrong question. It made a long page
+     navigable; it did not make it short. Someone who came to fix a broken
+     field mapping still loaded the sync history, the retention thresholds and
+     every run of both connectors to get there, and the address bar could not
+     tell anyone else where they had been.
 
-     Splitting them back into more rail items is the move I already rejected,
-     and for a reason that still holds: a failure IS a run, and the page that
-     could act on it was the one you had just left. So the weight stays on the
-     page, and the page gets a spine.
+     The rail already had a list of destinations in it. The spine was a SECOND
+     list of destinations, in a different place, in a different visual
+     language, for the sections of whichever destination you had picked from
+     the first. Merging them is not a new idea — it is what every console with
+     more settings than fit on a page does, Twilio's included: one tree, muted
+     group labels, expandable parents, one page per leaf.
 
-     It is one component doing three jobs, which is why it earns the room:
-       - a MAP, the stages in order, so the shape of the page is visible
-         before you scroll it
-       - a POSITION, which stage you are reading now
-       - a STATE, what each stage is carrying, so "3 failed" is legible from
-         the top of the page rather than 1500px down it
+     So these are PAGES now. Each is addressable (`?sec=`), each is one screen,
+     and the rail says what is on all of them at once.
 
-     WHERE IT LIVES. `.set2-col` is 46rem centred in a 1160px frame, which
-     leaves 212px of dead gutter on each side. The spine is 180px plus a 32px
-     gap -- exactly that gutter. So the content column does not move a pixel,
-     every measure inside it is untouched, and the left edge stays at 512 on
-     every module whether it carries a spine or not.
-     ====================================================================== */
-  const STAGES = {
-    config: (st) => {
-      const c = crmOf(st), p = primaryOf(st);
-      const mc = mapCounts(c);
-      const list = connsOf(prodOf(st));
-      const runs = list.reduce((a, x) => a + (x.runs ? x.runs.length : 0), 0);
-      const fails = failures().filter((f) => list.indexOf(f.conn) > -1).length;
-      /* Every CRM feeding this product, which is what the Retention section
-         itself lists -- `secRetention` derives its rows the same way. */
-      const retCrms = list.map((x) => x.crmId).filter((v, i, a) => a.indexOf(v) === i);
-      const nCrit = p && p.criteria ? p.criteria.length : 0;
-      return [
-        /* One entry per section, in the order the sections run, which is the
-           order the data moves: what we read from the CRM, what we pull and
-           what happened when we pulled it, what we delete afterwards.
+     WHAT EACH ENTRY IS. `id` addresses it, `name` is the rail row, `secs` are
+     the section renderers it composes, and `state` reports what the page is
+     carrying — the same computation the spine used, because it was the right
+     computation and only its housing was wrong.
 
-           No Failures entry. That section folded into the history, because a
-           failed run is a run -- the two lists were the same rows read twice.
-           The count still surfaces: it is what the history stage reports when
-           anything is broken. */
-        { id: 'fields', name: 'Fields',
-          note: mc.broken ? mc.broken + ' broken' : mc.confirmed + ' mapped',
-          s: mc.broken ? 'err' : 'ok' },
-        { id: 'window', name: 'Relevance', note: c.window + ' days' },
-        { id: 'records', name: 'Trigger sync',
-          note: nCrit ? nCrit + ' criteri' + (nCrit === 1 ? 'on' : 'a') : 'no filter' },
-        { id: 'history', name: 'Sync history',
-          note: fails ? fails + ' failed'
-              : runs ? runs + ' run' + (runs === 1 ? '' : 's') : 'never run',
-          s: fails ? 'err' : runs ? 'ok' : '' },
-        { id: 'retention', name: 'Retention', note: (() => {
-            const rows = RETENTION.filter((r) => retCrms.indexOf(r.id) > -1);
-            if (!rows.length) return 'not set';
-            const gone = rows.reduce((a, r) => a + wouldDelete(r), 0);
-            return gone ? gone.toLocaleString() + ' would go' : 'nothing to prune';
-          })(), s: RETENTION.filter((r) => retCrms.indexOf(r.id) > -1)
-                            .some((r) => wouldDelete(r)) ? 'warn' : '' }
-      ].filter(Boolean);
-    },
-    access: () => {
-      const pend = PEOPLE.filter((p) => p.s[0] === 'is-warn').length;
-      const none = PEOPLE.filter((p) => !p.grants.length).length;
-      return [
-        { id: 'people', name: 'People',
-          note: pend ? pend + ' pending' : PEOPLE.length + ' people',
-          s: (pend || none) ? 'warn' : 'ok' },
-        { id: 'roles',  name: 'Roles',  note: ROLES.length + ' roles' },
-        { id: 'scopes', name: 'Scopes', note: LEAF_TOTAL + ' scopes' }
-      ];
-    },
+     `state` returns `{ note, s, fix }`. `note` and `s` are the line and the
+     severity under the rail row. `fix` is what is new: the one thing worth
+     doing about a bad state, named as an action rather than as a count. */
 
-    /* Enablement is a switchboard and then the endpoints those switches fire
-       at. The spine indexes the page's two SECTIONS, not one entry per
-       connector: the webhooks became one section with a group per connector,
-       and on a page this short a third entry could never become current --
-       there is not enough scroll below it to bring its heading to the line,
-       so it stood in the map as a place you could not arrive at. The worst
-       endpoint outcome is what you need from across the page, and it is what
-       the one entry reports. */
-    enable: (st) => {
-      if (!prodOf(st)) return null;
-      const on = ENABLE.filter((e) => e.on).length;
-      const list = connsOf(prodOf(st)).filter((c) => !!ENDPOINTS[c.id]);
-      /* `last` is [when, pillClass, outcome, ms] -- an empty first slot means
-         the endpoint is live and nothing has reached it yet, which is a real
-         state and not a failure. */
-      const cls = (c) => ENDPOINTS[c.id].last[1];
-      const bad = list.filter((c) => cls(c) === 'is-err').length;
-      const warn = list.filter((c) => cls(c) === 'is-warn').length;
-      return [
-        { id: 'enrichment', name: 'Enrichment',
-          note: on + ' of ' + ENABLE.length + ' on',
-          s: on ? 'ok' : 'warn' },
-        { id: 'webhooks', name: 'Webhooks',
-          note: bad ? bad + ' endpoint' + (bad > 1 ? 's' : '') + ' down'
-              : list.length === 1 ? (ENDPOINTS[list[0].id].last[2] || 'never called')
-              : list.length + ' endpoints live',
-          s: bad ? 'err' : warn ? 'warn' : list.length ? 'ok' : '' }
-      ];
-    },
+  /* ── ONE PROBLEM, NAMED AS THE ACTION THAT ENDS IT ──
 
-    /* Only the DETAIL. The skills list is one table under one heading -- a
-       table of contents with a single entry is furniture, and the page is a
-       single screen, so there is nothing to find your way around. */
-    skills: (st) => {
-      if (!st.skill || !skillById(st.skill)) return null;
-      const sk = skillById(st.skill);
-      const [k] = standing(sk, st.lens);
-      return [
-        { id: 'precedence',   name: 'Precedence',   note: LEVELS.length + ' levels',
-          s: k === 'is-ok' ? 'ok' : k === 'is-err' ? 'err' : 'warn' },
-        { id: 'instructions', name: 'Instructions',
-          note: RAW.has(sk.id) ? 'markdown' : 'fields' },
-        { id: 'reach',        name: 'Reach',
-          note: (agentsOf(sk).length || 'no') + ' agent'
-              + (agentsOf(sk).length === 1 ? '' : 's') }
-      ];
-    }
+     "3 broken" is a diagnosis. It says a page has something wrong on it and
+     leaves you to find which row, which is the part that costs the time — and
+     the old spine did that from a gutter you could only read once you were
+     already on the page carrying the problem.
+
+     A fix carries `sec` (which page) and `find` (which row on it). Arriving
+     scrolls to that row and marks it, so the click lands you ON the thing
+     rather than at the top of a page that contains it somewhere. */
+  const fixTo = (label, sec, find) => ({ label: label, sec: sec, find: find || null });
+
+  const SUBPAGES = {
+    /* Three pages, grouped the way the questions group: what the fields MEAN,
+       how much data we keep, and what we pull and what happened when we did.
+       Relevance and Trigger delete are one page because they are one question
+       asked in two directions — how far back to read, and how far back to
+       keep. Trigger sync and Sync history are one page because a run and the
+       record of it are the same object before and after. */
+    config: [
+      { id: 'fields', name: 'Dynamic fields', secs: ['mapping'],
+        state: function (st) {
+          var mc = mapCounts(crmOf(st));
+          if (mc.broken) return { note: mc.broken + ' broken', s: 'err',
+            fix: fixTo('Repoint ' + mc.broken + ' broken path' + (mc.broken === 1 ? '' : 's'),
+                       'fields', '.set2-map-row.is-broken') };
+          if (mc.unmapped) return { note: mc.unmapped + ' not mapped', s: 'warn',
+            fix: fixTo('Map ' + mc.unmapped + ' field' + (mc.unmapped === 1 ? '' : 's'),
+                       'fields', '.set2-map-row.is-unmapped') };
+          return { note: mc.confirmed + ' mapped', s: 'ok' };
+        } },
+      { id: 'relevance', name: 'Data relevance', secs: ['window', 'retention'],
+        state: function (st) {
+          var list = connsOf(prodOf(st));
+          var crms = list.map(function (x) { return x.crmId; })
+                         .filter(function (v, i, a) { return a.indexOf(v) === i; });
+          var rows = RETENTION.filter(function (r) { return crms.indexOf(r.id) > -1; });
+          var gone = rows.reduce(function (a, r) { return a + wouldDelete(r); }, 0);
+          /* The queued deletion outranks the window, because one is a number
+             you set and the other is records about to stop existing. */
+          if (gone) return { note: gone.toLocaleString() + ' queued to delete', s: 'warn',
+            fix: fixTo('Review what would go', 'relevance', '#st-retention') };
+          var wins = list.map(function (x) { return x.window; })
+                         .filter(function (v, i, a) { return a.indexOf(v) === i; });
+          if (wins.length > 1) return { note: 'connectors disagree', s: 'warn',
+            fix: fixTo('Settle the window', 'relevance', '#st-window') };
+          return { note: (wins[0] || 0) + ' days', s: 'ok' };
+        } },
+      { id: 'sync', name: 'Sync', secs: ['criteria', 'runs'],
+        state: function (st) {
+          var list = connsOf(prodOf(st));
+          var runs = list.reduce(function (a, x) { return a + (x.runs ? x.runs.length : 0); }, 0);
+          var fails = failures().filter(function (f) { return list.indexOf(f.conn) > -1; }).length;
+          if (fails) return { note: fails + ' failed', s: 'err',
+            fix: fixTo('Open ' + fails + ' failed run' + (fails === 1 ? '' : 's'),
+                       'sync', '.set2-run.is-failed') };
+          if (!runs) return { note: 'never run', s: 'warn',
+            fix: fixTo('Run the first sync', 'sync', '#st-records') };
+          return { note: runs + ' run' + (runs === 1 ? '' : 's'), s: 'ok' };
+        } }
+    ],
+
+    /* Two, and the split is the one the design already drew: what enrichment
+       may read, and the endpoints it runs against. */
+    enable: [
+      { id: 'enrichment', name: 'Enrichment', secs: ['enrichment'],
+        state: function () {
+          var on = ENABLE.filter(function (e) { return e.on; }).length;
+          if (!on) return { note: 'nothing enabled', s: 'warn',
+            fix: fixTo('Turn on enrichment', 'enrichment', '#st-enrichment') };
+          return { note: on + ' of ' + ENABLE.length + ' on', s: 'ok' };
+        } },
+      { id: 'webhooks', name: 'Webhook settings', secs: ['apis'],
+        state: function (st) {
+          var list = connsOf(prodOf(st)).filter(function (c) { return !!ENDPOINTS[c.id]; });
+          var cls = function (c) { return ENDPOINTS[c.id].last[1]; };
+          var bad = list.filter(function (c) { return cls(c) === 'is-err'; }).length;
+          var warn = list.filter(function (c) { return cls(c) === 'is-warn'; }).length;
+          if (bad) return { note: bad + ' endpoint' + (bad > 1 ? 's' : '') + ' down', s: 'err',
+            fix: fixTo('Reconnect ' + bad + ' endpoint' + (bad > 1 ? 's' : ''),
+                       'webhooks', '.set2-wh-grp.is-err') };
+          if (warn) return { note: warn + ' degraded', s: 'warn',
+            fix: fixTo('Check ' + warn + ' endpoint' + (warn > 1 ? 's' : ''),
+                       'webhooks', '.set2-wh-grp.is-warn') };
+          return { note: list.length ? list.length + ' live' : 'none set up',
+                   s: list.length ? 'ok' : '' };
+        } }
+    ],
+
+    /* Access splits the same way, for the same reason. Nothing above asked for
+       it, but removing the spine leaves a 2114px page with no way around it,
+       and its three sections were already three clean pages. */
+    access: [
+      { id: 'people', name: 'People', secs: ['people'],
+        state: function () {
+          var pend = PEOPLE.filter(function (p) { return p.s[0] === 'is-warn'; }).length;
+          var none = PEOPLE.filter(function (p) { return !p.grants.length; }).length;
+          if (none) return { note: none + ' with no access', s: 'warn',
+            fix: fixTo('Give ' + none + ' person' + (none === 1 ? '' : 's') + ' a role',
+                       'people', '.set2-person.is-none') };
+          if (pend) return { note: pend + ' pending', s: 'warn',
+            fix: fixTo('Resend ' + pend + ' invite' + (pend === 1 ? '' : 's'),
+                       'people', '.set2-person.is-warn') };
+          return { note: PEOPLE.length + ' people', s: 'ok' };
+        } },
+      { id: 'roles', name: 'Roles', secs: ['roles'],
+        state: function () { return { note: ROLES.length + ' roles', s: '' }; } },
+      { id: 'scopes', name: 'Scopes', secs: ['scopes'],
+        state: function () { return { note: LEAF_TOTAL + ' scopes', s: '' }; } }
+    ]
   };
 
-  /* Two sections is a page you can see the end of, and a table of contents on
-     top of one is furniture. Enablement and Skills do not get a spine -- it
-     appears when the page has earned it, not because the module has a slot. */
-  const stagesOf = (st, m) => {
-    const f = STAGES[m.id];
-    const list = f ? f(st) : null;
-    /* Two headings is the floor. One is a page you can see the end of. */
-    return list && list.length > 1 ? list : null;
-  };
+  /* A module with no page list is one page, and the rail row IS the page.
+     Skills and the deferred modules are that. */
+  const pagesOf = (id) => SUBPAGES[aliasOf(id)] || null;
 
-  /* `flat` is the wide row under a header; `stack` is the narrow column at the
-     foot of the spine. Same three exits and the same order in both -- what
-     changes is only how much room they have to say it in. */
-  function spine(list) {
-    return '<div class="set2-spine-w"><div class="set2-spine-stick">'
-      + '<nav class="set2-spine" aria-label="Sections on this page">'
-      + list.map((x) => `
-          <button class="set2-spine-i" type="button" data-stage="${esc(x.id)}"
-                  aria-label="${esc(x.name)} — ${esc(x.note)}">
-            ${/* No 01-06. A number promises a sequence, and this order is the
-                  RECORD's lifecycle, not the reader's — nobody does Records,
-                  then Lookback, then Fields in that order. Someone arriving to
-                  check a failed run saw "04" and inferred three prerequisites.
-                  The order still earns its place; the numerals were charging
-                  for information they did not carry. */ ''}
-            <span class="set2-spine-dot${x.s ? ' ' + DOT[x.s] : ''}"></span>
-            <span class="set2-spine-l">
-              <span class="set2-spine-name">${esc(x.name)}</span>
-              <span class="set2-spine-note">${esc(x.note)}</span>
-            </span>
-          </button>`).join('')
-      + '</nav></div></div>';
+  /* Absent, unknown, or belonging to another module all mean the same thing:
+     the first page. A `sec` that names nothing here must not render a blank
+     column, and it must not sit in the URL pretending to name something. */
+  function pageOf(st) {
+    const list = pagesOf(st.m);
+    if (!list) return null;
+    const want = st.sec || ALIAS_SEC[st.m] || '';
+    return list.filter((x) => x.id === want)[0] || list[0];
+  }
+
+  /* Computed once per paint and read by both the rail row and its quick
+     action, so the two can never disagree about what is wrong. A module whose
+     scope is unset has no page state at all — the pages exist, but every
+     number on them would be about nothing. */
+  function pageState(st, pg, m) {
+    if (!pg || !pg.state) return null;
+    if (m && m.scope === 'prod' && !prodOf(st)) return null;
+    try { return pg.state(st); } catch (err) { return null; }
   }
 
   function body(st) {
@@ -3524,108 +3726,77 @@
        stacked two titles and two scope lines on one page, and the outer one
        named the list you had just left. */
     /* Only a SKILL detail brings its own header. A connection is a scope, not
-       a page you drilled into — Config scoped to FileBound is still Config —
-       so the module keeps its title and the scope shows in the bar under it. */
+       a page you drilled into — Dynamic fields scoped to FileBound is still
+       Dynamic fields — so the page keeps its title and the scope shows in the
+       bar under it. */
     /* 46rem is the widest a settings ROW stays legible — past it the control
        is a hand's width from the label it belongs to. A card GRID has the
        opposite problem: capped at 46rem it gives two cramped columns, which is
        what made this surface feel condensed. The cap is per-module now. */
-    const stages = stagesOf(st, m);
-    /* ── NO FLOATING BAR ──
-       It was fixed to the window and followed you down every page, laid over
-       whatever happened to be under it, and repeated the module's name back at
-       you on the module's own page. A bar that covers the work in order to
-       offer to save the work is arguing with itself.
-
-       The three exits are still three exits -- a half-finished mapping is a
-       normal condition and needs somewhere to go that is neither losing the
-       work nor publishing it half-done. They move into the chrome the page
-       already keeps on screen: the foot of the spine, which is sticky, sits in
-       the gutter, and covers nothing. Where a page is short enough to have no
-       spine, they sit under the header, which on a one-screen page never
-       leaves view either. Either way they are IN the layout rather than over
-       it. */
-    const col = `<div class="set2-col${m.wide ? ' is-wide' : ''}">`
+    /* ── NO SPINE, AND NOTHING TOOK ITS GUTTER ──
+       The map moved into the rail, where the other list of destinations
+       already was. What is left is one column, and it stays exactly where it
+       was: the 180px + 32px the spine occupied was dead gutter before it
+       existed and is dead gutter again, so no measure inside the column moves
+       and the left edge is still at 512 on every page. */
+    return `<div class="set2-col${m.wide ? ' is-wide' : ''}">`
       + (st.skill ? '' : head(st))
       + inner + `</div>`;
-    return stages ? `<div class="set2-stage">${spine(stages)}${col}</div>` : col;
   }
 
   /* Called by the console once the string above is in the DOM. `seatTabindex`
      reads elements, so it cannot run inside a function that only returns
      markup — and a timer would be a guess about when the paint landed. */
-  /* -- WHICH STAGE AM I READING --
-     One rule, in one place: the current stage is the LAST one whose heading has
-     crossed a line near the top of the viewport. `stageAt` is that rule and
-     nothing else -- it reads live geometry every time it is asked and keeps no
-     record between calls, so it cannot drift out of step with the page and it
-     can be tested on its own.
+  /* ── WHICH PAGE DID I TOUCH ──
+     The unsaved block says "1 unsaved" without naming which page it means, and
+     the rail is the only thing on screen that lists them. So the rail carries
+     it: the page you changed is marked, and its note is refreshed from the
+     model in the same call.
 
-     THE LINE IS NEAR THE TOP, not the middle. Centred, an 826px section and a
-     137px one compete on equal terms and the short one can never win: the mark
-     would skip Window entirely on the way past it. Read from the top, a stage
-     becomes current the moment its heading arrives -- which is also the moment
-     a person would say they are in it.
-
-     An IntersectionObserver does the WAKING. A scroll listener on a 2178px
-     page runs on every frame of every wheel tick to answer a question whose
-     answer changes five times in the whole scroll; the observer only speaks
-     when a heading actually crosses the band. But it is a trigger, not a
-     source of truth -- the answer is recomputed from rects each time, so a
-     missed or coalesced callback costs one late update rather than a mark
-     stuck on the wrong stage. */
-  const STAGE_LINE = 0.18;      /* down from the top of the scroll port */
-
-  function stageAt(secs, scroller) {
-    /* THE LAST SECTION CANNOT REACH THE LINE. There is not enough page below
-       it to scroll its heading that high, so on the rule alone Retention was
-       never current at any scroll position -- the mark stopped at Runs and the
-       fifth stage was decoration. Reaching the bottom of a page IS being at
-       the last thing on it, so the end of the scroll says so directly rather
-       than through geometry that cannot get there. */
-    if (scroller.scrollTop >= scroller.scrollHeight - scroller.clientHeight - 2) {
-      return secs[secs.length - 1];
-    }
-    const line = scroller.getBoundingClientRect().top
-               + scroller.clientHeight * STAGE_LINE;
-    let cur = secs[0];
-    secs.forEach((sec) => { if (sec.getBoundingClientRect().top <= line) cur = sec; });
-    return cur;
-  }
-
-  /* ── WHICH SECTION DID I TOUCH ──
-     The spine indexes six sections and carries a live count for each, and a
-     block directly beneath it says "1 unsaved" without naming which of the six
-     it means. The one piece of state the reader personally created was the one
-     state the index refused to show.
-
-     A class flip, not a re-render: this is called from an `input` handler, and
-     rebuilding the page would take the caret out of the field being typed in.
-     The note is refreshed from the same call, so a stale "30 days" beside an
-     input reading 45 cannot survive the keystroke that caused it. */
+     A class flip and a text swap, not a re-render — this is called from an
+     `input` handler, and rebuilding would take the caret out of the field
+     being typed in. */
   const DIRTY_STAGE = new Set();
 
   /* The note is RECOMPUTED from the model rather than passed in as a string.
      Two callers passing their own wording is how "30 days" ends up beside an
      input reading 45 — the same drift that let the retention row disagree with
-     its own confirmation. One function owns each stage's note, and this asks
-     it again rather than guessing. */
-  function stageNote(id) {
+     its own confirmation. One function owns each page's note, and this asks it
+     again rather than guessing. */
+  function pageNoteOf(secId) {
     const st0 = readURL();
     const m0 = moduleById(st0.m) || moduleById('config');
-    const list = (STAGES[m0.id] ? STAGES[m0.id](st0) : null) || [];
-    const hit = list.filter((x) => x.id === id)[0];
-    return hit ? hit.note : null;
+    const list = pagesOf(m0.id) || [];
+    const pg = list.filter((x) => x.id === secId)[0];
+    const ps = pg ? pageState(st0, pg, m0) : null;
+    return ps ? ps.note : null;
   }
+
+  /* Callers still name the SECTION they touched — `fields`, `records`,
+     `retention` — because that is what they know about themselves. This maps a
+     section to the page that now carries it, so nothing at a call site had to
+     learn the new grouping. */
+  const PAGE_OF_SECTION = (() => {
+    const out = {};
+    Object.keys(SUBPAGES).forEach((mid) => SUBPAGES[mid].forEach((pg) =>
+      pg.secs.forEach((k) => { out[k] = pg.id; })));
+    /* The ids the call sites use are the section ELEMENT ids (`st-history`),
+       which predate the renderer names. Both spellings resolve. */
+    out.history = out.runs; out.records = out.criteria;
+    out.window = out.window; out.fields = out.mapping;
+    return out;
+  })();
 
   function markDirtyStage(id) {
     DIRTY_STAGE.add(id);
-    const item = $('.set2-spine-i[data-stage="' + id + '"]');
-    if (!item) return;
-    item.classList.add('is-dirty');
-    const n = $('.set2-spine-note', item);
-    const note = stageNote(id);
-    if (n && note) n.textContent = note;
+    const sec = PAGE_OF_SECTION[id] || id;
+    const item = $('.rail-pg[data-sec="' + sec + '"]');
+    if (item) {
+      item.classList.add('is-dirty');
+      const n = $('.rail-pg-s', item);
+      const note = pageNoteOf(sec);
+      if (n && note) n.textContent = note;
+    }
     bumpUnsaved();
   }
 
@@ -3639,44 +3810,6 @@
     bar.hidden = !DIRTY.size;
     const n = $('.set2-num', bar);
     if (n) n.textContent = DIRTY.size;
-  }
-
-  let SPINE_OBS = null;
-  function watchStages() {
-    if (SPINE_OBS) { SPINE_OBS.disconnect(); SPINE_OBS = null; }
-    const nav = $('.set2-spine');
-    const scroller = $('.page-scroll');
-    if (!nav || !scroller) return;
-
-    const items = $$('.set2-spine-i', nav);
-    const secs = items.map((b) => $('#st-' + b.getAttribute('data-stage'))).filter(Boolean);
-    if (!secs.length) return;
-
-    const mark = () => {
-      const id = stageAt(secs, scroller).id.slice(3);
-      items.forEach((b) => {
-        const here = b.getAttribute('data-stage') === id;
-        b.classList.toggle('is-here', here);
-        /* The reading position was a class and nothing else, so the one fact
-           this component exists to carry was invisible to a screen reader. */
-        if (here) b.setAttribute('aria-current', 'true');
-        else b.removeAttribute('aria-current');
-        /* Reading position and unsaved state are different facts and the spine
-           carries both, so a repaint restores the dirty marks rather than
-           quietly clearing them. */
-      });
-    };
-    if (typeof IntersectionObserver === 'function') {
-      SPINE_OBS = new IntersectionObserver(mark, {
-        root: scroller,
-        /* A band straddling the line, so a heading crossing it in either
-           direction wakes us whichever way the page is moving. */
-        rootMargin: '-14% 0px -80% 0px',
-        threshold: 0
-      });
-      secs.forEach((sec) => SPINE_OBS.observe(sec));
-    }
-    mark();
   }
 
   /* The draft row is created by a render, so the caret has to be placed after
@@ -3713,7 +3846,35 @@
     return true;
   }
 
-  function painted() { seatTabindex(); watchStages(); focusDraft(); }
+  function painted() { seatTabindex(); focusDraft(); landFix(); }
+
+  /* ── ARRIVING AT A FIX ──
+     A quick action navigates and then has to finish the job: the page it asked
+     for is painted, and the row it named has to be found, brought into view
+     and marked. That cannot happen in the click — the page does not exist yet
+     — so the click records what it was after and this reads it once the paint
+     has landed.
+
+     One shot. The mark is a state of the arrival, not of the row, so it clears
+     itself and does not survive the next thing you do. */
+  let PENDING_FIX = null;
+  function landFix() {
+    const want = PENDING_FIX;
+    PENDING_FIX = null;
+    if (!want) return;
+    const el = $(want);
+    if (!el) return;
+    const quiet = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView({ behavior: quiet ? 'auto' : 'smooth', block: 'center' });
+    el.classList.add('is-found');
+    /* Focus follows the eye, or the next Tab resumes from the rail, which is
+       behind you now. */
+    const f = el.matches('button, input, a, select') ? el
+            : el.querySelector('button, input, a, select');
+    if (f) f.focus({ preventScroll: true });
+    else { el.setAttribute('tabindex', '-1'); el.focus({ preventScroll: true }); }
+    setTimeout(() => el.classList.remove('is-found'), 2400);
+  }
 
   function seatTabindex() {
     $$('[role="tree"]').forEach((t) => {
@@ -3747,8 +3908,41 @@
   document.addEventListener('click', (e) => {
     const st = readURL();
 
-    const railBtn = e.target.closest('[data-m]');
-    if (railBtn) { patch({ m: railBtn.dataset.m, skill: '' }); return; }
+    /* ── The quick action ──
+       Two moves in one click: go to the page, then find the row. The second
+       half cannot run here, so it is left for `landFix` to do once the page it
+       asked for has actually been painted. */
+    const fixBtn = e.target.closest('[data-fix-m]');
+    if (fixBtn) {
+      PENDING_FIX = fixBtn.getAttribute('data-fix-find') || null;
+      patch({ m: fixBtn.getAttribute('data-fix-m'),
+              sec: fixBtn.getAttribute('data-fix-sec'), skill: '' });
+      return;
+    }
+
+    /* Opening a parent is not going to it. See navRow: two things you can do
+       to a group, so two controls, and this one changes no page.
+
+       Opening one shuts whatever was open, and pressing the open one shuts it
+       — so the rail is an accordion with a closed state, and no group is stuck
+       open because you happen to be inside it. */
+    const railX = e.target.closest('[data-rail-x]');
+    if (railX) {
+      const id = railX.getAttribute('data-rail-x');
+      RAIL_OPEN = RAIL_OPEN === id ? null : id;
+      RAIL_FOR = aliasOf(st.m);
+      render();
+      return;
+    }
+    /* The header is a `<button>` wrapping the row, so a click inside it lands
+       on a child first. The branch above catches it either way through
+       `closest`; this note is here so nobody adds a `[data-m]` back to it. */
+
+    /* NO `[data-m]` BRANCH. The console routes rail rows — see knowledge.js,
+       which owns both the rail's DOM and the URL. A second handler here read
+       the same attribute and patched the same state a moment earlier, and the
+       two disagreed about `sec`: this one set it, that one cleared it, and the
+       page rows did nothing at all. One router. */
 
     const lens = e.target.closest('[data-lens]');
     if (lens) { patch({ lens: lens.dataset.lens }); return; }
@@ -4138,23 +4332,6 @@
        One control for what the console spread across three: a product picker
        in the page chrome, a CRM picker in a section header, and a disabled
        third copy of the product inside the sync form. */
-    /* Scroll position is not state. It does not go in the URL, it does not
-       push history, and coming back to this module should land you at the top
-       rather than wherever you last happened to stop reading. */
-    const stg = e.target.closest('[data-stage]');
-    if (stg) {
-      const sec = $('#st-' + stg.getAttribute('data-stage'));
-      if (sec) {
-        const quiet = matchMedia('(prefers-reduced-motion: reduce)').matches;
-        sec.scrollIntoView({ behavior: quiet ? 'auto' : 'smooth', block: 'start' });
-        /* Send focus where the eye went. Without this the jump is visual only
-           and the next Tab resumes from the spine, which is behind you now. */
-        const h = sec.querySelector('h2, h3');
-        if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
-      }
-      return;
-    }
-
     const clPick = e.target.closest('[data-client-pick]');
     if (clPick) {
       const cur = clientOf(st);
@@ -4725,13 +4902,17 @@
      Registered the way chat.js registers `window.AIMY_GATE` — the house
      pattern for "a second script that the shell drives".
      ═══════════════════════════════════════════════════════════════════════ */
-  /* The decision rule is exported so it can be checked against real geometry
-     at any scroll position -- the browser pane runs no rendering lifecycle, so
-     scroll events, rAF and IntersectionObserver callbacks never fire in it and
-     the wiring cannot be exercised there. The rule is the part that can be
-     wrong; this makes it the part that gets tested. */
+  /* `_pages` is exported for the same reason `_stageAt` was: it is the rule
+     that decides what the rail lists and what each row says about it, and a
+     browser pane can check it against the model without driving a scroll. */
   window.AIMY_SETTINGS = {
-    _stageAt: stageAt,
+    _pages: function (st) {
+      const m = moduleById(st.m) || moduleById('config');
+      const list = pagesOf(m.id) || [];
+      return list.map(function (pg) {
+        return { id: pg.id, name: pg.name, state: pageState(st, pg, m) };
+      });
+    },
     init: function (api) { API = api; },
     body: body,
     nav: nav,
