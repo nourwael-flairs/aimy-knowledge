@@ -20,9 +20,19 @@
    this file's own T1 rule removed them on the grounds that layout carries
    meaning and copy does not. That decision stands; it is not overturned by
    five products agreeing with each other. */
+/* ── THE HEADINGS WEAR THE PRODUCT'S HEADING FACE ──
+   Every heading in this product is set in `--font-display` — the corpus page
+   title, a card title, a document title, a peek's title, a comment head. Not
+   one heading in settings was: they inherited `--font-sans` because nothing
+   here ever named a family, so the one surface with the most headings on it
+   was the only surface setting them in the body face.
+
+   Nothing else about them changes. The pairing is the design system's, this
+   file simply was not using it. */
 .set2-title {
+  font-family: var(--font-display);
   font-size: var(--ty-display);
-  font-weight: var(--fw-semibold);
+  font-weight: var(--fw-extrabold);
   letter-spacing: var(--ls-tight);
   color: var(--ink-primary);
   line-height: var(--lh-tight);
@@ -121,9 +131,17 @@
      section head   15px semibold, --ink-quiet    read once
      row name       15px,          --ink-primary  what you came for */
 .set2-sec-t {
-  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
+  font-family: var(--font-display);
+  font-size: var(--ty-meta); font-weight: var(--fw-bold);
   letter-spacing: normal; text-transform: none;
-  color: var(--ink-quiet);
+  /* `--ink-quiet` is the ATTRIBUTION step — who, when, where. It was borrowed
+     here to make the head recede and made it read as washed out instead:
+     a heading in the display face at that value looks like text that failed to
+     load rather than text set quietly on purpose. `--ink-secondary` is the
+     substance step, one below identity, which is what a section head is. It
+     still sits under the row names at `--ink-primary`; the recession comes
+     from the size and the rule, which is where it belongs. */
+  color: var(--ink-secondary);
   line-height: var(--lh-snug);
 }
 .set2-sec-end {
@@ -351,7 +369,11 @@
 textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-base); }
 .set2-field + .set2-field { margin-top: 1rem; }
 .set2-hint { font-size: var(--ty-micro); color: var(--ink-faint); margin-top: 0.375rem; }
-.set2-mono { font-family: var(--font-mono); }
+/* Settings is set in Urbanist throughout — the URLs and tokens included. The
+   class stays as the hook for what a monospace face was doing here, because
+   one thing it was doing still has to be done: see the masked-token rule at
+   the foot of this file. */
+.set2-mono { font-family: var(--font-sans); }
 
 /* ══ EMPTY / NOTE ════════════════════════════════════════════════════════ */
 
@@ -365,7 +387,8 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
   font-size: var(--ty-meta); color: var(--ink-faint);
 }
 .set2-empty b {
-  color: var(--ink-primary); font-weight: var(--fw-semibold);
+  font-family: var(--font-display);
+  color: var(--ink-primary); font-weight: var(--fw-bold);
   font-size: var(--ty-body); margin-bottom: 0.125rem;
 }
 .set2-empty .btn { align-self: center; margin-top: 0.875rem; }
@@ -452,7 +475,7 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
   font-size: var(--ty-meta); color: var(--ink-secondary); line-height: var(--lh-base);
 }
 .set2-body.is-raw {
-  font-family: var(--font-mono); font-size: var(--ty-micro);
+  font-family: var(--font-sans); font-size: var(--ty-micro);
   color: var(--ink-quiet); white-space: pre-wrap; line-height: var(--lh-snug);
 }
 
@@ -472,7 +495,21 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
   font-size: var(--ty-micro); letter-spacing: var(--ls-wide);
   text-transform: uppercase; color: var(--ink-faint);
 }
-.set2-map-row:last-of-type { border-bottom: 0; }
+/* ── A ROW IS A FIELD AND EVERYTHING UNDER IT ──
+   The separator was on every `.set2-map-row`, so it fell between a parent and
+   its own subfields as readily as between two unrelated fields — six identical
+   lines saying nothing about which side of them belonged together, and the
+   subfield indent arguing with a rule that cut straight across it.
+
+   The unit is the FIELD plus its children. So the line moves to the top of
+   every top-level row, which puts exactly one between each group and the next
+   and none inside one. Drawn on the row that starts a group rather than under
+   the thing that ends it, because what ends a group varies — the last
+   subfield, or the "Add subfield" under it — and what starts one never does. */
+.set2-map-row { border-bottom: 0; }
+.set2-map-row:not(.is-sub) { border-top: 0.0625rem solid var(--hairline); }
+/* The column head already rules off the first group. */
+.set2-map-hd + .set2-map-row { border-top: 0; }
 .set2-map-ctx {
   font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -565,7 +602,7 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
   color: var(--ink-primary); font-weight: var(--fw-semibold);
 }
 .set2-pv th span {
-  display: block; font-family: var(--font-mono); font-weight: var(--fw-regular);
+  display: block; font-family: var(--font-sans); font-weight: var(--fw-regular);
   color: var(--ink-faint); margin-top: 0.125rem;
 }
 .set2-pv td {
@@ -575,7 +612,7 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
 .set2-pv tbody tr:nth-child(odd) td { background: var(--card-bg-raised); }
 .set2-pv td i { color: var(--ink-faint); }
 kbd {
-  font-family: var(--font-mono); font-size: var(--ty-micro);
+  font-family: var(--font-sans); font-size: var(--ty-micro);
   background: var(--card-bg-raised); color: var(--ink-faint);
   padding: 0.0625rem 0.25rem; border-radius: var(--r-sm);
 }
@@ -725,7 +762,7 @@ kbd {
   display: flex; align-items: center; gap: 0.5rem; width: 100%;
   appearance: none; border: 0; background: transparent;
   padding: 0.375rem 0.5rem; border-radius: var(--r-sm);
-  font: inherit; font-size: var(--ty-micro); font-family: var(--font-mono);
+  font: inherit; font-size: var(--ty-micro); font-family: var(--font-sans);
   color: var(--ink-secondary); text-align: left; cursor: pointer;
 }
 .set2-pop-i:hover { background: var(--card-bg); color: var(--ink-primary); }
@@ -738,7 +775,7 @@ kbd {
   display: flex; align-items: baseline; gap: 0.5rem;
   padding: 0.3125rem 0.5rem; font-size: var(--ty-micro); color: var(--ink-faint);
 }
-.set2-pop-row code { font-family: var(--font-mono); color: var(--ink-secondary); }
+.set2-pop-row code { font-family: var(--font-sans); color: var(--ink-secondary); }
 .set2-pop-row b { color: var(--ink-primary); font-weight: var(--fw-semibold); margin-left: auto; }
 
 /* ══ MODAL ═══════════════════════════════════════════════════════════════
@@ -761,7 +798,10 @@ kbd {
   overflow: hidden;
 }
 .set2-modal-hd { display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.125rem 0.75rem; }
-.set2-modal-t { font-size: var(--ty-title); font-weight: var(--fw-bold); color: var(--ink-primary); }
+.set2-modal-t {
+  font-family: var(--font-display);
+  font-size: var(--ty-title); font-weight: var(--fw-bold); color: var(--ink-primary);
+}
 .set2-modal-x {
   margin-left: auto; appearance: none; border: 0; background: transparent;
   cursor: pointer; color: var(--ink-faint); display: grid; place-items: center; padding: 0.25rem;
@@ -781,7 +821,7 @@ kbd {
 .set2-up { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .set2-up-req { font-size: var(--ty-micro); color: var(--ink-quiet); line-height: var(--lh-base); }
 .set2-up-req li { margin-bottom: 0.375rem; }
-.set2-up-req code { font-family: var(--font-mono); color: var(--ink-primary); }
+.set2-up-req code { font-family: var(--font-sans); color: var(--ink-primary); }
 .set2-drop {
   display: grid; place-items: center; gap: 0.5rem;
   min-height: 9rem; padding: 1rem; text-align: center;
@@ -1059,7 +1099,6 @@ kbd {
    ══════════════════════════════════════════════════════════════════════════ */
 .set2-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .set2-range-d { flex: 0 0 auto; width: 10rem; font-variant-numeric: tabular-nums; }
-.set2-range-a { color: var(--ink-faint); font-size: var(--ty-meta); }
 /* ══════════════════════════════════════════════════════════════════════════
    THE SKILLS TABLE
 
@@ -1127,16 +1166,15 @@ kbd {
    Fill is reserved for state — broken, suggested — which is the only thing on
    this table worth a colour, and it could not be seen while eight rows were
    already tinted. */
-.set2-map-row.is-sub {
-  box-shadow: inset 0.125rem 0 0 var(--ink-rule);
-}
+/* `.set2-map-row.is-sub` carried an inset box-shadow here, and later a
+   positioned guide. Both are gone: depth is the indent and the space, and
+   nothing is drawn to announce it. See "NO GUIDE" further down. */
 .set2-map-row {
   display: grid;
   grid-template-columns: 9rem 1fr auto;
   gap: 0.75rem;
   align-items: center;
   padding: 0.6875rem 0.25rem;
-  border-bottom: 0.0625rem solid var(--hairline);
   padding-left: calc(0.25rem + var(--d, 0) * 1.375rem);
   min-height: 3.25rem;
 }
@@ -1214,7 +1252,7 @@ kbd {
 .set2-pop-i.is-path { flex-direction: column; align-items: flex-start; gap: 0.0625rem; }
 .set2-pop-i.is-path .set2-pop-n { font-size: var(--ty-micro); color: var(--ink-primary); }
 .set2-pop-s {
-  font-family: var(--font-mono); font-size: var(--ty-micro); color: var(--ink-faint);
+  font-family: var(--font-sans); font-size: var(--ty-micro); color: var(--ink-faint);
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
@@ -1431,7 +1469,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
   padding: 0.1875rem 0.4375rem;
   border-radius: var(--r-sm);
   font: inherit;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--ty-meta);
   color: var(--ink-primary);
   cursor: pointer;
@@ -1443,20 +1481,32 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
      its segments or not at all: wrap the line, and let no segment shrink. */
   flex-wrap: wrap;
   overflow-wrap: normal;
+  gap: 0;
 }
 .set2-key > * { flex: 0 0 auto; }
 .set2-key-s {
   color: var(--ink-primary);
 }
-.set2-key-dot {
-  color: var(--ink-faint);
-  margin: 0 0.125rem;
-}
+/* ── THE SEPARATOR HAS TO BE SEEN ──
+   In JetBrains Mono the period occupied a full advance — a wide, mostly empty
+   cell — so the 2px of margin on each side of it was three helpings of the
+   same space and `assignee.name` came out as `assignee . name`.
+
+   Urbanist gives it a 2.7px advance and nothing else, so with the margin
+   removed the path went the other way and read as `assignee name`: the dot was
+   there and too small to register between two words set tight against it.
+
+   1px each side is the number. At 2px the separator measured 6.7px end to end
+   — wider than Urbanist's own word space, so the path read as separate words
+   with a speck between them, which is the same failure as the mono version at
+   half the size. A step up in ink does the rest: the dot has to be SEEN, not
+   given room. */
+.set2-key-dot { color: var(--ink-quiet); margin: 0 0.0625rem; }
 .set2-sample {
   display: flex;
   gap: 0.5rem;
   margin-top: 0;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--ty-micro);
   color: var(--ink-faint);
   min-width: 0;
@@ -1806,9 +1856,20 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
    ══════════════════════════════════════════════════════════════════════════ */
 
 /* ── 2. The path reads to its leaf ── */
-.set2-key-s { color: var(--ink-faint); font-weight: var(--fw-regular); }
-.set2-key-s:last-of-type { color: var(--ink-primary); font-weight: var(--fw-medium); }
-.set2-key-dot { color: var(--ink-rule); margin: 0 0.0625rem; }
+/* ── WEIGHT, NOT A SECOND FACE ──
+   These paths were set in JetBrains Mono. A monospace face says "this is a
+   machine string" — true, and it cost a whole second typeface on a surface
+   whose other 95% is Urbanist, at a size the file had already had to bump one
+   step because mono runs small. Two faces disagreeing down one column is a
+   louder signal than the one it was carrying.
+
+   The distinction it was making is still worth making, and the type scale can
+   make it: the leading segments are the ROUTE and recede, the last segment is
+   the VALUE the field actually reads and takes the weight. That is the same
+   ladder the rest of the surface uses, in the same face. */
+.set2-key-s { color: var(--ink-quiet); font-weight: var(--fw-regular); }
+.set2-key-s:last-of-type { color: var(--ink-primary); font-weight: var(--fw-bold); }
+.set2-key-dot { color: var(--ink-quiet); margin: 0 0.0625rem; }
 .set2-map-row.is-broken .set2-key-s:last-of-type { color: var(--ink-err); }
 
 /* ── 3. Evidence, not content — but still content ──
@@ -1860,7 +1921,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
   align-items: center; gap: 0.375rem;
 }
 .set2-vm-k {
-  font-family: var(--font-mono); font-size: var(--ty-micro);
+  font-family: var(--font-sans); font-size: var(--ty-micro);
   color: var(--ink-quiet); background: var(--card-bg);
   padding: 0.25rem 0.375rem; border-radius: var(--r-xs);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1911,18 +1972,45 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 /* ══════════════════════════════════════════════════════════════════════════
    A SUBFIELD LOOKS LIKE A SUBFIELD
 
-   I had this as a 1px guide with an elbow — a drawing of a tree, on top of an
-   indent that was too small to read. The design does it with a tinted band per
-   level: the row steps right AND the surface behind it lifts, so depth is
-   legible from the shape of the block before you read a word of it. Two
-   signals agreeing beat one signal drawn carefully.
-   ══════════════════════════════════════════════════════════════════════════ */
-.set2-map-row.is-d1 { background: var(--card-bg); }
-.set2-map-row.is-d2 { background: var(--card-bg-raised); }
-/* The add-row under a group belongs to the band above it. */
-.set2-map-add.is-open { background: var(--card-bg); }
+   This was a tinted band per level — `--card-bg` at depth 1, `--card-bg-raised`
+   at depth 2 — on the argument that two signals agreeing beat one signal drawn
+   carefully. It read as a stack of filled cards inside a table of unfilled
+   rows: the subfields looked like a different KIND of object rather than the
+   same object one level down, and the fill made them the heaviest thing in a
+   section where the parent rows are the ones you scan.
 
-/* Nothing else needs a colour: the indent and the band carry it. */
+   It also spent the surface step this file reserves elsewhere for state.
+   Nothing on the row could go `--card-bg` to say "suggested" or "broken" while
+   two of every three rows were already tinted, which is the exact objection an
+   earlier pass in this same file recorded before the bands came back.
+
+   So: indent and space, and a guide so the step reads as descent rather than
+   as a margin somebody chose. One signal, drawn where it means something.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── NO GUIDE ──
+   There was a hairline down the parent's gutter, on the reasoning that a step
+   needs a mark or it reads as a margin somebody chose. It does not: the rows
+   already have a hairline between every one of them, so a second hairline at
+   right angles to those was one more line in a table made of lines, and the
+   only thing it added was a fragment hanging beside each "Add subfield" that
+   attached to nothing.
+
+   28px of indent against a 9rem label column is unambiguous on its own. The
+   step and the space around the group carry it. */
+
+/* ── SPACE IS THE OTHER HALF ──
+   With the fill gone the run needs air around it, or a group and the row after
+   it are one undifferentiated column of hairlines. A subfield sits tight to
+   its parent; the next top-level field gets a clear gap. */
+.set2-map-row.is-sub { min-height: 2.75rem; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+/* Air on both sides of the line that starts a group, so the separator reads as
+   a break between two things rather than as a lid on the row beneath it. */
+.set2-map-row:not(.is-sub) { margin-top: 0.375rem; padding-top: 1rem; }
+.set2-map-hd + .set2-map-row { margin-top: 0; padding-top: 0.6875rem; }
+
+/* A subfield's own name still reads at full contrast — it is a field, not a
+   detail of the one above it. */
 .set2-map-row.is-sub .set2-map-ctx { color: var(--ink-primary); }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -2108,28 +2196,54 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
    The picker button is the browser's, and it arrives as a grey square that
    matches nothing. It is tinted to the surface instead.
    ══════════════════════════════════════════════════════════════════════════ */
+/* Every `-webkit-datetime-edit` and `-webkit-calendar-picker-indicator` rule
+   that used to live here is gone, along with the `--cal-invert` variable that
+   existed to flip a black icon the browser ships and this file cannot replace.
+   The ends are buttons opening our own calendar; there is no vendor shadow DOM
+   left to reach into. */
 .set2-range-d { min-width: 0; }
-.set2-range-d.is-empty::-webkit-datetime-edit { color: var(--ink-rule); }
-.set2-range-d::-webkit-datetime-edit { padding: 0; }
-.set2-range-d::-webkit-calendar-picker-indicator {
-  opacity: 0.45; cursor: pointer; padding: 0.125rem;
-  border-radius: var(--r-xs);
-  filter: invert(var(--cal-invert, 1));
-}
-.set2-range-d::-webkit-calendar-picker-indicator:hover { opacity: 1; }
-/* The icon ships black; it is inverted on the dark ground and left alone on
-   the light one. */
-:root { --cal-invert: 1; }
-:root[data-theme="light"] { --cal-invert: 0; }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) { --cal-invert: 0; }
-}
 
-/* Both ends the same width, and the arrow between them stays put rather than
-   being pushed around by whichever side has a value. */
-.set2-range { display: flex; align-items: center; gap: 0.5rem; }
-.set2-range-d { flex: 1 1 0; }
-.set2-range-a { flex: 0 0 auto; color: var(--ink-faint); }
+/* One field for one value. It was two boxes with an arrow between them, sized
+   to match each other; there is nothing left to match. `relative`, because the
+   calendar hangs off it. */
+.set2-range { display: flex; align-items: center; gap: 0.5rem; position: relative; }
+.set2-range-d { flex: 1 1 auto; max-width: 20rem; }
+
+/* ── THE TRIGGER ──
+   It wears `.set2-fld`, so it is the same box as every other field on the
+   page — this only adds what a button needs that an input does not, and the
+   glyph that says what pressing it does. */
+.set2-range-d {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  cursor: pointer; text-align: left;
+  font-family: var(--font-sans); font-size: var(--ty-micro);
+  color: var(--ink-primary);
+}
+.set2-range-d.is-empty { color: var(--ink-rule); }
+.set2-range-d .set2-cal-i { flex-shrink: 0; color: var(--ink-faint); }
+.set2-range-d:hover .set2-cal-i { color: var(--ink-primary); }
+.set2-range-d.is-open { border-color: var(--brand); }
+
+/* ── THE PANEL ──
+   Anchored to the pair rather than to one end, so opening from either box puts
+   the calendar in the same place — the month you are reading does not jump
+   sideways depending on which date you pressed.
+
+   Below the topnav and below the chat surfaces, which is the band this file's
+   z-index note puts settings popovers in. It opens UPWARD: the sync form sits
+   low enough on its page that a 300px panel dropping from it would land in the
+   float bar, and unlike the day picker there is only ever one of these, in one
+   place, so the direction can simply be the right one. */
+.set2-cal {
+  position: absolute; z-index: 120;
+  left: 0; bottom: calc(100% + 0.5rem);
+  width: 17rem;
+}
+.set2-cal .cal-day { font-size: var(--ty-micro); }
+.set2-cal .cal-dow { font-size: 0.6875rem; }
+.set2-cal .cal-hint b { color: var(--ink-quiet); font-weight: var(--fw-semibold); }
+/* `.set2-range-a` — the arrow between the two date boxes — went with the
+   second box. One field needs nothing pointing at anything. */
 
 /* A run in flight is not a finished run. The pill says so, and the row it sits
    on says nothing else different — a sync that is working is the normal case,
@@ -2163,10 +2277,18 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 .set2-danger-i { flex-shrink: 0; display: flex; }
 .set2-danger-i svg { width: 0.9375rem; height: 0.9375rem; }
 
+/* ── NOT `overflow: hidden` ──
+   It was, to clip row fills to the rounded corners. The rows carry no fill —
+   the card's border and the hairlines between rows do all of it — so the only
+   thing that clipping reached was the one element that has to escape: the day
+   picker's panel opens downward out of the last row and was being cut off at
+   the card's edge, which is a dropdown you cannot read the bottom of.
+
+   The corners still round because the border rounds; there is nothing inside
+   painting over them. */
 .set2-ret-card {
   border: 0.0625rem solid var(--hairline);
   border-radius: var(--r-lg);
-  overflow: hidden;
 }
 .set2-ret-row {
   display: grid;
@@ -2301,11 +2423,8 @@ body.is-settings .set2-col .btn-sm,
 body.is-settings .set2-scrim .btn-sm,
 body.is-settings .set2-pop .btn-sm { font-size: 0.875rem; }
 
-/* Mono runs visually smaller than the sans at the same size, so the key paths
-   and tokens take the next step up rather than reading a size below their
-   neighbours. */
-body.is-settings .set2-mono,
-body.is-settings .set2-key { font-size: var(--ty-meta); }
+/* This compensated for mono running visually small. Nothing here uses mono, so
+   it went with it — everything sits on the one scale now. */
 
 /* The compact way to start a group. It sits with the row's other actions, so
    a field that has no subfields yet costs no vertical space to offer one. */
@@ -2390,7 +2509,8 @@ body.is-settings .set2-key { font-size: var(--ty-meta); }
 }
 .set2-wh-hd { display: flex; align-items: center; gap: 0.625rem; margin-bottom: 0.875rem; }
 .set2-wh-t {
-  margin: 0; font-size: var(--ty-meta); font-weight: var(--fw-semibold);
+  margin: 0; font-family: var(--font-display);
+  font-size: var(--ty-meta); font-weight: var(--fw-bold);
   color: var(--ink-primary); letter-spacing: var(--ls-tight);
 }
 /* Asleep: legible, plainly inert. The library's 0.38 made "Saved" unreadable
@@ -2456,3 +2576,138 @@ body.is-settings .set2-key { font-size: var(--ty-meta); }
    page carrying nothing there it is a hairline under the header — which is the
    separator the title used to sit on anyway. */
 .set2-solo .set2-sec:first-child > .set2-sec-h { min-height: 1.5rem; align-items: center; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DATA RELEVANCE RANGE
+
+   Almost nothing of its own. The section is `secRetention`'s card and rows
+   with a different control in the slot, which is the point: two sections
+   asking "how much history" answer in one shape, so a reader learns the row
+   once. `.set2-ret-card`, `.set2-ret-row`, `.set2-ret-n`, `.set2-ret-says` and
+   `.set2-ret-c` all do their usual jobs here.
+
+   What is left is the one difference — no trash column, so the grid is three
+   tracks rather than four.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-win-row { grid-template-columns: minmax(7rem, auto) minmax(0, 1fr) auto; }
+/* The range is chosen from a list, so the slot holds a select where Retention
+   holds a number input. Same width, so the two stacks line up down the page. */
+.set2-win-row .set2-fld-sel { width: 5.25rem; }
+
+/* ── The caveat, as a caveat ──
+   "Reading only. Nothing is removed here" was the row's DESCRIPTION, sitting
+   where a control explains itself — so the one control on the section was
+   introduced by a sentence about what it does not do. It is a note about the
+   whole section and it reads as one now, under the card rather than inside it. */
+.set2-fine {
+  margin: 0.75rem 0 0; max-width: 46rem;
+  font-size: var(--ty-micro); color: var(--ink-faint); line-height: 1.5;
+}
+.set2-fine b { color: var(--ink-quiet); font-weight: var(--fw-semibold); }
+
+@media (max-width: 46rem) {
+  /* Same fold as the retention rows: the consequence drops to its own line. */
+  .set2-win-row { grid-template-columns: 1fr auto; }
+  .set2-win-row .set2-ret-says { grid-column: 1 / -1; order: 3; }
+}
+
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A MASKED TOKEN KEEPS ITS SIZE
+
+   The auth token is a password field, so what you see is the browser's mask
+   glyph set in whatever face the input carries — and that is the one thing the
+   move off JetBrains Mono broke rather than improved.
+
+   Measured: ten mask bullets run 90px in JetBrains Mono at 15px and 28px in
+   Urbanist at the same size. Urbanist draws a small bullet on a tight advance,
+   which is correct for a bullet in running prose and wrong for a row of them
+   standing in for a 28-character secret: the field went from reading as a
+   redacted value to reading as a dotted line.
+
+   So the mask is sized deliberately rather than inheriting. The bullet comes
+   up so it is a mark you can count, and letter-spacing gives it back the
+   advance the monospace cell used to provide. `[type="password"]` scopes it to
+   the masked state — press the eye and the field is ordinary text at the
+   ordinary size, which is when you actually want to read the characters.
+   ══════════════════════════════════════════════════════════════════════════ */
+input.set2-fld[type="password"] {
+  font-size: 1.375rem;
+  letter-spacing: 0.3125rem;
+  /* The type is 22px in a field that has to stay the height of the URL field
+     stacked above it, so the box is pinned rather than left to the font's own
+     leading — 22px of Urbanist leading pushed the row to 42px against the
+     URL's 36. The bullets sit mid-x-height, so nothing clips. */
+  line-height: 1;
+  height: 2.125rem;
+  padding-top: 0; padding-bottom: 0;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE DAY PICKER
+
+   `.v2-dropdown` from the design system, unmodified in behaviour — this is
+   only the sizing that puts it in a settings row, plus one state it should not
+   express here.
+
+   `.active-filter` is the library marking "not the default", where the default
+   is the FIRST option. That is right for a filter chip, whose first option is
+   "All". These options are a scale of days: 7 is not a default and 90 is not a
+   deviation from it, so every row but one would have worn the accent border
+   for no reason a reader could name.
+   ══════════════════════════════════════════════════════════════════════════ */
+/* ── SIZED FOR A ROW, NOT FOR THE CHROME ──
+   The library sets the trigger at 11px, which is right where it lives: a
+   filter chip in the workbench's top bar, among other 11px chrome. In a
+   settings row it sits beside a 15px name and a 14px unit and reads as the
+   smallest thing on the line — which is the defect this file already recorded
+   against `.btn-sm`, whose 10.5px made "Run sync" and "Delete" the quietest
+   text on the surface. Same fix, same reasoning: the control a row exists for
+   is not where the type scale bottoms out. */
+.set2-dd .v2-dropdown-btn {
+  min-width: 4.75rem; justify-content: space-between;
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  padding: 0.375rem 0.5rem 0.375rem 0.6875rem;
+  min-height: 2.125rem;
+  color: var(--ink-primary);
+}
+.set2-dd .v2-dropdown-btn svg { width: 0.6875rem; height: 0.6875rem; }
+.set2-dd .dd-label-text { font-variant-numeric: tabular-nums; max-width: none; }
+.set2-dd .v2-dropdown-option { font-size: var(--ty-micro); padding: 0.4375rem 0.625rem; }
+.set2-dd .v2-dropdown-btn.active-filter {
+  border-color: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: inherit;
+}
+:root[data-theme="light"] .set2-dd .v2-dropdown-btn.active-filter {
+  border-color: rgba(16,24,40,0.14);
+  background: rgba(16,24,40,0.03);
+}
+/* The panel is a column of two-digit numbers, so it needs none of the width a
+   label list does — and it is right-aligned under a right-aligned control. */
+.set2-dd .v2-dropdown-panel { min-width: 100%; left: auto; right: 0; }
+.set2-dd .v2-dropdown-option { font-variant-numeric: tabular-nums; }
+
+
+/* The flipped panel. `bottom` replaces `top` rather than being added to it, or
+   the library's `top: calc(100% + 4px)` would keep it pinned below and stretch
+   the box between the two edges. See placeDD. */
+.set2-dd.is-up .v2-dropdown-panel {
+  top: auto;
+  bottom: calc(100% + 0.25rem);
+}
+
+
+/* The panel's foot: what to do next on the left, the way out on the right.
+   `.cal-hint` brought its own top rule from the corpus calendar, so the row
+   sits on it rather than adding a second. */
+.set2-cal .cal-foot {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem;
+  margin-top: 0.5rem; padding-top: 0.5rem;
+  border-top: 0.0625rem solid var(--hairline);
+}
+.set2-cal .cal-hint { margin: 0; padding: 0; border-top: 0; }
+.set2-cal .cal-foot .set2-lnk { font-size: var(--ty-micro); }

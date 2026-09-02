@@ -69,6 +69,7 @@
     tree: '<svg class="set2-row-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="1.5" width="5" height="3.5" rx="1"/><rect x="1.5" y="11" width="4.5" height="3.5" rx="1"/><rect x="10" y="11" width="4.5" height="3.5" rx="1"/><path d="M8 5v3.5M3.75 11V8.5h8.5V11"/></svg>',
     left: '<svg class="set2-lad-ch" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5 4 6l3.5 3.5"/></svg>',
     trash: '<svg class="set2-tr" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h10M6.5 4.5V3.2a.7.7 0 0 1 .7-.7h1.6a.7.7 0 0 1 .7.7v1.3M4.4 4.5l.5 8a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.5-8"/></svg>',
+    cal:  '<svg class="set2-cal-i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true"><rect x="2.2" y="3.2" width="11.6" height="10.6" rx="1.6"/><path d="M2.2 6.4h11.6M5.5 1.8v2.4M10.5 1.8v2.4"/></svg>',
     key:  '<svg class="set2-row-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="10.5" r="3"/><path d="M7.6 8.4 13 3M11 5l1.5 1.5M12.5 3.5 14 5"/></svg>'
   };
 
@@ -783,7 +784,6 @@
      filters widens toward the sum of their individual shares. */
   /* The history's own date format, so a run written now sits in the same
      column as the ones that came with the fixture. */
-  let RANGE_ERR = false;
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const pad2 = (n) => (n < 10 ? '0' : '') + n;
@@ -804,6 +804,117 @@
     };
     if (r[0] && r[1]) return one(r[0]) + ' \u2013 ' + one(r[1]);
     return r[0] ? 'from ' + one(r[0]) : 'up to ' + one(r[1]);
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     THE DATE RANGE, IN OUR OWN CALENDAR
+
+     Both ends were `<input type="date">`. The browser draws that control
+     itself, in its own colours, at its own size, in the OS's locale — so on a
+     dark settings page it opened a white sheet reading `08/01/2026` in
+     month-first order, which is the one date format this product uses nowhere
+     else. It was also the only control on the surface whose look nobody here
+     could change.
+
+     `.cal` is the design system's month calendar and it is used unchanged:
+     head with two nav buttons, seven-column grid, `.muted` / `.today` /
+     `.selected`. The RANGE states — `in-range`, `range-start`, `range-end` —
+     are the product extension knowledge.js already added for the corpus date
+     filter and recorded in GAPS.md; this is the second consumer of them, not a
+     second copy.
+
+     WHY NOT REUSE knowledge.js's WHOLE CALENDAR. Its model is days-before-
+     today: every date it handles is an offset, it refuses the future because
+     nothing in the corpus has one, and it writes a filter key. A sync range is
+     two absolute dates with neither of those properties. Sharing the CSS is
+     sharing what is genuinely the same; sharing the controller would mean
+     bending one model around the other.
+
+     ONE COMPONENT, NOT TWO PICKERS. It was two boxes, each opening this same
+     panel "for its end" — and the panel drew the whole range regardless, so it
+     was neither two date pickers nor one range picker. It was one range picker
+     wearing two triggers, which meant the thing on screen could not tell you
+     what it was: a range highlighted across a month, opened from a box that
+     claimed to own one end of it.
+
+     A range is one value. So it is one trigger, one panel, and two clicks: the
+     first sets an end, the second closes the range. And because the component
+     owns both ends, it ORDERS them — click the later day first and it is still
+     a range that runs forwards. A backwards range is not an error to be caught
+     here, it is a state this control can no longer express. */
+  let calOpen = false;    /* is the picker showing */
+  let calPick = null;     /* an end chosen, waiting for its partner */
+  let calMonth = null;    /* the month on show, as a UTC first-of-month */
+
+  const DOW = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const CAL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+
+  const isoOf = (d) => d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+  const dayOf = (v) => (v ? new Date(v + 'T00:00:00Z') : null);
+  /* "1 Aug 2026". The trigger shows a date a person reads, not an ISO string
+     and not the platform's `mm/dd/yyyy`. */
+  const fmtDay = (v) => {
+    const d = dayOf(v);
+    return d ? d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear() : '';
+  };
+
+  function calPanel(r) {
+    /* Open on the range's own month, else today. Landing on today when the
+       range is in March is a month of clicking. */
+    const anchor = dayOf(calPick) || dayOf(r[0]) || dayOf(r[1]) || new Date();
+    const view = calMonth
+      || new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
+    const y = view.getUTCFullYear(), mo = view.getUTCMonth();
+    const lead = new Date(Date.UTC(y, mo, 1)).getUTCDay();
+    const days = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+    const prev = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+
+    const cells = [];
+    for (let i = lead - 1; i >= 0; i--) cells.push({ n: prev - i, muted: true, d: new Date(Date.UTC(y, mo - 1, prev - i)) });
+    for (let i = 1; i <= days; i++) cells.push({ n: i, muted: false, d: new Date(Date.UTC(y, mo, i)) });
+    while (cells.length % 7) { const i = cells.length - lead - days + 1; cells.push({ n: i, muted: true, d: new Date(Date.UTC(y, mo + 1, i)) }); }
+
+    const today = isoOf(new Date());
+    /* Mid-pick the range on show is the one end chosen so far, not the one
+       stored — otherwise the panel goes on drawing the range you are in the
+       middle of replacing. */
+    const a = calPick || r[0], b = calPick ? '' : r[1];
+    return `<div class="cal set2-cal" role="dialog" aria-label="Choose a date">
+      <div class="cal-head">
+        <button class="cal-nav" type="button" data-scal-nav="-1" aria-label="Previous month">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <div class="cal-title">${esc(CAL_MONTHS[mo])} ${y}</div>
+        <button class="cal-nav" type="button" data-scal-nav="1" aria-label="Next month">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+      </div>
+      <div class="cal-grid">
+        ${DOW.map((d) => `<div class="cal-dow">${d}</div>`).join('')}
+        ${cells.map((c) => {
+          const v = isoOf(c.d);
+          const isA = !!a && v === a, isB = !!b && v === b;
+          const between = !!a && !!b && v > a && v < b;
+          const cls = ['cal-day']
+            .concat(c.muted ? ['muted'] : [])
+            .concat(v === today ? ['today'] : [])
+            .concat(isA || isB ? ['selected'] : [])
+            .concat(isA && a !== b && b ? ['range-start'] : [])
+            .concat(isB && a !== b && a ? ['range-end'] : [])
+            .concat(between ? ['in-range'] : []);
+          return `<button class="${cls.join(' ')}" type="button"
+            data-scal-day="${v}" aria-label="${esc(fmtDay(v))}">${c.n}</button>`;
+        }).join('')}
+      </div>
+      <div class="cal-foot">
+        <span class="cal-hint">${calPick
+          ? 'Now pick the other end.'
+          : 'Pick two dates.'}</span>
+        ${r[0] || r[1] || calPick
+          ? '<button class="set2-lnk" type="button" data-scal-clear>Clear</button>' : ''}
+      </div>
+    </div>`;
   }
 
   function matchCount(c) {
@@ -1746,41 +1857,104 @@
      once, so it reads every connector and says so when they disagree. */
   const RELEVANCE = [7, 14, 30, 60, 90, 180, 365];
 
+  /* ── DAYS, AS THE SYSTEM'S OWN SELECT ──
+
+     Both of this page's sections ask for a number of days and each had reached
+     for a different platform control: a native `<select>` on the range and a
+     `<input type="number">` on the threshold. Two shapes for one question, and
+     neither of them ours — a native select paints its own list in the OS's
+     colours and a number spinner puts two 8px arrows inside the field, which
+     is the sliver of chrome in the screenshot that started this.
+
+     `.v2-dropdown` is the design system's only select control, and it already
+     carries what a custom listbox owes: keyboard navigation, typeahead, focus
+     management, and the ARIA that makes it announce as a listbox. Nothing here
+     re-implements any of that — this builds the markup its controller expects
+     and listens for the `dd:change` it emits.
+
+     A THRESHOLD BECOMES A CHOICE. The retention field took any integer from 1
+     to 3650. In practice a retention policy is chosen from a shortlist, not
+     dialled in, and the free number was buying arbitrary precision at the cost
+     of a control nobody could use with a keyboard without also being able to
+     see a spinner. The list is the same one the range uses, because "how long
+     do we keep this" and "how far back do we read" are measured on one scale. */
+  function daysDD(value, attr, label) {
+    const opts = RELEVANCE.indexOf(value) > -1
+      ? RELEVANCE : RELEVANCE.concat([value]).sort((x, y) => x - y);
+    return `<div class="v2-dropdown set2-dd" ${attr}>
+      <button class="v2-dropdown-btn" type="button" aria-haspopup="listbox"
+              aria-expanded="false" aria-label="${esc(label)}">
+        <span class="dd-label-text">${value}</span>
+        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+      </button>
+      <div class="v2-dropdown-panel" role="listbox">
+        ${opts.map((d) => `<div class="v2-dropdown-option${d === value ? ' selected' : ''}"
+          role="option" aria-selected="${d === value}" data-value="${d}">${d}</div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  /* ── ONE CONTROL PER CONNECTOR, LIKE THE SECTION BELOW IT ──
+
+     This was a single select governing every connector at once, on the
+     reasoning that "how far back to read" is a question the PRODUCT answers
+     once. Two rewrites tried to make that work and both failed on the same
+     rock: the connectors in the fixture disagree, so the one control had no
+     honest value to show. First it showed `Math.min` and drew a change nobody
+     had asked for; then it showed "Mixed", which is a control admitting it
+     cannot answer its own question and putting the reader in front of a
+     dropdown whose only real option is "overwrite both".
+
+     A range IS per connector — the model has always stored it that way — and
+     Trigger delete directly below has had one threshold per CRM from the
+     start. So this is that: same card, same row, same control slot, same unit.
+     Two sections that ask "how much history" answer it in one shape, and a
+     disagreement between connectors stops being an exception the layout has to
+     apologise for. It is just two rows with two values.
+
+     The middle column is the consequence, where Retention puts its record
+     count: the date the range actually reaches back to. A number of days is a
+     setting; the date is what it means. */
   function secWindow(st) {
     const list = connsOf(prodOf(st));
-    const vals = list.map((x) => x.window).filter((v, i, a) => a.indexOf(v) === i);
-    const same = vals.length === 1;
-    const now = same ? vals[0] : Math.min.apply(null, vals);
-    const opts = RELEVANCE.indexOf(now) > -1 ? RELEVANCE : RELEVANCE.concat([now]).sort((x, y) => x - y);
+    if (!list.length) return '';
     return `
       <section class="set2-sec" id="st-window">
         <div class="set2-sec-h"><h2 class="set2-sec-t">Data relevance range</h2></div>
-        <div class="set2-sub">Control how far back AiMY retrieves knowledge from your CRM.${
-          list.length > 1 ? ' Applies to all ' + list.length + ' connectors.' : ''}</div>
-        <div class="set2-set" style="margin-top:0.75rem">
-          <div class="set2-set-row">
-            <div class="set2-set-l">
-              <div class="set2-set-n">Retrieve data from the past:</div>
-              ${/* It deletes nothing. That is Retention, further down this
-                    page, and the two are the settings most often confused for
-                    each other. */ ''}
-              <div class="set2-set-d">Reading only. Nothing is removed here \u2014 that is Retention, below.</div>
-              ${same ? '' : `<div class="set2-note is-warn" style="margin-top:0.5rem">${
-                list.map((x) => esc(x.crm) + ' reads ' + x.window + ' days').join(', ')
-                }. Saving here sets them all to one range.</div>`}
-            </div>
-            <div class="set2-set-c">
-              ${/* Applies on change, like everything else here. It used to
-                    only mark the page dirty and wait for Publish, which is the
-                    one behaviour the save bar existed to serve. */ ''}
-              <select class="set2-fld set2-fld-sel" data-window
-                      aria-label="How far back to retrieve data">
-                ${opts.map((d) => `<option value="${d}"${d === now ? ' selected' : ''}>${d} days</option>`).join('')}
-              </select>
-            </div>
-          </div>
+        <div class="set2-sub">How far back AiMY reads when it answers from ${esc(prodOf(st))}, per CRM.</div>
+
+        <div class="set2-ret-card">
+          ${list.map((c) => `
+            <div class="set2-ret-row set2-win-row">
+              <span class="set2-ret-n">${esc(c.crm)}</span>
+              <span class="set2-ret-says">${windowSays(c)}</span>
+              <span class="set2-ret-c">
+                ${daysDD(c.window, `data-window="${esc(c.id)}"`,
+                    'How far back to read from ' + c.crm + ', in days')}
+                <span class="set2-set-u">days</span>
+              </span>
+            </div>`).join('')}
         </div>
+
+        ${/* It deletes nothing. That is Trigger delete, further down this page,
+              and the two are the settings most often confused for each other —
+              so the reference names the heading it points at. */ ''}
+        <p class="set2-fine">Reading only. Nothing is removed here — that is
+          <b>Trigger delete</b>, below.</p>
       </section>`;
+  }
+
+  /* The one sentence a range gets to say about itself, in the slot Retention
+     uses for "2,105 records would go". A count is not available here — nothing
+     in the model knows how many records fall inside a window — and the date it
+     reaches back to is the honest equivalent: it is what the number MEANS,
+     computed rather than restated. */
+  function windowSays(c) {
+    const d = new Date();
+    d.setDate(d.getDate() - c.window);
+    return 'reads back to <b>' + esc(d.toLocaleDateString('en-GB',
+      { day: 'numeric', month: 'short', year: 'numeric' })) + '</b>';
   }
 
   /* The single sentence a retention threshold gets to say about itself. Both
@@ -1845,7 +2019,11 @@
     const cls = [!res.ok ? 'is-broken' : '', incomplete ? 'is-partial' : '',
                  m.state === 'unmapped' ? 'is-unmapped' : '',
 
-                 depth ? 'is-sub is-d' + depth : ''].filter(Boolean).join(' ');
+                 /* `is-d1` / `is-d2` went with the tinted bands they named.
+                    Depth is `--d` — a number the indent and the guide both
+                    compute from — so a class per level was a second copy of
+                    the same fact, and one that stopped at two. */
+                 depth ? 'is-sub' : ''].filter(Boolean).join(' ');
 
     /* What the field is set to, as one control. Derived rows name the
        derivation instead of a path, because that is what they are. */
@@ -2286,21 +2464,25 @@
           <div class="set2-field">
             <label class="set2-lbl">Date range</label>
             <div class="set2-range">
-              ${/* `is-empty` so an unset box reads as a prompt rather than as
-                    the literal text "mm/dd/yyyy" -- which is what the native
-                    control prints, and what a reader takes for a value. */ ''}
-              <input class="set2-fld set2-range-d${r[0] ? '' : ' is-empty'}" type="date"
-                     value="${esc(r[0])}" data-range="0" aria-label="Sync from">
-              <span class="set2-range-a" aria-hidden="true">&rarr;</span>
-              <input class="set2-fld set2-range-d${r[1] ? '' : ' is-empty'}" type="date"
-                     value="${esc(r[1])}" data-range="1" aria-label="Sync to">
+              ${/* ONE control for one value. See calPanel: two boxes each
+                    opening the same range panel was one component pretending
+                    to be two, and neither of them could say what it was. */ ''}
+              <button class="set2-fld set2-range-d${r[0] || r[1] ? '' : ' is-empty'}${calOpen ? ' is-open' : ''}"
+                      type="button" data-range-open aria-haspopup="dialog"
+                      aria-expanded="${calOpen}" aria-label="The date range to sync">
+                <span>${r[0] || r[1] ? esc(rangeLabel(r)) : 'Any dates'}</span>
+                ${I.cal}
+              </button>
               ${r[0] || r[1] ? `<button class="set2-x" type="button" data-range-clear aria-label="Clear the date range">${I.x}</button>` : ''}
+              ${calOpen ? calPanel(r) : ''}
             </div>
             ${/* Under the dates, not under the whole row. It was full width at
                   the section's left edge, 288px from the field it describes. */ ''}
-            ${RANGE_ERR
-              ? `<div class="set2-note is-err">The end of the range is before its start, so nothing would match. Swap them, or clear one.</div>`
-              : `<div class="set2-hint">Leave empty to resume from the last successful sync.</div>`}
+            ${/* No backwards-range error. The picker orders its own ends, so
+                  the state that note described cannot be reached from here —
+                  and a warning that can never fire is a warning nobody trusts
+                  when a different one does. */ ''}
+            <div class="set2-hint">Leave empty to resume from the last successful sync.</div>
           </div>
         </div>
 
@@ -2429,9 +2611,8 @@
               <span class="set2-ret-n">${esc(r.name)}</span>
               <span class="set2-ret-says">${retentionSays(r)}</span>
               <span class="set2-ret-c">
-                <input class="set2-fld set2-fld-n set2-num" type="number" min="1" max="3650"
-                       value="${r.days}" data-ret="${esc(r.id)}"
-                       aria-label="${esc(r.name)} retention threshold in days">
+                ${daysDD(r.days, `data-ret="${esc(r.id)}"`,
+                    r.name + ' retention threshold in days')}
                 <span class="set2-set-u">days</span>
               </span>
               <button class="set2-ret-del" type="button" data-ret-go="${esc(r.id)}"
@@ -4026,16 +4207,8 @@
        filter to the one the button beneath it would run is worse than no test,
        because it would be believed. */
     if (e.target.closest('[data-test]')) {
-      const p0 = primaryOf(st);
-      const r0 = (p0 && p0.range) || ['', ''];
-      /* Refused for the same reason a run is: a backwards window matches
-         nothing, and a preview of nothing looks like a mapping problem. */
-      if (r0[0] && r0[1] && r0[0] > r0[1]) {
-        RANGE_ERR = true; render();
-        const f = $('[data-range="1"]'); if (f) f.focus();
-        return;
-      }
-      RANGE_ERR = false;
+      /* No backwards-range refusal. The range picker orders its ends, so the
+         pair this used to reject cannot be built. */
       const c = crmOf(st);
       c.previewed = true;
       /* Repaint the page under the modal too. The checklist's fourth step is
@@ -4323,9 +4496,72 @@
     }
 
     /* ── The date range for one run ── */
-    if (e.target.closest('[data-range-clear]')) {
-      const c = primaryOf(st); if (c) { c.range = ['', '']; DIRTY.add('range'); render(); }
+    if (e.target.closest('[data-range-clear]') || e.target.closest('[data-scal-clear]')) {
+      const c = primaryOf(st);
+      if (c) {
+        c.range = ['', ''];
+        DIRTY.add('range');
+        /* Clearing from inside the panel leaves it open — you cleared in order
+           to pick again, and closing under you would mean re-opening it. From
+           the ✕ beside the field there is nothing open to leave. */
+        calOpen = !!e.target.closest('[data-scal-clear]');
+        calPick = null; calMonth = null;
+        render();
+      }
       return;
+    }
+
+    /* ── Our calendar ──
+       One trigger, toggling. `calMonth` and any half-finished pick are cleared
+       on every open, so the panel lands on the range's own month and never
+       resumes a selection somebody abandoned. */
+    if (e.target.closest('[data-range-open]')) {
+      calOpen = !calOpen;
+      calPick = null; calMonth = null;
+      render();
+      return;
+    }
+    const calNav = e.target.closest('[data-scal-nav]');
+    if (calNav) {
+      const step = +calNav.getAttribute('data-scal-nav');
+      const cur = $('.set2-cal .cal-title');
+      /* Read the month off the panel rather than keeping a second copy of it:
+         whatever is on screen is what "next" means. */
+      const parts = cur ? cur.textContent.trim().split(' ') : null;
+      const mi = parts ? CAL_MONTHS.indexOf(parts[0]) : -1;
+      const base = mi > -1 ? new Date(Date.UTC(+parts[1], mi, 1)) : new Date();
+      calMonth = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + step, 1));
+      render();
+      return;
+    }
+    const calDay = e.target.closest('[data-scal-day]');
+    if (calDay) {
+      const c = primaryOf(st);
+      const v = calDay.getAttribute('data-scal-day');
+      if (c) {
+        if (calPick === null) {
+          /* First of two. Nothing is written yet: a range with one end is not
+             a range, and writing it would leave the form in a state the picker
+             is one click away from replacing. */
+          calPick = v;
+        } else {
+          /* ── THE COMPONENT ORDERS ITS OWN ENDS ──
+             Whichever day was pressed first, the earlier one is the start.
+             This is the whole reason a range picker beats two date fields: a
+             backwards range is not caught, it is impossible. */
+          c.range = calPick <= v ? [calPick, v] : [v, calPick];
+          DIRTY.add('range');
+          calPick = null; calOpen = false; calMonth = null;
+        }
+        render();
+      }
+      return;
+    }
+    /* Anywhere else puts it away — including the rest of the form, which is
+       the gesture people use without thinking. A pick left half-made is
+       dropped rather than kept: one end is not a range. */
+    if (calOpen && !e.target.closest('.set2-cal')) {
+      calOpen = false; calPick = null; calMonth = null; render();
     }
 
     /* ── The connection picker ──
@@ -4443,17 +4679,11 @@
       const p = primaryOf(st);
       const r = (p && p.range) || ['', ''];
 
-      /* ── A RANGE HAS TO RUN FORWARDS ──
-         Both ends are free text as far as the control is concerned, and a pair
-         that ends before it starts matches nothing while looking like a
-         perfectly ordinary filter. It is caught here rather than discovered in
-         a run that returns zero for a reason nobody can see. */
-      if (r[0] && r[1] && r[0] > r[1]) {
-        RANGE_ERR = true; render();
-        const f = $('[data-range="1"]'); if (f) f.focus();
-        return;
-      }
-      RANGE_ERR = false;
+      /* ── A RANGE HAS TO RUN FORWARDS, AND NOW ALWAYS DOES ──
+         There was a check here refusing a pair that ended before it started —
+         necessary while both ends were free-text date inputs that knew nothing
+         about each other. The range picker sorts the two days it is given, so
+         the state is unreachable and the guard went with it. */
 
       /* ── ONE ROW PER CONNECTOR ──
          The header says the run goes to all of them and the count above the
@@ -4663,22 +4893,6 @@
       }
       return;
     }
-    const ret = e.target.closest('[data-ret]');
-    if (ret) {
-      const r = RETENTION.filter((x) => x.id === ret.dataset.ret)[0];
-      const v = parseInt(ret.value, 10);
-      const rowEl = ret.closest('[data-ret-row]');
-      if (r && v > 0 && rowEl) {
-        r.days = v;
-        DIRTY.add('retention:' + r.id);
-        const said = $('.set2-ret-says', rowEl);
-        if (said) said.innerHTML = retentionSays(r);
-        /* The spine's note is the same fact one column to the left. Leaving it
-           reading "over 90 days" beside an input reading 10 is the stale-index
-           problem in miniature. */
-        markDirtyStage('retention');
-      }
-    }
     /* Filtered in place. Re-rendering on each keystroke would rebuild the box
        being typed into and take the caret with it. */
     const cq = e.target.closest('[data-crit-q]');
@@ -4695,12 +4909,9 @@
       return;
     }
     /* One horizon for the product, written the moment it is chosen. */
-    const win = e.target.closest('[data-window]');
-    if (win) {
-      const v = parseInt(win.value, 10);
-      if (v > 0) connsOf(prodOf(readURL())).forEach((c) => { c.window = v; });
-      render(); return;
-    }
+    /* `[data-window]` and `[data-ret]` are not here. Both are `.v2-dropdown`
+       now, which is a listbox rather than a form field — it has no `value` and
+       fires no `input`. They are handled by the `dd:change` listener below. */
     if (e.target.hasAttribute && e.target.hasAttribute('data-dirty')) {
       /* Keyed by `data-dirty`, not by `id`. These inputs carry no id, so this
          was adding "" every time -- one empty string in a Set, which meant the
@@ -4710,6 +4921,127 @@
          guess at it. */
       const sec = e.target.closest('[id^="st-"]');
       if (sec) markDirtyStage(sec.id.slice(3)); else bumpUnsaved();
+    }
+  });
+
+  /* ── A PANEL THAT OPENS INTO THE FLOOR ──
+
+     The day picker on the last row of a card opened downward into the chat
+     bar and lost its bottom options under it. The bar is `.aimy-float-wrap` at
+     z-index 550; the library's panel is 200, and this file's own note on the
+     z-index bands says settings surfaces sit BELOW the app-level chat
+     surfaces on purpose, because those own the whole window.
+
+     So this does not raise the panel into a band it was deliberately kept out
+     of. It moves the panel instead: when there is not room beneath the
+     trigger, it opens upward, and either way it is capped to the space it
+     actually has. A menu that never reaches the bar cannot be covered by it,
+     and the band structure is left as documented.
+
+     THE FLOOR IS MEASURED, NOT ASSUMED. The bar is a fixed element whose
+     height depends on what is in it, so the limit is read off the element
+     rather than written down as a number that goes stale the first time the
+     bar grows a row.
+
+     Run after the library's own handler — aimy-ds.js is loaded first, so its
+     document listener has already opened the panel by the time this one is
+     called and there is something to measure. */
+  const DD_GAP = 8;
+
+  function placeDD(dd) {
+    if (!dd) return;
+    const btn = dd.querySelector('.v2-dropdown-btn');
+    const panel = dd.querySelector('.v2-dropdown-panel');
+    if (!btn || !panel) return;
+    dd.classList.remove('is-up');
+    panel.style.maxHeight = '';
+    panel.style.bottom = '';
+    if (!panel.classList.contains('open')) return;
+
+    const bar = $('.aimy-float-wrap');
+    const floor = bar && bar.getBoundingClientRect().height
+      ? bar.getBoundingClientRect().top - DD_GAP
+      : window.innerHeight - DD_GAP;
+
+    const r = btn.getBoundingClientRect();
+    const room = { below: floor - r.bottom - DD_GAP, above: r.top - DD_GAP };
+    /* `scrollHeight` rather than the rendered height: the library caps the
+       panel at 260px, and asking how tall it WANTS to be is what decides
+       whether it fits. */
+    const want = panel.scrollHeight;
+
+    /* Down unless down does not fit and up fits better. A menu that flips for
+       a few pixels' gain is a menu that moves for no reason. */
+    const up = room.below < want && room.above > room.below;
+    if (up) dd.classList.add('is-up');
+    const room2 = up ? room.above : room.below;
+    if (want > room2) panel.style.maxHeight = Math.max(96, room2) + 'px';
+
+    /* ── AND NEVER INTO THE BAR ──
+       Flipped, the panel's bottom edge is the trigger's top, which is the right
+       answer whenever the trigger is somewhere you can see. `.page-scroll`
+       reserves 96px so that is normally guaranteed — but "normally" is not the
+       same as "always", and a trigger that is itself half under the bar would
+       otherwise hand its menu the same problem the flip exists to solve. The
+       offset is whatever it takes to clear, and zero the rest of the time. */
+    panel.style.bottom = '';
+    if (up) {
+      const over = r.top - DD_GAP - floor;
+      if (over > 0) panel.style.bottom = 'calc(100% + ' + (DD_GAP / 2 + over) + 'px)';
+    }
+  }
+
+  /* Both ways in: the pointer, and Enter, Space or an arrow on the trigger.
+
+     SYNCHRONOUS, not on the next frame. aimy-ds.js is loaded first, so its
+     document listener has already run — and finished opening the panel — by
+     the time this one is called in the same dispatch. There is nothing to wait
+     for, and a `requestAnimationFrame` here bought two problems for nothing:
+     one frame in which the panel is painted in the wrong place, and no
+     placement at all in a tab the browser has throttled. */
+  ['click', 'keydown'].forEach((ev) => document.addEventListener(ev, (e) => {
+    const btn = e.target.closest && e.target.closest('.set2-dd .v2-dropdown-btn');
+    if (!btn) return;
+    placeDD(btn.closest('.set2-dd'));
+  }));
+
+  /* ── THE SYSTEM'S DROPDOWN REPORTS BY EVENT ──
+
+     `.v2-dropdown` is a listbox, not a form field: it has no `value`, fires no
+     `input`, and announces a choice with a bubbling `dd:change` carrying the
+     value in `detail`. So the two day-pickers are read here rather than in the
+     `input` handler, and the element the event arrives on is the dropdown
+     itself — which is where `data-window` and `data-ret` live.
+
+     Both re-render. The old number input could not: rebuilding the field being
+     typed into takes the caret with it, so the retention path patched its own
+     row in place and had to remember to refresh the sentence beside it and the
+     note in the rail. A choice from a list has no caret to lose, so the paint
+     that already knows how to draw every one of those facts draws them. */
+  document.addEventListener('dd:change', (e) => {
+    const dd = e.target.closest && e.target.closest('.set2-dd');
+    if (!dd) return;
+    const v = parseInt(e.detail && e.detail.value, 10);
+    if (!(v > 0)) return;
+
+    const winId = dd.getAttribute('data-window');
+    if (winId) {
+      /* The connector it belongs to, not all of them — one control per row. */
+      const c = connsOf(prodOf(readURL())).filter((x) => x.id === winId)[0];
+      if (c) { c.window = v; render(); }
+      return;
+    }
+
+    const retId = dd.getAttribute('data-ret');
+    if (retId) {
+      const r = RETENTION.filter((x) => x.id === retId)[0];
+      if (r) {
+        r.days = v;
+        DIRTY.add('retention:' + r.id);
+        render();
+        /* After the paint, so it marks the row this paint just drew. */
+        markDirtyStage('retention');
+      }
     }
   });
 
@@ -4744,14 +5076,11 @@
     if (fs) { const st = readURL();
       patch({ f: withF(st, fs.getAttribute('data-f'), fs.value) }); return; }
 
-    /* Touching either end retracts the complaint: it was about the pair as it
-       stood, and the pair has changed. */
-    if (e.target.closest('[data-range]') && RANGE_ERR) RANGE_ERR = false;
-    const rg = e.target.closest('[data-range]');
-    if (rg) { const st = readURL(); const c = primaryOf(st);
-      if (c) { c.range = c.range || ['', '']; c.range[+rg.getAttribute('data-range')] = rg.value;
-               DIRTY.add('range'); render(); }
-      return; }
+    /* No `[data-range]` branch. Both ends were `<input type="date">` and
+       reported through `change`; they are buttons opening our own calendar
+       now, and the day you press writes the value in the click handler. The
+       complaint about a backwards pair is retracted there too, at the moment
+       the pair changes. */
 
     const t = e.target.closest('[data-skill-on]');
     if (t) { const s = skillById(t.dataset.skillOn); s.on = t.checked; render(); return; }
