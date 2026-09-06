@@ -8283,7 +8283,7 @@
          One field, and it is what lets an answer show its sources, be
          retried, and hand its documents to the Console. */
       if (turn) turn.q = text;
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         /* THE TURN IS UPDATED BEFORE THE ELEMENT, and whether or not the
            element is still there. Switching conversations mid-answer removes
            the bubble from the DOM, and returning to that conversation rebuilds
@@ -8304,7 +8304,11 @@
         stopThinking();
         if (turn) turn.thinking = false;
         const el = document.getElementById(id);
-        if (!el) return;
+        /* The run is over either way. Switching conversations mid-answer takes
+           the bubble out of the DOM, and returning early without saying so left
+           the beam travelling and the send button stuck on Stop for the rest of
+           the session. */
+        if (!el) { generating.finish(run); return; }
         /* The bubble and the avatar arrive here, with the first words. */
         const msg = el.closest('.chat-msg');
         if (msg) msg.classList.remove('is-thinking');
@@ -8318,7 +8322,7 @@
           el._live = wrapLive; el.dataset.live = '1';
           if (turn) turn.html = wrapLive;
         }
-        typeIn(el, finalHtml);
+        typeIn(el, finalHtml, () => generating.finish(run));
         /* After the answer, not with it: the chips are about where to go
            next, and offering them beside a paragraph nobody has read yet is
            asking the question for them. Appended to the MESSAGE, so a rebuild
@@ -8354,6 +8358,48 @@
          either way — there is no backend to be slow — so the number is a
          reading decision rather than a measurement. */
       }, 3000);
+
+      /* ══ AND IT CAN BE CALLED OFF ═════════════════════════════════
+         Three seconds of thinking and then a stream is long enough to change
+         your mind in, and until now there was nothing to change it with.
+
+         BOTH PHASES STOP, AND THEY STOP DIFFERENTLY. Before the answer exists
+         there is nothing to keep, so the thinking mark is what gets replaced.
+         Once it is streaming there IS something — half an answer is still an
+         answer, and deleting what somebody has already read is the product
+         taking it back — so the note goes underneath it instead.
+
+         The TURN is written and not just the element, because a conversation
+         is its turns: an element left ahead of them comes back whole on the
+         next repaint, which is the answer you stopped returning by itself. */
+      const run = generating.start(() => {
+        clearTimeout(timer);
+        stopStream();
+        stopThinking();
+        const el = document.getElementById(id);
+        const msg = el && el.closest('.chat-msg');
+        const kept = (turn && turn.thinking) ? '' : (el ? el.innerHTML : '');
+        const html = kept + stoppedNote();
+        if (turn) { turn.html = html; turn.thinking = false; }
+        if (el) {
+          el.innerHTML = html;
+          /* A live answer re-runs its closure on every repaint. Stopped, it
+             must not: the closure would put back the answer that was called
+             off, the first time anything touched the model. */
+          el._live = null;
+          delete el.dataset.live;
+        }
+        if (msg) {
+          msg.classList.remove('is-thinking');
+          /* The acts row was rendered while the turn still held the dots and
+             had not been told its question, so it carries no Retry. A stopped
+             answer is the one that most needs one. */
+          msg.dataset.q = text;
+          const acts = msg.querySelector('.msg-acts');
+          if (acts) acts.outerHTML = msgActs(turn);
+        }
+        saveChats();
+      });
     },
 
     /* Appends, and RECORDS. The turn is what a conversation is made of — the
@@ -10280,13 +10326,22 @@
   };
 
   function wire() {
+    /* The beams are hung now, at rest. Made on the first answer instead, the
+       element and the class would arrive in the same frame, no style would ever
+       have been computed for opacity 0, and the first beam of the session would
+       snap on where every one after it faded. */
+    generating.paint();
+
     /* Submit */
     const fb = $('#floatInput');
     if (fb) fb.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); const v = fb.value.trim(); fb.value = ''; submit(v); }
     });
     const fs = $('#floatSend');
-    if (fs) fs.addEventListener('click', () => { const v = fb.value.trim(); fb.value = ''; submit(v); });
+    if (fs) fs.addEventListener('click', () => {
+      if (generating.on) { generating.cancel(); return; }
+      const v = fb.value.trim(); fb.value = ''; submit(v);
+    });
 
     /* The canvas input runs the same router as the float bar. Typing a filter
        phrase here narrows the surface behind the glass rather than being read
@@ -10303,6 +10358,7 @@
     });
     const os = $('#overlaySend');
     if (os) os.addEventListener('click', () => {
+      if (generating.on) { generating.cancel(); return; }
       const v = oi.value.trim();
       if (!v) return;
       oi.value = '';
@@ -13283,7 +13339,10 @@
     const finish = (fn) => { clearTimeout(bail); bail = 0; if (fn) fn(); };
 
     const nextBlock = () => {
-      if (!el.isConnected) { stopStream(); clearTimeout(bail); return; }
+      /* `done` fires here too. This is the one exit that cancels the bail
+         timer, so returning without it left the caller waiting on a completion
+         nothing would ever send. */
+      if (!el.isConnected) { stopStream(); clearTimeout(bail); if (done) done(); return; }
       if (bi >= blocks.length) { stopStream(); finish(done); return; }
       const b = blocks[bi++];
       el.appendChild(b);
@@ -13831,6 +13890,83 @@
     }
     ctx.globalAlpha = 1;
     return true;
+  }
+
+  /* ══ ONE ANSWER IN FLIGHT, AND ONE PLACE THAT KNOWS ABOUT IT ═══════════
+     Two things had no owner until this. The BEAM, which belongs on every
+     composer on the page rather than on the one that happened to be typed
+     into — the gate's bar, the canvas's bar and the workbench's float bar are
+     one control in three shells, and the answer is being produced for
+     whichever of them is on screen. And the WAY OUT: `ask` scheduled its own
+     resolution on an anonymous timer, so nothing could reach it, which is why
+     the send button had nothing it could turn into.
+
+     `abort` is the whole contract — a run hands over the one function that
+     ends it, and that function is what the stop button calls. It doubles as
+     the run's identity, so a question asked over the top of another cannot
+     have its completion switch off a beam it does not own. */
+  const generating = {
+    abort: null,
+
+    get on() { return !!this.abort; },
+
+    /* The beam element is made here rather than written into the two shells,
+       for the same reason the stop square is drawn in CSS: a state no markup
+       has to know about is a state no markup can ship without. */
+    paint() {
+      const on = this.on;
+      $$('.overlay-input-bar, .aimy-float-bar').forEach((bar) => {
+        if (!$('.beam', bar)) {
+          const b = document.createElement('span');
+          b.className = 'beam';
+          b.setAttribute('aria-hidden', 'true');
+          /* The bloom is a real element because the beam has three layers and a
+             pseudo-element only gives two. It carries no content and no class:
+             it is the third box, and `.beam > i` is the whole of what the
+             stylesheet needs to know about it. */
+          b.appendChild(document.createElement('i'));
+          bar.insertBefore(b, bar.firstChild);
+        }
+        bar.classList.toggle('is-generating', on);
+      });
+      /* The one part of the swap that is not CSS, and the part a screen reader
+         is actually given. A button that has become Stop while still
+         announcing Send is worse than one that never changed. */
+      $$('.overlay-send, .aimy-float-send').forEach((b) => {
+        b.setAttribute('aria-label', on ? 'Stop generating' : 'Send');
+        b.title = on ? 'Stop generating' : '';
+      });
+      /* And the empty bar says what it is doing. The three composers ask three
+         different questions — the gate's, the canvas's and the workbench's are
+         not the same sentence — so the original is parked on the element the
+         first time it is replaced rather than written out here in a table that
+         would go stale the day one of them is reworded. */
+      $$('.overlay-input, .aimy-float-input').forEach((el) => {
+        if (el.dataset.ph === undefined) el.dataset.ph = el.placeholder || '';
+        el.placeholder = on ? 'Generating…' : el.dataset.ph;
+      });
+    },
+
+    start(abort) { this.abort = abort; this.paint(); return abort; },
+
+    /* Both take the run's own handle and ignore every other, so a superseded
+       run finishing late cannot turn the beam off over the live one. */
+    finish(h) { if (h && this.abort !== h) return; this.abort = null; this.paint(); },
+
+    cancel() {
+      const h = this.abort;
+      if (!h) return;
+      /* Cleared BEFORE the handler runs: the handler writes a turn and saves,
+         and a re-entrant cancel in the middle of that is a second stop note. */
+      this.abort = null;
+      this.paint();
+      h();
+    }
+  };
+
+  function stoppedNote() {
+    return '<div class="msg-stopped">' + ICO.slash.replace('<svg', '<svg width="12" height="12"') +
+           'Stopped</div>';
   }
 
   function startThinking() {
