@@ -76,6 +76,7 @@
     left: '<svg class="set2-lad-ch" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5 4 6l3.5 3.5"/></svg>',
     trash: '<svg class="set2-tr" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h10M6.5 4.5V3.2a.7.7 0 0 1 .7-.7h1.6a.7.7 0 0 1 .7.7v1.3M4.4 4.5l.5 8a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.5-8"/></svg>',
     cal:  '<svg class="set2-cal-i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true"><rect x="2.2" y="3.2" width="11.6" height="10.6" rx="1.6"/><path d="M2.2 6.4h11.6M5.5 1.8v2.4M10.5 1.8v2.4"/></svg>',
+    plus: '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 2.5v7M2.5 6h7"/></svg>',
     search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
     key:  '<svg class="set2-row-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="10.5" r="3"/><path d="M7.6 8.4 13 3M11 5l1.5 1.5M12.5 3.5 14 5"/></svg>'
   };
@@ -2326,7 +2327,7 @@
      opened with and putting that behind a click would be the card grid's old
      defect in a new shape. What the toggle hides is which CLIENTS each one
      reaches, which is the detail you go looking for rather than scan for. */
-  function grantBlock(p) {
+  function grantBlock(p, client) {
     if (!p.grants.length) {
       return `<span class="set2-sp-note">Can sign in and reach nothing.</span>`;
     }
@@ -2336,6 +2337,17 @@
         <span class="set2-sp-on">${g.v.map((v) =>
           scopeChip(v, idOfName(v, g.t))).join('')}</span>
       </span>`).join('');
+
+    /* ── SCOPED TO A CLIENT, THE SUMMARY IS THE ROLE THAT APPLIES HERE ──
+       The client view printed that and stopped: no breakdown, on the reasoning
+       that a person's other clients answer a question about a client you are
+       not looking at. Half right. Which role they hold HERE is the summary and
+       stays the summary — but "and what else does this person reach" is the
+       next question anyone checking a grant asks, and the accordion is where a
+       next question belongs. So the breakdown comes back on a client too, and
+       still opens on the full picture rather than the scoped one. */
+    const here = client ? p.grants.filter((g) => covers(g, client)) : p.grants;
+    const sum = here.map((g) => roleChip(g.r)).join('');
 
     if (p.grants.length === 1) return `<span class="set2-sp-grants">${lines}</span>`;
 
@@ -2351,7 +2363,7 @@
         ${I.caret}Roles breakdown
       </button>
       ${open ? `<span class="set2-sp-grants">${lines}</span>`
-        : `<span class="set2-sp-sum">${p.grants.map((g) => roleChip(g.r)).join('')}</span>`}`;
+        : `<span class="set2-sp-sum">${sum}</span>`}`;
   }
   /* A chip that goes somewhere. Used where a grant is written on a node other
      than the one you are looking at — the chip names the scope and takes you
@@ -2392,37 +2404,64 @@
     (body.ids || []).forEach((id) => shownIds.push(id));
     [...PICKED].forEach((id) => { if (shownIds.indexOf(id) < 0) PICKED.delete(id); });
 
-    const allOn = shownIds.length > 0 && shownIds.every((id) => PICKED.has(id));
     const narrowed = pool.length !== PEOPLE.length;
 
     return `
       <section class="set2-sec is-headless" id="st-people">
 
         <div class="set2-fbar">
-          <button class="set2-ck2" type="button" role="checkbox" aria-checked="${allOn}"
-                  data-pick-all aria-label="Select everyone shown">${allOn ? I.tick : ''}</button>
-          ${/* One search, and it does NOT respect the scope. Looking somebody up
-                is how you find out where they are — narrowing it to the node you
-                happen to be on would answer "not here" for everyone you cannot
-                already see. The results say so on the way past. */ ''}
-          <input class="set2-fld set2-fbar-q" type="search" placeholder="Search everyone…"
-                 value="${esc(f.q || '')}" data-f-q aria-label="Search everyone">
-          <span class="set2-fbar-end">
-            ${/* Role and Status. "Access" offered the five scope TYPES, and a
-                  grant names a client and nothing else now — so every option in
-                  it but Client matched zero people, and Client matched all of
-                  them. A filter that cannot narrow is a control that teaches
-                  the reader their filters do not work. */ ''}
-            ${filterSel(st, 'role', 'Role', ROLES.map((r) => r[0]))}
-            ${filterSel(st, 'status', 'Status', ['Active', 'Invite pending'])}
-            ${narrowed || q ? `<button class="btn btn-ghost btn-sm" type="button" data-f-clear>Clear</button>` : ''}
-            ${/* Root only, as the invite bar was. Adding somebody is a
-                  directory act, not a scoped one — offered from inside
-                  InterFAX Support it would add a person who then does not
-                  appear, because they reach nothing yet and nothing is where
-                  the root keeps them. */ ''}
-            ${atRoot && !q ? `<button class="btn btn-brand btn-sm" type="button" data-add-user>Add user</button>` : ''}
-          </span>
+          ${/* No select-all. It was a bare checkbox at the head of the filter
+                row, which is a control that looks like a filter and is not one
+                — and the act it offered, ticking every person the filters left,
+                is the one bulk act with no undo on this page. Rows still tick
+                individually and the bulk bar still appears. */ ''}
+          ${/* Role and Status. "Access" offered the five scope TYPES, and a
+                grant names a client and nothing else now — so every option in
+                it but Client matched zero people, and Client matched all of
+                them. A filter that cannot narrow is a control that teaches the
+                reader their filters do not work. */ ''}
+          ${filterSel(st, 'role', 'Role', ROLES.map((r) => r[0]))}
+          ${filterSel(st, 'status', 'Status', ['Active', 'Invite pending'])}
+          ${narrowed || q ? `<button class="btn btn-ghost btn-sm" type="button" data-f-clear>Clear</button>` : ''}
+
+          ${/* SAME BAR AS SKILLS. The filters narrow, on the left; the search
+                finds one inside what they left, on the right, in the field the
+                documents view uses. It was a full-width `.set2-fld` wedged
+                between the select-all box and the dropdowns, so the three
+                controls in this row read as one run and the search — the widest
+                thing on the page — was the least like a search anywhere in the
+                product.
+
+                It does NOT respect the scope. Looking somebody up is how you
+                find out where they are; narrowing it to the node you happen to
+                be on would answer "not here" for everyone you cannot already
+                see. The results say so on the way past. */ ''}
+          <div class="k-search set2-fbar-q${f.q ? ' is-on' : ''}">
+            ${I.search.replace('<svg', '<svg width="13" height="13" aria-hidden="true"')}
+            <input class="k-search-i" type="search" placeholder="Search everyone…"
+                   value="${esc(f.q || '')}" data-f-q autocomplete="off" spellcheck="false"
+                   aria-label="Search everyone">
+            ${f.q ? `<button class="k-search-x" type="button" data-fq-clear
+                     aria-label="Clear search">${I.x.replace('<svg', '<svg width="11" height="11"')}</button>` : ''}
+          </div>
+
+          ${/* Root only, as the invite bar was. Adding somebody is a directory
+                act, not a scoped one — offered from inside InterFAX Support it
+                would add a person who then does not appear, because they reach
+                nothing yet and nothing is where the root keeps them. */ ''}
+          ${/* ── ADDING SOMEBODY WORKS WHERE YOU ARE STANDING ──
+                Root only, before. The reasoning was sound and the conclusion
+                was not: a new user reaches nothing, so one added from inside
+                Upland would not appear in the Upland list — which argues for
+                the sheet ASKING FOR THE ROLE when it is opened on a client,
+                not for hiding the button. Hidden, the answer to "add a person
+                to this client" was: go to the root, add them, come back, find
+                them, grant a role. Five steps for one act.
+
+                Search is still the exception. It is not a place, so there is
+                no client for the grant to name. */ ''}
+          ${!q ? `<button class="btn btn-brand btn-sm" type="button"
+                    data-add-user="${esc(atRoot ? '' : client.id)}">Add user</button>` : ''}
         </div>
 
         ${body.html}
@@ -2479,9 +2518,9 @@
 
     return { ids: ids, html: group('Has a role on ' + client.name, 'is-ok', on.length,
       on.map((p) => personRow(p, {
-        /* Only the roles that apply HERE. Printing the rest would answer a
-           question about a client you are not looking at. */
-        why: p.grants.filter((g) => covers(g, client)).map((g) => roleChip(g.r)).join(''),
+        /* The role that applies HERE is the summary; the breakdown behind it
+           is every grant the person holds, which is the question that follows. */
+        why: grantBlock(p, client),
         act: `<button class="set2-lnk is-err" type="button"
                 data-revoke="${esc(p.id)}:${esc(client.id)}">Revoke here</button>`
       })).join('')) };
@@ -3155,7 +3194,15 @@
      Picked once and carried. It reads as a sentence about where you are, with
      exactly one thing in it you can change — which is the shape the design
      uses and the reason nothing below it has to ask again. */
-  function prodScope(st) {
+  /* `hideConns` — Dynamic fields only. The connector COUNT and the connection
+     HEALTH belong to a page about connections; on the mapping page there is a
+     connector picker ten pixels below saying which one you are reading, and its
+     own counts beside it. "2 connectors · 1 not connected" there answers a
+     question about a different screen, and the red pill in the chrome reads as
+     a warning about the fields you are looking at when nothing is wrong with
+     them. Sync and Data relevance keep it: on those, whether a connector is
+     connected is the subject. */
+  function prodScope(st, hideConns) {
     const client = clientOf(st);
     const prod = prodOf(st);
     const list = prod ? connsOf(prod) : [];
@@ -3172,9 +3219,10 @@
                      aria-label="Choose a product">
                <span class="set2-scope-k">Product</span><b>${esc(prod)}</b>${I.down}
              </button>
+             ${hideConns ? '' : `
              <span class="set2-scope-s">&rsaquo;</span>
              <span class="set2-scope-i">${list.length} connector${list.length === 1 ? '' : 's'}</span>
-             ${bad ? pill('is-err', bad + ' not connected') : pill('is-ok', 'Connected')}`
+             ${bad ? pill('is-err', bad + ' not connected') : pill('is-ok', 'Connected')}`}`
           : pill('is-mute', 'No products connected')}
       </div>`;
   }
@@ -3222,8 +3270,15 @@
     const list = connsOf(prodOf(st));
     return `
       <section class="set2-sec" id="st-fields">
-        <div class="set2-sec-h"><h2 class="set2-sec-t">Fields</h2>
-          <span class="set2-sec-end set2-tally">
+        ${/* ── THE COUNTS SIT AT THE LEFT EDGE, THE ACTION AT THE RIGHT ──
+              All of it was in `.set2-sec-end`, which carries `margin-left:
+              auto` — and on this page the section's own `h2` is hidden, because
+              a page with one section is titled by the page. So the whole group
+              was pushed to the right against nothing, floating in the middle of
+              a row whose left half was empty. What the section IS goes left;
+              what it DOES goes right. */ ''}
+        <div class="set2-sec-h is-bare"><h2 class="set2-sec-t">Fields</h2>
+          <span class="set2-sec-lead set2-tally">
             ${/* The CRM picker belongs HERE and nowhere else. A product's
                   connectors differ in exactly one way — what their fields are
                   called — so this is the only section on any of these pages
@@ -3243,18 +3298,26 @@
 
             ${k.unmapped ? `<span class="set2-num is-mute"><b>${k.unmapped}</b> not mapped</span>` : ''}
             ${k.broken ? `<span class="set2-num is-err"><b>${k.broken}</b> broken</span>` : ''}
+            ${/* The sentence that stood under this row as `.set2-sub` — what an
+                  AiMY field reads from, and what a subfield is. Two facts you
+                  need once and then never again, taking two lines above the
+                  table forever. Same move as the owner tabs and precedence. */ ''}
+            ${tip('mapTip', 'these fields', 'What each AiMY field reads from ' + c.crm
+              + ' for this product. A subfield takes its value from the field above it.')}
+          </span>
+          <span class="set2-sec-end">
+            <!-- THE PRIMARY ACTION SAT UNDER THE TABLE, which on a mapping of
+                 any size means below the fold: eleven fields and their
+                 subfields put "Add field mapping" off the bottom of the
+                 screen, so the one thing you came to this section to do was
+                 the one thing you had to scroll to find. -->
+            <button class="btn btn-brand btn-sm" type="button" data-add-field>Add field</button>
           </span></div>
-        ${/* Every other section on the page opens with one sentence saying
-              what it governs; this one opened with a table. */ ''}
-        <div class="set2-sub">What each AiMY field reads from ${esc(c.crm)} for this product. A subfield takes its value from the field above it.</div>
         <div class="set2-map">
           <div class="set2-map-hd"><span>AiMY field</span><span>${esc(c.crm)} key</span><span></span></div>
           ${c.maps.length ? mapBranch(c, c.maps, '', 0, null)
             : `<div class="set2-empty"><b>No fields yet</b>Add the first thing you want ${esc(c.crm)} to answer for this product.</div>`}
         </div>
-        <button class="set2-map-new" type="button" data-add-field>
-          <span class="set2-map-add-i">+</span> Add field mapping
-        </button>
 
         ${k.broken ? `<div class="set2-note is-err" style="margin-top:0.5rem">${k.broken} path no longer exists in ${esc(c.crm)}. A mapped field that is gone reads as empty, and an empty field answers as though the data were missing rather than misrouted.</div>` : ''}
       </section>`;
@@ -3519,10 +3582,18 @@
               is not a third fact about the field — it is an action, so it
               belongs with the other actions. */ ''}
         <span class="set2-map-end">
-          ${canSub && !(m.kids && m.kids.length)
-            ? `<button class="set2-map-plus" type="button" data-add-sub="${esc(addr)}"
-                       title="Add a subfield under ${esc(m.ctx)}"
-                       aria-label="Add a subfield under ${esc(m.ctx)}">+</button>` : ''}
+          <!-- ONE WAY TO ADD A SUBFIELD, LABELLED, AND ALWAYS ON SCREEN.
+               There were two, and neither read as a control. A bare "+" that
+               only appeared on hover, for a field with no children yet — an
+               icon with no word, invisible until you happened to be over the
+               right row, and unreachable by touch. And a full-width rail after
+               the children for a field that had some, which sat below the
+               group it belonged to and looked like a line of text.
+               Both are this: a word, in the row's own actions, on the field
+               the subfield would hang under, whether or not it already has
+               any. Adding the first child and the fourth is the same act. -->
+          ${canSub ? `<button class="set2-map-plus" type="button" data-add-sub="${esc(addr)}"
+                       aria-label="Add a subfield under ${esc(m.ctx)}">${I.plus} Subfield</button>` : ''}
           ${flag}
           ${canAdv ? `<button class="set2-adv${ADV.has(addr) ? ' is-open' : ''}" type="button" data-adv="${esc(addr)}"
              aria-expanded="${ADV.has(addr)}">Advanced${I.caret}</button>` : ''}
@@ -3590,16 +3661,6 @@
      get a second or third child was to find the transform list again. */
   /* Nested groups stack their add rows, so two of these sit one above the
      other 21px apart -- close enough to read as the same button twice. Each
-     names the field it would hang a subfield under. */
-  function addSubRow(addr, depth, open, parent) {
-    return `
-      <button class="set2-map-add${open ? ' is-open' : ''}" type="button"
-              data-add-sub="${esc(addr)}" style="--d:${depth}">
-        <span class="set2-map-add-i">+</span> Add subfield${
-          parent ? ' to <b>' + esc(parent) + '</b>' : ''}
-      </button>`;
-  }
-
   /* Depth-first, so a child is always drawn directly under the field it comes
      from and the indentation means what it looks like it means. */
   function mapBranch(c, list, prefix, depth, parentSamples) {
@@ -3615,19 +3676,17 @@
          mapped to an object -- the case where subfields matter most -- offered
          none. */
       const canSub = canNest(depth) && !m.draft;
+      /* ── NOTHING BETWEEN A GROUP AND THE NEXT FIELD ──
+         An "Add subfield to X" rail was drawn after every group's children. It
+         sat at the child's indent under the last child, so it read as another
+         subfield until you got to the verb; two nested groups stacked two of
+         them 21px apart; and it separated a group from the field below it with
+         something that was neither. The act it offered now lives on the parent
+         row, which is where the reader is looking when they decide a field
+         needs breaking down. */
       return mapRow(c, m, addr, depth, samples, canSub)
         + (ADV.has(addr) ? advSection(c, m, addr, depth) : '')
-        + mapBranch(c, m.kids || [], addr, depth + 1, samples)
-        /* ── NO INVISIBLE ROWS ──
-           This rendered under every nestable row and hid the ones that were
-           not wanted with `opacity: 0` -- which hides the pixels and keeps the
-           38px. Eight fields meant eight empty bands padding the table out,
-           and the gaps between rows read as arbitrary because half of them
-           were an invisible button.
-           A group that is open keeps the full-width row, as the frame shows.
-           Everywhere else the affordance is a "+" in the row's own actions,
-           which costs no vertical space at all. */
-        + (canSub && m.kids && m.kids.length ? addSubRow(addr, depth + 1, true, m.ctx) : '');
+        + mapBranch(c, m.kids || [], addr, depth + 1, samples);
     }).join('');
   }
 
@@ -4770,10 +4829,18 @@
      that does not need correcting afterwards — and bulk import belongs with
      the CSV flow it needs, not bolted onto a field that cannot ask for a
      title. */
-  const ADDU = { name: '', mail: '', title: '', bad: null };
+  const ADDU = { name: '', mail: '', title: '', role: '', client: '', bad: null };
+
+  /* One reader for the sheet's text fields, because two things now need it:
+     submitting, and repainting after a role is chosen. */
+  function readAddU() {
+    const val = (id) => { const el = $('#' + id); return el ? el.value.trim() : ADDU[id] || ''; };
+    ADDU.name = val('auName'); ADDU.mail = val('auMail'); ADDU.title = val('auTitle');
+  }
 
   function addUserModal() {
     const bad = ADDU.bad || {};
+    const cl = ADDU.client ? findNode(ADDU.client) : null;
     /* ── THE HELP IS ON THE LABEL, NOT UNDER THE FIELD ──
        Three sentences printed under three fields is a sheet that reads as
        four times longer than the decision in it, and every one of them is
@@ -4801,7 +4868,7 @@
       <div class="set2-scrim" data-scrim>
         <div class="set2-modal" role="dialog" aria-modal="true" aria-labelledby="auT">
           <div class="set2-modal-hd">
-            <h2 class="set2-modal-t" id="auT">Add a user</h2>
+            <h2 class="set2-modal-t" id="auT">${cl ? 'Add a user to ' + esc(cl.name) : 'Add a user'}</h2>
             <button class="set2-modal-x" type="button" data-close aria-label="Close">${I.x}</button>
           </div>
           <div class="set2-modal-bd">
@@ -4811,12 +4878,51 @@
                   'Where the invitation goes.')}
             ${fld('auTitle', 'title', 'Job title', 'QA Manager',
                   'Shown beside their name. It does not grant anything.')}
+            ${/* ── THE ROLE FIELD EXISTS ONLY WHEN THERE IS A CLIENT TO PUT IT ON ──
+                  A grant is a role AND the clients it names. Opened at the
+                  root there is no client, so a role picker there would be
+                  half a grant with nowhere to land; opened on Upland the
+                  client is decided by where you are and only the role is
+                  missing. Required, for the same reason: without it the
+                  person is created and does not appear in the list you added
+                  them to, which reads as the button having failed. */ ''}
+            ${cl ? `
+              <div class="set2-field">
+                <span class="set2-lbl-row">
+                  <label class="set2-lbl" for="auRole">Role on ${esc(cl.name)}</label>
+                  <span class="set2-tip-wrap">
+                    <button class="set2-tip-b" type="button" aria-describedby="auRoleTip"
+                            aria-label="About the role">${I.info}</button>
+                    <span class="set2-tip" role="tooltip" id="auRoleTip">What they may do on
+                      ${esc(cl.name)}. It can be changed or revoked from their row afterwards.</span>
+                  </span>
+                </span>
+                ${/* `roster-dd` is the design system's own full-width variant of
+                      this control. The fields above it are full-width inputs, so
+                      a role picker that hugs its label reads as a chip somebody
+                      dropped into the form rather than as the fourth field. */ ''}
+                <div class="v2-dropdown roster-dd set2-dd${bad.role ? ' is-error' : ''}" data-au-role>
+                  <button class="v2-dropdown-btn" type="button" aria-haspopup="listbox"
+                          aria-expanded="false" aria-label="Role on ${esc(cl.name)}">
+                    <span class="dd-label-text">${esc(ADDU.role || 'Choose a role')}</span>
+                    <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
+                         stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+                  </button>
+                  <div class="v2-dropdown-panel" role="listbox">
+                    ${ROLES.map((r) => `<div class="v2-dropdown-option${r[0] === ADDU.role ? ' selected' : ''}"
+                      role="option" aria-selected="${r[0] === ADDU.role}"
+                      data-value="${esc(r[0])}">${esc(r[0])}</div>`).join('')}
+                  </div>
+                </div>
+                ${bad.role ? `<div class="set2-hint is-err">${esc(bad.role)}</div>` : ''}
+              </div>` : ''}
           </div>
           <div class="set2-modal-ft">
             ${/* Said plainly, here, rather than discovered afterwards on a row
-                  that reaches nothing. Access is a separate decision and this
-                  sheet does not pretend to make it. */ ''}
-            <span class="set2-hint">They arrive with no access. Grant a role once they are in.</span>
+                  that reaches nothing. */ ''}
+            <span class="set2-hint">${cl
+              ? 'They arrive on ' + esc(cl.name) + ' with the role you pick, and nowhere else.'
+              : 'They arrive with no access. Grant a role once they are in.'}</span>
             <span class="set2-modal-end">
               <button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button>
               <button class="btn btn-brand btn-sm" type="button" data-au-add>Send invitation</button>
@@ -5359,7 +5465,7 @@
      A page with no scope says the one true thing left — which organisation
      you are in — and nothing more. */
   function scopeSlot(st, m, pg) {
-    if (m.scope === 'prod') return prodScope(st);
+    if (m.scope === 'prod') return prodScope(st, !!(pg && pg.id === 'fields'));
     if (pg && pg.id === 'people') return peopleScope(st);
     return `<div class="set2-scope"><span class="set2-scope-i">Org <b>FlairsTech</b></span></div>`;
   }
@@ -6367,15 +6473,6 @@
     if (pk) { const id = pk.getAttribute('data-pick-p');
       PICKED.has(id) ? PICKED.delete(id) : PICKED.add(id); render(); return; }
 
-    /* Over what is SHOWN, never over the whole list — a "select all" that
-       reaches past the filter is how people revoke rows they never saw. */
-    if (e.target.closest('[data-pick-all]')) {
-      const ids = [...document.querySelectorAll('[data-pick-p]')]
-        .map((b) => b.getAttribute('data-pick-p'));
-      const all = ids.length && ids.every((k) => PICKED.has(k));
-      ids.forEach((k) => { all ? PICKED.delete(k) : PICKED.add(k); });
-      render(); return;
-    }
     if (e.target.closest('[data-pick-none]')) { PICKED.clear(); render(); return; }
 
     /* One role, granted to everyone ticked. Same picker a single person uses —
@@ -6407,14 +6504,15 @@
     }
 
     /* ── Adding somebody ── */
-    if (e.target.closest('[data-add-user]')) {
-      ADDU.name = ''; ADDU.mail = ''; ADDU.title = ''; ADDU.bad = null;
+    const addU = e.target.closest('[data-add-user]');
+    if (addU) {
+      ADDU.name = ''; ADDU.mail = ''; ADDU.title = ''; ADDU.role = ''; ADDU.bad = null;
+      ADDU.client = addU.getAttribute('data-add-user') || '';
       MODAL = { kind: 'adduser' }; paintModal(); return;
     }
 
     if (e.target.closest('[data-au-add]')) {
-      const val = (id) => { const el = $('#' + id); return el ? el.value.trim() : ''; };
-      ADDU.name = val('auName'); ADDU.mail = val('auMail'); ADDU.title = val('auTitle');
+      readAddU();
 
       /* Every field that is wrong says so, in one pass. Validating to the
          first failure makes somebody fix three things in three rounds. */
@@ -6425,6 +6523,8 @@
       else if (PEOPLE.some((x) => x.mail.toLowerCase() === ADDU.mail.toLowerCase()))
         bad.mail = 'Somebody in this workspace already has that address.';
       if (!ADDU.title) bad.title = 'A job title is required.';
+      const cl = ADDU.client ? findNode(ADDU.client) : null;
+      if (cl && !ADDU.role) bad.role = 'Pick what they may do on ' + cl.name + '.';
 
       if (Object.keys(bad).length) { ADDU.bad = bad; paintModal(); return; }
 
@@ -6432,15 +6532,21 @@
         id: 'p' + Date.now().toString(36),
         name: ADDU.name, mail: ADDU.mail, title: ADDU.title,
         s: ['is-warn', 'Invite pending'],
-        grants: []
+        /* Added on a client, they arrive holding the role you named on it —
+           which is what makes the row appear in the list you added them to.
+           Added at the root, they arrive reaching nothing, as before. */
+        grants: cl ? [{ r: ADDU.role, t: 'Client', v: [cl.name] }] : []
       });
-      ADDU.name = ''; ADDU.mail = ''; ADDU.title = ''; ADDU.bad = null;
+      const stay = ADDU.client;
+      ADDU.name = ''; ADDU.mail = ''; ADDU.title = ''; ADDU.role = ''; ADDU.client = ''; ADDU.bad = null;
       closeModal();
-      /* They land at the root under No access, with a Pending pill. That row
-         arriving IS the confirmation — a toast saying the same thing over the
-         top of it would be the product telling you what you can already see. */
+      /* The row arriving IS the confirmation — a toast saying the same thing
+         over the top of it would be the product telling you what you can
+         already see. So the view does not move: added at the root they appear
+         under No access, added on a client they appear in that client's list,
+         and either way you are looking at them. */
       DIRTY.add('people');
-      patch({ node: '', f: withF(readURL(), 'q', null) });
+      patch({ node: stay, f: withF(readURL(), 'q', null) });
       return;
     }
 
@@ -6976,6 +7082,23 @@
        the chips, the Clear button and the URL are unchanged by the swap. It is
        read before the day pickers because its value is a STRING — parsing it as
        an integer below would turn "QA Manager" into NaN and drop it. */
+    /* The sheet's role picker writes to the draft, not to the URL: the sheet is
+       not a place, and a half-filled invitation restored on a later visit is a
+       decision the reader has forgotten making.
+
+       READ THE TEXT FIELDS FIRST. Choosing a role repaints the sheet, and the
+       sheet renders its inputs from `ADDU` — which only the submit handler was
+       filling. So picking a role after typing a name silently emptied all three
+       fields and the invitation then failed validation on everything. Anything
+       that repaints a form has to bank what is in it. */
+    if (dd.hasAttribute('data-au-role')) {
+      readAddU();
+      ADDU.role = (e.detail && e.detail.value) || '';
+      if (ADDU.bad) delete ADDU.bad.role;
+      paintModal();
+      return;
+    }
+
     if (dd.hasAttribute('data-vsdd')) {
       patch({ vs: (e.detail && e.detail.value) || '' });
       return;

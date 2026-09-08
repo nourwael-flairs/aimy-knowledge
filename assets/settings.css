@@ -178,6 +178,31 @@
   margin-bottom: 0.75rem; padding-bottom: 0.5rem;
   border-bottom: 0.0625rem solid var(--hairline);
 }
+/* ── NO RULE UNDER A HEAD THAT IS A TOOLBAR ──
+   The border exists to separate a section's TITLE from its content. On a page
+   whose single section is titled by the page, the head carries no title — it
+   is a row of controls — and the rule under it became the first of three
+   stacked hairlines before any data: this, the column head's, then the first
+   row's. Same call as `.set2-tabs.is-bare`, same modifier name: a toolbar is
+   not a heading and does not get a heading's rule.
+
+   The head aligns on `baseline` for a title beside its counts; a row of boxed
+   controls has no shared baseline to sit on, so it centres instead. */
+.set2-sec-h.is-bare {
+  align-items: center;
+  padding-bottom: 0; border-bottom: 0;
+  /* The rule was doing two jobs and only one of them was decoration: it also
+     held the toolbar off the column head beneath it. Taking it away left four
+     bands — page title, scope, toolbar, table — stacked at 14, 20, 12 and 0
+     pixels, which reads as one dense block rather than as four things. The
+     space it was providing has to be declared now that the line is not.
+     A margin here COLLAPSES: the head is the section's first child and the
+     section has no top padding, so `margin-top` escapes the box and merges
+     with the space already above it, changing nothing. Padding does not
+     collapse, which is why the space above is padding and the space below is
+     margin. */
+  padding-top: 0.75rem; margin-bottom: 1.5rem;
+}
 /* ── QUIET, NOT SHOUTED ──
    The first pass at "muted" reached for micro uppercase with wide tracking,
    which is the treatment this file uses for a LABEL — the rail's group names,
@@ -594,7 +619,7 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
    job. */
 .set2-map { display: flex; flex-direction: column; }
 .set2-map-hd {
-  display: grid; grid-template-columns: 9rem 1fr auto;
+  display: grid; grid-template-columns: 12rem minmax(0, 1fr) auto;
   gap: 0.75rem; padding: 0 0.25rem 0.5rem;
   font-size: var(--ty-micro); letter-spacing: var(--ls-wide);
   text-transform: uppercase; color: var(--ink-quiet);
@@ -644,7 +669,10 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
    surface that hides its own guesses cannot be checked. */
 .set2-map-row.is-unmapped .set2-map-ctx { color: var(--ink-quiet); font-weight: var(--fw-medium); }
 
-.set2-tally { display: flex; gap: 0.75rem; font-size: var(--ty-micro); color: var(--ink-quiet); }
+/* The counts and what they are counted FROM, at the left edge where the
+   section's own title would be if the page were not already carrying it. */
+.set2-sec-lead { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
+.set2-tally { display: flex; align-items: center; gap: 0.75rem; font-size: var(--ty-micro); color: var(--ink-quiet); }
 .set2-tally b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
 .set2-tally .is-info b { color: var(--ink-info); }
 .set2-tally .is-err b  { color: var(--ink-err); }
@@ -1920,13 +1948,14 @@ body.is-settings .set2-bulk { bottom: 4.75rem; }
 /* Text-shaped controls get their height from line-box padding rather than a
    min-height, so they stay on the baseline they share with their row. */
 .set2-adv,
-.set2-lnk,
-.set2-map-add,
-.set2-map-new {
+.set2-lnk {
   min-height: 1.75rem;
   display: inline-flex; align-items: center;
 }
-.set2-map-add, .set2-map-new { display: flex; }
+/* `.set2-map-add` and `.set2-map-new` stood here — the "Add subfield to X"
+   rail and the "Add field mapping" link under the table. Both are gone: the
+   subfield action is on the parent's row, and the primary action is a button
+   in the section head. */
 
 /* One focus ring for everything in this file. It was written eleven times
    with three different offsets, which is how a keyboard pass ends up looking
@@ -2239,15 +2268,35 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-/* ── 1 & the tree ──
-   A wider step, and a guide so the step is read as descent rather than as a
-   margin someone chose. The rows are flat siblings carrying `--d`, so the
-   guide is drawn per row at its parent's gutter rather than by nesting. */
-.set2-map-row, .set2-adv-bd, .set2-map-add {
-  --step: 1.75rem;
+/* ══════════════════════════════════════════════════════════════════════════
+   THE ROW IS A GRID AGAIN
+
+   `.set2-map-row` had no `display` at all — it was a block, so its three cells
+   stacked. The column head above it went on declaring `9rem 1fr auto`, which
+   meant ZENDESK KEY was a heading over empty space and every key sat under its
+   own field name instead of beside it. The actions cell, being a full-width
+   block with `justify-content: flex-end`, became a line of its own with
+   `Advanced` marooned at the right margin — which is why it read as a separate
+   row, and why the plus and the bin in it were never found.
+
+   Three columns, matching the head. Wider first column: eleven characters of
+   9rem was ellipsising "Email address" at the second level of indent.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-map-row, .set2-adv-bd, .set2-map-ctx { --step: 1.75rem; }
+.set2-map-row {
+  display: grid;
+  grid-template-columns: 12rem minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding-left: 0.25rem;
 }
-.set2-map-row { padding-left: calc(0.25rem + var(--d, 0) * var(--step)); }
-.set2-map-add { padding-left: calc(0.25rem + var(--d, 0) * var(--step)); }
+/* ── THE INDENT MOVED INTO THE NAME CELL ──
+   It was on the row, so a subfield pushed its KEY right as well as its name.
+   Reading down the Zendesk column — which is the column you scan when you are
+   checking a mapping — every nested key started at a different x, and the
+   deeper the field the further it drifted from the one above it. The tree is a
+   fact about the NAME; the key column stays a column. */
+.set2-map-ctx { padding-left: calc(var(--d, 0) * var(--step)); }
 .set2-adv-bd  { padding-left: calc(0.25rem + (var(--d, 0) + 1) * var(--step)); }
 
 /* ── The actions stop competing with the data ──
@@ -2257,8 +2306,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 .set2-adv { color: var(--ink-quiet); }
 .set2-map-row:hover .set2-adv,
 .set2-map-row:focus-within .set2-adv { color: var(--ink-primary); }
-.set2-map-add { color: var(--ink-quiet); }
-.set2-map-add:hover, .set2-map-add:focus-visible { color: var(--ink-action); }
+
 
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -2782,22 +2830,22 @@ body.is-settings .set2-pop .btn-sm { font-size: 0.875rem; }
 /* This compensated for mono running visually small. Nothing here uses mono, so
    it went with it — everything sits on the one scale now. */
 
-/* The compact way to start a group. It sits with the row's other actions, so
-   a field that has no subfields yet costs no vertical space to offer one. */
+/* ── A WORD, NOT A GLYPH ──
+   It was a bare "+" at `--ink-rule`, invisible until the row was hovered. Two
+   things wrong with that and only one of them is the contrast: a plus on a row
+   in a table of fields could as easily mean "add a field here" as "add a field
+   UNDER this", and the word is the only thing that says which. It reads at the
+   weight of the other row actions and comes forward on approach like them. */
 .set2-map-plus {
   appearance: none; border: 0; background: none; cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 1.75rem; min-height: 1.75rem; border-radius: var(--r-sm);
-  font: inherit; font-size: var(--ty-meta); line-height: 1;
-  color: var(--ink-rule);
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  min-height: 1.75rem; padding: 0.125rem 0.375rem; border-radius: var(--r-sm);
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  white-space: nowrap; color: var(--ink-quiet);
 }
-.set2-map-row:hover .set2-map-plus,
-.set2-map-row:focus-within .set2-map-plus { color: var(--ink-quiet); }
-.set2-map-plus:hover, .set2-map-plus:focus-visible { color: var(--ink-action); }
+.set2-map-plus svg { width: 0.625rem; height: 0.625rem; }
+.set2-map-plus:hover, .set2-map-plus:focus-visible { color: var(--ink-action); background: var(--card-bg); }
 .set2-map-plus:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
-
-/* The parent's name is the part that tells two stacked add rows apart. */
-.set2-map-add b { color: var(--ink-quiet); font-weight: var(--fw-semibold); }
 
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -2823,16 +2871,18 @@ body.is-settings .set2-pop .btn-sm { font-size: 0.875rem; }
    removed from the tab order, and a touch screen, which has no hover to
    approach with, keeps them visible.
    ══════════════════════════════════════════════════════════════════════════ */
-.set2-map-row .set2-map-plus,
+/* Only the BIN hides now. Adding a subfield is the act this section exists to
+   let you perform and it was the one control you had to find by accident;
+   deleting a mapping is the one you should have to reach for. Hiding both put
+   the constructive act and the destructive one behind the same gesture. */
 .set2-map-row .set2-x {
   opacity: 0;
   transition: opacity var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out),
               background var(--t-fast) var(--ease-out);
 }
-.set2-map-row:hover .set2-map-plus, .set2-map-row:focus-within .set2-map-plus,
-.set2-map-row:hover .set2-x,        .set2-map-row:focus-within .set2-x { opacity: 1; }
+.set2-map-row:hover .set2-x, .set2-map-row:focus-within .set2-x { opacity: 1; }
 @media (hover: none) {
-  .set2-map-row .set2-map-plus, .set2-map-row .set2-x { opacity: 1; }
+  .set2-map-row .set2-x { opacity: 1; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -3079,6 +3129,16 @@ input.set2-fld[type="password"] {
 .set2-sc-bar { display: flex; align-items: center; gap: 0.5rem; }
 .set2-sc-q { max-width: 20rem; }
 .set2-sc-bar-end { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+
+/* ── A BUTTON BESIDE A DROPDOWN TAKES THE DROPDOWN'S BOX ──
+   `.btn-sm` is 27px at an 8px radius; `.v2-dropdown-btn` is 34px at 6px. Side
+   by side in a toolbar that is a 7px step and two different corners on two
+   controls doing the same kind of job, which reads as one of them being an
+   afterthought. The dropdown is the design system's own select and cannot
+   move, so the button matches it. */
+.set2-fbar > .btn,
+.set2-sc-bar-end > .btn,
+.set2-tabs-end > .btn { min-height: 2.125rem; border-radius: var(--r-sm); }
 
 .set2-sc-canvas {
   overflow: auto;
