@@ -3,6 +3,69 @@
    pairing them. 46rem is the widest this stays legible. */
 .set2-col { max-width: 46rem; margin: 0 auto; padding: 2.25rem 2rem 6rem; }
 
+/* ══ SCROLLBARS ══════════════════════════════════════════════════════════
+   ONE TREATMENT, EVERY SCROLL REGION ON THIS SURFACE.
+
+   Each of these carried `scrollbar-width: thin` and nothing else, which is the
+   half of the contract that BREAKS the other half: declaring it switches
+   Chrome to the standard scrollbar, and the standard scrollbar ignores the
+   `::-webkit-scrollbar` rules the design system styles the rest of the product
+   with. So every one of them — the scope picker, the popovers, the skill
+   library, the tenancy canvas — grew a pale native bar down its edge while
+   everything around it had the quiet one.
+
+   `scrollbar-color` is the standard-scrollbar equivalent and carries the DS's
+   own values; the webkit rules stay for the engines that still read those.
+   Listed rather than applied to `*`, because a rule that broad would also
+   reach the page scroller the shell owns.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-pick-bd,
+.set2-pop,
+.set2-pop-bd,
+.set2-sc-canvas,
+.set2-body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+.set2-pick-bd::-webkit-scrollbar,
+.set2-pop::-webkit-scrollbar,
+.set2-pop-bd::-webkit-scrollbar,
+.set2-sc-canvas::-webkit-scrollbar,
+.set2-body::-webkit-scrollbar { width: 0.3125rem; height: 0.3125rem; }
+.set2-pick-bd::-webkit-scrollbar-track,
+.set2-pop::-webkit-scrollbar-track,
+.set2-pop-bd::-webkit-scrollbar-track,
+.set2-sc-canvas::-webkit-scrollbar-track,
+.set2-body::-webkit-scrollbar-track { background: transparent; }
+.set2-pick-bd::-webkit-scrollbar-thumb,
+.set2-pop::-webkit-scrollbar-thumb,
+.set2-pop-bd::-webkit-scrollbar-thumb,
+.set2-sc-canvas::-webkit-scrollbar-thumb,
+.set2-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14); border-radius: 0.1875rem;
+}
+.set2-pick-bd::-webkit-scrollbar-thumb:hover,
+.set2-pop::-webkit-scrollbar-thumb:hover,
+.set2-pop-bd::-webkit-scrollbar-thumb:hover,
+.set2-sc-canvas::-webkit-scrollbar-thumb:hover,
+.set2-body::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.24); }
+
+:root[data-theme="light"] .set2-pick-bd,
+:root[data-theme="light"] .set2-pop,
+:root[data-theme="light"] .set2-pop-bd,
+:root[data-theme="light"] .set2-sc-canvas,
+:root[data-theme="light"] .set2-body { scrollbar-color: rgba(16, 24, 40, 0.18) transparent; }
+:root[data-theme="light"] .set2-pick-bd::-webkit-scrollbar-thumb,
+:root[data-theme="light"] .set2-pop::-webkit-scrollbar-thumb,
+:root[data-theme="light"] .set2-pop-bd::-webkit-scrollbar-thumb,
+:root[data-theme="light"] .set2-sc-canvas::-webkit-scrollbar-thumb,
+:root[data-theme="light"] .set2-body::-webkit-scrollbar-thumb { background: rgba(16, 24, 40, 0.18); }
+:root[data-theme="light"] .set2-pick-bd::-webkit-scrollbar-thumb:hover,
+:root[data-theme="light"] .set2-pop::-webkit-scrollbar-thumb:hover,
+:root[data-theme="light"] .set2-pop-bd::-webkit-scrollbar-thumb:hover,
+:root[data-theme="light"] .set2-sc-canvas::-webkit-scrollbar-thumb:hover,
+:root[data-theme="light"] .set2-body::-webkit-scrollbar-thumb:hover { background: rgba(16, 24, 40, 0.30); }
+
 /* ══ HEAD ════════════════════════════════════════════════════════════════ */
 
 /* ── WHY THE TITLE STOPPED SHOUTING ──
@@ -188,7 +251,9 @@
    for the old surface, so it takes the padding back as a negative inset. */
 .set2-row[data-go]:hover { background: var(--card-bg); box-shadow: -0.5rem 0 0 var(--card-bg), 0.5rem 0 0 var(--card-bg); }
 .set2-row:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; border-radius: var(--r-xs); }
-.set2-row.is-off .set2-row-n,
+/* The GLYPH dims on an off row, the NAME does not. Dimming the name made a
+   switched-off agent's own label the hardest text in the list to read, and the
+   toggle beside it already says off. */
 .set2-row.is-off .set2-row-ico { opacity: 0.5; }
 
 /* ── The settings row proper ──
@@ -226,7 +291,7 @@
   .set2-set-c { justify-content: flex-start; }
 }
 
-.set2-row-ico { width: 1rem; height: 1rem; flex-shrink: 0; color: var(--ink-faint); }
+.set2-row-ico { width: 1rem; height: 1rem; flex-shrink: 0; color: var(--ink-quiet); }
 .set2-row-main { flex: 1 1 0; min-width: 0; }
 .set2-row-n {
   font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
@@ -253,7 +318,7 @@
 
 /* Where a row's value came from. A word, not a badge -- five coloured chips in
    a column is a bar chart nobody asked for. */
-.set2-from { font-size: var(--ty-micro); color: var(--ink-faint); white-space: nowrap; }
+.set2-from { font-size: var(--ty-micro); color: var(--ink-quiet); white-space: nowrap; }
 .set2-from.is-org { color: var(--ink-quiet); font-weight: var(--fw-semibold); }
 
 .set2-chev { width: 0.875rem; height: 0.875rem; color: var(--ink-rule); flex-shrink: 0; }
@@ -270,48 +335,18 @@
 .set2-pill.is-warn { background: var(--warn-bg); color: var(--ink-warn); }
 .set2-pill.is-err  { background: var(--err-bg);  color: var(--ink-err); }
 .set2-pill.is-info { background: var(--info-bg); color: var(--ink-info); }
-.set2-pill.is-mute { background: var(--card-bg-raised); color: var(--ink-faint); }
+.set2-pill.is-mute { background: var(--card-bg-raised); color: var(--ink-quiet); }
 
 .set2-num { font-variant-numeric: tabular-nums; }
-.w-lock { width: 0.75rem; height: 0.75rem; flex-shrink: 0; color: var(--ink-faint); }
+.w-lock { width: 0.75rem; height: 0.75rem; flex-shrink: 0; color: var(--ink-quiet); }
 
-/* ══ LADDER ══════════════════════════════════════════════════════════════
-   Quiet at rest: one line naming the level that governs. The whole six-stop
-   chain is one click away and not before, because the chain is the answer to a
-   question most readers are not asking yet. */
-.set2-lad { background: var(--card-bg); border-radius: var(--r-lg); overflow: hidden; }
-.set2-lad-hd {
-  display: flex; align-items: center; gap: 0.625rem; width: 100%;
-  appearance: none; border: 0; background: transparent;
-  padding: 0.75rem 0.875rem; font: inherit; cursor: pointer; color: inherit;
-}
-.set2-lad-hd:hover { background: var(--card-bg-raised); }
-.set2-lad-hd:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
-.set2-lad-lv { font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary); }
-.set2-lad-more { margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+/* The chevron OUTLIVED the ladder. `I.left` and `I.down` carry this class,
+   and the scope picker and the popover back button draw both — so the rule
+   stays while the six-stop chain it was written for does not. */
 .set2-lad-ch {
-  width: 0.75rem; height: 0.75rem; color: var(--ink-faint);
+  width: 0.75rem; height: 0.75rem; color: var(--ink-quiet);
   transition: transform var(--t-base) var(--ease-out);
 }
-.set2-lad.is-open .set2-lad-ch { transform: rotate(180deg); }
-.set2-lad-bd { display: none; padding: 0 0.375rem 0.375rem; }
-.set2-lad.is-open .set2-lad-bd { display: block; }
-
-.set2-stop {
-  display: flex; align-items: center; gap: 0.75rem;
-  padding: 0.5rem 0.5rem; border-radius: var(--r-sm);
-  font-size: var(--ty-micro);
-}
-.set2-stop-lv {
-  width: 4.75rem; flex-shrink: 0;
-  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
-}
-.set2-stop-v { flex: 1 1 0; min-width: 0; color: var(--ink-secondary); }
-.set2-stop.is-empty .set2-stop-v { color: var(--ink-faint); }
-.set2-stop.is-beat .set2-stop-v { color: var(--ink-faint); text-decoration: line-through; }
-.set2-stop.is-win { background: var(--brand-dim); }
-.set2-stop.is-win .set2-stop-v { color: var(--ink-primary); font-weight: var(--fw-semibold); }
-.set2-stop-end { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
 
 /* ══ TARGETING PICKER ════════════════════════════════════════════════════ */
 
@@ -321,7 +356,7 @@
 .set2-pick-ft {
   display: flex; align-items: center; gap: 0.75rem;
   padding: 0.5rem 0.875rem; background: var(--card-bg-raised);
-  font-size: var(--ty-micro); color: var(--ink-faint);
+  font-size: var(--ty-micro); color: var(--ink-quiet);
 }
 .set2-pick-ft b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
 .set2-pick-ft.is-zero { color: var(--ink-err); }
@@ -343,9 +378,9 @@
 .set2-node.is-l5 { padding-left: 4.375rem; }
 .set2-node.is-l6 { padding-left: 5.375rem; }
 .set2-node-n { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.set2-node-ct { font-size: var(--ty-micro); color: var(--ink-faint); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.set2-node-ct { font-size: var(--ty-micro); color: var(--ink-quiet); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .set2-exp {
-  width: 0.875rem; height: 0.875rem; flex-shrink: 0; color: var(--ink-faint);
+  width: 0.875rem; height: 0.875rem; flex-shrink: 0; color: var(--ink-quiet);
   transition: transform var(--t-fast) var(--ease-out);
 }
 .set2-node.is-open > .set2-exp { transform: rotate(90deg); }
@@ -364,11 +399,71 @@
   padding: 0.4375rem 0.6875rem; border-radius: var(--r-md);
   font: inherit; font-size: var(--ty-meta); color: var(--ink-primary);
 }
-.set2-fld::placeholder { color: var(--ink-faint); }
+.set2-fld::placeholder { color: var(--ink-quiet); }
 .set2-fld:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.0625rem; border-color: transparent; }
+/* An invalid field marks itself, so a sheet with one bad address does not
+   rely on the reader pairing a message at the bottom with a box at the top.
+
+   TWO TOKENS, ON PURPOSE. The border takes `--err`, which is what the design
+   system's `.input.error` uses. The MESSAGE does not: `--err` is #f04438 on
+   dark and #d92d20 on light, and knowledge.css records both as failing when
+   they were used as text — 4.08:1 and 3.73:1 — which is why `--ink-err`
+   exists and what it was corrected to. A border is a UI component at a 3:1
+   floor and passes; a sentence is text at 4.5 and does not. */
+.set2-fld.is-bad { border-color: var(--err); }
+.set2-hint.is-err { color: var(--ink-err); }
 textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-base); }
 .set2-field + .set2-field { margin-top: 1rem; }
-.set2-hint { font-size: var(--ty-micro); color: var(--ink-faint); margin-top: 0.375rem; }
+.set2-hint { font-size: var(--ty-micro); color: var(--ink-quiet); margin-top: 0.375rem; }
+.set2-modal .set2-fld { background: var(--card-bg-raised); }
+
+/* ── FIELD HELP, ON DEMAND ──
+   The design system's `.tooltip-wrap` / `.tooltip`, with two changes it needs
+   to carry a sentence rather than a word: it wraps, and it sits to the RIGHT
+   rather than above. Above would be clipped — `.set2-modal-bd` scrolls, so it
+   establishes a clipping context whether or not it is currently overflowing,
+   and the first field's tooltip would be cut off by the top edge every time.
+   To the side it clears both edges at any field. */
+.set2-lbl-row { display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.375rem; }
+.set2-lbl-row .set2-lbl { margin-bottom: 0; }
+.set2-tip-wrap { position: relative; display: inline-flex; }
+.set2-tip-b {
+  appearance: none; border: 0; background: none; cursor: help; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.125rem; height: 1.125rem; border-radius: var(--r-pill);
+  color: var(--ink-rule);
+}
+.set2-tip-b svg { width: 0.875rem; height: 0.875rem; display: block; }
+.set2-tip-b:hover { color: var(--ink-quiet); }
+.set2-tip-b:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+.set2-tip {
+  /* Top-aligned to the icon and growing DOWN, not centred on it. Centred, a
+     two-line tooltip on the first field reached above `.set2-modal-bd`, which
+     scrolls and therefore clips — measured outside its top edge. There is
+     always room below a label and never any above the first one, whose row
+     sits flush against the top of that box. Flush is why this is `0` and not
+     a small negative: four pixels of overhang is still four pixels cut off. */
+  position: absolute; left: calc(100% + 0.5rem); top: 0;
+  width: max-content; max-width: 15rem; white-space: normal;
+  background: var(--card-bg-raised); border: 0.0625rem solid var(--card-border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-md);
+  padding: 0.375rem 0.5rem;
+  font-size: var(--ty-micro); line-height: var(--lh-snug); color: var(--ink-quiet);
+  opacity: 0; pointer-events: none; z-index: 4;
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+.set2-tip-wrap:hover .set2-tip,
+.set2-tip-b:focus-visible + .set2-tip { opacity: 1; }
+/* Below rather than beside, for a glyph on a HEADING. The sideways placement
+   above exists because `.set2-modal-bd` scrolls and clips its top edge; a
+   heading in the page body has nothing above it to clear and plenty of room
+   under it, and going sideways from a tab would put the panel over the next
+   tab. Wider too: these carry two sentences, not a phrase. */
+.set2-tip.is-below {
+  left: 0; top: calc(100% + 0.4375rem);
+  max-width: 21rem;
+}
+@media (prefers-reduced-motion: reduce) { .set2-tip { transition: none; } }
 /* Settings is set in Urbanist throughout — the URLs and tokens included. The
    class stays as the hook for what a monospace face was doing here, because
    one thing it was doing still has to be done: see the masked-token rule at
@@ -384,7 +479,7 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
   display: flex; flex-direction: column; align-items: center; gap: 0.375rem;
   padding: 3rem 1.5rem; text-align: center;
   background: var(--card-bg); border-radius: var(--r-lg);
-  font-size: var(--ty-meta); color: var(--ink-faint);
+  font-size: var(--ty-meta); color: var(--ink-quiet);
 }
 .set2-empty b {
   font-family: var(--font-display);
@@ -445,16 +540,25 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
 
 /* ══ DETAIL ══════════════════════════════════════════════════════════════ */
 
+/* THE WAY BACK MOVED INTO THE HEADER.
+   It was a labelled link on its own line above the title: `< Skills`, printed
+   directly under an <h1> reading Skills and a scope line reading Org
+   FlairsTech. Three stacked lines of chrome before the thing you opened, one
+   of them the same word twice.
+
+   An icon against the skill's name instead. The label goes to `aria-label` and
+   `title`, so it is still named for anyone who needs it named, and the target
+   grows rather than shrinks: a 28px square beats a 16px-tall text link. */
 .set2-back {
-  appearance: none; border: 0; background: transparent; padding: 0;
-  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
-  color: var(--ink-faint); cursor: pointer; margin-bottom: 0.75rem;
-  /* 40x16 before. The way back out of a detail view is not the control to
-     make people aim at — same 24px floor as everything else here. */
-  display: inline-flex; align-items: center; gap: 0.3125rem;
-  min-height: 1.75rem; padding-right: 0.375rem;
+  appearance: none; padding: 0; cursor: pointer; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.75rem; height: 1.75rem;
+  border: 0.0625rem solid var(--card-border); border-radius: var(--r-sm);
+  background: var(--card-bg); color: var(--ink-quiet);
 }
-.set2-back:hover { color: var(--ink-primary); }
+.set2-back svg { width: 0.875rem; height: 0.875rem; }
+.set2-back:hover { border-color: var(--ink-rule); color: var(--ink-primary); }
+.set2-back:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
 
 /* The skill body, shown as prose or as the file it actually is. A skill that
    can be uploaded as a file has to be readable as one, or the download and the
@@ -463,7 +567,7 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
 .set2-view-b {
   appearance: none; border: 0; background: transparent; cursor: pointer;
   padding: 0.25rem 0.5rem; border-radius: var(--r-sm);
-  color: var(--ink-faint); display: grid; place-items: center;
+  color: var(--ink-quiet); display: grid; place-items: center;
   min-width: 1.75rem; min-height: 1.75rem;
 }
 .set2-view-b svg { width: 0.875rem; height: 0.875rem; }
@@ -493,7 +597,7 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
   display: grid; grid-template-columns: 9rem 1fr auto;
   gap: 0.75rem; padding: 0 0.25rem 0.5rem;
   font-size: var(--ty-micro); letter-spacing: var(--ls-wide);
-  text-transform: uppercase; color: var(--ink-faint);
+  text-transform: uppercase; color: var(--ink-quiet);
 }
 /* ── A ROW IS A FIELD AND EVERYTHING UNDER IT ──
    The separator was on every `.set2-map-row`, so it fell between a parent and
@@ -517,7 +621,7 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
 .set2-map-row.is-broken .set2-map-ctx { color: var(--ink-err); }
 .set2-x {
   appearance: none; border: 0; background: transparent; padding: 0.1875rem;
-  cursor: pointer; color: var(--ink-faint); display: grid; place-items: center; border-radius: var(--r-sm);
+  cursor: pointer; color: var(--ink-quiet); display: grid; place-items: center; border-radius: var(--r-sm);
 }
 .set2-x:hover { color: var(--ink-err); background: var(--err-bg); }
 .set2-x svg { width: 0.75rem; height: 0.75rem; }
@@ -538,36 +642,190 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
 /* A suggestion is not an error and not a fact. It sits between them, and the
    row says so without dimming: everything stays fully readable, because a
    surface that hides its own guesses cannot be checked. */
-.set2-map-row.is-unmapped .set2-map-ctx { color: var(--ink-faint); font-weight: var(--fw-medium); }
+.set2-map-row.is-unmapped .set2-map-ctx { color: var(--ink-quiet); font-weight: var(--fw-medium); }
 
-.set2-tally { display: flex; gap: 0.75rem; font-size: var(--ty-micro); color: var(--ink-faint); }
+.set2-tally { display: flex; gap: 0.75rem; font-size: var(--ty-micro); color: var(--ink-quiet); }
 .set2-tally b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
 .set2-tally .is-info b { color: var(--ink-info); }
 .set2-tally .is-err b  { color: var(--ink-err); }
-.set2-tally .is-mute b { color: var(--ink-faint); }
-/* ══ ROLE MATRIX ═════════════════════════════════════════════════════════
-   Words, not ticks. A checkbox encodes a binary and permissions here are
-   ternary: "can read it but not change it" is the most common answer and a
-   tick has nowhere to put it. */
-.set2-matrix-wrap { overflow-x: auto; background: var(--card-bg); border-radius: var(--r-lg); }
-.set2-matrix { border-collapse: collapse; width: 100%; min-width: 44rem; font-size: var(--ty-micro); }
-.set2-matrix th {
-  text-align: left; padding: 0.75rem 0.625rem 0.5rem; white-space: nowrap;
+.set2-tally .is-mute b { color: var(--ink-quiet); }
+/* ══ ROLES ═══════════════════════════════════════════════════════════════
+   Words, not ticks — that part of the matrix was right and it survives. A
+   checkbox encodes a binary and permissions here are ternary: "can read it but
+   not change it" is the most common answer and a tick has nowhere to put it.
+
+   What changed is that the words are for ONE role at a time, so they can be
+   set as a document instead of packed into cells. No card behind the rows, no
+   fill, no radius: hairlines and space carry the structure, because this is a
+   page you read rather than a surface you operate. That is also what keeps it
+   visually apart from the skill library, which uses the same two columns for
+   the opposite job.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-rl {
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr);
+  gap: 2rem;
+  margin-top: 1.5rem;
+  align-items: start;
+}
+
+/* ── The list ──
+   Six rows and a settled number. It gets no scroll port and no filter of its
+   own, because neither would ever do anything. */
+.set2-rl-nav { position: sticky; top: 1rem; }
+.set2-rl-hd { margin-bottom: 0.75rem; }
+.set2-rl-bd { display: flex; flex-direction: column; }
+/* ── NO BACKGROUND TRANSITION ON A SELECTED ROW ──
+   These four rows take their RESTING background from a theme token, and the
+   theme toggle swaps the token on `<html>` without re-rendering anything. A
+   property that is mid-transition — or merely declared transitionable — does
+   not re-resolve its `var()` when the variable changes underneath it, so the
+   selected row kept the previous theme's fill: white-on-white going one way,
+   near-black on a light page coming back. Reproduced both directions on the
+   live toggle; correct on a fresh load, which is why it hides.
+
+   The 150ms hover fade is not worth a row that renders the wrong theme, so it
+   goes. Rows whose resting background is `none` keep theirs — a hover state
+   re-resolves when you hover it. */
+.set2-rl-r {
+  display: flex; align-items: baseline; gap: 0.5rem; width: 100%;
+  appearance: none; border: 0; background: none; cursor: pointer;
+  text-align: left; font: inherit;
+  min-height: 2rem; padding: 0.3125rem 0.5rem;
+  border-radius: var(--r-sm);
+  color: var(--ink-secondary);
+}
+.set2-rl-r:hover { background: var(--card-bg); }
+.set2-rl-r:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+.set2-rl-r.is-on { background: var(--card-bg); }
+.set2-rl-r.is-on .set2-rl-n { color: var(--ink-primary); font-weight: var(--fw-semibold); }
+.set2-rl-n {
+  flex: 1 1 auto; min-width: 0; font-size: var(--ty-meta);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The holder count is the fact that turns a reference into something you can
+   act on, so it sits on every row and not only on the open one. Zero says so
+   in a word: a role nobody holds is worth noticing, and "0" reads as a
+   measurement rather than as a finding. */
+.set2-rl-held {
+  flex-shrink: 0; font-size: var(--ty-micro); color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
+}
+.set2-rl-held.is-zero { color: var(--ink-warn); }
+.set2-rl-ft {
+  margin-top: 0.5rem; padding: 0 0.5rem;
+  font-size: var(--ty-micro); color: var(--ink-rule);
+}
+
+/* ── The document ── */
+.set2-rl-doc { min-width: 0; }
+.set2-rl-t {
+  font-family: var(--font-display);
+  font-size: var(--ty-title); font-weight: var(--fw-bold);
+  color: var(--ink-primary); margin: 0;
+}
+.set2-rl-d {
+  margin: 0.375rem 0 0; max-width: 40rem;
+  font-size: var(--ty-meta); color: var(--ink-secondary); line-height: var(--lh-base);
+}
+/* The segmented control sits in the column the label used to, so the rows
+   still line up whether a capability is settable or locked. */
+.set2-rl-seg { justify-self: start; }
+.set2-rl-seg .seg-btn { font-size: var(--ty-micro); padding: 0.1875rem 0.5rem; }
+
+.set2-rl-bar {
+  display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+  margin-top: 1.5rem; padding-bottom: 0.625rem;
+  border-bottom: 0.0625rem solid var(--hairline);
+}
+.set2-rl-bar-l { font-size: var(--ty-meta); color: var(--ink-secondary); }
+.set2-rl-bar-l b { color: var(--ink-primary); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; }
+.set2-rl-cmp { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+.set2-rl-cmp-k {
   font-size: var(--ty-micro); font-weight: var(--fw-semibold);
-  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-faint);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-quiet);
 }
-.set2-matrix td { padding: 0.4375rem 0.625rem; }
-.set2-matrix-g td {
-  padding-top: 0.875rem; font-weight: var(--fw-semibold); color: var(--ink-primary);
-  letter-spacing: var(--ls-wide); text-transform: uppercase; font-size: var(--ty-micro);
+
+/* ── The two columns of a diff ──
+   One grid for the heads and every row under them, so the two states line up
+   down the page. This is the ONE place in People-and-Roles where alignment
+   carries meaning rather than decoration: a comparison whose columns do not
+   line up is not a comparison. */
+/* The first state column holds a three-button segmented control now, not a
+   word, so it is wider than the second — which still holds the compared
+   role's LABEL. Sized to the control rather than the other way round: a seg
+   squeezed into a label's column is what put "None" on top of "Always". */
+.set2-rl-heads,
+.set2-rl-cap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 11.5rem 8.5rem;
+  align-items: center;
+  gap: 0.75rem;
 }
-.set2-matrix-cap { color: var(--ink-secondary); white-space: nowrap; }
-.set2-cell { white-space: nowrap; }
-.set2-cell.is-ok   { color: var(--ink-ok); font-weight: var(--fw-semibold); }
-.set2-cell.is-mute { color: var(--ink-quiet); }
-.set2-cell.is-off  { color: var(--ink-faint); }
-.set2-cell.is-locked { display: table-cell; }
-.set2-cell.is-locked .w-lock { color: var(--ink-ok); margin-right: 0.25rem; vertical-align: -0.0625rem; }
+.set2-rl-heads {
+  padding: 0.625rem 0 0;
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-quiet);
+}
+.set2-rl-h1 { grid-column: 2; }
+.set2-rl-h2 { grid-column: 3; }
+/* Without a comparison there is one state column and the capability takes the
+   rest, so the name is not pinned to a track sized for a column that is not
+   being drawn. */
+.set2-rl-cap:not(.is-wide) { grid-template-columns: minmax(0, 1fr) 11.5rem 8.5rem; }
+.set2-rl-cap { padding: 0.5rem 0; border-bottom: 0.0625rem solid var(--hairline); }
+.set2-rl-cap.is-wide { grid-template-columns: minmax(0, 1fr); border-bottom: 0; padding-bottom: 0.25rem; }
+.set2-rl-cn { font-size: var(--ty-meta); color: var(--ink-secondary); }
+
+.set2-rl-g { margin-top: 1.5rem; }
+.set2-rl-gt {
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-quiet);
+  padding-bottom: 0.375rem;
+}
+
+/* The state, as a word. Same four values the matrix used and the same colour
+   for each, so anybody who learned them there has not had to learn them
+   again. */
+.set2-rl-s { font-size: var(--ty-micro); white-space: nowrap; display: inline-flex; align-items: center; gap: 0.25rem; }
+.set2-rl-s.is-ok   { color: var(--ink-ok); font-weight: var(--fw-semibold); }
+.set2-rl-s.is-mute { color: var(--ink-quiet); }
+.set2-rl-s.is-off  { color: var(--ink-quiet); }
+.set2-rl-s .w-lock { color: var(--ink-ok); }
+
+.set2-rl-same {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin-top: 1rem; padding-top: 0.75rem;
+  font-size: var(--ty-micro); color: var(--ink-quiet);
+}
+.set2-rl-same .set2-lnk { margin-left: auto; }
+
+/* ── Capability-first ──
+   The same data read the other way: one capability, every role. Wraps rather
+   than scrolling sideways, which is the whole reason the grid had to go. */
+.set2-rl-across {
+  display: flex; flex-wrap: wrap; gap: 0.375rem;
+  padding-bottom: 0.5rem;
+}
+.set2-rl-x {
+  display: inline-flex; align-items: center; gap: 0.4375rem;
+  appearance: none; cursor: pointer; font: inherit;
+  padding: 0.25rem 0.5rem; min-height: 1.75rem;
+  border: 0.0625rem solid var(--hairline); border-radius: var(--r-sm);
+  background: var(--card-bg);
+}
+.set2-rl-x:hover { border-color: var(--ink-rule); }
+.set2-rl-x:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+.set2-rl-xn { font-size: var(--ty-micro); color: var(--ink-primary); font-weight: var(--fw-semibold); }
+
+@media (max-width: 58rem) {
+  .set2-rl { grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
+  .set2-rl-nav { position: static; }
+  .set2-rl-bd { flex-direction: row; flex-wrap: wrap; }
+  .set2-rl-r { width: auto; }
+  .set2-rl-heads,
+  .set2-rl-cap:not(.is-wide) { grid-template-columns: minmax(0, 1fr) 10.5rem 6.5rem; }
+}
 
 /* ══ CASCADE ═════════════════════════════════════════════════════════════
    The second casualty. A count says how big the hole is; this says what falls
@@ -576,7 +834,7 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
 .set2-cascade-t {
   font-size: var(--ty-micro); font-weight: var(--fw-semibold);
   letter-spacing: var(--ls-wide); text-transform: uppercase;
-  color: var(--ink-faint); margin-bottom: 0.5rem;
+  color: var(--ink-quiet); margin-bottom: 0.5rem;
 }
 .set2-cascade-i { display: flex; gap: 0.625rem; align-items: baseline; padding: 0.1875rem 0; font-size: var(--ty-micro); }
 .set2-cascade-k { flex: 0 0 10rem; color: var(--ink-primary); font-weight: var(--fw-semibold); }
@@ -603,22 +861,22 @@ textarea.set2-fld { resize: vertical; min-height: 6rem; line-height: var(--lh-ba
 }
 .set2-pv th span {
   display: block; font-family: var(--font-sans); font-weight: var(--fw-regular);
-  color: var(--ink-faint); margin-top: 0.125rem;
+  color: var(--ink-quiet); margin-top: 0.125rem;
 }
 .set2-pv td {
   padding: 0.4375rem 0.75rem; color: var(--ink-secondary);
   white-space: nowrap; font-variant-numeric: tabular-nums;
 }
 .set2-pv tbody tr:nth-child(odd) td { background: var(--card-bg-raised); }
-.set2-pv td i { color: var(--ink-faint); }
+.set2-pv td i { color: var(--ink-quiet); }
 kbd {
   font-family: var(--font-sans); font-size: var(--ty-micro);
-  background: var(--card-bg-raised); color: var(--ink-faint);
+  background: var(--card-bg-raised); color: var(--ink-quiet);
   padding: 0.0625rem 0.25rem; border-radius: var(--r-sm);
 }
 
 .set2-scrim.is-top { align-items: flex-start; padding-top: 12vh; }
-.set2-pal-empty { padding: 1.5rem 0.75rem; text-align: center; font-size: var(--ty-meta); color: var(--ink-faint); }
+.set2-pal-empty { padding: 1.5rem 0.75rem; text-align: center; font-size: var(--ty-meta); color: var(--ink-quiet); }
 .set2-pal-empty b { color: var(--ink-secondary); }
 /* ══ CHIPS ═══════════════════════════════════════════════════════════════ */
 
@@ -631,7 +889,7 @@ kbd {
 .set2-chip b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
 .set2-chip button {
   appearance: none; border: 0; background: transparent; padding: 0; cursor: pointer;
-  color: var(--ink-faint); display: grid; place-items: center;
+  color: var(--ink-quiet); display: grid; place-items: center;
 }
 .set2-chip button:hover { color: var(--ink-primary); }
 .set2-chip button svg { width: 0.625rem; height: 0.625rem; }
@@ -647,17 +905,30 @@ kbd {
 /* The conjunction is stated. The console shows the same chips side by side
    with nothing between them, so whether two filters mean AND or OR is left
    for the reader to assume. */
-.set2-crit-and { font-size: var(--ty-micro); color: var(--ink-faint); font-style: italic; }
-.set2-crit-all { font-size: var(--ty-micro); color: var(--ink-faint); }
+.set2-crit-and { font-size: var(--ty-micro); color: var(--ink-quiet); font-style: italic; }
+.set2-crit-all { font-size: var(--ty-micro); color: var(--ink-quiet); }
 
 /* ══ BLAST RADIUS ════════════════════════════════════════════════════════
    What the action is about to touch, next to the button that does it. The
    console offers Test Sync and Run Sync with no figure anywhere, so the only
    way to learn the size of a run is to start one. */
+/* Two shapes from one class. The retention modal still puts a figure and a
+   sentence in here — that number IS the decision, because it counts records
+   about to stop existing — while Trigger sync now holds only its actions. So
+   the block keeps the fill and the padding, and `:has()` closes the gap the
+   count used to fill rather than leaving the buttons adrift at the end of an
+   empty bar. */
 .set2-blast {
   display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap;
   margin-top: 0.125rem; padding: 0.75rem 0.875rem;
   background: var(--card-bg-raised); border-radius: var(--r-lg);
+}
+/* With the count gone there is nothing for a container to contain: a filled,
+   rounded bar holding two right-aligned buttons draws a box around empty
+   space and reads as a section of its own. The actions keep their place in
+   the flow and lose the panel. */
+.set2-blast:not(:has(.set2-blast-l)) {
+  background: none; padding: 0.25rem 0 0; justify-content: flex-end;
 }
 .set2-blast-n {
   font-size: var(--ty-title); font-weight: var(--fw-bold); color: var(--ink-primary);
@@ -736,6 +1007,52 @@ kbd {
    all get. 15px of air on a succeeded row is not waste — it is the succeeded
    row agreeing to be the same shape as its neighbour. */
 .set2-run:not(.set2-run-hd) { min-height: 4.25rem; }
+
+/* ── The progress bar on a running sync ──
+   Spans every column, because what is in progress is the run and a bar the
+   width of the status cell cannot show a proportion. It is the last child of
+   the same grid rather than a wrapper around the row, so the four columns
+   above it keep the alignment they share with every other row. */
+/* Bar and count on one line, the count to the RIGHT of the bar rather than up
+   in the Records column — that column reports what a run wrote and stays empty
+   until it has written it. */
+.set2-prog-row {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 0.625rem;
+}
+.set2-prog {
+  flex: 1 1 auto; min-width: 0;
+  height: 0.1875rem; border-radius: var(--r-pill);
+  background: var(--card-bg-raised); overflow: hidden;
+}
+.set2-prog-c {
+  flex-shrink: 0; font-size: var(--ty-micro); color: var(--ink-quiet);
+  font-variant-numeric: tabular-nums;
+}
+.set2-prog-fill {
+  display: block; height: 100%; border-radius: inherit;
+  background: var(--brand);
+  /* Matches the tick, so the fill glides between samples instead of stepping
+     sixteen times a second. */
+  transition: width 60ms linear;
+}
+/* A determinate bar already says how far along it is; the sheen says it is
+   still MOVING, which is the fact a static screenshot of a stalled sync
+   cannot distinguish from a live one. */
+.set2-prog-fill::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: set2-prog-sheen 2.2s linear infinite;
+}
+.set2-prog-fill { position: relative; }
+@keyframes set2-prog-sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .set2-prog-fill { transition: none; }
+  .set2-prog-fill::after { animation: none; }
+}
+/* The count reads "128 / 412" — the half that changes is the half that is
+   emphasised. */
+.set2-run-n b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
 .set2-fld-n { width: 5rem; flex: 0 0 auto; text-align: right; }
 /* ══ POPOVER ═════════════════════════════════════════════════════════════
    Anchored beside the cell it changes. GAPS 22 and 25 note the library has one
@@ -748,18 +1065,103 @@ kbd {
   background: var(--card-bg-raised);
   border: 0.0625rem solid var(--card-border);
   border-radius: var(--r-lg);
-  overflow: hidden;
+  /* ── PADDING, AND THE ABILITY TO SCROLL ──
+     It had neither. Rows sat 1px from the border, so a hovered row's 6px
+     radius pressed against the panel's 10px one and the two corners fought;
+     4px of inset lets the row's own shape read.
+
+     And `overflow: hidden` on a box with `max-height` is a clip, not a
+     contract: the role picker is 359px of content in 288px of panel, so Read
+     Only — the last row — could not be reached at all. It scrolls now, and
+     the scroll stops at the panel instead of taking the page with it. */
+  padding: 0.375rem;
+  overflow-y: auto; overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.22);
 }
-.set2-pop-hd { padding: 0.4375rem; }
-.set2-pop-hd.set2-pop-t {
-  padding: 0.5rem 0.6875rem 0.25rem;
-  font-size: var(--ty-micro); letter-spacing: var(--ls-wide);
-  text-transform: uppercase; color: var(--ink-faint);
+/* ── THE PANEL'S TITLE, SET AS ONE ──
+   "Grant to Alex Smith" was micro and faint: the same size and colour as the
+   CAPTIONS under the rows beneath it, so the one line naming what the whole
+   panel does read as the quietest thing in it. It is the title, and the rows
+   are the options — it takes body weight and full-strength ink, and the rows'
+   own left edge so the column starts in one place.
+
+   The rule beneath groups it with what it heads rather than leaving it
+   floating above the first row. */
+.set2-pop-hd {
+  padding: 0.375rem 0.5rem 0.5rem;
+  margin-bottom: 0.3125rem;
+  border-bottom: 0.0625rem solid var(--hairline);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
+  color: var(--ink-primary); line-height: var(--lh-snug);
 }
+.set2-pop-hd b { color: var(--ink-action); font-weight: var(--fw-semibold); }
+/* The search sits between the heading and the rows and belongs to neither, so
+   it takes the rows' inset and its own breathing room below. */
+.set2-pop-f { margin: 0 0.125rem 0.3125rem; width: calc(100% - 0.25rem); }
+/* ── ROWS NEED AIR BETWEEN THEM, NOT JUST INSIDE THEM ──
+   The rows were flush siblings, so a two-line row's second line sat directly
+   above the next row's NAME with nothing between them: "Cannot change billing"
+   and "Manager" read as one paragraph, and six roles read as a wall of text
+   rather than six things you can press. The panel is already a flex column, so
+   the separation is a gap — one value, applied between every child, including
+   the heading and the rule.
+
+   A row carrying two lines also needs more of its own: 6px top and bottom is
+   right under a single line and cramped under two. */
+/* ── WHY THE ROWS WERE OVERLAPPING ──
+   The panel is a flex COLUMN with a `max-height`, so once six roles exceeded
+   288px every row was flex-shrunk to fit instead of the panel scrolling: a row
+   measured 42px tall around 59px of text, and each description ran into the
+   name beneath it. Adding gaps made it worse, because the gaps came out of the
+   same budget.
+
+   Flex items shrink by default. These must not — they scroll. */
+.set2-pop { gap: 0.1875rem; }
+.set2-pop > * { flex-shrink: 0; }
+
+
+/* ── SEPARATED BY SPACE, NOT BY A LINE ──
+   A rule is a heavy way to say "these two belong to different groups" in a
+   panel this small, and it competed with the group label already doing the
+   job. Twice the gap says it on its own. */
+.set2-pop-i.is-gap { margin-top: 0.5rem; }
+.set2-pop-i.is-role,
+.set2-pop-i.is-scope { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+
+/* Two lines that are ONE thing. 1px between them read as a rendering
+   accident; 2px with the caption a step quieter reads as a caption. */
+.set2-pop-tx { gap: 0.125rem; }
+.set2-pop-i .set2-pop-p { line-height: var(--lh-snug); }
+/* The description is prose and wraps; snug keeps a two-line one compact
+   without letting the two lines touch. */
+.set2-pop-i.is-role .set2-pop-s { line-height: var(--lh-snug); }
+
+/* ── THE GROUP LABEL ──
+   This style was in the file and nothing rendered it. It is what a menu of
+   mixed actions needs: three ways to change somebody's access, then the two
+   that are not about access at all. The label names the first group and a rule
+   closes it, so the reader sorts five items into two ideas before reading any
+   of them.
+
+   Set at the quietest level in the panel on purpose — it is scaffolding for
+   the rows, and a label that competes with what it labels has inverted the
+   hierarchy it was added to create. */
+.set2-pop-t {
+  padding: 0.375rem 0.5rem 0.25rem;
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--ink-rule);
+}
+.set2-pop-t:not(:first-child) { margin-top: 0.25rem; }
 .set2-pop-bd { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.1875rem; scrollbar-width: thin; }
+/* 32px, not 30. Two extra pixels per row is what stops a six-row menu reading
+   as a list of text and starts it reading as a list of controls — and it puts
+   the single-line rows on the same rhythm as the two-line ones. */
 .set2-pop-i {
   display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  min-height: 2rem;
   appearance: none; border: 0; background: transparent;
   padding: 0.375rem 0.5rem; border-radius: var(--r-sm);
   font: inherit; font-size: var(--ty-micro); font-family: var(--font-sans);
@@ -769,11 +1171,11 @@ kbd {
 .set2-pop-i span:first-child { flex: 1 1 auto; }
 .set2-pop-i .set2-pop-t {
   font-family: var(--font-sans); font-size: var(--ty-micro);
-  color: var(--ink-faint); letter-spacing: var(--ls-wide); text-transform: uppercase;
+  color: var(--ink-quiet); letter-spacing: var(--ls-wide); text-transform: uppercase;
 }
 .set2-pop-row {
   display: flex; align-items: baseline; gap: 0.5rem;
-  padding: 0.3125rem 0.5rem; font-size: var(--ty-micro); color: var(--ink-faint);
+  padding: 0.3125rem 0.5rem; font-size: var(--ty-micro); color: var(--ink-quiet);
 }
 .set2-pop-row code { font-family: var(--font-sans); color: var(--ink-secondary); }
 .set2-pop-row b { color: var(--ink-primary); font-weight: var(--fw-semibold); margin-left: auto; }
@@ -788,13 +1190,24 @@ kbd {
   background: rgba(0, 0, 0, 0.55);
   display: grid; place-items: center; padding: 1.5rem;
 }
+/* ── `--card-bg`, which is what the design system's own `.modal` uses ──
+   This was `--body-bg`: the PAGE ground, borrowed for a thing that floats
+   above the page. Two costs. It read flat, because a dialog painted the same
+   value as the surface behind it has only its border to say it is in front;
+   and it was the one neutral in a blue-tinted ramp — #171a1c beside #141b24
+   and #1c2630 — so the modal was subtly the wrong temperature next to every
+   other surface in the product.
+
+   The shadow comes from the same DS rule, and is what actually does the
+   lifting now that the fill is a card fill. */
 .set2-modal {
   width: 100%; max-width: 34rem;
   max-height: calc(100dvh - 6rem);
   display: flex; flex-direction: column;
-  background: var(--body-bg);
+  background: var(--card-bg);
   border: 0.0625rem solid var(--card-border);
   border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xl);
   overflow: hidden;
 }
 .set2-modal-hd { display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.125rem 0.75rem; }
@@ -804,14 +1217,16 @@ kbd {
 }
 .set2-modal-x {
   margin-left: auto; appearance: none; border: 0; background: transparent;
-  cursor: pointer; color: var(--ink-faint); display: grid; place-items: center; padding: 0.25rem;
+  cursor: pointer; color: var(--ink-quiet); display: grid; place-items: center; padding: 0.25rem;
 }
 .set2-modal-x:hover { color: var(--ink-primary); }
 .set2-modal-x svg { width: 0.875rem; height: 0.875rem; }
 .set2-modal-bd { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 1.125rem 1rem; }
+/* Both of these were `--card-bg` while the dialog was `--body-bg`. The dialog
+   is `--card-bg` now, so they step up rather than dissolving into it. */
 .set2-modal-ft {
   display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.875rem 1.125rem; background: var(--card-bg);
+  padding: 0.875rem 1.125rem; background: var(--card-bg-raised);
 }
 .set2-modal-ft .set2-modal-end { margin-left: auto; display: flex; gap: 0.5rem; }
 
@@ -828,7 +1243,7 @@ kbd {
   border: 0.0938rem dashed var(--card-border-hover);
   border-radius: var(--r-lg);
   background: var(--card-bg);
-  font-size: var(--ty-micro); color: var(--ink-faint);
+  font-size: var(--ty-micro); color: var(--ink-quiet);
   cursor: pointer;
 }
 .set2-drop:hover, .set2-drop.is-over { border-color: var(--brand); color: var(--ink-secondary); }
@@ -882,9 +1297,20 @@ kbd {
 }
 .set2-pop-i .set2-pop-p {
   font-family: var(--font-sans); font-size: var(--ty-micro);
-  color: var(--ink-faint); white-space: nowrap;
+  color: var(--ink-quiet); white-space: nowrap;
 }
-.set2-pop-i.is-on { background: var(--card-bg-raised); }
+/* ── THE CURRENT ROW WAS NEVER MARKED ──
+   This tinted with `--card-bg-raised`, which is the popover's OWN background
+   in both themes — so every "you are here" in every one of these menus, the
+   client picker and the role picker included, has been painting a row the
+   exact colour it already was. Measured at #1c2630 on #1c2630 dark and
+   #f7f9fc on #f7f9fc light.
+
+   A brand tint instead, which no other state here uses: hover is
+   `--card-bg`, so selected and hovered stay tellable apart on the row under
+   the cursor — which was the second half of the same problem. */
+.set2-pop-i.is-on { background: var(--brand-dim); }
+.set2-pop-i.is-on .set2-pop-n { color: var(--ink-action); }
 
 /* ══════════════════════════════════════════════════════════════════════════
    FAILURES
@@ -925,7 +1351,7 @@ kbd {
    a guess. Its own line: it is a sentence, and `.set2-from` is nowrap, so
    sharing the footer with the button ran it underneath. */
 .set2-fail-note {
-  margin: 0.25rem 0 0; font-size: var(--ty-micro); color: var(--ink-faint);
+  margin: 0.25rem 0 0; font-size: var(--ty-micro); color: var(--ink-quiet);
   line-height: var(--lh-snug); max-width: 52ch;
 }
 /* Inside the popout the card is the content, not a surface of its own: the
@@ -945,45 +1371,191 @@ kbd {
 .set2-pop .set2-fail > .set2-pill { margin-top: 0.5rem; }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   USER & ACCESS
+   PEOPLE, ANCHORED TO A SCOPE
 
-   A card per person, because a grant is a role ON A SCOPE and a list that
-   prints only the role name is lying by omission. Two columns: wide enough for
-   `Super Admin` beside `Product InterFAX Support` without either wrapping.
+   Rows in groups, not a grid of cards. The card grid's height was the roster;
+   this page's height is whoever reaches one node, which does not grow with
+   the company. The groups are the answer — granted here, inherited from
+   above — so they carry the weight and the rows inside them stay quiet.
+
+   Deliberately NOT a table: no column headers, no shared track widths between
+   groups. Every row is a flex line that sizes to its own content, which is
+   what keeps a person with three roles from setting a column width for a
+   person with one.
    ══════════════════════════════════════════════════════════════════════════ */
-.set2-team {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
-  gap: 0.75rem;
+
+/* ── People's scope lives in the HEADER slot, in the Connections component ──
+   It had a bar of its own sitting 40px under the one the header already keeps
+   for exactly this, and a treatment of its own inside that bar — plain crumbs
+   for the ancestors, a control only on the node you stood on. Both went. The
+   bar is `.set2-scope` and every level is `.set2-scope-pick`, which is the
+   control Dynamic fields has always used, so it needs no new rules at all.
+
+   One addition stood here: `.is-muted`, which faded the whole scope line to
+   55% while a search was running, on the reasoning that the search stops
+   reading from the scope so the line should recede. It made a breadcrumb you
+   still need — it is how you get back — the least readable thing on the page
+   at exactly the moment you are lost in it. The search field having a value in
+   it is the signal that a search is running. */
+
+/* ── The scope menu row ──
+   Two lines and a tick. `.set2-pop-i:has(.set2-pop-n)` turns every two-line
+   row into a column, which would stack the tick under the caption, so the
+   text gets a wrapper of its own and the row goes back to being a row. The
+   selector carries one class more than that rule so it wins on specificity
+   rather than on source order — two rules at 0,2,0 deciding a layout by
+   which one was pasted second is not a cascade anybody can maintain. */
+.set2-pop-i.is-scope:has(.set2-pop-n),
+.set2-pop-i.is-role:has(.set2-pop-n),
+.set2-pop-i.is-val:has(.set2-pop-n) { flex-direction: row; align-items: center; gap: 0.5rem; }
+.set2-pop-i.is-val .set2-pop-n { flex: 1 1 auto; min-width: 0; }
+.set2-pop-tx {
+  display: flex; flex-direction: column; gap: 0.0625rem;
+  flex: 1 1 auto; min-width: 0;
 }
-.set2-person:hover { border-color: var(--ink-rule); }
+.set2-pop-tx .set2-pop-n,
+.set2-pop-tx .set2-pop-p { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+/* THE TRIGGER MENU DOES NOT TRUNCATE.
+   Everywhere else the caption is a detail beside a name you already know, so
+   an ellipsis costs nothing. Here the caption IS the choice: the three names
+   are `Always`, `Automatic` and `On demand`, and the second and third are
+   indistinguishable from their names alone — the sentence saying which one
+   fires when is the only thing separating them. "Fires when the description
+   ma…" is the menu withholding the answer to the question it just asked.
+   The copy is cut to the bone AND the rule is lifted; one without the other
+   still truncates on a narrow panel. Three classes deep to outrank the rule
+   above on specificity rather than on source order. */
+.set2-pop.is-trig { width: 17rem; }
+.set2-pop.is-trig .set2-pop-tx .set2-pop-p {
+  white-space: normal; overflow: visible; text-overflow: clip;
+  line-height: var(--lh-snug);
+}
+/* Reserved, not conditional: a tick that only occupies space on the current
+   row shifts every caption sideways as the selection moves. */
+.set2-pop-k {
+  width: 0.75rem; height: 0.75rem; flex-shrink: 0;
+  color: var(--ink-action); opacity: 0;
+}
+.set2-pop-i.is-scope.is-on .set2-pop-k,
+.set2-pop-i.is-role.is-on .set2-pop-k,
+.set2-pop-i.is-val.is-on .set2-pop-k { opacity: 1; }
+
+/* ── The role menu ──
+   Six sentences need more than the 15rem a list of names does, and they need
+   to WRAP: `.set2-pop-s` truncates by default, which turned every description
+   into "Everything, on every scope it is gra…" — the half that says what
+   the role does, cut. Two lines, then ellipsis, so the panel still cannot run
+   away down the screen. */
+.set2-pop.is-roles { width: 20rem; }
+.set2-pop-i.is-role .set2-pop-s {
+  white-space: normal; line-height: var(--lh-snug);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.set2-pop-k svg { width: 100%; height: 100%; display: block; }
+
+
+/* ── A group ──
+   The label is the answer to "how does this person reach here", so it is set
+   as a statement rather than as a quiet section marker, and it takes the
+   status colour of what it means. */
+.set2-sp-g + .set2-sp-g { margin-top: 1.5rem; }
+.set2-sp-gt {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding-bottom: 0.4375rem; margin-bottom: 0.375rem;
+  border-bottom: 0.0625rem solid var(--hairline);
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-quiet);
+}
+.set2-sp-gt.is-ok   { color: var(--ink-ok); }
+.set2-sp-gt.is-warn { color: var(--ink-warn); }
+.set2-sp-gt.is-err  { color: var(--ink-err); }
+.set2-sp-gt .set2-num {
+  color: var(--ink-quiet); font-weight: var(--fw-regular); letter-spacing: normal;
+}
+.set2-sp-ge {
+  margin-left: auto; text-transform: none; letter-spacing: normal;
+  font-weight: var(--fw-regular); color: var(--ink-quiet);
+}
+
+/* ── A row ── */
+.set2-sp-row {
+  display: flex; align-items: center; gap: 0.625rem;
+  padding: 0.5rem 0.5rem; border-radius: var(--r-md);
+  min-height: 3rem;
+}
+.set2-sp-row:hover { background: var(--card-bg); }
+.set2-sp-row.is-picked { background: var(--brand-dim); }
+/* Somebody holding nothing is still a person in the directory. Quiet, not
+   hidden — an account you cannot see is one you will re-invite by accident. */
+.set2-sp-row.is-none .set2-av { background: var(--card-bg-raised); color: var(--ink-quiet); }
+
+.set2-sp-lines { display: flex; flex-direction: column; min-width: 0; flex: 0 1 15rem; }
+.set2-sp-n2 {
+  display: flex; align-items: center; gap: 0.375rem; min-width: 0;
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
+}
+.set2-sp-m {
+  font-size: var(--ty-micro); color: var(--ink-quiet);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The reason they are in this group, in their own words: the roles, and where
+   each was written. Wraps rather than truncates — this is the content of the
+   row, not a trailing detail. */
+.set2-sp-why {
+  display: flex; align-items: center; gap: 0.3125rem; flex-wrap: wrap;
+  flex: 1 1 auto; min-width: 0;
+  font-size: var(--ty-micro); color: var(--ink-quiet);
+}
+/* ── A LINE PER GRANT ──
+   Stacked, and the role chip takes a fixed track so the client chips start at
+   one x down the column — which is what makes "what does this person hold"
+   readable vertically instead of parsed out of a run of chips. */
+.set2-sp-why:has(.set2-sp-grants),
+.set2-sp-why:has(.set2-sp-toggle) { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+.set2-sp-grants { display: flex; flex-direction: column; gap: 0.25rem; width: 100%; }
+.set2-sp-grant { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
+.set2-sp-grant > .set2-chip.is-role { flex: 0 0 auto; min-width: 6.5rem; justify-content: center; }
+.set2-sp-on { display: flex; align-items: center; gap: 0.3125rem; flex-wrap: wrap; min-width: 0; }
+/* Collapsed still names the roles — only the clients are behind the press. */
+.set2-sp-sum { display: flex; align-items: center; gap: 0.3125rem; flex-wrap: wrap; }
+.set2-sp-toggle {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  appearance: none; border: 0; background: none; cursor: pointer; padding: 0;
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  color: var(--ink-action);
+}
+.set2-sp-toggle:hover { text-decoration: underline; }
+.set2-sp-toggle:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; border-radius: var(--r-xs); }
+.set2-sp-toggle .set2-exp { width: 0.625rem; height: 0.625rem; transition: transform var(--t-fast) var(--ease-out); }
+.set2-sp-toggle[aria-expanded="true"] .set2-exp { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .set2-sp-toggle .set2-exp { transition: none; } }
+.set2-sp-note { color: var(--ink-quiet); }
+.set2-sp-act { flex-shrink: 0; margin-left: auto; }
+
+.set2-chip.is-role {
+  background: var(--brand-dim); color: var(--ink-primary);
+  font-weight: var(--fw-semibold);
+}
+/* A scope you can go to. It is a chip because it names a scope, and a button
+   because "granted on Upland" is only useful if Upland is one press away. */
+.set2-chip.is-go { cursor: pointer; appearance: none; font: inherit; }
+.set2-chip.is-go:hover { border-color: var(--brand); color: var(--ink-action); }
+.set2-chip.is-go:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+
 .set2-av {
   width: 2rem; height: 2rem; flex-shrink: 0; border-radius: var(--r-pill);
   display: flex; align-items: center; justify-content: center;
   background: var(--accent-dim); color: var(--ink-action);
   font-size: var(--ty-micro); font-weight: var(--fw-bold); letter-spacing: 0.02em;
 }
-.set2-person-lines { display: flex; flex-direction: column; min-width: 0; }
-.set2-person-n {
-  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+
+/* Below the point where the reason and the row stop fitting on one line, the
+   reason drops under the name rather than squeezing both. */
+@media (max-width: 58rem) {
+  .set2-sp-row { flex-wrap: wrap; }
+  .set2-sp-lines { flex: 1 1 12rem; }
+  .set2-sp-why { flex: 1 1 100%; padding-left: 3.5rem; }
 }
-.set2-person-m {
-  font-size: var(--ty-micro); color: var(--ink-faint);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.set2-grant { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
-.set2-grant.is-none {
-  font-size: var(--ty-micro); color: var(--ink-faint); line-height: var(--lh-snug);
-}
-.set2-grant-add {
-  align-self: flex-start; margin-top: 0.125rem;
-  appearance: none; background: none; cursor: pointer;
-  border: 0.0625rem dashed var(--ink-rule); border-radius: var(--r-sm);
-  padding: 0.1875rem 0.5rem;
-  font: inherit; font-size: var(--ty-micro); color: var(--ink-quiet);
-}
-.set2-grant-add:hover { border-color: var(--brand); color: var(--ink-action); }
-.set2-grant-add:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
 
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -994,29 +1566,34 @@ kbd {
    control in this file a phone renders as a native wheel, and a filter is the
    last place to spend a custom popover.
    ══════════════════════════════════════════════════════════════════════════ */
-.set2-fbar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.set2-fbar-q { flex: 1 1 12rem; min-width: 0; }
+/* ── THE FILTER ROW IS A BOUNDARY ──
+   It sat flush against the first group heading beneath it, so the controls
+   that NARROW the list and the heading that counts what survived read as one
+   block — and on a page where the row above is chrome and everything below it
+   is the answer, that is the one gap that has to be legible. The gap is bigger
+   than the one between the controls inside the row, which is what makes the
+   row read as a unit rather than as the first line of the results. */
+.set2-fbar {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+/* The search is not a third filter, so it does not sit against them. `auto`
+   opens the gap that says so, and the field keeps the width `.k-search` gives
+   it rather than growing to fill what the gap leaves — a box that changes size
+   with the viewport reads as layout filler, not as a control with a size. */
+.set2-fbar-q { margin-left: auto; flex: 0 1 auto; }
 .set2-fbar-end { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; margin-left: auto; }
 
-.set2-fsel { position: relative; display: inline-flex; align-items: center; }
-.set2-fsel-s {
-  appearance: none; -webkit-appearance: none;
-  border: 0.0625rem solid var(--hairline); border-radius: var(--r-sm);
-  background: var(--card-bg); color: var(--ink-quiet);
-  font: inherit; font-size: var(--ty-micro);
-  padding: 0.3125rem 1.625rem 0.3125rem 0.625rem;
-  cursor: pointer;
-}
-.set2-fsel-s:hover { border-color: var(--ink-rule); color: var(--ink-primary); }
-.set2-fsel-s:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
-/* A chosen filter has to look different from an unchosen one, or the row reads
-   as "no filters" while it is hiding half the list. */
-.set2-fsel-s:valid { color: var(--ink-primary); border-color: var(--ink-rule); }
-.set2-fsel-s option[value=""] { color: var(--ink-faint); }
-.set2-fsel .set2-lad-ch {
-  position: absolute; right: 0.4375rem; width: 0.75rem; height: 0.75rem;
-  pointer-events: none; color: var(--ink-faint);
-}
+/* ── THE FILTERS ARE `.v2-dropdown` NOW ──
+   Everything that stood here styled a native `<select>` into looking like a
+   control it was not — appearance stripped, a chevron absolutely positioned
+   over it, `:valid` standing in for "something is chosen". None of it reached
+   the LIST, which the OS drew in its own colours and its own theme.
+
+   The design system's dropdown draws both halves, so the rules it needs are
+   the two that place it in this row. */
+.set2-fsel { min-width: 8rem; }
+.set2-fsel .v2-dropdown-btn { width: 100%; justify-content: space-between; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    ROLE GROUPS
@@ -1025,24 +1602,7 @@ kbd {
    Collapsed by default — the header alone answers "what can this person do and
    over what", and the chips are the detail behind that.
    ══════════════════════════════════════════════════════════════════════════ */
-.set2-gr { position: relative; }
-.set2-gr + .set2-gr { margin-top: 0.25rem; padding-top: 0.25rem; border-top: 0.0625rem solid var(--hairline); }
-.set2-gr-hd:hover { color: var(--ink-primary); }
-.set2-gr-hd:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
-.set2-gr-hd .set2-lad-ch {
-  width: 0.75rem; height: 0.75rem; flex-shrink: 0; color: var(--ink-faint);
-  transform: rotate(-90deg); transition: transform var(--t-fast) var(--ease-out);
-}
-.set2-gr.is-open .set2-gr-hd .set2-lad-ch { transform: none; }
-.set2-gr-n {
-  margin-left: auto; font-size: var(--ty-micro); color: var(--ink-faint);
-  font-variant-numeric: tabular-nums;
-}
-.set2-person:hover .set2-gr-del, .set2-gr-del:focus-visible { opacity: 1; }
-.set2-gr-del:hover { color: var(--ink-err); }
-.set2-gr-del:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
 .set2-tr { width: 0.875rem; height: 0.875rem; display: block; }
-.set2-gr.is-open .set2-gr-bd { display: flex; }
 
 .set2-chip.is-type {
   background: var(--accent-dim); color: var(--ink-action);
@@ -1051,19 +1611,11 @@ kbd {
 .set2-chip.is-scope { display: inline-flex; align-items: center; gap: 0.25rem; padding-right: 0.25rem; }
 .set2-chip-x {
   appearance: none; border: 0; background: none; cursor: pointer;
-  padding: 0; display: inline-flex; color: var(--ink-faint); line-height: 0;
+  padding: 0; display: inline-flex; color: var(--ink-quiet); line-height: 0;
 }
 .set2-chip-x svg { width: 0.625rem; height: 0.625rem; }
 .set2-chip-x:hover { color: var(--ink-err); }
 .set2-chip-x:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
-
-.set2-gr-new {
-  align-self: center; appearance: none; background: none; cursor: pointer; border: 0;
-  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
-  color: var(--ink-action); padding: 0.125rem 0.25rem; border-radius: var(--r-xs);
-}
-.set2-gr-new:hover { text-decoration: underline; }
-.set2-gr-new:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
 
 .set2-kebab {
   margin-left: auto; flex-shrink: 0; appearance: none; border: 0; background: none;
@@ -1100,162 +1652,166 @@ kbd {
 .set2-range { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .set2-range-d { flex: 0 0 auto; width: 10rem; font-variant-numeric: tabular-nums; }
 /* ══════════════════════════════════════════════════════════════════════════
-   THE SKILLS TABLE
+   SKILLS — THE PRODUCTION TABLE AND CLAUDE'S DOCUMENT
 
-   Three columns and a lot of rows. Grid rather than <table> so the row can be
-   a single <button> — the whole row is the destination, and a table cell
-   wrapping a link puts the target on the words instead of the row.
+   The two-pane library that stood here is gone: a persistent left column of
+   skills with their parts nested under them, which cost two clicks to reach
+   three facts and used the same shape Claude and MagicPath already use for a
+   different job.
+
+   What replaces it is the list production actually ships — Name, Description,
+   Status, all sortable, under the two filters and the search — and the detail
+   Claude ships: a back link, the name over its author, tabs, and the file.
    ══════════════════════════════════════════════════════════════════════════ */
-.set2-tbl { margin-top: 0.875rem; border-top: 0.0625rem solid var(--hairline); }
-.set2-tbl-hd { border-bottom: 0.0625rem solid var(--hairline); }
-.set2-th:hover { color: var(--ink-primary); }
-.set2-th:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
-/* The arrow is always there, so pressing a header is never a guess about
-   whether it does anything. It lights up only for the column doing the work. */
-.set2-th-a { color: var(--ink-rule); font-size: var(--ty-micro); }
-.set2-th-a.is-on { color: var(--ink-action); }
 
+/* ── The list ──
+   Grid rather than <table> so the row can be one <button>: the whole row is
+   the destination, and a cell wrapping a link puts the target on the words. */
+.set2-tbl { margin-top: 1.25rem; border-top: 0.0625rem solid var(--hairline); }
+.set2-tbl-hd { border-bottom: 0.0625rem solid var(--hairline); }
+.set2-tbl-hd,
+.set2-tbl-r {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1.2fr) minmax(0, 1.4fr) 9.5rem;
+  align-items: center; gap: 0.75rem;
+  padding: 0.6875rem 0.5rem;
+}
+/* Every row is the height of a two-line description, so a short one does not
+   make its row shorter than its neighbours. */
+.set2-tbl-r { min-height: 3.5rem; }
 .set2-tbl-r {
   width: 100%; appearance: none; border: 0; background: none; cursor: pointer;
   text-align: left; font: inherit;
   border-bottom: 0.0625rem solid var(--hairline);
-  transition: background-color var(--t-fast) var(--ease-out);
 }
 .set2-tbl-r:hover { background: var(--card-bg); }
 .set2-tbl-r:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
-/* A skill that is off still occupies its row, because a skill you cannot see
-   is one you will re-create by accident. It reads as switched off, not gone. */
-.set2-tbl-r.is-off { opacity: 0.55; }
-
-.set2-tbl-n { display: flex; align-items: baseline; gap: 0.4375rem; min-width: 0; }
+/* A disabled or overridden skill keeps its row at FULL STRENGTH: one you
+   cannot see is one you re-create by accident, and one you can barely read is
+   one you misread. It carried `opacity: 0.55`, which dimmed its name, its
+   description and the pill explaining why it is idle — the pill being the one
+   thing on the row that says which of the two it is. The Status column already
+   says Disabled or Overridden in words and colour; the row does not need to be
+   made harder to read to say it twice. */
+.set2-tbl-n { display: flex; align-items: center; gap: 0.4375rem; min-width: 0; }
 .set2-tbl-n b {
   font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.set2-tbl-n .set2-row-ico { flex-shrink: 0; color: var(--ink-faint); }
-/* Below the point where three columns stop being three columns, the row
-   becomes two lines and the description leads. */
+.set2-tbl-n .set2-row-ico { flex-shrink: 0; color: var(--ink-quiet); }
+.set2-tbl-d {
+  font-size: var(--ty-micro); color: var(--ink-quiet); line-height: var(--lh-snug);
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.set2-tbl-s { display: flex; align-items: center; gap: 0.5rem; justify-content: space-between; }
+.set2-tbl-s .set2-pill { white-space: normal; text-align: left; min-width: 0; }
+
+.set2-th {
+  display: inline-flex; align-items: center; gap: 0.3125rem;
+  appearance: none; border: 0; background: none; cursor: pointer; padding: 0;
+  font: inherit; font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-quiet);
+}
+.set2-th:hover { color: var(--ink-primary); }
+.set2-th:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+/* The arrow is always drawn, so pressing a header is never a guess about
+   whether it does anything. It lights only for the column doing the work. */
+.set2-th-a { color: var(--ink-rule); font-size: var(--ty-micro); }
+.set2-th-a.is-on { color: var(--ink-action); }
+
 @media (max-width: 52rem) {
   .set2-tbl-hd { display: none; }
   .set2-tbl-r { grid-template-columns: 1fr auto; row-gap: 0.25rem; }
-  .set2-tbl-d { grid-column: 1 / -1; white-space: normal; }
+  .set2-tbl-d { grid-column: 1 / -1; }
 }
 
-/* The unit beside a numeric input. Not a label — the label is on the left —
-   so it stays at the faint level and never competes with the value. */
-.set2-set-u { font-size: var(--ty-micro); color: var(--ink-faint); flex-shrink: 0; }
-/* ── WHY LONG VALUES BREAK THE TWO-COLUMN RULE ──
-   Label-left / control-right is right for a value you can read at a glance: a
-   threshold, a toggle, a picked option. It is wrong for a 50-character URL or
-   a JWT, which get squeezed into a 20rem gutter and truncate mid-path — and a
-   truncated endpoint is one somebody will mis-copy.
-
-   So the rule has an exception with a stated boundary: SHORT VALUES SIT
-   BESIDE THEIR LABEL, LONG VALUES SIT UNDER IT AND TAKE THE FULL COLUMN. Same
-   pattern Plain uses for Workspace ID and domain names, and the same one it
-   abandons for its short toggles. */
-.set2-set-row.is-stacked { grid-template-columns: 1fr; gap: 0.5rem; }
-.set2-set-row.is-stacked .set2-set-c { justify-content: flex-start; }
-.set2-set-row.is-stacked .set2-set-c .set2-fld { flex: 1 1 auto; min-width: 0; }
-.set2-set-row.is-stacked .set2-set-d { max-width: 68ch; }
-/* ── STRUCTURE IS NOT STATE ──
-   The child row and the "add subfield" button were the same accent wash, so
-   "this came out of the row above" and "press this" read as one class of
-   thing. Depth is now carried by the INDENT and a rule; the wash is gone.
-
-   Fill is reserved for state — broken, suggested — which is the only thing on
-   this table worth a colour, and it could not be seen while eight rows were
-   already tinted. */
-/* `.set2-map-row.is-sub` carried an inset box-shadow here, and later a
-   positioned guide. Both are gone: depth is the indent and the space, and
-   nothing is drawn to announce it. See "NO GUIDE" further down. */
-.set2-map-row {
-  display: grid;
-  grid-template-columns: 9rem 1fr auto;
-  gap: 0.75rem;
-  align-items: center;
-  padding: 0.6875rem 0.25rem;
-  padding-left: calc(0.25rem + var(--d, 0) * 1.375rem);
-  min-height: 3.25rem;
+/* ── The document ──
+   Claude's header: the name with its author beneath, and the controls that act
+   on the whole skill at the far right. */
+.set2-doc { display: flex; flex-direction: column; }
+.set2-doc-hd {
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  margin-top: 0.875rem;
 }
-.set2-key:hover { border-color: var(--ink-rule); background: var(--card-bg); }
-.set2-key:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
-.set2-key.is-derived { cursor: default; font-family: var(--font-sans); }
-.set2-key-s.is-bad { color: var(--ink-err); text-decoration: line-through; }
-/* An empty mapping asks for what it needs in words, not with a blank box. */
-.set2-key-none { font-family: var(--font-sans); color: var(--ink-faint); font-style: italic; }
-.set2-key-d { font-weight: var(--fw-semibold); color: var(--ink-primary); }
-.set2-key-h { color: var(--ink-faint); margin-left: 0.375rem; }
-.set2-adv:hover { color: var(--ink-primary); }
-.set2-adv:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
-.set2-adv .set2-exp { width: 0.6875rem; height: 0.6875rem; transition: transform var(--t-fast) var(--ease-out); }
-.set2-adv.is-open .set2-exp { transform: rotate(90deg); }
+.set2-doc-id { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; }
+.set2-doc-t {
+  margin: 0; font-family: var(--font-display);
+  font-size: var(--ty-title); font-weight: var(--fw-bold);
+  color: var(--ink-primary); letter-spacing: var(--ls-tight);
+}
+.set2-doc-by { font-size: var(--ty-micro); color: var(--ink-quiet); }
+.set2-doc-end { margin-left: auto; display: flex; align-items: center; gap: 0.625rem; }
 
-.set2-adv-bd {
-  display: flex; flex-wrap: wrap; gap: 1.5rem;
-  padding: 0.75rem 0.25rem 0.875rem calc(0.25rem + (var(--d, 0) + 1) * 1.375rem);
+/* ── Tabs ──
+   Underlined rather than pilled: they switch what the page SHOWS, and a pill
+   would put them in the same visual family as the filters above, which change
+   what it contains. */
+.set2-tabs {
+  display: flex; align-items: center; gap: 0.25rem;
+  margin: 1.25rem 0 0;
   border-bottom: 0.0625rem solid var(--hairline);
-  background: var(--card-bg);
 }
-.set2-adv-g { min-width: 0; }
-.set2-adv-t {
-  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
-  letter-spacing: var(--ls-wide); text-transform: uppercase;
-  color: var(--ink-faint); margin-bottom: 0.375rem;
-}
-.set2-adv-pairs { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
-.set2-pair {
-  display: inline-flex; align-items: center; gap: 0.3125rem;
-  padding: 0.125rem 0.5rem; border-radius: var(--r-pill);
-  border: 0.0625rem solid var(--hairline);
-  font-size: var(--ty-micro); color: var(--ink-secondary);
-}
-.set2-pair b { color: var(--ink-primary); font-weight: var(--fw-semibold); }
-
-/* ── Adding ──
-   Indented to the level of the thing it would create, so where it lands is
-   visible before it is pressed. */
-.set2-map-add, .set2-map-new {
-  display: flex; align-items: center; gap: 0.4375rem; width: 100%;
+.set2-tab {
+  position: relative;
   appearance: none; border: 0; background: none; cursor: pointer;
-  padding: 0.4375rem 0.25rem;
-  font: inherit; font-size: var(--ty-micro); color: var(--ink-action);
-  text-align: left;
+  padding: 0.5rem 0.75rem; margin-bottom: -0.0625rem;
+  font: inherit; font-size: var(--ty-meta); color: var(--ink-quiet);
+  border-bottom: 0.125rem solid transparent;
+  display: inline-flex; align-items: center; gap: 0.375rem;
 }
-/* An affordance, not a row. It was a full-width tinted bar with an accent
-   rule — four of them striping the table, each louder than the field it
-   offered to extend. It is a small text button at the child's indent now. */
-.set2-map-add {
-  width: auto; padding-left: calc(0.25rem + var(--d, 0) * 1.375rem);
-  color: var(--ink-quiet); font-size: var(--ty-micro);
+.set2-tab:hover { color: var(--ink-primary); }
+.set2-tab:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; border-radius: var(--r-xs); }
+.set2-tab.is-on { color: var(--ink-primary); font-weight: var(--fw-semibold); border-bottom-color: var(--brand); }
+/* `.set2-tab-dot` stood here. It marked the Precedence tab when a name was
+   contested — a signal that had to exist because the answer was behind a tab.
+   The answer is on Overview now, so the signal is the section itself. */
+
+/* ── Overview ──
+   Description left, and on the right the card Claude uses for the trigger —
+   which is where "how and where does this fire" belongs. */
+.set2-ov {
+  display: grid; grid-template-columns: minmax(0, 1fr) 17rem;
+  gap: 1.5rem; margin-top: 1.25rem; align-items: start;
 }
-.set2-map-add:hover { color: var(--ink-action); text-decoration: none; }
-.set2-map-add .set2-map-add-i { background: none; color: var(--ink-faint); }
-.set2-map-add:hover .set2-map-add-i { color: var(--ink-action); }
-.set2-map-new { margin-top: 0.75rem; width: auto; font-weight: var(--fw-semibold); }
-.set2-map-add:hover, .set2-map-new:hover { text-decoration: underline; }
-.set2-map-add:focus-visible, .set2-map-new:focus-visible {
-  outline: 0.125rem solid var(--brand); outline-offset: -0.125rem;
+.set2-ov-main { min-width: 0; }
+.set2-ov-d {
+  margin: 0.375rem 0 0; max-width: 40rem;
+  font-size: var(--ty-meta); color: var(--ink-secondary); line-height: var(--lh-base);
 }
-.set2-map-add-i {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 0.875rem; height: 0.875rem; border-radius: var(--r-xs);
-  background: var(--accent-dim); color: var(--ink-action);
-  font-size: var(--ty-micro); font-weight: var(--fw-bold); flex-shrink: 0;
+.set2-ov-side { display: flex; flex-direction: column; gap: 0.5rem; }
+.set2-ov-card {
+  background: var(--card-bg); border-radius: var(--r-lg);
+  padding: 0.625rem 0.75rem;
+}
+/* A card whose list is empty is a defect, not an empty state — the skill
+   cannot run. It says so on its own edge. */
+.set2-ov-card.is-err { box-shadow: inset 0 0 0 0.0625rem var(--err-line); }
+.set2-ov-k {
+  margin: 0; font-size: var(--ty-micro); color: var(--ink-quiet);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+}
+.set2-ov-v { margin: 0.25rem 0 0; font-size: var(--ty-meta); color: var(--ink-primary); }
+.set2-ov-chips {
+  display: flex; align-items: center; gap: 0.3125rem; flex-wrap: wrap;
+  margin-top: 0.4375rem;
 }
 
-/* ── The picker's rows ──
-   Path on the left, what it returns on the right. The values are the whole
-   point: a path that resolves and returns the wrong column passes every other
-   check there is, and this is the only place you can catch it before you
-   commit rather than after. */
-.set2-pop-i.is-path { flex-direction: column; align-items: flex-start; gap: 0.0625rem; }
-.set2-pop-i.is-path .set2-pop-n { font-size: var(--ty-micro); color: var(--ink-primary); }
-.set2-pop-s {
-  font-family: var(--font-sans); font-size: var(--ty-micro); color: var(--ink-faint);
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+/* ── Contents ──
+   The file, with the rendered/source toggle in its own corner rather than in a
+   bar above it: the toggle changes how THIS card reads, so it belongs to the
+   card. */
+.set2-file { margin-top: 1.25rem; }
+.set2-file .set2-body {
+  background: var(--card-bg); border-radius: var(--r-lg);
+  padding: 1.25rem 1.5rem;
 }
 
+
+@media (max-width: 62rem) {
+  .set2-ov { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+  .set2-ov-side { flex-direction: row; flex-wrap: wrap; }
+  .set2-ov-card { flex: 1 1 12rem; }
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    SELECTION, AND THE BAR THAT ANSWERS IT
@@ -1277,9 +1833,6 @@ kbd {
 .set2-ck2:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
 .set2-ck2[aria-checked="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
 .set2-ck2 svg { width: 0.6875rem; height: 0.6875rem; }
-/* The picked card says so on its edge, so the state survives scrolling past
-   the checkbox. */
-.set2-person.is-picked { border-color: var(--brand); box-shadow: inset 0 0 0 0.0625rem var(--brand); }
 
 .set2-bulk {
   position: sticky; bottom: 0; z-index: 6;
@@ -1308,9 +1861,6 @@ body.is-settings .set2-bulk { bottom: 4.75rem; }
    46rem gives two cramped columns, which is what made this surface feel
    condensed in the first place. Per-module, not global. */
 .set2-col.is-wide { max-width: 72rem; }
-.set2-col.is-wide .set2-team {
-  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
-}
 .set2-lbl {
   display: flex;
   font-size: var(--ty-micro);
@@ -1337,22 +1887,6 @@ body.is-settings .set2-bulk { bottom: 4.75rem; }
    A field that grows chips. The input is the last child and takes the rest of
    the row, so typing always happens where the caret already is rather than in
    a separate box below the ones already added. */
-.set2-tags {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.3125rem;
-  padding: 0.375rem 0.4375rem;
-  border: 0.0625rem solid var(--hairline); border-radius: var(--r-md);
-  background: var(--card-bg);
-  transition: border-color var(--t-fast) var(--ease-out);
-}
-.set2-tags:focus-within { border-color: var(--brand); }
-.set2-tags.is-bad { border-color: var(--ink-err); }
-.set2-tags-i {
-  flex: 1 1 8rem; min-width: 0;
-  appearance: none; border: 0; background: none; outline: none;
-  font: inherit; font-size: var(--ty-meta); color: var(--ink-primary);
-  padding: 0.1875rem 0.125rem;
-}
-.set2-tags-i::placeholder { color: var(--ink-faint); }
 .set2-hint .is-err { color: var(--ink-err); }
 
 
@@ -1372,7 +1906,6 @@ body.is-settings .set2-bulk { bottom: 4.75rem; }
    ══════════════════════════════════════════════════════════════════════════ */
 .set2-x,
 .set2-chip-x,
-.set2-gr-del,
 .set2-kebab,
 .set2-ck2,
 .set2-modal-x {
@@ -1384,50 +1917,14 @@ body.is-settings .set2-bulk { bottom: 4.75rem; }
    grown the chip. Negative margin gives the hit area back without moving a
    pixel of what is drawn. */
 .set2-chip-x { margin: -0.5rem -0.375rem -0.5rem -0.25rem; }
-.set2-gr-del {
-  position: absolute;
-  top: 0.1875rem;
-  right: 0;
-  appearance: none;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  padding: 0.1875rem;
-  border-radius: var(--r-xs);
-  color: var(--ink-faint);
-  opacity: 0;
-  transition: opacity var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
-  margin: -0.25rem;
-}
-
 /* Text-shaped controls get their height from line-box padding rather than a
    min-height, so they stay on the baseline they share with their row. */
 .set2-adv,
-.set2-gr-new,
-.set2-grant-add,
 .set2-lnk,
 .set2-map-add,
-.set2-map-new,
-.set2-th {
+.set2-map-new {
   min-height: 1.75rem;
   display: inline-flex; align-items: center;
-}
-.set2-th {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3125rem;
-  appearance: none;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  padding: 0.3125rem 0;
-  font: inherit;
-  font-size: var(--ty-micro);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--ls-wide);
-  text-transform: uppercase;
-  color: var(--ink-faint);
-  text-align: left;
 }
 .set2-map-add, .set2-map-new { display: flex; }
 
@@ -1508,7 +2005,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
   margin-top: 0;
   font-family: var(--font-sans);
   font-size: var(--ty-micro);
-  color: var(--ink-faint);
+  color: var(--ink-quiet);
   min-width: 0;
   overflow: hidden;
   opacity: 0.85;
@@ -1534,41 +2031,12 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
   font-size: var(--ty-micro);
   color: var(--ink-quiet);
 }
-.set2-tbl-hd,
-.set2-tbl-r {
-  display: grid;
-  the description is
-     what they read once the row is found. */
-  grid-template-columns: minmax(13rem, 1.15fr) minmax(0, 1.3fr) minmax(6.5rem, auto);
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.5rem;
-  /* The earlier rule said "the name gets the room" and then this one gave the
-     description the larger share, which pinned the name to its own minimum.
-     Two rows clipped their name AND the scope chip beside it — the identifier
-     you scan for was the thing being cut. Ratio inverted, and the status
-     column stops reserving 11rem for its longest label. */
-  grid-template-columns: minmax(14.5rem, 1.35fr) minmax(0, 1.15fr) 9.5rem;
-  padding-top: 0.6875rem;
-  padding-bottom: 0.6875rem;
-  /* Every row is the height of a two-line description, so a short one does not
-     make the row it sits in shorter than its neighbours. */
-  min-height: 3.5rem;
-}
-.set2-tbl-n .set2-from {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: var(--ty-micro);
-  opacity: 0.8;
-}
 .set2-ck2.is-void { border: 0; background: none; cursor: default; }
 
 /* The count line under the filter row. One sentence, and the number that
    matters most in it is the one nobody wants to be non-zero. */
 .set2-lede {
-  margin: 0.875rem 0 0; font-size: var(--ty-micro); color: var(--ink-faint);
+  margin: 0.875rem 0 0; font-size: var(--ty-micro); color: var(--ink-quiet);
 }
 .set2-lede b.is-warn { color: var(--ink-warn); }
 
@@ -1610,89 +2078,6 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
    A floor instead of a ceiling. Cards in one grid ROW already stretch to the
    tallest of them, so the rhythm survives without hiding anything -- the
    evenness came from the grid, not from the magic number. */
-.set2-person {
-  border: 0.0625rem solid var(--hairline);
-  border-radius: var(--r-lg);
-  padding: 0.875rem 0.875rem 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  transition: border-color var(--t-fast) var(--ease-out);
-  min-height: 15.5rem;
-  overflow: hidden;
-}
-.set2-person-hd {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-  flex-shrink: 0;
-}
-.set2-person-tags {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-  margin-top: 0.625rem;
-  padding-bottom: 0.75rem;
-}
-.set2-grants {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3125rem;
-  padding-top: 0.625rem;
-  border-top: 0.0625rem solid var(--hairline);
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: visible;
-  overflow-x: hidden;
-  padding: 0.75rem 0 0;
-  scrollbar-width: thin;
-}
-.set2-gr-bd {
-  display: none;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  padding: 0.25rem 0 0.375rem 1.125rem;
-  min-width: 0;
-}
-.set2-gr-bd .set2-chip { max-width: 100%; overflow: hidden; }
-.set2-gr-hd {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  width: 100%;
-  appearance: none;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  padding: 0.25rem 1.5rem 0.25rem 0;
-  border-radius: var(--r-sm);
-  font: inherit;
-  text-align: left;
-  color: var(--ink-secondary);
-  min-width: 0;
-}
-.set2-gr-r {
-  font-size: var(--ty-micro);
-  font-weight: var(--fw-semibold);
-  color: var(--ink-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.set2-grants::-webkit-scrollbar { width: 0.25rem; }
-.set2-grants::-webkit-scrollbar-thumb { background: var(--ink-rule); border-radius: 0.125rem; }
-
-/* Pinned, so the primary action sits on one line across the whole grid
-   instead of wherever each person's roles happen to end. */
-.set2-person-ft {
-  flex-shrink: 0; display: flex;
-  padding: 0.5rem 0; margin-top: 0.125rem;
-  border-top: 0.0625rem solid var(--hairline);
-}
 
 /* A count line under the filter row, replacing the tally that used to fight
    the section heading from the right-hand side. */
@@ -1718,36 +2103,14 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
    it is the only row where the number and the switch disagree about intent.
    It sat at `--ink-rule`, 4.02:1, under the floor: the one row whose state you
    most need to read was the one below the contrast minimum. */
-.set2-en .set2-row.is-off .set2-from { color: var(--ink-faint); font-style: italic; }
-.set2-tbl-d {
-  font-size: var(--ty-micro);
-  color: var(--ink-quiet);
-  line-height: var(--lh-snug);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.set2-tbl-s {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  justify-content: space-between;
-}
-.set2-tbl-s .set2-pill {
-  white-space: normal;
-  text-align: left;
-  min-width: 0;
-}
+.set2-en .set2-row.is-off .set2-from { color: var(--ink-quiet); font-style: italic; }
 
 
 /* The scope pickers name what they choose. Two adjacent dropdowns showing only
    their values is a puzzle — "CXS" and "Knowledge Search" do not say which is
    the client and which is the product until you already know the answer. */
 .set2-scope-k {
-  font-size: var(--ty-micro); color: var(--ink-faint);
+  font-size: var(--ty-micro); color: var(--ink-quiet);
   font-weight: var(--fw-regular); margin-right: 0.3125rem;
 }
 
@@ -1824,13 +2187,6 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 /* Both at once: the ring of the current stage, plus the hollow brand fill of
    an edited one. Neither cancels the other. */
 
-/* The grants port is focusable now, so it needs a focus ring like anything
-   else that can hold focus — a scroll region a keyboard reaches but cannot
-   see it has reached is worse than one it cannot reach. */
-.set2-grants:focus-visible {
-  outline: 0.125rem solid var(--brand); outline-offset: -0.125rem;
-  border-radius: var(--r-xs);
-}
 
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -1878,7 +2234,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
    for a hairline and wrong for a word, and four text roles were wearing it —
    samples, Advanced, Add subfield, the +N count. They read at `--ink-faint`
    now: still the quietest text on the row, at 6.08:1. */
-.set2-sample { color: var(--ink-faint); }
+.set2-sample { color: var(--ink-quiet); }
 .set2-sample i {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -1898,10 +2254,10 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
    Four identical "Advanced" links down the column read as content. They step
    back to the level of a caption and come forward on approach — the row is
    still one tab stop away, so nothing is hidden from the keyboard. */
-.set2-adv { color: var(--ink-faint); }
+.set2-adv { color: var(--ink-quiet); }
 .set2-map-row:hover .set2-adv,
 .set2-map-row:focus-within .set2-adv { color: var(--ink-primary); }
-.set2-map-add { color: var(--ink-faint); }
+.set2-map-add { color: var(--ink-quiet); }
 .set2-map-add:hover, .set2-map-add:focus-visible { color: var(--ink-action); }
 
 
@@ -1928,7 +2284,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 }
 .set2-vm-ar { color: var(--ink-rule); text-align: center; font-size: var(--ty-micro); }
 .set2-vm-v { min-width: 0; }
-.set2-vm-none { font-size: var(--ty-micro); color: var(--ink-faint); }
+.set2-vm-none { font-size: var(--ty-micro); color: var(--ink-quiet); }
 
 /* ══════════════════════════════════════════════════════════════════════════
    THE SETTINGS LAYER SITS ABOVE THE PAGE CHROME
@@ -1948,8 +2304,8 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 
 
 /* The "+2" is a count, not a separator — same floor as the value it follows. */
-.set2-sample-n { color: var(--ink-faint); }
-.set2-adv-none { font-size: var(--ty-micro); color: var(--ink-faint); }
+.set2-sample-n { color: var(--ink-quiet); }
+.set2-adv-none { font-size: var(--ty-micro); color: var(--ink-quiet); }
 
 /* "e.g." marks the values as examples rather than as the field's content. It
    is the quietest thing on the line because it is a label, not a value. */
@@ -2035,7 +2391,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
   transition: border-color var(--t-fast) var(--ease-out);
 }
 .set2-crm-pick b { font-weight: var(--fw-semibold); }
-.set2-crm-pick svg { width: 0.75rem; height: 0.75rem; color: var(--ink-faint); }
+.set2-crm-pick svg { width: 0.75rem; height: 0.75rem; color: var(--ink-quiet); }
 .set2-crm-pick:hover { border-color: var(--ink-rule); }
 .set2-crm-pick:focus-visible {
   outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem;
@@ -2096,8 +2452,8 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 }
 .set2-ta-i:hover { background: var(--card-bg); }
 .set2-ta-i:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
-.set2-ta-k { color: var(--ink-faint); }
-.set2-ta-none { padding: 0.5rem 0.625rem; font-size: var(--ty-micro); color: var(--ink-faint); }
+.set2-ta-k { color: var(--ink-quiet); }
+.set2-ta-none { padding: 0.5rem 0.625rem; font-size: var(--ty-micro); color: var(--ink-quiet); }
 
 /* Product and date range share a row: they scope the same run. */
 .set2-up { display: grid; grid-template-columns: 1fr 1.4fr; gap: 0.875rem; }
@@ -2105,7 +2461,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 /* The history table gets a head, because three columns of mixed content need
    naming — a date, a set of chips and a state do not announce themselves. */
 .set2-run-hd {
-  background: none; font-size: var(--ty-micro); color: var(--ink-faint);
+  background: none; font-size: var(--ty-micro); color: var(--ink-quiet);
   letter-spacing: var(--ls-wide); text-transform: uppercase;
   /* The head is a label for the column, not the first row of it. At 6px it was
      closer to the run below than that run was to its own contents. */
@@ -2220,7 +2576,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
   color: var(--ink-primary);
 }
 .set2-range-d.is-empty { color: var(--ink-rule); }
-.set2-range-d .set2-cal-i { flex-shrink: 0; color: var(--ink-faint); }
+.set2-range-d .set2-cal-i { flex-shrink: 0; color: var(--ink-quiet); }
 .set2-range-d:hover .set2-cal-i { color: var(--ink-primary); }
 .set2-range-d.is-open { border-color: var(--brand); }
 
@@ -2301,7 +2657,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
   font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary);
 }
 /* The consequence, in the frame's empty middle. Quiet until it is alarming. */
-.set2-ret-says { font-size: var(--ty-micro); color: var(--ink-faint); }
+.set2-ret-says { font-size: var(--ty-micro); color: var(--ink-quiet); }
 .set2-ret-c { display: flex; align-items: center; gap: 0.5rem; }
 
 /* The trash is the destructive act and the only red control on the row. It
@@ -2354,7 +2710,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 }
 .set2-wh-c { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .set2-wh-note {
-  grid-column: 2; font-size: var(--ty-micro); color: var(--ink-faint);
+  grid-column: 2; font-size: var(--ty-micro); color: var(--ink-quiet);
   display: flex; align-items: baseline; gap: 0.5rem;
 }
 
@@ -2367,7 +2723,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
   appearance: none; border: 0; background: none; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 1.75rem; min-height: 1.75rem; border-radius: var(--r-sm);
-  color: var(--ink-faint);
+  color: var(--ink-quiet);
 }
 .set2-wh-help svg { width: 0.875rem; height: 0.875rem; }
 .set2-wh-help:hover { color: var(--ink-primary); }
@@ -2453,18 +2809,8 @@ body.is-settings .set2-pop .btn-sm { font-size: 0.875rem; }
    field's height so the two read as one control, not a box with a button
    parked next to it.
    ══════════════════════════════════════════════════════════════════════════ */
-.set2-invite {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.375rem 0.5rem; align-items: stretch;
-  margin-bottom: 0.875rem;
-}
-.set2-invite-f { min-height: 2.375rem; }
-.set2-invite-go { white-space: nowrap; align-self: stretch; }
-.set2-invite-h { grid-column: 1 / -1; margin-top: 0; }
 @media (max-width: 46rem) {
-  .set2-invite { grid-template-columns: minmax(0, 1fr); }
-  .set2-invite-go { justify-self: start; }
-}
+    }
 
 /* ══════════════════════════════════════════════════════════════════════════
    ROW ACTIONS COME FORWARD ON APPROACH
@@ -2508,6 +2854,9 @@ body.is-settings .set2-pop .btn-sm { font-size: 0.875rem; }
   border-top: 0.0625rem solid var(--hairline);
 }
 .set2-wh-hd { display: flex; align-items: center; gap: 0.625rem; margin-bottom: 0.875rem; }
+/* Right edge, away from the name and the pill it would otherwise read as part
+   of — those two say what the endpoint IS, and this does something to it. */
+.set2-wh-test { margin-left: auto; }
 .set2-wh-t {
   margin: 0; font-family: var(--font-display);
   font-size: var(--ty-meta); font-weight: var(--fw-bold);
@@ -2539,7 +2888,6 @@ body.is-settings .set2-pop .btn-sm { font-size: 0.875rem; }
    ══════════════════════════════════════════════════════════════════════════ */
 .set2-col .btn:active:not(:disabled),
 .set2-scrim .btn:active:not(:disabled),
-.set2-invite-go:active:not(:disabled) { transform: translateY(0.0625rem); }
 @media (prefers-reduced-motion: reduce) {
   .set2-map-row .set2-map-plus, .set2-map-row .set2-x { transition-duration: 0.01ms !important; }
 }
@@ -2602,7 +2950,7 @@ body.is-settings .set2-pop .btn-sm { font-size: 0.875rem; }
    whole section and it reads as one now, under the card rather than inside it. */
 .set2-fine {
   margin: 0.75rem 0 0; max-width: 46rem;
-  font-size: var(--ty-micro); color: var(--ink-faint); line-height: 1.5;
+  font-size: var(--ty-micro); color: var(--ink-quiet); line-height: 1.5;
 }
 .set2-fine b { color: var(--ink-quiet); font-weight: var(--fw-semibold); }
 
@@ -2711,3 +3059,450 @@ input.set2-fld[type="password"] {
 }
 .set2-cal .cal-hint { margin: 0; padding: 0; border-top: 0; }
 .set2-cal .cal-foot .set2-lnk { font-size: var(--ty-micro); }
+
+/* ══ SCOPES — THE MAP ═════════════════════════════════════════════════════
+   DOM nodes over one SVG wire layer, not a drawing. The boxes are real
+   buttons, so they focus, tab, take a hit area and read their type out to a
+   screen reader; the SVG draws the elbows and nothing else. A canvas that is
+   one <svg> is a picture of a hierarchy — this one is the hierarchy.
+
+   Panning is SCROLLING. The container scrolls both ways, which is free, native
+   and keyboard-reachable, and it is what "drag to pan" reimplements badly.
+   ══════════════════════════════════════════════════════════════════════════ */
+.set2-sc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16rem;
+  gap: 1rem;
+  margin-top: 0.875rem;
+  align-items: start;
+}
+.set2-sc-bar { display: flex; align-items: center; gap: 0.5rem; }
+.set2-sc-q { max-width: 20rem; }
+.set2-sc-bar-end { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
+
+.set2-sc-canvas {
+  overflow: auto;
+  background: var(--card-bg);
+  border-radius: var(--r-lg);
+  padding: 0.5rem;
+  max-height: 34rem;
+  scrollbar-width: thin;
+}
+/* Fit scales the whole layer rather than re-laying it out, so the geometry is
+   computed once and zoom cannot change what is drawn — only how big it is.
+   `min()` with 1 stops a small tenancy being blown up past actual size, which
+   would make four boxes look like a diagram of something important.
+
+   ── THE SCALE HAS TO REACH THE BOX, NOT ONLY THE PAINT ──
+   `transform` scales what is DRAWN and leaves the layout box alone, so fitting
+   a six-level tenancy drew it at 68% and still reserved the full height: 174px
+   of dead scroll under a canvas whose whole promise is that everything is on
+   screen. One factor, `--sc-k`, now drives the transform AND the reserved
+   width and height, so the space kept is the space used.
+
+   The wires take their size from the same two numbers rather than from 100%
+   of a parent that is now shorter than its own viewBox — a percentage there
+   scaled the elbows a second time and walked them off the nodes. */
+.set2-sc-canvas { container-type: inline-size; --sc-k: 1; }
+.set2-sc-canvas.is-fit {
+  overflow: hidden;
+  --sc-k: min(1, calc((100cqw - 1rem) / (var(--sc-w) * 1px)));
+}
+/* Two elements because one cannot do both jobs: a transform scales what is
+   PAINTED and leaves the layout box alone, so putting the scale and the
+   reduced size on the same element scaled it twice — the box came out at
+   `k²` and the wires drew past their own container. The outer box reserves
+   `size × k` and the inner layer stays at full size and is painted down into
+   it. At `--sc-k: 1` the two are identical and the transform is a no-op. */
+.set2-sc-box {
+  width: calc(var(--sc-w) * 1px * var(--sc-k));
+  height: calc(var(--sc-h) * 1px * var(--sc-k));
+}
+.set2-sc-layer {
+  position: relative;
+  width: calc(var(--sc-w) * 1px);
+  height: calc(var(--sc-h) * 1px);
+  transform: scale(var(--sc-k));
+  transform-origin: 0 0;
+}
+.set2-sc-wires {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  color: var(--ink-rule); pointer-events: none;
+}
+
+.set2-sc-w { position: absolute; }
+.set2-sc-n {
+  display: flex; align-items: center; width: 100%; height: 100%;
+  appearance: none; cursor: pointer; font: inherit; text-align: left;
+  padding: 0 0.5rem;
+  border: 0.0625rem solid var(--card-border); border-radius: var(--r-sm);
+  background: var(--card-bg-raised); color: var(--ink-secondary);
+}
+.set2-sc-n:hover { border-color: var(--ink-rule); color: var(--ink-primary); }
+.set2-sc-n:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+.set2-sc-nn {
+  font-size: var(--ty-micro); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.set2-sc-n.is-on {
+  border-color: var(--brand); color: var(--ink-primary);
+  box-shadow: inset 0 0 0 0.0625rem var(--brand);
+}
+/* Dashed is the tenancy STOPPING, not a branch being closed. A closed branch
+   carries a count you can press; this carries nothing, because there is
+   nothing under it. */
+.set2-sc-n.is-empty {
+  border-style: dashed; border-color: var(--ink-rule);
+  background: none; color: var(--ink-quiet);
+}
+/* Ours. Pinned last in the fixture and never scoped away, so it is marked
+   rather than left to be inferred from its position. */
+.set2-sc-n.is-aimy { border-color: rgba(var(--accent-rgb), 0.4); background: var(--accent-dim); }
+/* Search dims rather than hides: a match with its containment removed tells
+   you nothing about which Tier 1 you found. 0.28 before, which was a node you
+   could see the shape of and not read — the map went illegible everywhere
+   except the hits. It steps back rather than disappearing now: still clearly
+   not what you searched for, still a name you can read to decide the search
+   was wrong. */
+.set2-sc-n.is-dim { opacity: 0.62; }
+.set2-sc-n.is-more,
+.set2-sc-n.is-more:hover {
+  justify-content: center;
+  border-style: dashed; background: none;
+  color: var(--ink-action); font-size: var(--ty-micro);
+}
+
+/* The rolled-up count, sitting on the node's edge where the branch would
+   continue — so what it opens is where it points. */
+.set2-sc-roll {
+  position: absolute; right: -0.5rem; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 0.125rem;
+  min-width: 1.25rem; height: 1.25rem; padding: 0 0.25rem;
+  appearance: none; cursor: pointer; font: inherit;
+  font-size: 0.625rem; font-variant-numeric: tabular-nums;
+  border: 0.0625rem solid var(--card-border); border-radius: var(--r-pill);
+  background: var(--card-bg); color: var(--ink-quiet);
+}
+.set2-sc-roll:hover { border-color: var(--brand); color: var(--ink-action); }
+.set2-sc-roll:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
+.set2-sc-roll .set2-exp { width: 0.5rem; height: 0.5rem; }
+.set2-sc-roll.is-open .set2-exp { transform: rotate(180deg); }
+
+/* ── The inspector ──
+   Counts and one way in per count. It does not list the people: People
+   answers that properly, split by whether a grant can be revoked where you
+   are standing, and two surfaces answering it differently is how they start
+   disagreeing. */
+.set2-sc-insp {
+  background: var(--card-bg); border-radius: var(--r-lg);
+  padding: 0.875rem 0.875rem 0.75rem;
+  position: sticky; top: 1rem;
+}
+.set2-sc-path {
+  display: flex; align-items: center; gap: 0.25rem; flex-wrap: wrap;
+  margin: 0 0 0.375rem; font-size: var(--ty-micro); color: var(--ink-quiet);
+}
+.set2-sc-crumb {
+  appearance: none; border: 0; background: none; cursor: pointer; padding: 0;
+  font: inherit; font-size: var(--ty-micro); color: var(--ink-quiet);
+}
+.set2-sc-crumb:hover { color: var(--ink-primary); text-decoration: underline; }
+.set2-sc-t {
+  font-family: var(--font-display); font-size: var(--ty-body);
+  font-weight: var(--fw-bold); color: var(--ink-primary); margin: 0;
+}
+.set2-sc-type {
+  margin: 0.125rem 0 0; font-size: var(--ty-micro);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-quiet);
+}
+.set2-sc-sub { margin: 0.5rem 0 0; font-size: var(--ty-micro); color: var(--ink-quiet); }
+.set2-sc-sub.is-empty { color: var(--ink-warn); }
+
+.set2-sc-facts { margin-top: 0.875rem; display: flex; flex-direction: column; }
+.set2-sc-fact {
+  display: flex; align-items: center; gap: 0.5rem; width: 100%;
+  appearance: none; border: 0; background: none; cursor: pointer;
+  text-align: left; font: inherit;
+  min-height: 2rem; padding: 0.25rem 0.375rem;
+  border-radius: var(--r-sm); color: var(--ink-secondary);
+  border-top: 0.0625rem solid var(--hairline);
+}
+.set2-sc-fact:first-child { border-top: 0; }
+.set2-sc-fact:hover { background: var(--card-bg-raised); }
+.set2-sc-fact:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+.set2-sc-fact.is-flat { cursor: default; }
+.set2-sc-fact.is-flat:hover { background: none; }
+.set2-sc-fn { flex: 1 1 auto; font-size: var(--ty-micro); }
+.set2-sc-fv { font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-primary); }
+.set2-sc-fv.is-zero { color: var(--ink-quiet); font-weight: var(--fw-regular); }
+.set2-sc-fact .set2-chev { width: 0.75rem; height: 0.75rem; }
+.set2-sc-fact.is-flat .set2-chev { display: none; }
+
+.set2-sc-inh { margin-top: 0.875rem; padding-top: 0.625rem; border-top: 0.0625rem solid var(--hairline); }
+.set2-sc-ih {
+  font-size: var(--ty-micro); font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase; color: var(--ink-quiet);
+  margin-bottom: 0.375rem;
+}
+.set2-sc-ir { display: flex; align-items: baseline; gap: 0.375rem; padding: 0.1875rem 0; }
+.set2-sc-in { font-size: var(--ty-micro); color: var(--ink-secondary); }
+/* `--ink-faint`, not `--ink-rule`. The rule value is for LINES; used as text
+   it measures about 4:1 and this file has already been caught putting a
+   sentence there once. It is the quietest thing on the panel and it still has
+   to be readable — it is where "nothing here edits the hierarchy" is said. */
+.set2-sc-ft {
+  margin: 0.875rem 0 0; padding-top: 0.625rem;
+  border-top: 0.0625rem solid var(--hairline);
+  font-size: var(--ty-micro); color: var(--ink-quiet); line-height: var(--lh-snug);
+}
+
+/* Under the point where a 16rem panel beside a canvas leaves neither enough
+   room, the inspector goes below and the canvas keeps the width — the map is
+   the thing you came for. */
+@media (max-width: 62rem) {
+  .set2-sc { grid-template-columns: minmax(0, 1fr); }
+  .set2-sc-insp { position: static; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   OWNERSHIP — WHOSE SKILL IT IS, AND WHAT THAT DECIDES
+
+   A skill belongs to the organization or to you, and two answering to one
+   name is the whole of precedence. So ownership is not a badge dropped beside
+   a name: it heads the two halves of the list, it sits against the title, and
+   it labels each side of the resolution.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* The tag. Two owners, two readings, and neither of them is a status — so it
+   borrows nothing from the pills, which mean "is this working". Uppercase and
+   small, the same register the card keys use, because it names a category. */
+.set2-own {
+  display: inline-flex; align-items: center; flex-shrink: 0;
+  height: 1.125rem; padding: 0 0.375rem;
+  border-radius: var(--r-xs);
+  font-size: 0.625rem; font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-wide); text-transform: uppercase;
+  white-space: nowrap;
+}
+/* The same pairing `.set2-chip.is-role` already uses — brand tint under
+   primary ink — rather than `--ink-action`, which is purple and was sitting on
+   a blue fill. */
+.set2-own.is-org { background: var(--brand-dim); color: var(--ink-primary); }
+/* Yours is neutral, and in the light theme `--card-bg-raised` is within a
+   couple of values of a white card: the fill alone left no tag at all on the
+   precedence cards. The hairline is what makes it a tag on any ground. */
+.set2-own.is-you {
+  background: var(--card-bg-raised); color: var(--ink-quiet);
+  box-shadow: inset 0 0 0 0.0625rem var(--hairline);
+}
+
+/* The address, wherever it is printed. Mono because it is a token you type,
+   not a phrase you read — the same reason the frontmatter is mono. */
+.set2-slug {
+  font-family: var(--font-mono); font-size: 0.6875rem;
+  color: var(--ink-quiet); word-break: break-all;
+}
+
+/* ── The list's two halves ──
+   TWO GROUPS UNDER ONE HEADER ROW WAS THE FIRST ANSWER, AND IT DID NOT SCALE.
+   Both halves visible at once put the org skill and the personal one it
+   overrides three rows apart, which was the argument for it — but an
+   organization ships tens of skills and a person writes two, so reaching your
+   own meant scrolling past every one of theirs. That is the O(records) rule
+   this project has held on every other page.
+
+   Tabs instead. Yours is one press away whatever the org's count is, the
+   filters and the sort belong to the half you are in, and the collision stays
+   legible where it actually matters: the row keeps its Overridden pill, and
+   the skill's own page names the version that beat it with a way to open it.
+
+   They reuse the document's tab rules — same component, and the two are never
+   on screen together. */
+.set2-tab-n {
+  margin-left: 0.375rem;
+  min-width: 1.125rem; height: 1.125rem; padding: 0 0.3125rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--r-pill); background: var(--card-bg-raised);
+  font-size: 0.625rem; font-weight: var(--fw-semibold); color: var(--ink-quiet);
+}
+.set2-tab.is-on .set2-tab-n { background: var(--brand-dim); color: var(--ink-primary); }
+
+/* The tab and its help glyph travel together, and the underline belongs to the
+   BUTTON so the glyph sits outside it — pressing the tab and asking what the
+   tab means are two acts, and only one of them changes the list. */
+.set2-tab-w { display: inline-flex; align-items: center; }
+
+/* NO RULE UNDER THE OWNER TABS.
+   `.set2-tabs` carries a full-width hairline because on the DOCUMENT it is the
+   only thing separating the tabs from the panel they switch. On the list it
+   was the second of three stacked horizontal lines in 100px — tab rule, then
+   the filter row, then the table's own top border — and the one carrying the
+   least meaning. The active tab's own underline stays: that is the selection,
+   not a separator. */
+.set2-tabs.is-bare { border-bottom: 0; }
+.set2-tabs.is-bare .set2-tab { margin-bottom: 0; }
+.set2-tabs.is-bare .set2-tabs-end { padding-bottom: 0; }
+
+/* Make a skill, or fetch a template to make one from. Neither narrows the set,
+   so neither belongs in the row of things that do. */
+.set2-tabs-end {
+  margin-left: auto; display: flex; align-items: center; gap: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+
+/* `.set2-own-note` stood here — a sentence under the tab row saying who
+   overrides whom. True, and not news after the first read. It is the tab's
+   tooltip now.
+
+   It was also, accidentally, the gap: the filter row sat under the note, and
+   removing the note left the dropdowns flush against the tab row's underline,
+   touching the boundary they are supposed to sit below. The space has to be
+   declared rather than inherited from a paragraph that is no longer there. */
+.set2-tabs + .set2-fbar { margin-top: 1.125rem; }
+
+/* ── The document's title row ──
+   Owner beside the name, not under it. Under it is the byline, which is who
+   wrote the thing; beside it is whose it is, and only the second one decides
+   whether the page describes something that runs. */
+.set2-doc-tr { display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex-wrap: wrap; }
+
+/* The name, edited in place. It has to be the SAME text at the same size in
+   the same face as the heading it replaces — a rename that changes how big the
+   title is reads as the page jumping rather than as a field opening. So it
+   takes the display face and `--ty-title` from `.set2-doc-t`, and only the box
+   around it says it is now editable. */
+.set2-doc-ti {
+  min-width: 12rem; max-width: 100%; flex: 1 1 20rem;
+  margin: -0.25rem -0.5rem; padding: 0.25rem 0.5rem;
+  appearance: none;
+  border: 0.0625rem solid var(--brand); border-radius: var(--r-sm);
+  background: var(--card-bg);
+  font-family: var(--font-display); font-size: var(--ty-title);
+  font-weight: var(--fw-bold); letter-spacing: var(--ls-tight);
+  color: var(--ink-primary);
+}
+.set2-doc-ti:focus,
+.set2-doc-ti:focus-visible { outline: none; box-shadow: 0 0 0 0.1875rem var(--brand-dim); }
+
+/* ── The editable cards ──
+   Label left, action right, on the card's own head. `Edit` used to sit at the
+   end of the chip flow wearing a class that had no CSS anywhere in the build,
+   so it rendered as the word Edit in body text, in line with the chips it
+   edits — indistinguishable from one of them. */
+.set2-ov-h {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  min-height: 1.5rem;
+}
+.set2-ov-h .btn { flex-shrink: 0; }
+.set2-ov-s {
+  margin: 0.1875rem 0 0;
+  font-size: var(--ty-micro); color: var(--ink-quiet); line-height: var(--lh-snug);
+}
+
+/* ── Editing the file ──
+   The textarea IS the card: same fill, same radius, same padding as the
+   rendered body it replaces, so pressing Edit changes what you can do to the
+   text and not where the text is. Mono at the source's size, because what you
+   are editing is the file and half of it is YAML. */
+.set2-file.is-edit { display: flex; flex-direction: column; gap: 0.625rem; }
+.set2-ed {
+  width: 100%; box-sizing: border-box;
+  min-height: 22rem; resize: vertical;
+  padding: 1.25rem 1.5rem;
+  border: 0; border-radius: var(--r-lg);
+  background: var(--card-bg); color: var(--ink-secondary);
+  font-family: var(--font-mono); font-size: var(--ty-micro); line-height: 1.7;
+  tab-size: 2;
+  scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+.set2-ed:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: -0.125rem; }
+.set2-ed::-webkit-scrollbar { width: 0.3125rem; height: 0.3125rem; }
+.set2-ed::-webkit-scrollbar-track { background: transparent; }
+.set2-ed::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: var(--r-pill); }
+.set2-ed::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.24); }
+.set2-ed-bar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.set2-ed-h {
+  flex: 1 1 16rem; min-width: 0;
+  font-size: var(--ty-micro); color: var(--ink-quiet); line-height: var(--lh-snug);
+}
+
+/* THE CORNER STOPPED WORKING WHEN A SECOND CONTROL ARRIVED.
+   The view toggle sat absolutely in the card's top-right, over the padding,
+   which held while it was one small pill. Add `Edit` beside it and the pair
+   is wide enough to land on the first line of the instruction — the word
+   `Edit` printed straight through the prose, in both themes, at every width.
+
+   So they come out of the corner and become a bar above the card, right
+   aligned and tight to it. Nothing overlaps, the buttons keep the same
+   grouping, and the text starts where the card starts. */
+.set2-file-bar {
+  display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Precedence ──
+   Two cards, stacked, the winner first. Not side by side: they are not being
+   compared feature by feature, they are being RANKED, and a rank reads down. */
+/* Precedence lives inside Overview now, under the description, so it opens
+   with the section label the description already uses rather than with the
+   page-level top margin a tab panel needed. */
+.set2-prec { margin-top: 1.75rem; display: flex; flex-direction: column; gap: 0.625rem; }
+.set2-prec > .set2-lbl { margin-bottom: 0; }
+.set2-prec > .set2-note { margin: 0; }
+.set2-pr-c {
+  background: var(--card-bg); border-radius: var(--r-lg);
+  padding: 0.875rem 1rem;
+}
+/* No edge on the winner. It carried an inset brand stripe, which put a third
+   marker on a card that already says `Applies` in a pill and holds the only
+   un-muted body text of the two. The pill is the statement; the ink weight is
+   the reinforcement; a coloured rail was decoration reading as a state. */
+.set2-pr-h { display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap; }
+.set2-pr-p { margin-left: auto; }
+.set2-pr-b {
+  margin: 0.5rem 0 0;
+  font-size: var(--ty-meta); color: var(--ink-secondary); line-height: var(--lh-base);
+}
+.set2-pr-w {
+  margin: 0.4375rem 0 0;
+  font-size: var(--ty-micro); color: var(--ink-quiet);
+}
+/* The container is now just a stack: the insight inside it carries the fill,
+   and a card holding a card is two borders saying one thing. `.set2-pr-none`
+   went with it — the line under an uncontested skill saying its name is
+   unshared, which is the absence of a finding rather than one. */
+/* Just a stack around the insight now. `.set2-pr-row` and `.set2-pr-hint` went
+   with the second rename field: the address follows the skill's name, so there
+   is one editor for it and it is at the top of the page. */
+.set2-pr-act { display: flex; flex-direction: column; gap: 0.625rem; }
+
+/* ── AN AIMY INSIGHT, IN SETTINGS ──
+   A name collision is something AiMY NOTICED — a fact about two objects that
+   neither object states on its own — so it is said in AiMY's voice and wears
+   AiMY's treatment. The values are lifted from `.tc-foot .tc-ins` in
+   knowledge.css deliberately, not approximated: the band on the results page,
+   the note on a type card, the line in the rail and this have to read as one
+   voice in four places. */
+.set2-ins {
+  display: flex; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;
+  margin: 0; padding: 0.625rem 0.75rem;
+  border-radius: var(--r-md);
+  background: linear-gradient(120deg, rgba(var(--accent-rgb), 0.10), rgba(0, 102, 255, 0.04));
+  border: 0.0625rem solid rgba(var(--accent-rgb), 0.18);
+  font-size: var(--ty-meta); line-height: var(--lh-snug); color: var(--ink-secondary);
+}
+.set2-ins svg { flex-shrink: 0; margin-top: 0.125rem; }
+.set2-ins-t { flex: 1 1 14rem; min-width: 0; }
+/* A text action, not a filled bar — the same call `.ins-act` makes. The insight
+   is a reading, and a primary button on it would make it a form. */
+.set2-ins-a {
+  flex-shrink: 0; appearance: none; border: 0; background: none; cursor: pointer;
+  padding: 0; font: inherit; font-size: var(--ty-meta); font-weight: var(--fw-semibold);
+  color: var(--ink-action);
+}
+.set2-ins-a:hover { opacity: 0.75; }
+.set2-ins-a:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; border-radius: var(--r-xs); }
+@media (max-width: 52rem) {
+  .set2-pr-p { margin-left: 0; }
+}

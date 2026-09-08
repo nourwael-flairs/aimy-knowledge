@@ -1454,7 +1454,7 @@
   /* The settings view's own keys, kept apart from ALL_KEYS on purpose: those
      are FILTERS, and changing one re-composes the working set. These are a
      PLACE YOU ARE. The two clear each other in `patch` for that reason. */
-  const SET_KEYS  = ['m', 'skill', 'sc', 'sp', 'crm', 'f', 'who', 'sec'];
+  const SET_KEYS  = ['m', 'skill', 'part', 'node', 'role', 'vs', 'sc', 'sp', 'crm', 'f', 'who', 'sec'];
 
   /* Parse a query string into the full state object. Split out from `readURL`
      so a stored conversation can be turned back into state by the same code
@@ -1510,6 +1510,27 @@
                     writer, or the two disagree about what the URL says. */
                  m: p.get('m') || '',
                  skill: p.get('skill') || '',
+                 /* Which part of the open skill is showing — Instructions,
+                    Precedence or Reach. A place you are, like `skill` and
+                    `sec`, so it is linkable: the chain that explains why an
+                    answer came out the way it did is a thing people paste at
+                    each other. settings.js falls back to Instructions for an
+                    unknown value rather than rendering nothing. */
+                 part: p.get('part') || '',
+                 /* Which node of the tenancy tree People is standing on. A
+                    place you are, and the one worth pasting: "who reaches
+                    InterFAX Support" is the question a client asks by name.
+                    settings.js falls back to the root for an id it does not
+                    recognise, so a stale link lands on the directory rather
+                    than on nothing. */
+                 node: p.get('node') || '',
+                 /* Which role Roles is showing, and which one it is being read
+                    against. Two places you are, not two filters: `vs` does not
+                    narrow anything, it decides what the page compares. Both
+                    linkable, because "how does Admin differ from Super Admin"
+                    is a question people settle by sending each other a URL. */
+                 role: p.get('role') || '',
+                 vs: p.get('vs') || '',
                  /* ── The settings scope ──
                     `sp` is the PRODUCT and it is the page's scope, picked once
                     in the module bar and carried across every Client module —
@@ -1549,8 +1570,7 @@
                     module is open and a dedicated key per filter would put
                     six dead parameters in the address bar of the five modules
                     that do not have them. Cleared whenever `m` changes. */
-                 f: p.get('f') || '',
-                 lens: ['yours', 'org', 'eff'].indexOf(p.get('lens')) >= 0 ? p.get('lens') : 'eff' };
+                 f: p.get('f') || '' };
     LIST_KEYS.forEach((k) => { st[k] = (p.get(k) || '').split(',').filter(Boolean); });
     DATE_KEYS.forEach((k) => { st[k] = p.get(k) || ''; });
     FLAG_KEYS.forEach((k) => { st[k] = p.get(k) === '1'; });
@@ -1563,6 +1583,11 @@
   }
 
   function readURL() { return parseParams(new URLSearchParams(location.search)); }
+
+  /* Shared by the search input's debounce and by the two controls that cancel
+     it — the × and Escape — so a pending keystroke cannot land after a clear
+     and put the query back. */
+  let Q_T = 0;
 
   /* True when the URL carries no filter at all — the landing case, where the
      surface composes a working set rather than showing the whole corpus. */
@@ -1594,15 +1619,20 @@
     if (st.chat) p.set('chat', st.chat);
     if (st.m) p.set('m', st.m);
     if (st.skill) p.set('skill', st.skill);
+    if (st.part) p.set('part', st.part);
+    if (st.node) p.set('node', st.node);
+    if (st.role) p.set('role', st.role);
+    if (st.vs) p.set('vs', st.vs);
     if (st.sc) p.set('sc', st.sc);
     if (st.sec) p.set('sec', st.sec);
     if (st.sp) p.set('sp', st.sp);
     if (st.crm) p.set('crm', st.crm);
     if (st.who) p.set('who', st.who);
     if (st.f) p.set('f', st.f);
-    /* `eff` is the default, so writing it would put a key in every settings
-       URL that means the same as its absence. */
-    if (st.lens && st.lens !== 'eff') p.set('lens', st.lens);
+    /* `lens` stood here. It addressed the Effective / Organization / Yours
+       control on a skill's Precedence tab; precedence is two parties now and
+       the control is gone, so the key goes with it rather than staying as a
+       parameter nothing reads. */
     /* Prototype affordance, carried so a forced state survives a filter change
        and the degraded case can actually be driven rather than just looked at. */
     if (forcedState) p.set('state', forcedState);
@@ -2676,8 +2706,41 @@
       <div class="filter-row">
         ${FACET_FILTERS.map((c) => facetControl(c, st)).join('')}
         ${dateFilter(st)}
+        ${/* ── SEARCH IS NOT A FACET ──
+              It sits in `.filter-row-end`, which already carries `margin-left:
+              auto`, so it holds the right edge while the facets stay grouped
+              at the left. That separation is the point: Collection, Type,
+              Client and Product each narrow to a value someone picked from a
+              list the corpus supplied, and search narrows to whatever you
+              typed. Sitting it fifth in that row would have made it look like
+              a fifth facet with a very long menu.
+
+              `q` was already real — it filters, it writes to the URL, it draws
+              a chip. What it did not have was a control: the only way in was
+              the ask bar at the foot of the page, which is a different
+              gesture with a different result. */ ''}
         <span class="filter-row-end">
-          ${dirty ? '<button class="k-clear" data-clear-all>Clear</button>' : ''}
+          ${/* A `div`, not a `label`: the clear button lives inside the field
+                and an interactive control nested in a label is both invalid and
+                ambiguous about what a click does. Click-to-focus is kept by the
+                handler instead, which can tell the × from the padding. */ ''}
+          <div class="k-search${st.q ? ' is-on' : ''}">
+            ${ICO.search.replace('<svg', '<svg width="13" height="13" aria-hidden="true"')}
+            <input class="k-search-i" type="search" value="${esc(st.q || '')}"
+                   placeholder="Search documents…" data-q
+                   autocomplete="off" spellcheck="false" aria-label="Search documents">
+            ${/* Clears the QUERY only, and appears only when there is one. The
+                  × is the reach-for gesture in a field you are typing in;
+                  Escape does the same for the keyboard, and the chip below does
+                  it for the reader who has already looked away. */ ''}
+            ${st.q ? `<button class="k-search-x" type="button" data-q-clear
+                      aria-label="Clear search">${ICO.x.replace('<svg', '<svg width="11" height="11"')}</button>` : ''}
+          </div>
+          ${/* Stays. It empties EVERYTHING, which is a different act from
+                emptying the search box — and the facets are the case it exists
+                for, so it must not vanish just because the × now handles the
+                query. `isComposed` already counts every facet, date and flag. */ ''}
+          ${dirty ? '<button class="k-clear" data-clear-all>Clear all</button>' : ''}
         </span>
       </div>`;
   }
@@ -3743,10 +3806,14 @@
         <span class="rm-count">${list.length}</span>
         <span class="rm-word">document${list.length === 1 ? '' : 's'}</span>
         ${composed
-          /* "your work" described the whole set when the whole set was yours.
-             It now opens with one of every kind, so the note names both halves
-             — otherwise the count is right and the sentence under it is not. */
-          ? `<span class="rm-note">one of each kind, then your work</span>`
+          /* "one of each kind, then your work" described how the FIXTURE was
+             composed — a demo note, useful while the landing set was being
+             built and meaningless to anybody using the product. What the set
+             IS, on any real workspace, is the reader's own work, and that is
+             what the landing view is for. The fixture still opens with one of
+             every kind so every card shape gets exercised; that is a property
+             of the sample data, not something the page should narrate. */
+          ? `<span class="rm-note">your work</span>`
           : axis
             ? `<span class="rm-note">in <button class="rm-ask" data-settings="${axis.key}:${axis.value}">${esc(axisLabel)}</button></span>`
             : `<span class="rm-note">of ${LIVE.length}</span>`}
@@ -5465,8 +5532,16 @@
            body and every other row on this page. A new one arrives already
            open, with the placeholders doing the naming the labels used to fail
            to do. -->
-      <div class="prop-custom">
-        ${custom.length ? '<p class="prop-also">Other facts about it</p>' : ''}
+      ${/* No "+ Add a fact". A document's facts come from the source it was
+            synced from, and a box for typing your own invited a second,
+            hand-maintained vocabulary alongside the mapped one — two answers
+            to "what is this document's tier", disagreeing, with nothing
+            saying which the product reads.
+
+            Facts already on a record still READ and still EDIT here. What
+            went is the invitation to invent one. */ ''}
+      ${custom.length ? `<div class="prop-custom">
+        <p class="prop-also">Other facts about it</p>
         ${custom.map((k) => `<div class="prop-kv${k === openProp ? ' is-open' : ''}" data-prop-pair="${esc(k)}">
           <button class="prop-kv-read" data-prop-open="${esc(k)}">
             <span class="prop-lead">${esc(k)}</span>
@@ -5478,9 +5553,7 @@
                  placeholder="Value" aria-label="Value of ${esc(k)}">
           <button class="prop-kv-x" data-prop-del="${esc(k)}" aria-label="Remove ${esc(k)}">${ICO.x.replace('<svg', '<svg width="12" height="12"')}</button>
         </div>`).join('')}
-        <!-- "Add another" when there is nothing to add another OF. -->
-        <button class="prop-add" data-prop-add>+ Add ${custom.length ? 'another' : 'a fact'}</button>
-      </div>
+      </div>` : ''}
     </div>`;
   }
 
@@ -10623,6 +10696,37 @@
     facetNarrow(box.closest('.k-facet-panel'));
   });
 
+  /* ── The corpus search ──
+     Debounced, because `patch` pushes history and a keystroke per entry makes
+     the back button useless. And it puts the caret back: `renderFilters`
+     reassigns `innerHTML`, so the field being typed into is destroyed and
+     replaced on every commit — without this the cursor jumps to the end, or
+     off the element entirely, mid-word. */
+  document.addEventListener('input', (e) => {
+    const box = e.target.closest && e.target.closest('[data-q]');
+    if (!box) return;
+    const v = box.value;
+    clearTimeout(Q_T);
+    Q_T = setTimeout(() => {
+      const at = (($('[data-q]') || {}).selectionStart);
+      patch({ q: v.trim() });
+      const back = $('[data-q]');
+      if (back) { back.focus(); if (at != null) back.setSelectionRange(at, at); }
+    }, 260);
+  });
+
+  /* Escape clears rather than blurring. A search box you cannot empty without
+     selecting the text first is one people leave filtered by accident. */
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const box = e.target.closest && e.target.closest('[data-q]');
+    if (!box || !box.value) return;
+    e.preventDefault(); e.stopPropagation();
+    clearTimeout(Q_T); box.value = '';
+    patch({ q: '' });
+    const back = $('[data-q]'); if (back) back.focus();
+  });
+
   /* The keyboard half of the control. The library's model belongs to
      `.v2-dropdown` and never sees these rows, so arrowing, activating and
      getting back out are all wired here — hidden rows skipped, because the
@@ -11316,6 +11420,18 @@
         return;
       }
       if (t.closest('[data-clear-all]')) { writeURL(readURL0()); return; }
+      if (t.closest('[data-q-clear]')) {
+        clearTimeout(Q_T);
+        patch({ q: '' });
+        const back = $('[data-q]'); if (back) back.focus();
+        return;
+      }
+      /* Click-to-focus, which the `label` used to give for free. Anywhere in
+         the field except the clear button, which has its own job. */
+      if (t.closest('.k-search') && !t.closest('[data-q-clear]')) {
+        const box = $('[data-q]'); if (box) box.focus();
+        return;
+      }
       if ((el = t.closest('[data-quick]'))) {
         const [k, v] = el.getAttribute('data-quick').split('=');
         addFilter(k, v);
@@ -11545,19 +11661,9 @@
         repaintEditor();
         return;
       }
-      if (t.closest('[data-prop-add]')) {
-        const o = byId(readURL().doc);
-        let n = 1;
-        while (o.props['property-' + n] !== undefined) n++;
-        o.props['property-' + n] = '';
-        /* A new one arrives open — there is nothing to read yet, and the
-           placeholders are what name the two boxes. */
-        openProp = 'property-' + n;
-        repaintEditor();
-        const key = $('[data-prop-k="' + openProp + '"]');
-        if (key) setTimeout(() => { key.focus(); key.select(); }, 40);
-        return;
-      }
+      /* No `[data-prop-add]` branch: the control that reached it is gone, and
+         a handler minting `property-1` for a button nothing renders is the
+         kind of thing that reads as load-bearing three rewrites later. */
       if ((el = t.closest('[data-discard]'))) {
         const o = byId(el.getAttribute('data-discard'));
         [CORPUS, LIVE, ENTITLED].forEach((arr) => { const i = arr.indexOf(o); if (i > -1) arr.splice(i, 1); });

@@ -4527,6 +4527,79 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
 .filter-row.is-more { padding-top: 0.125rem; }
 .filter-row-end { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
 
+/* ── The corpus search ──
+   Same height, radius and border as the facet buttons beside it, because it
+   belongs to the same row — but it is a FIELD, so it fills rather than hugs,
+   and the gap plus `margin-left: auto` on its container is what says it is not
+   a fifth facet. It shrinks before it wraps: on a narrow viewport the row is
+   already carrying five controls, and a search box that drops to its own line
+   reads as a second toolbar. */
+.k-search {
+  display: inline-flex; align-items: center; gap: 0.4375rem;
+  height: 1.875rem; padding: 0 0.625rem;
+  min-width: 8rem; width: 14rem; max-width: 100%;
+  border: 0.0625rem solid var(--card-border); border-radius: var(--r-md);
+  background: none; color: var(--ink-faint);
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.k-search:hover { border-color: var(--card-border-hover); }
+/* ── ONE FOCUS RING, ON THE WRAPPER ──
+   The field is a bare `<input>` inside a bordered label, and the design system
+   carries a global `input:focus-visible { outline: 2px solid var(--brand);
+   outline-offset: 2px }`. That is right for an unstyled input and wrong here:
+   it drew a second, tighter ring around the text INSIDE this one's border, so
+   focusing the search produced two brand-blue rectangles nested in each other.
+
+   `outline: none` on the element alone did not stop it — `.k-search-i` is
+   0,1,0 and `input:focus-visible` is 0,1,1, so the design system won. The
+   suppression has to carry the pseudo-class to outrank it.
+
+   What replaces it is the design system's OWN treatment for a styled field,
+   `.input:focus` — border to brand with a faint brand wash — applied to the
+   thing that actually looks like the field. */
+.k-search-i:focus,
+.k-search-i:focus-visible { outline: none; box-shadow: none; }
+/* Lit when it is doing something, from the same values every other active
+   filter in this row uses. */
+.k-search.is-on { border-color: rgba(99,169,255,0.32); color: var(--ai-text); }
+:root[data-theme="light"] .k-search.is-on { border-color: rgba(51,105,255,0.32); color: #1f5fd0; }
+/* AFTER `.is-on`, deliberately. Both are 0,2,0, so whichever is written last
+   wins when the field is focused AND filtering — and that should be focus,
+   which is where the reader is right now, not the tint, which is a fact about
+   the set. It was resolving the other way purely on source order. */
+.k-search:focus-within {
+  border-color: var(--brand);
+  background: rgba(51, 105, 255, 0.05);
+  color: var(--ink-quiet);
+}
+.k-search svg { flex-shrink: 0; }
+.k-search-i {
+  flex: 1 1 auto; min-width: 0;
+  appearance: none; border: 0; background: none; padding: 0;
+  font-family: inherit; font-size: var(--ty-meta); color: var(--ink-primary);
+  outline: none;
+}
+.k-search-i::placeholder { color: var(--ink-faint); }
+/* The type="search" clear affordance is a second, differently-shaped way to do
+   what Escape and the filter chip already do, and it only appears in one
+   engine. */
+/* The UA's own clear button is suppressed in favour of the explicit one: it
+   only exists in one engine, sits at a different size, and cannot be reached
+   by a screen reader with a name. */
+.k-search-i::-webkit-search-cancel-button { display: none; }
+.k-search { cursor: text; }
+.k-search-x {
+  flex-shrink: 0; appearance: none; border: 0; background: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.125rem; height: 1.125rem; margin-right: -0.1875rem;
+  border-radius: var(--r-pill); color: var(--ink-faint);
+  transition: color var(--t-fast), background-color var(--t-fast);
+}
+.k-search-x:hover { color: var(--ink-primary); background: rgba(255,255,255,0.08); }
+:root[data-theme="light"] .k-search-x:hover { background: rgba(16,24,40,0.06); }
+.k-search-x:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.0625rem; }
+@media (max-width: 52rem) { .k-search { width: 10rem; } }
+
 /* The dropdowns are chrome until they carry a value, so they sit quiet by
    default and the component's own .active-filter does the lighting up. */
 .k-filter .v2-dropdown-btn {

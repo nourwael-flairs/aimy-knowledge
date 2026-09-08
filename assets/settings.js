@@ -46,6 +46,12 @@
      AiMY's reading of a page, and it has to be recognisable as that from the
      rail without a legend. */
   const AIMY = '<svg class="rail-fix-m" width="11" height="12" viewBox="0 0 18 20" aria-hidden="true"><use href="#aimy-logo-small"/></svg>';
+  /* The same mark without the rail's sizing class, for an insight sitting in
+     the page body. `knowledge.js` calls its copy `AIMY_MARK`; this is the same
+     symbol from the same sprite, so the band, the card, the rail and this read
+     as one voice rather than four components that happen to agree. */
+  const AIMY_MK = (w, h) =>
+    `<svg width="${w || 13}" height="${h || 15}" viewBox="0 0 18 20" aria-hidden="true"><use href="#aimy-logo-small"/></svg>`;
   const I = {
     warn: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.6 1.8 13.4h12.4z"/><path d="M8 6.6v3"/><path d="M8 11.6h.01"/></svg>',
     info: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.4v3.4"/><path d="M8 5.2h.01"/></svg>',
@@ -70,6 +76,7 @@
     left: '<svg class="set2-lad-ch" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 2.5 4 6l3.5 3.5"/></svg>',
     trash: '<svg class="set2-tr" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5h10M6.5 4.5V3.2a.7.7 0 0 1 .7-.7h1.6a.7.7 0 0 1 .7.7v1.3M4.4 4.5l.5 8a1 1 0 0 0 1 .9h4.2a1 1 0 0 0 1-.9l.5-8"/></svg>',
     cal:  '<svg class="set2-cal-i" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true"><rect x="2.2" y="3.2" width="11.6" height="10.6" rx="1.6"/><path d="M2.2 6.4h11.6M5.5 1.8v2.4M10.5 1.8v2.4"/></svg>',
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
     key:  '<svg class="set2-row-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="10.5" r="3"/><path d="M7.6 8.4 13 3M11 5l1.5 1.5M12.5 3.5 14 5"/></svg>'
   };
 
@@ -134,11 +141,6 @@
   }
   const ALL_LEAVES = TREE.reduce((a, n) => a.concat(leavesOf(n)), []);
   const LEAF_TOTAL = ALL_LEAVES.length;
-  const nodeState = (node, sel) => {
-    const lv = leavesOf(node);
-    const on = lv.filter((l) => sel.has(l.id)).length;
-    return on === 0 ? 'false' : on === lv.length ? 'true' : 'mixed';
-  };
   function findNode(id, list) {
     list = list || TREE;
     for (const n of list) {
@@ -149,105 +151,149 @@
   }
 
   /* ═══ PRECEDENCE ═══
-     Six stops, one order, for every governed object.
+     THE SIX-LEVEL LADDER IS GONE, AND SO IS THE MACHINERY THAT RESOLVED IT.
 
-     Specificity alone would hand every argument to the User stop, because the
-     user is always the narrowest scope -- the opposite of what is wanted. A
-     LOCK reconciles them: it sits at the level that set it and blocks every
-     level BELOW, so specificity still decides among the levels it allows.
-     That is what the console's padlock meant and never said. */
-  const LEVELS = ['Organisation', 'Client', 'Business Unit', 'Product', 'Team', 'You'];
+     `LEVELS`, `resolve()`, `ladder()`, `chainSpeaks()`, `lensNothing`, the
+     three-way lens and every skill's six-entry `chain` stood here. They
+     described precedence as a walk down the tenancy — Organisation, Client,
+     Business Unit, Product, Team, You — with a lock that could stop the walk
+     early.
 
-  function resolve(chain, lens, lockAt) {
-    const floorFor = (top) => (lockAt == null ? top : Math.min(top, lockAt));
-    if (lens === 'yours') return (chain[5] && chain[5].val && floorFor(5) === 5) ? 5 : -1;
-    const top = lens === 'org' ? 4 : 5;           /* the org lens cannot see You */
-    for (let i = floorFor(top); i >= 0; i--) if (chain[i] && chain[i].val) return i;
-    return -1;
-  }
+     Two things killed it. Reach became agents × products, which are not levels
+     of that tenancy, so the ladder was resolving a hierarchy nothing else on
+     the surface used any more; that contradiction was flagged on screen rather
+     than settled. And Nour settled it: the organisation's skills override
+     yours when they overlap. That is a rule about WHO OWNS a skill, not about
+     how deep in a tree it was set, and it needs two parties rather than six
+     stops.
+
+     Also removed on the way out: the Effective / Organization / Yours lens.
+     It read and wrote `lens` correctly, but `.set2-lens` and `.set2-lens-b`
+     were never written in `settings.css`, so it rendered as three unstyled
+     words. Its `lens` key leaves `knowledge.js` with it — a URL parameter no
+     screen reads is a promise the address bar cannot keep. */
+  const ORG = 'FlairsTech';
 
   /* ═══ SKILLS ═══
      `trigger: always` is what an instruction was. Nothing else changed: the
      old rules keep their scope, their reach and their state. */
   const TRIGGER = { always: 'Always', auto: 'Automatic', manual: 'On demand' };
+  /* What each one COSTS you, not what it is called. `Automatic` and `On demand`
+     are indistinguishable from their names alone, and the difference between
+     them decides whether a badly written description silently stops a skill
+     firing — which is the failure this whole surface exists to make visible. */
+  const TRIGGER_WHY = {
+    always:  'Every turn.',
+    auto:    'When the description matches.',
+    manual:  'Only when asked by name.'
+  };
 
   const SKILLS = [
-    { id: 'tone', name: 'Professional tone', from: 'Organization', trigger: 'always', on: true,
+    { id: 'tone', slug: 'professional-tone', name: 'Professional tone', own: 'org', trigger: 'always', on: true,
       desc: 'Neutral register. No emojis or jargon unless the reader asks for something looser.',
-      by: 'A. Mahfouz', when: '11 Aug', v: 3, sources: ['policies'], targets: ['copilot', 'sales', 'voice'],
+      by: 'A. Mahfouz', when: '11 Aug', v: 3, sources: ['policies'],
+      agents: ['copilot', 'sales', 'voice'], products: ['General', 'Support', 'Sales'],
       body: 'Keep a professional, neutral tone. Avoid emojis and jargon unless the reader asks '
-          + 'for something more creative. Never open with an apology.',
-      lock: null,
-      chain: [
-        { on: 'FlairsTech', val: 'Professional, neutral tone. No emojis.', by: 'A. Mahfouz', when: '11 Aug' },
-        {}, {}, {}, {}, {}
-      ] },
+          + 'for something more creative. Never open with an apology.' },
 
-    { id: 'refund', name: 'Draft a refund response', from: 'Yours', trigger: 'auto', on: true,
+    /* THE OVERLAP, and the reason two of these share a name. FlairsTech ships
+       its own refund skill; Nour wrote one too, before or after, and both are
+       real files that exist. The organisation's applies. Nothing is deleted
+       and nothing is hidden — the personal one is kept, editable, and marked. */
+    { id: 'refund-org', slug: 'draft-refund-response', name: 'Draft a refund response', own: 'org', trigger: 'auto', on: true,
+      desc: 'Answer from the EU refund article and name it. Never quote a figure that is not in a source.',
+      by: 'A. Mahfouz', when: '11 Aug', v: 2, sources: ['policies', 'support'],
+      agents: ['copilot'], products: ['Support'],
+      body: 'Answer from the EU refund article first, and name it. Never quote a figure that is '
+          + 'not in a cited source. If the customer asks for an exception, say who can grant it '
+          + 'rather than guessing whether it will be granted.' },
+
+    { id: 'refund', slug: 'draft-refund-response', name: 'Draft a refund response', own: 'you', trigger: 'auto', on: true,
       desc: 'Cite the policy article and flag the contested clause rather than picking a side.',
       by: USER.name, when: '20m ago', v: 4, sources: ['policies', 'support'],
-      targets: ['u-mahfouz', 'u-nour', 'copilot'],
+      agents: ['copilot'], products: ['Support'],
       body: 'Answer from the EU refund article first, and name it. If the Returns FAQ disagrees '
           + 'about what happens after activation, say the clause is contested rather than picking '
-          + 'a side. Nobody has ruled on it. Never quote a figure that is not in a cited source.',
-      /* The organisation locked at Product, so this personal skill exists, is
-         visible, and does not apply. This is the case the brief named. */
-      lock: 3,
-      chain: [
-        { on: 'FlairsTech', val: 'Professional, neutral tone. No emojis.', by: 'A. Mahfouz', when: '11 Aug' },
-        { on: 'CXS', val: 'Second person. Never quote a fare without a booking reference.', by: 'Ahmed Samy', when: '3 Sep' },
-        {},
-        { on: 'Support Copilot', val: 'Warm and conversational. Emojis permitted in chat.', by: 'Nour Wael', when: '2h ago' },
-        {},
-        { on: USER.name, val: 'Always open with the policy article, then the exception.', by: 'You', when: '20m ago' }
-      ] },
+          + 'a side. Nobody has ruled on it. Never quote a figure that is not in a cited source.' },
 
-    { id: 'booking', name: 'Booking reference guard', from: 'Organization', trigger: 'always', on: true,
+    { id: 'booking', slug: 'booking-reference-guard', name: 'Booking reference guard', own: 'org', trigger: 'always', on: true,
       desc: 'Never quote a fare without a booking reference.',
-      by: 'Ahmed Samy', when: '3 Sep', v: 1, sources: ['policies'], targets: ['u-alex', 'u-saly'],
+      by: 'Ahmed Samy', when: '3 Sep', v: 1, sources: ['policies'],
+      agents: ['copilot', 'voice'], products: ['Support'],
       body: 'Refer to the traveller in the second person. Never quote a fare without a booking '
-          + 'reference in hand.',
-      lock: null,
-      chain: [ {}, { on: 'CXS', val: 'Never quote a fare without a booking reference.', by: 'Ahmed Samy', when: '3 Sep' }, {}, {}, {}, {} ] },
+          + 'reference in hand.' },
 
-    { id: 'sweep', name: 'Weekly staleness sweep', from: 'Yours', trigger: 'manual', on: true,
+    { id: 'sweep', slug: 'weekly-staleness-sweep', name: 'Weekly staleness sweep', own: 'you', trigger: 'manual', on: true,
       desc: 'Documents behind their source, grouped by connector, with an owner for each.',
-      by: USER.name, when: '3 Sep', v: 2, sources: ['policies', 'support', 'marketing'], targets: ['copilot'],
+      by: USER.name, when: '3 Sep', v: 2, sources: ['policies', 'support', 'marketing'],
+      agents: ['copilot'], products: ['General'],
       body: 'Group by connector, not by collection. A stale document is almost always a symptom '
           + 'of the sync that fed it. Name the owner for each. Stop at ten and say how many were '
-          + 'left out.',
-      lock: null,
-      chain: [ {}, {}, {}, {}, {}, { on: USER.name, val: 'Group by connector, stop at ten.', by: 'You', when: '3 Sep' } ] },
+          + 'left out.' },
 
-    { id: 'triage', name: 'Triage an inbound ticket', from: 'Library', trigger: 'auto', on: false,
+    { id: 'triage', slug: 'triage-inbound-ticket', name: 'Triage an inbound ticket', own: 'org', trigger: 'auto', on: false,
       desc: 'Classify, cite the article that settles it, and say plainly when none does.',
-      by: 'A. Mahfouz', when: '11 Aug', v: 1, sources: ['support'], targets: [],
+      by: 'A. Mahfouz', when: '11 Aug', v: 1, sources: ['support'],
+      agents: [], products: [],
       body: 'Classify first, answer second. If no article settles the ticket, say so plainly and '
           + 'route it. A confident answer from adjacent material is the failure this skill exists '
-          + 'to prevent.',
-      lock: null,
-      chain: [ {}, {}, {}, {}, {}, {} ] }
+          + 'to prevent.' }
   ];
 
   /* Per skill, so editing one skill's reach cannot move another's. */
-  const SEL = {};
-  SKILLS.forEach((s) => { SEL[s.id] = new Set(s.targets); });
   const OPEN = new Set(['flairs', 'cxs', 'cxs-ops', 'upland', 'aimy']);
   const DIRTY = new Set();
 
   const skillById = (id) => SKILLS.filter((s) => s.id === id)[0];
-  const reachOf = (s) => SEL[s.id].size;
 
-  /* A skill's standing under the current lens. `zero` is a defect, not an
-     empty state: a skill that reaches nothing can never fire. */
-  function standing(s, lens) {
-    if (!s.on) return ['is-mute', 'Off'];
-    if (reachOf(s) === 0) return ['is-err', 'Reaches nothing'];
-    const win = resolve(s.chain, lens, s.lock);
-    if (win === -1) return ['is-mute', 'Nothing of yours applies'];
-    if (s.lock != null && s.chain[5] && s.chain[5].val && win !== 5) return ['is-mute', 'Overridden by Organization'];
-    return ['is-ok', 'Applies'];
+  /* ═══ OWNERSHIP, WHICH IS THE WHOLE PRECEDENCE MODEL ═══
+     A skill belongs to the organisation or to you. Two skills OVERLAP when
+     they share a name, because the name is how a skill is addressed — an
+     agent asked for `Draft a refund response` has to be handed exactly one
+     file, and something has to decide which. The organisation's wins.
+
+     Matching on NAME rather than on reach is deliberate. Agents × products
+     intersect constantly — three of these six skills touch Copilot and
+     Support — so an overlap defined that way would shadow nearly every
+     personal skill and make owning one pointless. Name collision is the case
+     where two files genuinely answer to the same call. */
+  const isOrg = (s) => s.own === 'org';
+
+  /* The SLUG is the address — `name:` in the frontmatter, lower case and
+     hyphenated, which is what an agent asks for. `id` stays unique because it
+     is the URL key; the slug is allowed to collide, and a collision across the
+     two owners is precisely the overlap this model is about. Two skills of the
+     SAME owner may never share one: that is a mistake, not a precedence. */
+  const nameKey = (s) => String(s.slug || s.id).trim().toLowerCase();
+
+  function uniqueId(base) {
+    let id = base, n = 2;
+    while (skillById(id)) id = base + '-' + (n++);
+    return id;
   }
+
+  /* The organisation's skill that beats this one, or null. The rule runs ONE
+     WAY: only a skill of yours can be shadowed, and only by an ENABLED org
+     skill — a switched-off skill overrides nothing, because it is not there to
+     be handed over. */
+  function shadowedBy(s) {
+    if (!s || isOrg(s)) return null;
+    return SKILLS.filter((x) => isOrg(x) && x.on && x.id !== s.id && nameKey(x) === nameKey(s))[0] || null;
+  }
+
+  /* The other direction: yours that this org skill is standing on. */
+  function shadowing(s) {
+    if (!s || !isOrg(s) || !s.on) return null;
+    return SKILLS.filter((x) => !isOrg(x) && x.id !== s.id && nameKey(x) === nameKey(s))[0] || null;
+  }
+
+  const ownerName = (s) => (isOrg(s) ? ORG : 'You');
+
+  /* `standing()` and `reachOf()` stood here, reading `SEL` — the tree-based
+     target set. Reach is agents and products now, so the one that survived
+     moved into the Skills block as `standing2`, where the fields it reads
+     live. Two functions answering "does this skill apply" from two different
+     models is how a status column and a filter start disagreeing. */
 
   /* ═══════════════════════════════════════════════════════════════════════
      CONNECTIONS
@@ -533,7 +579,11 @@
       criteria: [['Status', 'Solved'], ['Form', 'Customer Support']],
       range: ['2026-08-01', '2026-08-31'],
       runs: [
-        ['31 Oct, 15:41', [['Status', 'Closed'], ['Form', 'Sales']], 'run', 'Running', 412],
+        /* Slot 7 is DONE SO FAR, and only a running run has one. Slot 4 has
+           always been the run's total — `matchCount` at the moment it started
+           — so the pair is "128 of the 412 this run is for", and a finished
+           run needs no second number because done and total are the same. */
+        ['31 Oct, 15:41', [['Status', 'Closed'], ['Form', 'Sales']], 'run', 'Running', 412, null, null, 128],
         ['31 Oct, 14:14', [['Status', 'Solved'], ['Form', 'Customer Support']], 'ok', 'Succeeded', 1284],
         /* The 6th slot is only on failures. A parallel FAILURES array would
            drift from the runs it describes the first time either was edited —
@@ -945,32 +995,39 @@
   /* Five, not three. A card grid never shows its wrap at three and the filters
      have nothing to filter, so the surface reads as finished when it is not. */
   const PEOPLE = [
-    /* A grant is a ROLE, a scope TYPE, and the VALUES of that type it reaches.
-       It was a flat triple, which could only ever say one value — so "Super
-       Admin on Product" reaching two products had to be two grants that looked
-       like two different things. The design draws it as one collapsible group
-       with a chip per value, which is the shape the data always wanted. */
+    /* ── A GRANT IS A ROLE AND THE CLIENTS IT APPLIES TO ──
+       It carried a scope TYPE as well — Organisation, Business Unit, Product,
+       Team — and the picker walked role, then type, then values. Production
+       does neither: you choose a role, then multi-select the clients it
+       applies to. Two steps, one type.
+
+       So `t` is always 'Client'. The field STAYS rather than being deleted,
+       because the tenancy tree still has six levels and skills still target
+       all of them — what collapsed is what a GRANT may name, not the
+       hierarchy. Keeping the key leaves `covers()` and everything reading it
+       untouched, and a second grantable type stays a fixture edit rather than
+       a migration.
+
+       The fixture moves with it. The two Product grants become grants on the
+       client owning those products, and Mahfouz's organisation-wide Admin
+       becomes Admin on every client, which is what it always meant. */
     { id: 'p1', name: 'Alex Smith', mail: 'alex.smith@flairstech.com', title: 'Solution Engineer',
       s: ['is-ok', 'Active'], admin: true,
-      grants: [{ r: 'Super Admin', t: 'Product', v: ['InterFAX Support', 'Kapost Support'] },
+      grants: [{ r: 'Super Admin', t: 'Client', v: ['Upland'] },
                { r: 'QA Manager', t: 'Client', v: ['CXS'] }] },
     { id: 'p2', name: 'Saly Tarek', mail: 'saly.tarek@flairstech.com', title: 'Support Lead',
       s: ['is-warn', 'Invite pending'], grants: [] },
     { id: 'p3', name: 'A. Mahfouz', mail: 'a.mahfouz@flairstech.com', title: 'Head of Delivery',
       s: ['is-ok', 'Active'], admin: true,
-      grants: [{ r: 'Admin', t: 'Organisation', v: ['FlairsTech'] }] },
+      grants: [{ r: 'Admin', t: 'Client', v: ['CXS', 'Upland', 'MedFar'] }] },
     { id: 'p4', name: 'Nour Wael', mail: 'nour.wael@flairstech.com', title: 'Product Design',
       s: ['is-ok', 'Active'],
       grants: [{ r: 'Contributor', t: 'Client', v: ['Upland'] },
                { r: 'Read Only', t: 'Client', v: ['CXS'] }] },
-    { id: 'p5', name: 'Karim Fouad', mail: 'karim.fouad@upland.com', title: 'QA Manager \u00b7 Upland',
+    { id: 'p5', name: 'Karim Fouad', mail: 'karim.fouad@upland.com', title: 'QA Manager · Upland',
       s: ['is-ok', 'Active'],
-      grants: [{ r: 'QA Manager', t: 'Product', v: ['FileBound Support'] }] }
+      grants: [{ r: 'QA Manager', t: 'Client', v: ['Upland'] }] }
   ];
-  /* Which role groups are open. Collapsed by default: a card with three roles
-     and four chips each is a wall, and the role plus its scope type is the
-     summary that answers "what can this person reach" without opening it. */
-  const GOPEN = new Set(['p1:0']);
   /* The scope pickers read the SAME tree the targeting picker does, so a grant
      can never name a scope the hierarchy does not have. */
   const SCOPE_TYPES = ['Organisation', 'Client', 'Business Unit', 'Product', 'Team'];
@@ -1050,7 +1107,11 @@
     { g: 'Client', id: 'enable',    name: 'Enablement',           scope: 'prod' },
 
     { g: 'Admin',  id: 'access',    name: 'User & access', wide: true },
-    { g: 'Admin',  id: 'skills',    name: 'Skills' },
+    /* `wide`, because the library and the document are two columns and the
+       46rem measure that suits a settings ROW gives each of them about 20rem —
+       a nav that truncates every name and a document set narrower than the
+       prose it holds. Same reason User & access carries it. */
+    { g: 'Admin',  id: 'skills',    name: 'Skills', wide: true },
 
     /* Deferred: reachable by URL and findable in the palette, absent from the
        rail. Not deleted — that is the difference between deferring a module and
@@ -1119,26 +1180,46 @@
   }
   /* One dropdown. `all` is the absence of the key, never a value of it, so a
      filter set with nothing chosen serialises to nothing at all. */
+  /* ── THE SYSTEM'S DROPDOWN, NOT A NATIVE SELECT ──
+     These were bare `<select>` elements under a chevron drawn on top. A native
+     select renders its list with the OS, so it ignored every token this
+     surface is built from: the panel came up in the platform's colours, at the
+     platform's metrics, in whichever theme the platform was in rather than the
+     one the page is in. Three of them sat beside a `.v2-dropdown` that the
+     design system calls its only select control, which the day pickers two
+     pages over already use.
+
+     Same component here, and the same `set2-dd` marker so it is placed and
+     read by the machinery that is already listening — `dd:change`, because a
+     listbox has no `value` and fires no `input`. */
   function filterSel(st, key, label, opts) {
     const f = readF(st);
     const cur = f[key] || '';
     return `
-      <div class="set2-fsel">
-        <select class="set2-fsel-s" data-f="${esc(key)}" aria-label="${esc(label)}">
-          <option value=""${cur ? '' : ' selected'}>${esc(label)}</option>
-          ${opts.map((o) => `<option value="${esc(o)}"${o === cur ? ' selected' : ''}>${esc(o)}</option>`).join('')}
-        </select>
-        ${I.down}
+      <div class="v2-dropdown set2-dd set2-fsel" data-fdd="${esc(key)}">
+        <button class="v2-dropdown-btn${cur ? ' active-filter' : ''}" type="button"
+                aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(label)}">
+          <span class="dd-label-text">${esc(cur || label)}</span>
+          <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+        </button>
+        <div class="v2-dropdown-panel" role="listbox">
+          ${/* "Any role" rather than a blank row: an option that clears the
+                filter has to say what it leaves you with. */ ''}
+          <div class="v2-dropdown-option${cur ? '' : ' selected'}" role="option"
+               aria-selected="${!cur}" data-value="">Any ${esc(label.toLowerCase())}</div>
+          ${opts.map((o) => `<div class="v2-dropdown-option${o === cur ? ' selected' : ''}"
+            role="option" aria-selected="${o === cur}" data-value="${esc(o)}">${esc(o)}</div>`).join('')}
+        </div>
       </div>`;
   }
 
   let FQ_T = 0;
   let API = null;
-  const FALLBACK = { m: 'config', skill: '', sp: '', crm: '', f: '', lens: 'eff' };
+  const FALLBACK = { m: 'config', skill: '', sp: '', crm: '', f: '' };
   function readURL() { return API ? API.readURL() : FALLBACK; }
   function patch(changes) { if (API) API.patch(changes); }
   function render() { if (API) API.render(); }
-  const lensName = { yours: 'yours', org: 'org', eff: 'effective' };
 
   /* ═══ ATOMS ═══ */
   const pill = (k, t) => `<span class="set2-pill ${k}"><i></i>${esc(t)}</span>`;
@@ -1163,136 +1244,193 @@
     </${tag}>`;
   }
 
-  /* ═══ LADDER ═══ */
-  function ladder(s, lens) {
-    const win = resolve(s.chain, lens, s.lock);
-    const filled = s.chain.filter((c) => c && c.val).length;
-    const head = win === -1
-      ? `<span class="set2-lad-lv">Nothing of yours applies here</span>`
-      : `<span class="set2-lad-lv">${esc(LEVELS[win])}</span>${pill('is-ok', 'Applies')}`;
-    return `
-      <div class="set2-lad" data-lad>
-        <button class="set2-lad-hd" type="button" data-lad-t aria-expanded="false">
-          ${head}
-          <span class="set2-lad-more set2-num">${filled} of 6 levels set</span>${I.down}
-        </button>
-        <div class="set2-lad-bd">
-          ${LEVELS.map((lv, i) => {
-            const c = s.chain[i] || {};
-            const empty = !c.val;
-            const blocked = s.lock != null && i > s.lock && !empty;
-            const beat = !empty && i !== win;
-            return `<div class="set2-stop ${empty ? 'is-empty' : ''} ${beat ? 'is-beat' : ''} ${i === win ? 'is-win' : ''}">
-              <span class="set2-stop-lv">${esc(lv)}</span>
-              <span class="set2-stop-v">${empty ? 'Nothing set' : esc(c.val)}</span>
-              <span class="set2-stop-end">
-                ${i === win ? pill('is-ok', 'Applies') : ''}
-                ${blocked ? I.lock + pill('is-mute', 'Locked by Organization') : ''}
-                ${!empty && !blocked && i !== win ? `<span class="set2-from">${esc(c.by)} · ${esc(c.when)}</span>` : ''}
-              </span>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`;
-  }
+  /* ── THE TREE TARGETING PICKER IS GONE, AND SO IS ITS MACHINERY ──
+     `walk()`, `nodeState()`, `picker()`, `productsOf()`, `repaintPicker()`,
+     `toggleNode()`, `SEL` and both tree keyboard handlers stood between here
+     and there. All of it rendered and drove one control: a six-level
+     selectable tree over the tenancy, for choosing what a skill reached.
 
-  /* ═══ TARGETING PICKER ═══ */
-  function walk(node, depth, out, sel, filter) {
-    const kids = node.kids || [];
-    const isLeaf = !kids.length;
-    const hit = !filter || node.name.toLowerCase().indexOf(filter) >= 0;
-    const kidRows = [];
-    if (kids.length && (OPEN.has(node.id) || filter)) kids.forEach((k) => walk(k, depth + 1, kidRows, sel, filter));
-    if (filter && !hit && !kidRows.length) return;
-    const st = nodeState(node, sel);
-    const lv = leavesOf(node);
-    out.push(`<div class="set2-node is-l${depth}${isLeaf ? '' : ' is-grp'}${OPEN.has(node.id) ? ' is-open' : ''}"
-      data-node="${esc(node.id)}" role="treeitem" tabindex="-1" aria-level="${depth}"
-      aria-selected="${st === 'true'}"${isLeaf ? '' : ` aria-expanded="${OPEN.has(node.id)}"`}>
-      ${isLeaf ? '<span class="set2-exp is-none"></span>' : I.caret}
-      ${ck(st, node.name)}
-      <span class="set2-node-n">${esc(node.name)}</span>
-      ${isLeaf ? '' : `<span class="set2-node-ct">${lv.filter((l) => sel.has(l.id)).length} of ${lv.length}</span>`}
-    </div>`);
-    out.push.apply(out, kidRows);
-  }
+     Reach is AGENTS and PRODUCTS now, and neither is a level of that tree — so
+     the picker could not express what a skill targets, and it offered five
+     levels a skill can no longer name. The Overview card edits the two lists
+     directly.
 
-  function picker(s, filter) {
-    const sel = SEL[s.id];
-    const rows = [];
-    TREE.forEach((n) => walk(n, 1, rows, sel, filter || ''));
-    const zero = sel.size === 0;
-    return `
-      <div class="set2-pick" data-pick="${esc(s.id)}">
-        <div class="set2-pick-hd">
-          <input class="set2-fld" type="search" placeholder="Search clients, products, teams or people…" data-pfilter value="${esc(filter || '')}">
-        </div>
-        <div class="set2-pick-bd" role="tree" aria-multiselectable="true" aria-label="What this skill reaches">${rows.join('')}</div>
-        <div class="set2-pick-ft${zero ? ' is-zero' : ''}" data-foot>
-          ${zero
-            ? '<span>Reaches nothing. A skill with no targets can never fire.</span>'
-            : `<span>Reaches <b class="set2-num">${sel.size}</b> of <span class="set2-num">${LEAF_TOTAL}</span></span>`}
-        </div>
-      </div>`;
-  }
+     Removed rather than left standing: every one of them referenced something
+     the others owned, so the first call into any of them would have thrown. */
 
   /* ═══ MODULE BODIES ═══ */
   const M = {};
 
-  /* Which products a skill actually reaches, read off the same tree the
-     targeting picker writes to — so the Products filter can never offer a
-     product no skill was ever granted on. */
-  const PRODUCTS = () => nodesOfType('Product');
-  function productsOf(s) {
-    const sel = SEL[s.id];
-    const out = [];
-    (function walk(ns) {
-      ns.forEach((n) => {
-        if (n.type === 'Product' && leavesOf(n).some((l) => sel && sel.has(l.id))) out.push(n.name);
-        if (n.kids) walk(n.kids);
-      });
-    })(TREE);
-    return out;
-  }
-  const agentsOf = (s) => AGENTS.filter((a) => s.targets.indexOf(a.id) > -1).map((a) => a.name);
+  /* `PRODUCTS()` and `productsOf()` stood here. Both derived a skill's products
+     from the tenancy tree; a skill carries its own `products` list now, from
+     the domains production actually offers. */
 
   /* ══ SKILLS ════════════════════════════════════════════════════════════
-     A table, because that is what the screen is: three facts per skill and
-     rather a lot of skills. The list it replaces split them into "From the
-     organization" and "Yours", which put the same question — does this apply
-     to me — in two places and made the count at the top of the page wrong for
-     both halves.
+     THE PRODUCTION TOOLBAR, AND CLAUDE'S DOCUMENT.
 
-     Where it came from is a COLUMN now, so it sorts and filters like every
-     other fact rather than being a wall you have to pick a side of. */
+     Two references, and they answer different halves.
+
+     PRODUCTION owns the LIST: `All agents` and `All products` beside a name
+     search, `Download example` and `New Skill` on the right, and a sortable
+     Name / Description / Status table under it. That is what a skill is
+     filtered by in the real console, so it is what the list does here.
+
+     CLAUDE owns the DOCUMENT: a back link, the name with its author under it,
+     an enable toggle and an overflow at the right, and two tabs — `Overview`
+     and `Contents · n`. Overview is the description on the left with a card on
+     the right saying how the skill fires; Contents is the file itself with a
+     rendered/source toggle in its corner.
+
+     ── WHAT REPLACED WHAT ──
+     The build before this was a two-pane library whose left column expanded
+     into PARTS: Instructions, Precedence, Reach. Three of those clicks existed
+     to reach three facts, and two of the facts are one line each. Claude's
+     answer is better and simpler: everything about the skill except its text
+     is in Overview, and the text is Contents.
+
+     ── REACH IS AGENTS × PRODUCTS ──
+     It was a six-level tree picker over the tenancy — clients, business units,
+     products, teams, individual users. Production targets two things: which
+     AGENT runs the skill and which PRODUCT it belongs to, and its products are
+     knowledge domains (General, Support, Sales, Dev, UI…) rather than the
+     tenancy's products. Two multi-selects, and the tree stops being involved.
+
+     ── AND PRECEDENCE IS ON NOTICE ──
+     Production has no chain, no lens, no override. The six-level ladder in
+     this file was authored here and is the one thing on the surface no
+     competitor has, so it survives as a third tab rather than being deleted in
+     passing — but it now describes a hierarchy that reach no longer uses, and
+     that is a contradiction somebody has to settle rather than inherit.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  /* Production's own list, from the console screenshot. These are knowledge
+     domains, not the tenancy products the Scopes map draws. */
+  const SKILL_PRODUCTS = ['General', 'Support', 'Sales', 'Recruitments',
+                          'Dev', 'UI', 'cxs_calls_kpis'];
+
+  /* TWO TABS. Precedence was a third, and on five skills out of six it opened
+     on the sentence "there is nothing to resolve" — a destination whose usual
+     content is a denial that it has any. What it had to say when a name IS
+     contested is worth saying, so it moved into Overview and appears only when
+     there is a collision to explain. */
+  const TABS = [['overview', 'Overview'], ['contents', 'Contents']];
+  const tabOf = (st) => (TABS.some((t) => t[0] === st.part) ? st.part : 'overview');
+
+  const agentName = (id) => ((AGENTS.filter((a) => a.id === id)[0] || {}).name || id);
+
+  function standing2(s) {
+    if (!s.on) return ['is-mute', 'Disabled'];
+    /* Overridden outranks a broken reach, because it is the reason the skill
+       is not running: fixing its agents would change nothing while the
+       organisation's version is answering to the same name. */
+    if (shadowedBy(s)) return ['is-warn', 'Overridden'];
+    if (!(s.agents || []).length) return ['is-err', 'No agent'];
+    if (!(s.products || []).length) return ['is-err', 'No product'];
+    return ['is-ok', 'Enabled'];
+  }
+
   const SORTS = {
     name:   (a, b) => a.name.localeCompare(b.name),
     desc:   (a, b) => a.desc.localeCompare(b.desc),
-    status: (a, b) => standing(a, 'eff')[1].localeCompare(standing(b, 'eff')[1])
+    status: (a, b) => standing2(a)[1].localeCompare(standing2(b)[1])
   };
 
+  /* Production marks all three columns sortable, so all three sort. Three
+     states — ascending, descending, and back to the authored order, which is
+     the one a two-state toggle can never return you to. */
   function sortTh(st, key, label) {
     const f = readF(st);
     const on = f.sort === key || f.sort === key + '!';
     const desc = f.sort === key + '!';
     return `<button class="set2-th" type="button" data-sort="${esc(key)}"
       aria-sort="${on ? (desc ? 'descending' : 'ascending') : 'none'}">
-      ${esc(label)}<span class="set2-th-a${on ? ' is-on' : ''}">${on ? (desc ? '\u2193' : '\u2191') : '\u21c5'}</span>
+      ${esc(label)}<span class="set2-th-a${on ? ' is-on' : ''}">${
+        on ? (desc ? '↓' : '↑') : '⇅'}</span>
     </button>`;
   }
 
-  M.skills = function (st) {
-    if (st.skill && skillById(st.skill)) return skillDetail(skillById(st.skill), st);
+  function skillsMatching(st) {
     const f = readF(st);
     const q = (f.q || '').toLowerCase();
-
-    let list = SKILLS.filter((s) => {
+    return SKILLS.filter((s) => {
       if (q && (s.name + ' ' + s.desc).toLowerCase().indexOf(q) < 0) return false;
-      if (f.agent && agentsOf(s).indexOf(f.agent) < 0) return false;
-      if (f.product && productsOf(s).indexOf(f.product) < 0) return false;
+      if (f.agent && (s.agents || []).map(agentName).indexOf(f.agent) < 0) return false;
+      if (f.product && (s.products || []).indexOf(f.product) < 0) return false;
       return true;
     });
-    const narrowed = list.length !== SKILLS.length;
+  }
+
+  M.skills = function (st) {
+    const cur = SKILLS.filter((s) => s.id === st.skill)[0];
+    return cur ? skillDoc(cur, st, tabOf(st)) : skillList(st);
+  };
+
+  /* ── The list ──
+     Production's toolbar exactly: the two filters first because they narrow to
+     a set, then the name search which finds one inside it, then the two
+     actions.
+
+     Under it the rows are SPLIT BY OWNER rather than left in one run. Whose a
+     skill is decides whether it runs when two answer to the same name, so it
+     is not a fourth column to be sorted by — it is the shape of the list. Two
+     headers is O(2), so the rule that keeps every page off O(records) is
+     untouched, and the note stating the override rule finally has a place that
+     is next to the skills it applies to. */
+  const OWNER_TABS = [
+    ['org', 'Organization',
+     'Set by ' + ORG + '. Everyone on the tenancy has these, and they override a '
+     + 'personal skill that answers to the same name.'],
+    ['you', 'Yours',
+     'Only you have these. ' + ORG + '’s skills override yours when the two answer to '
+     + 'the same name — yours is kept and stays editable, it just does not run.']
+  ];
+  const ownOf = (st) => (readF(st).own === 'you' ? 'you' : 'org');
+
+  /* ── EXPLANATION MOVED OFF THE PAGE AND ONTO ITS HEADING ──
+     The rule about who overrides whom was a paragraph under the tab row and a
+     second one inside Precedence. Both were true and neither was news after
+     the first read: a sentence you have to scroll past on every visit to a
+     screen you use daily is a cost paid forever for a fact learned once.
+
+     It becomes an info glyph beside the heading it explains. The text is still
+     there for the reader who wants it, on hover and on keyboard focus, and it
+     is `aria-describedby` so it reaches a screen reader without hovering.
+
+     Reuses `.set2-tip-wrap` / `.set2-tip-b` / `.set2-tip`, already carrying
+     the same job on the Add user sheet — one help affordance in this file. */
+  const tip = (id, about, text) => `
+    <span class="set2-tip-wrap">
+      <button class="set2-tip-b" type="button" aria-describedby="${esc(id)}"
+              aria-label="About ${esc(about)}">${I.info}</button>
+      <span class="set2-tip is-below" role="tooltip" id="${esc(id)}">${esc(text)}</span>
+    </span>`;
+
+  function skillRow(s) {
+    const [k, t] = standing2(s);
+    /* Dimmed for the same reason in both cases: the row is on the page and is
+       not doing anything. Which of the two it is, the pill says. */
+    const idle = !s.on || !!shadowedBy(s);
+    return `
+      <button class="set2-tbl-r${idle ? ' is-off' : ''}" type="button" role="row"
+              data-go="skill:${esc(s.id)}">
+        <span class="set2-tbl-n" role="cell">
+          ${s.trigger === 'always' ? I.bolt : s.trigger === 'manual' ? I.hand : I.doc}
+          <b>${esc(s.name)}</b>
+        </span>
+        <span class="set2-tbl-d" role="cell">${esc(s.desc)}</span>
+        <span class="set2-tbl-s" role="cell">${pill(k, t)}${I.chev}</span>
+      </button>`;
+  }
+
+  function skillList(st) {
+    const f = readF(st);
+    const own = ownOf(st);
+    const all = skillsMatching(st);
+    let list = all.filter((s) => s.own === own);
+    /* "Narrowed" means the FILTERS narrowed it, not the tab: offering to clear
+       filters on a tab that is simply empty would clear nothing and change
+       nothing. */
+    const narrowed = all.length !== SKILLS.length;
     const skey = (f.sort || '').replace('!', '');
     if (SORTS[skey]) {
       list = list.slice().sort(SORTS[skey]);
@@ -1300,20 +1438,52 @@
     }
 
     return `
-      ${/* No section heading. This module has exactly one section, and its
-            heading was the word already set as the page title two lines above
-            it -- "Skills" under "Skills". The count it carried moves to the
-            header, where it qualifies the title instead of repeating it. */ ''}
-      <section class="set2-sec is-headless">
-        <div class="set2-fbar">
-          ${filterSel(st, 'agent', 'All agents', AGENTS.map((a) => a.name))}
-          ${filterSel(st, 'product', 'All products', PRODUCTS())}
-          <input class="set2-fld set2-fbar-q" type="search" placeholder="Search by skill name\u2026"
-                 value="${esc(f.q || '')}" data-f-q aria-label="Search by skill name">
-          <span class="set2-fbar-end">
+      <section class="set2-sec is-headless" id="st-skills">
+        <!-- NOT a tablist. These do not switch panels of one document, they
+             narrow the list and write to the URL — the same job the two
+             dropdowns below do, in a different shape. Toggle buttons in a
+             group say that; the tab role would promise a tabpanel that is not
+             there. The document's own Overview / Contents pair stays a real
+             tablist, which is what makes the distinction worth keeping. -->
+        <div class="set2-tabs is-bare" role="group" aria-label="Whose skills">
+          ${OWNER_TABS.map(([v, label, note]) => {
+            /* The count is of the tab's OWN skills after the filters, so the
+               number on the tab and the number of rows behind it agree. */
+            const n = all.filter((s) => s.own === v).length;
+            return `
+            <span class="set2-tab-w">
+              <button class="set2-tab${own === v ? ' is-on' : ''}" type="button"
+                      aria-pressed="${own === v}" data-own="${v}">${esc(label)}<span
+                class="set2-tab-n set2-num">${n}</span></button>
+              ${tip('ownTip-' + v, v === 'you' ? 'your own skills' : 'the organization’s skills', note)}
+            </span>`;
+          }).join('')}
+          <!-- The two actions live on THIS row, not in the filter bar. They
+               make a skill and fetch a template; they narrow nothing, and
+               sharing a row with the filters made them read as two more
+               controls over the set. -->
+          <span class="set2-tabs-end">
             <button class="btn btn-ghost btn-sm" type="button" data-example>Download example</button>
             <button class="btn btn-brand btn-sm" type="button" data-new>New skill</button>
           </span>
+        </div>
+
+        <div class="set2-fbar">
+          ${filterSel(st, 'agent', 'All agents', AGENTS.map((a) => a.name))}
+          ${filterSel(st, 'product', 'All products', SKILL_PRODUCTS)}
+          <!-- The corpus search's own class, from knowledge.css, which
+               console.html already loads. Nour asked for this field at the
+               size of the one in the documents view; copying its metrics into
+               a second rule is how two controls meant to match start drifting.
+               Reusing the class means they cannot. -->
+          <div class="k-search set2-fbar-q${f.q ? ' is-on' : ''}">
+            ${I.search.replace('<svg', '<svg width="13" height="13" aria-hidden="true"')}
+            <input class="k-search-i" type="search" placeholder="Search by skill name…"
+                   value="${esc(f.q || '')}" data-f-q autocomplete="off" spellcheck="false"
+                   aria-label="Search by skill name">
+            ${f.q ? `<button class="k-search-x" type="button" data-fq-clear
+                     aria-label="Clear search">${I.x.replace('<svg', '<svg width="11" height="11"')}</button>` : ''}
+          </div>
         </div>
 
         ${list.length ? `
@@ -1323,63 +1493,385 @@
             ${sortTh(st, 'desc', 'Description')}
             ${sortTh(st, 'status', 'Status')}
           </div>
-          ${list.map((s) => {
-            const [k, t] = standing(s, 'eff');
-            return `
-            <button class="set2-tbl-r${s.on ? '' : ' is-off'}" type="button" role="row" data-go="skill:${esc(s.id)}">
-              <span class="set2-tbl-n" role="cell">
-                ${s.trigger === 'always' ? I.bolt : s.trigger === 'manual' ? I.hand : I.doc}
-                <b>${esc(s.name)}</b>
-                <span class="set2-from${s.from === 'Organization' ? ' is-org' : ''}">${esc(s.from)}</span>
-              </span>
-              <span class="set2-tbl-d" role="cell">${esc(s.desc)}</span>
-              <span class="set2-tbl-s" role="cell">${pill(k, t)}${I.chev}</span>
-            </button>`;
-          }).join('')}
-        </div>` : narrowed
-          ? `<div class="set2-empty"><b>No skill matches</b>Nothing fits that agent, product and name at once.
-              <button class="btn btn-ghost btn-sm" type="button" data-f-clear style="margin-top:0.5rem">Clear filters</button></div>`
-          : `<div class="set2-empty"><b>No skills yet</b>Create the first one to get started.</div>`}
+          ${list.map(skillRow).join('')}
+        </div>` : `
+          <div class="set2-empty">
+            <b>${narrowed ? 'No skill matches'
+                 : own === 'you' ? 'You have not written one yet' : 'No skills yet'}</b>
+            ${narrowed ? 'Nothing here fits that agent, product and name at once.'
+              : own === 'you' ? 'Write one, or upload a SKILL.md. It applies to you alone.'
+              : 'Create the first one to get started.'}
+            <button class="btn ${narrowed ? 'btn-ghost' : 'btn-brand'} btn-sm" type="button"
+                    data-${narrowed ? 'f-clear' : 'new'} style="margin-top:0.5rem">${
+              narrowed ? 'Clear filters' : 'New skill'}</button>
+          </div>`}
       </section>`;
-  };
+  }
 
-  function skillDetail(s, st) {
-    const [k, t] = standing(s, st.lens);
-    const raw = RAW.has(s.id);
+  /* ── The document ──
+     Claude's header: back, then the name with the author under it, then the
+     enable toggle and the overflow. The owner sits BESIDE the name rather than
+     in the byline, because "whose is this" is the fact that decides whether
+     the rest of the page describes something that runs. */
+  function skillDoc(s, st, tab) {
+    const [k, t] = standing2(s);
     return `
-      <button class="set2-back" type="button" data-back>&larr; Skills</button>
-      <div class="set2-sec-h" style="margin-bottom:0">
-        <h1 class="set2-title" style="font-size:var(--ty-title)">${esc(s.name)}</h1>
-        <span class="set2-sec-end">${pill(k, t)}${toggle(s.on, 'Enable ' + s.name, `data-skill-on="${esc(s.id)}"`)}</span>
-      </div>
-      <div class="set2-bar">
-        <div class="set2-scope">
-          <span class="set2-scope-i">${esc(s.from)}</span><span class="set2-scope-s">&middot;</span>
-          <span class="set2-scope-i">${esc(TRIGGER[s.trigger])}</span><span class="set2-scope-s">&middot;</span>
-          <span class="set2-scope-i">${esc(s.by)}, ${esc(s.when)}</span><span class="set2-scope-s">&middot;</span>
-          <span class="set2-scope-i set2-num">v${s.v}</span>
-        </div>
-      </div>
-
-      <section class="set2-sec" id="st-precedence">
-        <div class="set2-sec-h"><h2 class="set2-sec-t">Precedence</h2></div>
-        ${ladder(s, st.lens)}
-      </section>
-
-      <section class="set2-sec" id="st-instructions">
-        <div class="set2-sec-h"><h2 class="set2-sec-t">Instructions</h2>
-          <span class="set2-sec-end">
-            <span class="set2-view">
-              <button class="set2-view-b${raw ? '' : ' is-on'}" type="button" data-sview="pretty" data-sid="${esc(s.id)}" aria-label="Rendered">${I.eye}</button>
-              <button class="set2-view-b${raw ? ' is-on' : ''}" type="button" data-sview="raw" data-sid="${esc(s.id)}" aria-label="Source">${I.code}</button>
+      <div class="set2-doc">
+        <div class="set2-doc-hd">
+          <!-- The way back sits IN the header, against the skill's name. On
+               its own line above, it printed the word Skills directly under a
+               heading that already says Skills and a scope line that already
+               says Org FlairsTech: three lines of chrome, one a duplicate,
+               before the thing you opened. As an icon against the title it is
+               a control rather than a fourth heading. -->
+          <button class="set2-back" type="button" data-back
+                  aria-label="Back to all skills" title="All skills">${I.left}</button>
+          <span class="set2-doc-id">
+            <span class="set2-doc-tr">
+              <!-- The name is edited IN PLACE, reached from the overflow menu
+                   and from the precedence insight — not by clicking the title.
+                   A heading that turns into a field when you click it means
+                   every attempt to select the words for copying opens an
+                   editor instead; renaming is a deliberate act and belongs
+                   behind a deliberate control. It is also editable in the
+                   file, as the H1 under the frontmatter — same field, and the
+                   address follows it either way. -->
+              ${EDIT.has('title:' + s.id) ? `
+                <input class="set2-doc-ti" value="${esc(s.name)}" data-title-ed="${esc(s.id)}"
+                       aria-label="Name of this skill" autocomplete="off" spellcheck="false">` : `
+                <h2 class="set2-doc-t">${esc(s.name)}</h2>`}
+              <span class="set2-own ${isOrg(s) ? 'is-org' : 'is-you'}">${isOrg(s) ? esc(ORG) : 'Yours'}</span>
             </span>
-          </span></div>
-        <div class="set2-body${raw ? ' is-raw' : ''}">${raw ? esc(toMarkdown(s)) : esc(s.body)}</div>
-      </section>
+            <!-- The slug was printed here, after the author. On almost every
+                 skill it is the title again in hyphens, one line under the
+                 title. It survives where it is DOING something: in the file's
+                 frontmatter, and in the precedence insight, which is about two
+                 skills answering to it. -->
+            <span class="set2-doc-by">by ${esc(s.by)}</span>
+          </span>
+          <span class="set2-doc-end">
+            ${pill(k, t)}
+            ${toggle(s.on, 'Enable ' + s.name, `data-skill-on="${esc(s.id)}"`)}
+            <button class="set2-kebab" type="button" data-skill-menu="${esc(s.id)}"
+                    aria-haspopup="menu" aria-label="More for ${esc(s.name)}">
+              <span></span><span></span><span></span>
+            </button>
+          </span>
+        </div>
 
-      <section class="set2-sec" id="st-reach">
-        <div class="set2-sec-h"><h2 class="set2-sec-t">Reach</h2></div>
-        ${picker(s, FILTER[s.id])}
+        <div class="set2-tabs" role="tablist">
+          <!-- No count on Contents. It read "Contents · 1", copied from Claude,
+               where a skill is a FOLDER and the number says how many files are
+               in it. Here a skill is one file: the number was 1 on every skill
+               and would have been 1 forever, which is a counter that cannot
+               count. -->
+          ${TABS.map(([id, label]) => `
+            <button class="set2-tab${tab === id ? ' is-on' : ''}" type="button"
+              role="tab" aria-selected="${tab === id}" data-part="${id}" data-sid="${esc(s.id)}">
+              ${esc(label)}
+            </button>`).join('')}
+        </div>
+
+        ${tab === 'contents' ? docContents(s) : docOverview(s)}
+      </div>`;
+  }
+
+  /* ── Overview ──
+     Description left, and on the right the card Claude uses for `Slash
+     command` — which is where "how does this fire" belongs, so AiMY's extra
+     facts about firing go in it rather than becoming tabs of their own. Owner
+     is first in that column: it is the one fact that can make every fact under
+     it moot.
+
+     Precedence joins it, under the description, and ONLY when a name is
+     contested. As a tab of its own it opened on "there is nothing to resolve"
+     for five skills out of six. */
+  function docOverview(s) {
+    const ag = s.agents || [], pr = s.products || [];
+    return `
+      <div class="set2-ov" role="tabpanel">
+        <div class="set2-ov-main">
+          <p class="set2-lbl">Description</p>
+          <p class="set2-ov-d">${esc(s.desc)}</p>
+          ${precBlock(s)}
+        </div>
+        <aside class="set2-ov-side">
+          <div class="set2-ov-card">
+            <p class="set2-ov-k">Owner</p>
+            <p class="set2-ov-v">${isOrg(s) ? esc(ORG) : 'You'}</p>
+            <p class="set2-ov-s">${isOrg(s) ? 'Everyone on the tenancy has this one.'
+                                            : 'Only you have this one.'}</p>
+          </div>
+          <div class="set2-ov-card">
+            <div class="set2-ov-h">
+              <p class="set2-ov-k">Trigger</p>
+              <button class="btn btn-ghost btn-sm" type="button" data-pick-tr="${esc(s.id)}"
+                      aria-label="Edit the trigger for ${esc(s.name)}">Edit</button>
+            </div>
+            <p class="set2-ov-v">${esc(TRIGGER[s.trigger])}</p>
+            <p class="set2-ov-s">${esc(TRIGGER_WHY[s.trigger])}</p>
+          </div>
+          ${reachCard(s, 'Agents', 'ag', ag.map(agentName), 'is-role',
+                      'None — this skill cannot run.')}
+          ${reachCard(s, 'Products', 'pr', pr, 'is-scope',
+                      'None — this skill belongs nowhere.')}
+          <div class="set2-ov-card">
+            <p class="set2-ov-k">Last updated</p>
+            <p class="set2-ov-v">${esc(s.when)} · v${s.v}</p>
+          </div>
+        </aside>
+      </div>`;
+  }
+
+  /* The two editable cards. `Edit` used to sit at the end of the chip flow
+     wearing `.set2-grant-add`, a class with NO CSS anywhere in the build — a
+     bare <button>, so it rendered as the word "Edit" in body text, in line
+     with the chips, reading as one more chip rather than the way to change
+     them. It moves to the card's head, opposite the label, where an action on
+     a section belongs, and it wears the design system's button. */
+  function reachCard(s, label, kind, vals, chip, empty) {
+    return `
+      <div class="set2-ov-card${vals.length ? '' : ' is-err'}">
+        <div class="set2-ov-h">
+          <p class="set2-ov-k">${esc(label)}</p>
+          <button class="btn btn-ghost btn-sm" type="button"
+                  data-pick-${kind}="${esc(s.id)}"
+                  aria-label="Edit ${esc(label.toLowerCase())} for ${esc(s.name)}">Edit</button>
+        </div>
+        <div class="set2-ov-chips">
+          ${vals.length ? vals.map((v) => `<span class="set2-chip ${chip}">${esc(v)}</span>`).join('')
+            : `<span class="set2-sp-note">${esc(empty)}</span>`}
+        </div>
+      </div>`;
+  }
+
+  /* One panel for both lists. Agents come from `AGENTS`, products from the
+     domains production offers, and neither is a tree — so this is the flat
+     multi-select the scope menus already established rather than anything new. */
+  function paintReachPick(anchor, s, kind) {
+    const opts = kind === 'agents'
+      ? AGENTS.map((a) => [a.id, a.name])
+      : SKILL_PRODUCTS.map((p) => [p, p]);
+    const have = s[kind] || [];
+    popover(anchor, `
+      <div class="set2-pop-hd">${kind === 'agents' ? 'Which agents run it' : 'Which products it belongs to'}</div>
+      ${opts.map(([v, n]) => {
+        const on = have.indexOf(v) > -1;
+        return `
+        <button class="set2-pop-i is-val${on ? ' is-on' : ''}" type="button"
+                data-reach-val="${esc(s.id)}|${kind}|${esc(v)}" aria-pressed="${on}">
+          <span class="set2-pop-n">${esc(n)}</span>
+          <span class="set2-pop-k">${I.tick}</span>
+        </button>`;
+      }).join('')}`);
+  }
+
+  /* One of three, so it CLOSES on choosing. The reach menus stay open because
+     picking three agents is one decision; picking a trigger is one pick, and a
+     menu that stays open after the only choice has been made is asking a
+     question that has been answered. */
+  function paintTriggerPick(anchor, s) {
+    popover(anchor, `
+      <div class="set2-pop-hd">When it fires</div>
+      ${Object.keys(TRIGGER).map((k) => {
+        const on = s.trigger === k;
+        return `
+        <button class="set2-pop-i is-val${on ? ' is-on' : ''}" type="button"
+                data-trig-val="${esc(s.id)}|${esc(k)}" aria-pressed="${on}">
+          <span class="set2-pop-tx">
+            <span class="set2-pop-n">${esc(TRIGGER[k])}</span>
+            <span class="set2-pop-p">${esc(TRIGGER_WHY[k])}</span>
+          </span>
+          <span class="set2-pop-k">${I.tick}</span>
+        </button>`;
+      }).join('')}`, 'is-trig');
+  }
+
+  /* ── Contents, and editing it ──
+     The editor is THE FILE, not a form over its fields. `toMarkdown()` and
+     `parseSkillFile()` already round-trip — download, change, upload was the
+     only way to edit a skill in this build — so putting a textarea between
+     those two functions makes that loop local without inventing a second
+     representation of a skill. One control edits the name, the description,
+     the trigger, the sources and both reach lists, because every one of them
+     lives in the frontmatter.
+
+     Nothing is written until the whole file parses. A half-applied file leaves
+     behind a skill nobody authored, and the parser already NAMES the field it
+     could not find, which is the half of an error message worth showing. */
+  const EDIT = new Set();
+  const DRAFT = {};
+  const EDERR = {};
+
+  function docContents(s) {
+    const raw = RAW.has(s.id);
+    if (EDIT.has(s.id)) return `
+      <div class="set2-file is-edit" role="tabpanel">
+        ${EDERR[s.id] ? `<div class="set2-note is-err">${esc(EDERR[s.id])}</div>` : ''}
+        ${isOrg(s) ? `<div class="set2-note is-warn">This is ${esc(ORG)}’s skill.
+          Saving changes it for everyone on the tenancy.</div>` : ''}
+        <textarea class="set2-ed" spellcheck="false" data-ed="${esc(s.id)}"
+                  aria-label="SKILL.md for ${esc(s.name)}">${
+          esc(DRAFT[s.id] != null ? DRAFT[s.id] : toMarkdown(s))}</textarea>
+        <div class="set2-ed-bar">
+          <span class="set2-ed-h"><code class="set2-slug">name</code> is the address another
+            skill collides with. Everything under the frontmatter is the instruction.</span>
+          <button class="btn btn-ghost btn-sm" type="button" data-ed-cancel="${esc(s.id)}">Cancel</button>
+          <button class="btn btn-brand btn-sm" type="button" data-ed-save="${esc(s.id)}">Save</button>
+        </div>
+      </div>`;
+    return `
+      <div class="set2-file" role="tabpanel">
+        <div class="set2-file-bar">
+          <span class="set2-view">
+            <button class="set2-view-b${raw ? '' : ' is-on'}" type="button"
+                    data-sview="pretty" data-sid="${esc(s.id)}" aria-label="Rendered">${I.eye}</button>
+            <button class="set2-view-b${raw ? ' is-on' : ''}" type="button"
+                    data-sview="raw" data-sid="${esc(s.id)}" aria-label="Source">${I.code}</button>
+          </span>
+          <button class="btn btn-ghost btn-sm" type="button" data-ed-open="${esc(s.id)}">Edit</button>
+        </div>
+        <div class="set2-body${raw ? ' is-raw' : ''}">${raw ? esc(toMarkdown(s)) : esc(s.body)}</div>
+      </div>`;
+  }
+
+  function openEdit(id) {
+    /* The source view and the editor show the same characters, so leaving the
+       toggle on `raw` underneath would make Cancel look like it did nothing. */
+    RAW.delete(id); EDIT.add(id); delete EDERR[id];
+    render();
+    const ta = $('[data-ed="' + id + '"]');
+    if (ta) { ta.focus(); ta.setSelectionRange(0, 0); }
+  }
+
+  function closeEdit(id) {
+    EDIT.delete(id); delete DRAFT[id]; delete EDERR[id];
+    render();
+  }
+
+  function saveEdit(id) {
+    const s = skillById(id);
+    const ta = $('[data-ed="' + id + '"]');
+    if (!s || !ta) return;
+    try {
+      const p = parseSkillFile(ta.value);
+      /* Two skills of the SAME owner sharing an address is a mistake — nothing
+         could ever decide between them. Across owners it is the override, and
+         it is allowed, which is the whole point of this screen. */
+      const clash = SKILLS.filter((x) => x.id !== s.id && x.own === s.own
+                    && String(x.slug || '').toLowerCase() === p.slug.toLowerCase())[0];
+      if (clash) throw new Error('You already have a skill addressed `' + p.slug
+        + '`. Two skills with the same owner cannot share a name.');
+      s.slug = p.slug; s.name = p.name; s.desc = p.desc; s.trigger = p.trigger;
+      s.sources = p.sources; s.agents = p.agents; s.products = p.products;
+      s.body = p.body;
+      /* Editing is authorship. The byline follows the edit on a skill of
+         yours; the organisation's keeps the admin who owns it. */
+      if (!isOrg(s)) s.by = USER.name;
+      s.when = 'just now'; s.v = (s.v || 0) + 1;
+      DIRTY.add('file:' + s.id);
+      closeEdit(id);
+    } catch (ex) {
+      EDERR[id] = ex.message;
+      DRAFT[id] = ta.value;
+      render();
+    }
+  }
+
+  /* `saveSlug` stood here — a second field, in the precedence block, editing
+     the address on its own. It is gone with the field: the ADDRESS FOLLOWS THE
+     NAME now, so there is one name, one editor, and no pair to keep in step.
+
+     Slugified the way the file's own comment describes an address: lower case,
+     hyphens, no spaces. If that lands on one of YOUR other skills a numeral is
+     appended rather than an error being raised — an inline rename that stops
+     to argue is worse than one that quietly picks the next free address, and
+     the result is visible immediately in the frontmatter on Contents. Landing
+     on the ORGANISATION's address is not a clash at all: it is the override,
+     and re-creating one deliberately has to stay possible. */
+  const slugify = (v) => String(v).toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'skill';
+
+  function freeSlug(base, s) {
+    const taken = (v) => SKILLS.some((x) => x.id !== s.id && x.own === s.own && nameKey(x) === v);
+    let v = base, n = 2;
+    while (taken(v)) v = base + '-' + (n++);
+    return v;
+  }
+
+  /* ── Precedence, in place ──
+     Two parties, not six levels. The organisation's skill and yours, the one
+     that answers marked and the one that does not marked too — and the rule
+     written out, because a reader who has just found their own skill switched
+     off by something they did not do is owed the reason in a sentence.
+
+     It renders on EVERY skill, contested or not. The uncontested case is one
+     card and one line saying the name is unshared — which is the state most
+     skills are in, and a reader who cannot see the rule stated on a skill that
+     is fine has no way to learn it before the day one is not.
+
+     The editable thing is the ADDRESS. Renaming is not a workaround for the
+     override, it IS the mechanism: two files collide because they answer to
+     one name, and giving yours another name is the whole of un-colliding them.
+     So the rename sits where the collision is explained rather than being
+     something you have to already know to go and do in the file. */
+  function precCard(s, applies, why) {
+    return `
+      <div class="set2-pr-c${applies ? ' is-win' : ''}">
+        <div class="set2-pr-h">
+          <span class="set2-own ${isOrg(s) ? 'is-org' : 'is-you'}">${isOrg(s) ? esc(ORG) : 'Yours'}</span>
+          <span class="set2-from">${esc(s.by)} · ${esc(s.when)} · v${s.v}</span>
+          <span class="set2-pr-p">${applies ? pill('is-ok', 'Applies') : pill('is-mute', 'Does not apply')}</span>
+        </div>
+        <p class="set2-pr-b">${esc(s.body)}</p>
+        <p class="set2-pr-w">${esc(why)}</p>
+      </div>`;
+  }
+
+  function precBlock(s) {
+    const over = shadowedBy(s), under = shadowing(s);
+    const mine = isOrg(s) ? under : s;
+    const theirs = isOrg(s) ? s : over;
+    const pair = !!(mine && theirs);
+
+    return `
+      <section class="set2-prec">
+        <span class="set2-lbl-row">
+          <p class="set2-lbl">Precedence</p>
+          ${tip('precTip', 'precedence', ORG + '’s skills override yours when the two answer to '
+            + 'the same name. Yours is kept and stays editable — it just does not run. Nothing '
+            + 'overrides a skill whose name no one else uses.')}
+        </span>
+        ${!pair ? `
+          ${precCard(s, s.on, s.on ? 'No other skill answers to this name.'
+                                   : 'Switched off, so nothing is handed to an agent.')}` : `
+        ${precCard(theirs, true, 'The organization owns this name.')}
+        ${precCard(mine, false, 'Kept and editable, and handed to no agent while the name collides.')}
+        <div class="set2-pr-act">
+          <!-- A COLLISION IS SOMETHING AIMY NOTICED, so it is said in AiMY's
+               voice, in AiMY's wash, with AiMY's mark — the same treatment the
+               insight band and the type card use, which is what makes three
+               surfaces read as one voice rather than three components that
+               agree. The line under an UNCONTESTED skill is gone entirely: it
+               said the name is unshared, which is not a finding, and dressing
+               "nothing happened" as an insight is how an insight stops meaning
+               anything. -->
+          <p class="set2-ins">
+            ${AIMY_MK(13, 15)}
+            <span class="set2-ins-t">${isOrg(s) ? `
+              Two skills answer to <code class="set2-slug">${esc(nameKey(s))}</code>. This one
+              wins, so ${esc(mine.by)}’s copy is kept and never runs.` : `
+              Two skills answer to <code class="set2-slug">${esc(nameKey(s))}</code>, so yours
+              never runs. Give it another name and it applies again.`}</span>
+            ${isOrg(s) ? `
+              <button class="set2-ins-a" type="button" data-go="skill:${esc(mine.id)}">Open it</button>` : `
+              <!-- Sends you to the name at the top of THIS page rather than
+                   opening a field of its own. A second input for the same
+                   value is a second answer to "what is this called", and the
+                   two would drift the first time somebody used the other one. -->
+              <button class="set2-ins-a" type="button" data-slug-open="${esc(mine.id)}">Rename yours…</button>`}
+          </p>
+        </div>`}
       </section>`;
   }
 
@@ -1437,212 +1929,604 @@
   let RPICK = null;
   const personById = (id) => PEOPLE.filter((p) => p.id === id)[0];
 
+  /* One role on one already-known scope, to one person or to everyone ticked.
+     Somebody who already holds this role at this scope TYPE gains the scope
+     rather than a second group: two "QA Manager on Product" rows against one
+     person is a state nobody asked for and nobody can tell apart. */
+  function grantAt(rp) {
+    const who = rp.bulk ? PEOPLE.filter((x) => PICKED.has(x.id)) : [personById(rp.pid)];
+    who.filter(Boolean).forEach((x) => {
+      let g = x.grants.filter((y) => y.r === rp.role && y.t === rp.at.t)[0];
+      if (!g) { g = { r: rp.role, t: rp.at.t, v: [] }; x.grants.push(g); }
+      if (g.v.indexOf(rp.at.v) < 0) g.v.push(rp.at.v);
+      DIRTY.add('grant:' + x.id);
+    });
+  }
+
+  /* Which role. Each row names it AND everywhere it currently reaches, because
+     "Employee" alone does not say whether the next press costs somebody one
+     client or six. Shared by edit, revoke, and the way BACK out of the client
+     step — same list, same shape, a different verb on the far side of it. */
+  function roleListPop(anchor, p, attr) {
+    popover(anchor, p.grants.map((g, i) => `
+      <button class="set2-pop-i is-role" type="button" ${attr}="${esc(p.id)}:${i}">
+        <span class="set2-pop-tx">
+          <span class="set2-pop-n">${esc(g.r)}</span>
+          <span class="set2-pop-s">${esc(g.v.join(', '))}</span>
+        </span>
+      </button>`).join(''), 'is-roles');
+  }
+
   function paintRPick(anchor) {
     if (!RPICK) { closePop(); return; }
+    /* One ticked person is a selection of one, not "1 people" — and naming
+       them beats counting them, because at that point the count is the less
+       specific of the two things we know. */
+    const ticked = PEOPLE.filter((p) => PICKED.has(p.id));
     const who = RPICK.bulk
-      ? PEOPLE.filter((p) => PICKED.has(p.id)).length + ' people'
+      ? (ticked.length === 1 ? ticked[0].name : ticked.length + ' people')
       : ((personById(RPICK.pid) || {}).name || '');
     const back = (label) => `<button class="set2-pop-back" type="button" data-rp-back>${I.left} ${esc(label)}</button>`;
     let html = '';
 
     if (RPICK.step === 'role') {
+      /* ── SIX FIXED ROLES DO NOT NEED A SEARCH ──
+         The box sat above every one of them and could only ever narrow a list
+         short enough to read in full, while costing the first row its place at
+         the top and taking the focus that should have been on the choice. Same
+         rule the scope menus use: it appears when the list outgrows the panel,
+         and not before.
+
+         ── ORDER IS INFORMATION ──
+         ROLES is authored widest-first, so the list descends by power and
+         where a row sits says something before you have read it. Nothing
+         re-sorts it.
+
+         ── AND WHAT THEY ALREADY HAVE ──
+         Granting somebody a role they hold is a no-op that looks like an
+         action. Held rows say so — precisely: with a scope already decided it
+         means held HERE, because holding QA Manager on CXS tells you nothing
+         about whether they hold it on InterFAX. */
       const q = (RPICK.q || '').toLowerCase();
       const hits = ROLES.filter((r) => !q || r[0].toLowerCase().indexOf(q) >= 0);
-      html = `<div class="set2-pop-hd">Grant to ${esc(who)}</div>
-        <input class="set2-pop-f" type="search" placeholder="Search roles\u2026"
-               value="${esc(RPICK.q || '')}" data-rp-q autocomplete="off" aria-label="Search roles">`
-        + (hits.length ? hits.map((r) => `
-            <button class="set2-pop-i" type="button" data-rp-role="${esc(r[0])}">
-              <span class="set2-pop-n">${esc(r[0])}</span>
-              <span class="set2-pop-s">${esc(r[1])}</span>
-            </button>`).join('')
+      const holds = (role) => {
+        const of = (x) => x.grants.some((g) => g.r === role
+          && (!RPICK.at || (g.t === RPICK.at.t && g.v.indexOf(RPICK.at.v) > -1)));
+        if (!RPICK.bulk) { const p = personById(RPICK.pid); return !!p && of(p); }
+        return ticked.length > 0 && ticked.every(of);
+      };
+
+      html = `<div class="set2-pop-hd">Grant to ${esc(who)}${
+        RPICK.at ? ' on <b>' + esc(RPICK.at.v) + '</b>' : ''}</div>
+        ${ROLES.length > 7 ? `<input class="set2-pop-f" type="search" placeholder="Search roles…"
+               value="${esc(RPICK.q || '')}" data-rp-q autocomplete="off" aria-label="Search roles">` : ''}`
+        + (hits.length ? hits.map((r) => {
+            const on = holds(r[0]);
+            return `
+            <button class="set2-pop-i is-role${on ? ' is-on' : ''}" type="button"
+                    data-rp-role="${esc(r[0])}" aria-current="${on ? 'true' : 'false'}">
+              <span class="set2-pop-tx">
+                <span class="set2-pop-n">${esc(r[0])}</span>
+                <span class="set2-pop-s">${esc(r[1])}</span>
+              </span>
+              <span class="set2-pop-k" aria-label="${on ? 'Already held' : ''}">${I.tick}</span>
+            </button>`;
+          }).join('')
           : `<div class="set2-pal-empty">No role called <b>${esc(RPICK.q)}</b>.</div>`);
 
-    } else if (RPICK.step === 'type') {
-      html = back(RPICK.role) + SCOPE_TYPES.map((t) => `
-        <button class="set2-pop-i" type="button" data-rp-type="${esc(t)}">
-          <span class="set2-pop-n">${esc(t)}</span>
-          <span class="set2-pop-s">${nodesOfType(t).length}</span>
-        </button>`).join('');
-
     } else {
+      /* ── STEP TWO OF TWO: WHICH CLIENTS ──
+         The type step is gone. It asked which KIND of scope, and there is only
+         one kind a grant can name, so it was a question with a single answer
+         standing between the role and the clients every time. */
       const p = RPICK.pid ? personById(RPICK.pid) : null;
       const g = (p && RPICK.gi != null) ? p.grants[RPICK.gi] : null;
       /* In the plural case a scope counts as HELD only when every selected
          person has it — a tick against something half of them have is a lie. */
       const have = g ? g.v : (RPICK.bulk
-        ? nodesOfType(RPICK.type).filter((v) => {
+        ? nodesOfType('Client').filter((v) => {
             const sel = PEOPLE.filter((x) => PICKED.has(x.id));
             return sel.length && sel.every((x) => x.grants.some((gr) =>
-              gr.r === RPICK.role && gr.t === RPICK.type && gr.v.indexOf(v) > -1));
+              gr.r === RPICK.role && gr.v.indexOf(v) > -1));
           })
         : (RPICK.v || []));
-      html = back(RPICK.type) + nodesOfType(RPICK.type).map((v) => `
-        <button class="set2-pop-i${have.indexOf(v) > -1 ? ' is-on' : ''}" type="button" data-rp-val="${esc(v)}">
+      /* The tick sits ON the name's row and its space is reserved whether or
+         not it is showing — it was a second child of a column-flowing row, so
+         it dropped UNDER the client name, and appearing only when ticked would
+         have shifted every name sideways as you picked. Same treatment the
+         scope and role menus use. */
+      html = back(RPICK.role) + nodesOfType('Client').map((v) => {
+        const on = have.indexOf(v) > -1;
+        return `
+        <button class="set2-pop-i is-val${on ? ' is-on' : ''}" type="button"
+                data-rp-val="${esc(v)}" aria-pressed="${on}">
           <span class="set2-pop-n">${esc(v)}</span>
-          ${have.indexOf(v) > -1 ? `<span class="set2-pop-p">${I.tick}</span>` : ''}
-        </button>`).join('');
+          <span class="set2-pop-k">${I.tick}</span>
+        </button>`;
+      }).join('');
     }
-    popover(anchor, html);
+    popover(anchor, html, RPICK.step === 'role' ? 'is-roles' : '');
     const f = $('[data-rp-q]');
     if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
   }
 
-  /* ══ ACCESS ════════════════════════════════════════════════════════════
-     CARDS. A person is a thing, and their grants are a nested, independently
-     expandable structure that a table row cannot hold — which is why the
-     production surface uses cards and why they are the right call.
+  /* ══ PEOPLE ════════════════════════════════════════════════════════════
+     ANCHORED TO A SCOPE, NOT TO THE DIRECTORY.
 
-     What made the card grid bad was never the cards. It was two things:
+     This replaces a grid of one card per person. The cards were not the
+     problem — a grant really is a nested structure a table row cannot hold —
+     but their height was the roster, and this workspace is an MSP with ten
+     clients and fourteen products under Upland alone. Five cards is a page;
+     five hundred is a scroll with no question at the top of it.
 
-     1. VARIABLE HEIGHT. Everyone holds a different number of grants, so every
-        card was a different height and the grid was ragged by construction.
-        Fixed height now, with the grants area scrolling inside its own box.
-        The card is a frame; what it contains varies and the frame does not.
-     2. MY OWN COLLISIONS. The save bar sat over the second row, the scope
-        popover floated detached across two cards, and half the controls were
-        under the 24px target floor. None of that was the pattern's fault.
+     So the page asks a scope and answers who reaches it. InterFAX Support has
+     two people whether the company has fifty staff or five thousand.
 
-     Groups are COLLAPSED by default so the resting height is predictable and
-     the card shows what somebody can reach without being opened. */
-  function grantGroup(p, g, i) {
-    const key = p.id + ':' + i;
-    const open = GOPEN.has(key);
-    return `
-      <div class="set2-gr${open ? ' is-open' : ''}">
-        <button class="set2-gr-hd" type="button" data-gr="${esc(key)}" aria-expanded="${open}">
-          ${I.down}
-          <span class="set2-gr-r">${esc(g.r)}</span>
-          <span class="set2-chip is-type">${esc(g.t)}</span>
-          <span class="set2-gr-n">${g.v.length}</span>
-        </button>
-        <button class="set2-gr-del" type="button" data-gr-del="${esc(key)}"
-                aria-label="Remove ${esc(g.r)} on ${esc(g.t)}">${I.trash}</button>
-        <div class="set2-gr-bd">
-          ${g.v.map((v, j) => `
-            <span class="set2-chip is-scope">${esc(v)}
-              <button class="set2-chip-x" type="button" data-gr-v="${esc(p.id)}:${i}:${j}"
-                      aria-label="Revoke ${esc(v)}">${I.x}</button>
-            </span>`).join('')}
-          <button class="set2-grant-add" type="button" data-gr-add="${esc(key)}">+ Add scope</button>
-        </div>
-      </div>`;
+     ── THE SPLIT IS THE POINT ──
+     Everyone who reaches a node arrives one of two ways, and a flat roster
+     prints them identically:
+
+       GRANTED HERE          the grant names this node. Revocable in place.
+       INHERITED FROM ABOVE  the grant names an ancestor. NOT revocable here —
+                             you have to go up to where it was written.
+
+     Drawing that is the difference between a revocation that works and one
+     that silently does nothing, which is the failure a flat list invites: you
+     press Revoke on Nour at InterFAX, the grant lives on Upland, and either
+     nothing happens or you quietly cut her out of thirteen other products.
+
+     ── THE ROOT IS EVERYONE ──
+     Two things have no scope: inviting somebody, and holding nothing. Both
+     live at the root, which is not "the organisation" as a place so much as
+     the directory. It splits three ways instead of two — organisation-wide,
+     scoped below, and no access — which makes the two facts an admin audits
+     for into groups rather than a warning in a lede.
+
+     ── WHAT MOVED, NOT WHAT WENT ──
+     One person's COMPLETE access no longer has a card of its own. It has two
+     homes instead: the root lists every grant they hold as chips you can jump
+     through, and search — which is global, and deliberately ignores the scope
+     — finds them from anywhere and does the same. Editing a grant happens
+     where it applies, which is the whole argument for the shape.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  /* Indexed once. `pathTo` runs per person per grant per render, and walking
+     the tree from the top each time is how a five-person fixture teaches you
+     nothing about a five-hundred-person one. */
+  const NODE_AT = (() => {
+    const m = {};
+    (function walk(ns, parent) {
+      ns.forEach((n) => { m[n.id] = { node: n, pid: parent ? parent.id : null };
+        if (n.kids) walk(n.kids, n); });
+    })(TREE, null);
+    return m;
+  })();
+  const ROOT_ID = TREE[0].id;
+  const nodeById = (id) => ((NODE_AT[id] || NODE_AT[ROOT_ID]).node);
+  /* People can only ever stand at the root or on a CLIENT, because that is all
+     a grant can name. A `?node=` pointing anywhere else — a stale link from
+     when grants carried a scope type, or one copied out of Scopes, which still
+     addresses all six levels — resolves to the root rather than to a page that
+     would answer "nobody" for a reason it could not explain. */
+  const CLIENTS = () => (TREE[0].kids || []).filter((n) => n.type === 'Client');
+  const clientOfSt = (st) => CLIENTS().filter((c) => c.id === st.node)[0] || null;
+  function pathTo(id) {
+    const out = [];
+    let e = NODE_AT[id] || NODE_AT[ROOT_ID];
+    while (e) { out.unshift(e.node); e = e.pid ? NODE_AT[e.pid] : null; }
+    return out;
+  }
+  /* A grant covers a node when it names that exact node. Everything else in
+     this module is that one predicate, asked about a different node. */
+  const covers = (g, n) => g.t === n.type && g.v.indexOf(n.name) > -1;
+
+  /* Which KINDS of scope somebody holds anything on — what the Access filter
+     narrows by. It lived beside the person card and went with it; the filter
+     that reads it did not, so this is where it lives now. */
+
+  /* Who reaches this node, and by which route. `at` on an inherited grant is
+     the DEEPEST ancestor carrying it — the one you would actually have to go
+     to. Naming a shallower one would send the reader to a page where the
+     grant is not written either. */
+  function reachAt(node, list) {
+    const anc = pathTo(node.id).slice(0, -1);
+    const here = [], up = [];
+    list.forEach((p) => {
+      const mine = [], from = [];
+      p.grants.forEach((g) => {
+        if (covers(g, node)) { mine.push({ g: g }); return; }
+        for (let i = anc.length - 1; i >= 0; i--) {
+          if (covers(g, anc[i])) { from.push({ g: g, at: anc[i] }); break; }
+        }
+      });
+      if (mine.length) here.push({ p: p, gs: mine, from: from });
+      else if (from.length) up.push({ p: p, gs: from });
+    });
+    return { here: here, up: up };
   }
 
-  const reachTypes = (p) => p.grants.map((g) => g.t).filter((v, i, a) => a.indexOf(v) === i);
-  const reachCount = (p) => p.grants.reduce((a, g) => a + g.v.length, 0);
-
-  function personCard(p) {
-    const picked = PICKED.has(p.id);
-    const n = reachCount(p);
-    return `
-      ${/* Two facts a quick action needs to locate: an invite nobody accepted,
-             and somebody who can reach nothing. Both were readable on the card
-             and neither was addressable. */ ''}
-      <div class="set2-person${picked ? ' is-picked' : ''}${
-          !p.grants.length ? ' is-none' : p.s[0] === 'is-warn' ? ' is-warn' : ''
-        }" data-person="${esc(p.id)}">
-        <div class="set2-person-hd">
-          <button class="set2-ck2" type="button" role="checkbox" aria-checked="${picked}"
-                  data-pick-p="${esc(p.id)}" aria-label="Select ${esc(p.name)}">${picked ? I.tick : ''}</button>
-          <span class="set2-av">${esc(initialsOf(p.name))}</span>
-          <span class="set2-person-lines">
-            <span class="set2-person-n">${esc(p.name)}</span>
-            <span class="set2-person-m">${esc(p.mail)}</span>
-          </span>
-          <button class="set2-kebab" type="button" data-person-menu="${esc(p.id)}"
-                  aria-haspopup="menu" aria-label="More for ${esc(p.name)}">
-            <span></span><span></span><span></span>
-          </button>
-        </div>
-        <div class="set2-person-tags">
-          ${pill(p.s[0], p.s[1] === 'Invite pending' ? 'Pending' : p.s[1])}
-          ${p.admin ? pill('is-info', 'Admin') : ''}
-          <span class="set2-from">${n ? n + ' scope' + (n === 1 ? '' : 's') : 'reaches nothing'}</span>
-        </div>
-        ${/* Its own scroll port. A person with six roles does not get to set the
-              height of the row they happen to sit in. */ ''}
-        ${/* A scrolling region a keyboard user cannot reach is a region they
-              can only read the top of. Named and focusable, per the scrollable
-              -region rule. */ ''}
-        <div class="set2-grants" tabindex="0" role="group"
-             aria-label="Roles held by ${esc(p.name)}">
-          ${p.grants.length ? p.grants.map((g, i) => grantGroup(p, g, i)).join('')
-            : `<div class="set2-grant is-none">No roles yet. This account can sign in and reach nothing.</div>`}
-        </div>
-        <div class="set2-person-ft">
-          <button class="set2-gr-new" type="button" data-role-new="${esc(p.id)}">+ Grant a role</button>
-        </div>
-      </div>`;
-  }
+  const passes = (p, f) => {
+    if (f.role && !p.grants.some((g) => g.r === f.role)) return false;
+    if (f.status && p.s[1] !== f.status) return false;
+    return true;
+  };
 
   M.access = function (st) {
     return pageBody(st);
   };
 
+  /* ── People's scope IS the Connections scope ──
+     It was crumbs plus one picker: plain text for the ancestors, a control
+     only on the node you were standing on. That is a second treatment of the
+     idea two modules over already have, and having both means the same
+     question looks like two different things depending on which page asked
+     it. So this is that component — `.set2-scope-pick`, kind label, bold
+     value, caret — one per level, exactly as Dynamic fields draws Client and
+     Product.
+
+     The org is static text, again as over there: Connections starts its
+     pickers at Client because the organisation is not a choice. Neither is it
+     here.
+
+     The trailing picker is how you go DEEPER, and it is the same control in
+     its unset state — `Team · All` rather than a second idiom for descending.
+
+     It used to FADE while searching. Search is global here on purpose, so the
+     header would otherwise say `InterFAX Support` over results drawn from the
+     whole workspace — the scope has not moved, it just is not what you are
+     reading from. Fading it said that by making the breadcrumb you need to get
+     back the least readable thing on the page at the moment you are lost in
+     it. The line below it already says the search is global, in words. */
+  function scopePick(kind, name, listFrom) {
+    return `<button class="set2-scope-pick" type="button" data-scope-pick="${esc(listFrom)}"
+              aria-haspopup="menu" aria-label="Choose a ${esc(kind.toLowerCase())}">
+        <span class="set2-scope-k">${esc(kind)}</span><b>${esc(name)}</b>${I.down}
+      </button>`;
+  }
+
+  function peopleScope(st) {
+    const client = clientOfSt(st);
+    const searching = !!(readF(st).q || '').trim();
+    const sep = '<span class="set2-scope-s">&rsaquo;</span>';
+    const n = searching ? 0 : peopleReach(client, st);
+    return `
+      <div class="set2-scope">
+        <span class="set2-scope-i">Org <b>${esc(TREE[0].name)}</b></span>
+        ${sep}
+        ${scopePick('Client', client ? client.name : 'All', ROOT_ID)}
+        ${sep}
+        ${searching
+          ? `<span class="set2-scope-i">search ignores it</span>`
+          : `<span class="set2-scope-i">${n === 1 ? '1 person has a role'
+              : n + ' people have a role'}</span>`}
+      </div>`;
+  }
+
+  /* The header is painted before the body, so it cannot read the count off a
+     rendered group. It asks the model the same question the body will. */
+  function peopleReach(client, st) {
+    const pool = PEOPLE.filter((p) => passes(p, readF(st)));
+    if (!client) return pool.filter((p) => p.grants.length).length;
+    return pool.filter((p) => p.grants.some((g) => covers(g, client))).length;
+  }
+
+  /* Not URL state. The menu is open for one gesture and the query dies with
+     it — restoring it on a fresh load would restore a search nobody is running
+     any more, in a panel that is not on screen. */
+  let SCOPE_Q = '';
+
+  /* One LEVEL per menu, which is what makes it the same control as the
+     Connections one rather than a tree wearing its clothes.
+
+     ── NO HEADING ──
+     It said "In FlairsTech" over a list of FlairsTech's clients, which is the
+     panel narrating its own contents to somebody who just pressed the button
+     that opened it. Neither Connections picker has one. The widen row says the
+     parent's name anyway, and it says it as something you can press.
+
+     ── THE ROW HAS TO SAY WHAT YOU WOULD GET ──
+     A name and a bare `2` told you a number about something without saying
+     what it counted. Every row now carries the two facts this page exists to
+     answer — how many people reach it, and whether there is anything under it
+     to go on to — which is the same move `data-client-pick` makes with
+     "2 connected / nothing connected".
+
+     ── AND WHICH ONE YOU ARE ON ──
+     A background tint alone marks the current row the same way hovering does,
+     so on the row under the cursor the two are indistinguishable. It takes a
+     tick as well. */
+  const scopeLine = (n, st) => {
+    const ppl = peopleReach(n, st);
+    return ppl ? ppl + (ppl === 1 ? ' person' : ' people') : 'nobody yet';
+  };
+
+  function scopeItem(n, curId, wide, gap) {
+    const on = wide ? !curId : curId === n.id;
+    const st = readURL();
+    return `
+      <button class="set2-pop-i is-scope${on ? ' is-on' : ''}${wide ? ' is-wide' : ''}${
+        gap ? ' is-gap' : ''}"
+              type="button" data-scope-go="${esc(wide ? '' : n.id)}"
+              aria-current="${on ? 'true' : 'false'}">
+        <span class="set2-pop-tx">
+          <span class="set2-pop-n">${wide ? 'Every client' : esc(n.name)}</span>
+          <span class="set2-pop-p">${esc(wide ? scopeLine(null, st) : scopeLine(n, st))}</span>
+        </span>
+        <span class="set2-pop-k">${I.tick}</span>
+      </button>`;
+  }
+
+  /* ONE list, because there is one grantable level. It was a level-at-a-time
+     walk down six of them, which is the right control for a tenancy tree and
+     the wrong one for a choice among six clients. */
+  function paintScopePick(anchor, _parentId, q) {
+    const st = readURL();
+    const cur = (clientOfSt(st) || {}).id || '';
+    const k = (q || '').toLowerCase();
+    const all = CLIENTS();
+    const kids = all.filter((n) => !k || n.name.toLowerCase().indexOf(k) > -1);
+    popover(anchor, `
+      ${all.length > 7 ? `<input class="set2-pop-f" type="search" placeholder="Search clients…"
+             value="${esc(q || '')}" data-scope-q autocomplete="off" aria-label="Search clients">` : ''}
+      ${scopeItem(null, cur, true)}
+      ${kids.length ? kids.map((n, i) => scopeItem(n, cur, false, i === 0)).join('')
+        : `<div class="set2-pal-empty">No client called <b>${esc(q)}</b>.</div>`}`);
+  }
+
+  /* ── A person, on this scope ──
+     Same row everywhere; only the last cell changes, because what you can DO
+     is the only thing that differs between reaching here and reaching through
+     here. */
+  function personRow(p, opts) {
+    const picked = PICKED.has(p.id);
+    /* Read off the person, not passed in by the caller. Two facts a quick
+       action from the rail needs to LOCATE and not merely count: an invite
+       nobody accepted, and somebody who can reach nothing. Both were on the
+       old card as classes and both keep their names here, so the fix that
+       aims at them did not have to learn a new selector. */
+    const state = !p.grants.length ? ' is-none' : p.s[0] === 'is-warn' ? ' is-warn' : '';
+    return `
+      <div class="set2-sp-row${picked ? ' is-picked' : ''}${state}"
+           data-person="${esc(p.id)}">
+        <button class="set2-ck2" type="button" role="checkbox" aria-checked="${picked}"
+                data-pick-p="${esc(p.id)}" aria-label="Select ${esc(p.name)}">${picked ? I.tick : ''}</button>
+        <span class="set2-av">${esc(initialsOf(p.name))}</span>
+        <span class="set2-sp-lines">
+          <span class="set2-sp-n2">${esc(p.name)}${
+            p.s[0] === 'is-warn' ? pill('is-warn', 'Pending') : ''}${
+            p.admin ? pill('is-info', 'Admin') : ''}</span>
+          <span class="set2-sp-m">${esc(p.mail)} &middot; ${esc(p.title)}</span>
+        </span>
+        <span class="set2-sp-why">${opts.why}</span>
+        <span class="set2-sp-act">${opts.act || ''}</span>
+        <button class="set2-kebab" type="button" data-person-menu="${esc(p.id)}"
+                aria-haspopup="menu" aria-label="More for ${esc(p.name)}">
+          <span></span><span></span><span></span>
+        </button>
+      </div>`;
+  }
+
+  const roleChip = (r) => `<span class="set2-chip is-role">${esc(r)}</span>`;
+
+  /* Which people have their roles open. A gesture mid-read, so not in the URL
+     — the same reasoning that keeps the selection out of it. */
+  const ROPEN = new Set();
+
+  /* ── ONE LINE PER GRANT ──
+     These ran inline: `Super Admin · Upland · QA Manager · CXS · Admin · CXS`,
+     one undifferentiated run where the only thing marking where one grant
+     ended and the next began was the chips' fill. At three grants you are
+     parsing styling to find boundaries. A grant is role × clients, so it gets
+     a line, and the role names align into a column you can read down.
+
+     ── AND THE ACCORDION ONLY WHERE IT EARNS ITS CLICK ──
+     One grant is already one line; a toggle over it would hide nothing and
+     cost a press. Two or more collapse — but the collapsed state still NAMES
+     the roles, because "who is a Super Admin" is the question this page is
+     opened with and putting that behind a click would be the card grid's old
+     defect in a new shape. What the toggle hides is which CLIENTS each one
+     reaches, which is the detail you go looking for rather than scan for. */
+  function grantBlock(p) {
+    if (!p.grants.length) {
+      return `<span class="set2-sp-note">Can sign in and reach nothing.</span>`;
+    }
+    const lines = p.grants.map((g) => `
+      <span class="set2-sp-grant">
+        ${roleChip(g.r)}
+        <span class="set2-sp-on">${g.v.map((v) =>
+          scopeChip(v, idOfName(v, g.t))).join('')}</span>
+      </span>`).join('');
+
+    if (p.grants.length === 1) return `<span class="set2-sp-grants">${lines}</span>`;
+
+    const open = ROPEN.has(p.id);
+    return `
+      ${/* "Show roles" was a lie: the roles are already on the row, named, in
+            the summary beside this button. What it opens is the BREAKDOWN —
+            which clients each of those roles reaches. The label stays constant
+            and the caret carries the state, so the word under the cursor does
+            not change as you press it. */ ''}
+      <button class="set2-sp-toggle" type="button" data-roles="${esc(p.id)}"
+              aria-expanded="${open}">
+        ${I.caret}Roles breakdown
+      </button>
+      ${open ? `<span class="set2-sp-grants">${lines}</span>`
+        : `<span class="set2-sp-sum">${p.grants.map((g) => roleChip(g.r)).join('')}</span>`}`;
+  }
+  /* A chip that goes somewhere. Used where a grant is written on a node other
+     than the one you are looking at — the chip names the scope and takes you
+     to it, so "not revocable here" is a direction and not just a refusal. */
+  const scopeChip = (name, id) => id
+    ? `<button class="set2-chip is-scope is-go" type="button" data-scope-go="${esc(id)}">${esc(name)}</button>`
+    : `<span class="set2-chip is-scope">${esc(name)}</span>`;
+
+  const idOfName = (name, type) => {
+    let hit = null;
+    (function walk(ns) { ns.forEach((n) => {
+      if (!hit && n.name === name && n.type === type) hit = n.id;
+      if (n.kids) walk(n.kids); }); })(TREE);
+    return hit;
+  };
+
+  function group(label, kind, n, body, end) {
+    return `
+      <div class="set2-sp-g">
+        <div class="set2-sp-gt ${kind}">${esc(label)}<span class="set2-num">${n}</span>
+          ${end || ''}</div>
+        ${body}
+      </div>`;
+  }
+
   function secPeople(st) {
     const f = readF(st);
-    const q = (f.q || '').toLowerCase();
-    const list = PEOPLE.filter((p) => {
-      if (q && (p.name + ' ' + p.mail + ' ' + p.title).toLowerCase().indexOf(q) < 0) return false;
-      if (f.role && !p.grants.some((g) => g.r === f.role)) return false;
-      if (f.status && p.s[1] !== f.status) return false;
-      if (f.access && reachTypes(p).indexOf(f.access) < 0) return false;
-      return true;
-    });
-    const shown = list.map((p) => p.id);
-    [...PICKED].forEach((id) => { if (shown.indexOf(id) < 0) PICKED.delete(id); });
+    const q = (f.q || '').trim();
+    const client = clientOfSt(st);
+    const atRoot = !client;
+    const pool = PEOPLE.filter((p) => passes(p, f));
 
-    const narrowed = list.length !== PEOPLE.length;
-    const pend = PEOPLE.filter((p) => p.s[0] === 'is-warn').length;
-    const none = PEOPLE.filter((p) => !p.grants.length).length;
-    const allOn = list.length > 0 && list.every((p) => PICKED.has(p.id));
-    const picked = PEOPLE.filter((p) => PICKED.has(p.id));
+    /* Selection is scoped to what is on screen, the way it always was — a tick
+       that survives a change of scope is a tick against rows you can no longer
+       see. */
+    const body = q ? searchBody(q, f) : atRoot ? rootBody(pool, st) : clientBody(client, pool);
+    const shownIds = [];
+    (body.ids || []).forEach((id) => shownIds.push(id));
+    [...PICKED].forEach((id) => { if (shownIds.indexOf(id) < 0) PICKED.delete(id); });
+
+    const allOn = shownIds.length > 0 && shownIds.every((id) => PICKED.has(id));
+    const narrowed = pool.length !== PEOPLE.length;
 
     return `
-      <section class="set2-sec" id="st-people">
-        <div class="set2-sec-h"><h2 class="set2-sec-t">People</h2></div>
-
-        ${inviteBar()}
+      <section class="set2-sec is-headless" id="st-people">
 
         <div class="set2-fbar">
           <button class="set2-ck2" type="button" role="checkbox" aria-checked="${allOn}"
                   data-pick-all aria-label="Select everyone shown">${allOn ? I.tick : ''}</button>
-          <input class="set2-fld set2-fbar-q" type="search" placeholder="Search team…"
-                 value="${esc(f.q || '')}" data-f-q aria-label="Search team">
+          ${/* One search, and it does NOT respect the scope. Looking somebody up
+                is how you find out where they are — narrowing it to the node you
+                happen to be on would answer "not here" for everyone you cannot
+                already see. The results say so on the way past. */ ''}
+          <input class="set2-fld set2-fbar-q" type="search" placeholder="Search everyone…"
+                 value="${esc(f.q || '')}" data-f-q aria-label="Search everyone">
           <span class="set2-fbar-end">
+            ${/* Role and Status. "Access" offered the five scope TYPES, and a
+                  grant names a client and nothing else now — so every option in
+                  it but Client matched zero people, and Client matched all of
+                  them. A filter that cannot narrow is a control that teaches
+                  the reader their filters do not work. */ ''}
             ${filterSel(st, 'role', 'Role', ROLES.map((r) => r[0]))}
             ${filterSel(st, 'status', 'Status', ['Active', 'Invite pending'])}
-            ${filterSel(st, 'access', 'Access', SCOPE_TYPES)}
-            ${narrowed ? `<button class="btn btn-ghost btn-sm" type="button" data-f-clear>Clear</button>` : ''}
+            ${narrowed || q ? `<button class="btn btn-ghost btn-sm" type="button" data-f-clear>Clear</button>` : ''}
+            ${/* Root only, as the invite bar was. Adding somebody is a
+                  directory act, not a scoped one — offered from inside
+                  InterFAX Support it would add a person who then does not
+                  appear, because they reach nothing yet and nothing is where
+                  the root keeps them. */ ''}
+            ${atRoot && !q ? `<button class="btn btn-brand btn-sm" type="button" data-add-user>Add user</button>` : ''}
           </span>
         </div>
 
-        <p class="set2-lede">${list.length}${narrowed ? ' of ' + PEOPLE.length : ''} ${
-          (narrowed ? PEOPLE.length : list.length) === 1 ? 'person' : 'people'} · <b>${
-          PEOPLE.filter((p) => p.admin).length}</b> admins${
-          pend ? ` · <b class="is-warn">${pend}</b> pending` : ''}${
-          none ? ` · <b class="is-warn">${none}</b> with no access` : ''}</p>
-
-        ${list.length
-          ? `<div class="set2-team">${list.map(personCard).join('')}</div>`
-          : `<div class="set2-empty"><b>Nobody matches</b>No one on the team fits those filters.</div>`}
+        ${body.html}
       </section>
 
-      ${PICKED.size ? `
-        <div class="set2-bulk" role="region" aria-label="Actions for the selection">
-          <span class="set2-bulk-n"><b class="set2-num">${PICKED.size}</b> selected</span>
-          <button class="set2-lnk" type="button" data-pick-none>Deselect</button>
-          <span class="set2-bulk-end">
-            <button class="btn btn-ghost btn-sm" type="button" data-bulk-grant>Grant a role</button>
-            ${picked.some((p) => p.s[0] === 'is-warn')
-              ? `<button class="btn btn-ghost btn-sm" type="button" data-bulk-resend>Resend invite${
-                   picked.filter((p) => p.s[0] === 'is-warn').length > 1 ? 's' : ''}</button>` : ''}
-            <button class="btn btn-ghost btn-sm is-err" type="button" data-bulk-rm>Remove</button>
-          </span>
-        </div>` : ''}
+      ${PICKED.size ? bulkBar(client, atRoot) : ''}`;
+  }
 
-      `;
+  /* ── THE SPLIT WENT WITH THE LEVELS ──
+     This had three groups at the root and two at a node: organisation-wide,
+     scoped below, no access; then granted-here against inherited-from-above.
+     All five described a hierarchy of grants that no longer exists. A grant
+     names clients, nothing sits above a client, so nothing is ever inherited
+     and no grant is ever wider than another.
+
+     What is left is the only distinction the model still supports, and it is
+     the one worth having: who holds something, and who holds nothing. */
+  function rootBody(pool, st) {
+    const has = pool.filter((p) => p.grants.length);
+    const none = pool.filter((p) => !p.grants.length);
+    const ids = has.concat(none).map((p) => p.id);
+
+    if (!ids.length) {
+      return { ids: ids, html:
+        `<div class="set2-empty"><b>Nobody matches</b>No one fits those filters.
+          <button class="btn btn-ghost btn-sm" type="button" data-f-clear>Clear filters</button></div>` };
+    }
+
+    const html = [
+      has.length ? group('Has a role', 'is-ok', has.length,
+        has.map((p) => personRow(p, { why: grantBlock(p) })).join('')) : '',
+
+      none.length ? group('No access', 'is-err', none.length,
+        none.map((p) => personRow(p, { mute: true,
+          why: `<span class="set2-sp-note">Can sign in and reach nothing.</span>`,
+          act: `<button class="set2-lnk" type="button" data-role-new="${esc(p.id)}">Grant a role</button>`
+        })).join('')) : ''
+    ].join('');
+
+    return { ids: ids, html: html };
+  }
+
+  /* ── One client ── */
+  function clientBody(client, pool) {
+    const on = pool.filter((p) => p.grants.some((g) => covers(g, client)));
+    const ids = on.map((p) => p.id);
+
+    if (!ids.length) {
+      return { ids: ids, html:
+        `<div class="set2-empty"><b>Nobody has a role on ${esc(client.name)}</b>
+          No grant names this client.
+          <button class="btn btn-ghost btn-sm" type="button" data-scope-go="">Back to everyone</button></div>` };
+    }
+
+    return { ids: ids, html: group('Has a role on ' + client.name, 'is-ok', on.length,
+      on.map((p) => personRow(p, {
+        /* Only the roles that apply HERE. Printing the rest would answer a
+           question about a client you are not looking at. */
+        why: p.grants.filter((g) => covers(g, client)).map((g) => roleChip(g.r)).join(''),
+        act: `<button class="set2-lnk is-err" type="button"
+                data-revoke="${esc(p.id)}:${esc(client.id)}">Revoke here</button>`
+      })).join('')) };
+  }
+
+  /* ── Search: the one view that is not scope-bound ── */
+  function searchBody(q, f) {
+    const k = q.toLowerCase();
+    const hits = PEOPLE.filter((p) => passes(p, f)
+      && (p.name + ' ' + p.mail + ' ' + p.title).toLowerCase().indexOf(k) >= 0);
+    if (!hits.length) {
+      return { ids: [], html:
+        `<div class="set2-empty"><b>Nobody matches</b>No one in the workspace answers to
+          <b>${esc(q)}</b>.
+          <button class="btn btn-ghost btn-sm" type="button" data-f-clear>Clear search</button></div>` };
+    }
+    return { ids: hits.map((p) => p.id), html:
+      group('Everywhere in the workspace', '', hits.length,
+        hits.map((p) => personRow(p, {
+          why: grantBlock(p),
+          act: p.grants.length ? '' :
+            `<button class="set2-lnk" type="button" data-role-new="${esc(p.id)}">Grant a role</button>`
+        })).join(''),
+        `<span class="set2-sp-ge">search ignores the scope</span>`) };
+  }
+
+  function bulkBar(client, atRoot) {
+    const picked = PEOPLE.filter((p) => PICKED.has(p.id));
+    return `
+      <div class="set2-bulk" role="region" aria-label="Actions for the selection">
+        <span class="set2-bulk-n"><b class="set2-num">${PICKED.size}</b> selected</span>
+        <button class="set2-lnk" type="button" data-pick-none>Deselect</button>
+        <span class="set2-bulk-end">
+          ${/* Pre-scoped to where you are, so the picker asks one question
+                instead of three. At the root that means organisation-wide, and
+                the panel says so in its heading rather than leaving it to be
+                inferred from a breadcrumb behind a popover. */ ''}
+          <button class="btn btn-ghost btn-sm" type="button" data-bulk-grant>Grant a role${
+            atRoot ? '' : ' here'}</button>
+          ${picked.some((p) => p.s[0] === 'is-warn')
+            ? `<button class="btn btn-ghost btn-sm" type="button" data-bulk-resend>Resend invite${
+                 picked.filter((p) => p.s[0] === 'is-warn').length > 1 ? 's' : ''}</button>` : ''}
+          <button class="btn btn-ghost btn-sm is-err" type="button" data-bulk-rm>Remove</button>
+        </span>
+      </div>`;
   }
 
   const CAPS = [
@@ -1672,53 +2556,567 @@
     lock: ['is-ok', 'Always']
   };
 
-  M.roles = () => `
-    <section class="set2-sec" id="st-roles">
-      ${/* It read "Locked cells cannot be changed", which implies the
-            unlocked ones can. None can -- every cell is a static `td`. A
-            client admin clicks, gets nothing, and concludes the product is
-            broken rather than that the table is a reference. It says what it
-            is. */ ''}
-      ${/* No "New role" button. The note under the table says nothing here
-            is editable; a button in the head offering to add a row to it was
-            the table contradicting itself, and it did nothing when pressed. */ ''}
-      <div class="set2-sec-h"><h2 class="set2-sec-t">Roles</h2></div>
-      <div class="set2-matrix-wrap">
-        <table class="set2-matrix" aria-label="What each role can do — reference only, not editable">
-          <thead><tr><th></th>${ROLES.map((r) => `<th>${esc(r[0])}</th>`).join('')}</tr></thead>
-          <tbody>
-            ${CAPS.map(([group, caps]) => `
-              <tr class="set2-matrix-g"><td colspan="${ROLES.length + 1}">${esc(group)}</td></tr>
-              ${caps.map(([cap, states]) => `
-                <tr>
-                  <td class="set2-matrix-cap">${esc(cap)}</td>
-                  ${states.map((s) => {
-                    const [cls, label] = CAP_STATE[s];
-                    return `<td class="set2-cell ${cls}${s === 'lock' ? ' is-locked' : ''}">
-                      ${s === 'lock' ? I.lock : ''}${esc(label)}</td>`;
-                  }).join('')}
-                </tr>`).join('')}`).join('')}
-          </tbody>
-        </table>
-      </div>
-      <div class="set2-note" style="margin-top:0.75rem">This table is a reference — what each role can already do. Nothing in it is editable, including the cells without a lock: the lock marks the two capabilities that could not be granted back from inside the product if every admin gave them up. Change who holds a role above.</div>
-    </section>`;
+  /* ══ ROLES ═════════════════════════════════════════════════════════════
+     ONE ROLE AT A TIME, AND COMPARISON AS A DELTA.
 
-  M.hierarchy = () => {
-    const rows = [];
-    TREE.forEach((n) => walk(n, 1, rows, new Set(), ''));
+     This replaces a six-by-twelve matrix. The matrix was honest about being a
+     reference and said so under itself, but it was wrong about which axis
+     grows. Six roles is a settled number — even a custom-role feature keeps it
+     in the low tens. CAPABILITIES are what grow: twelve here, and fifty to two
+     hundred in any RBAC surface that has been in production a while. At fifty
+     the grid is six hundred cells with a horizontal scrollbar, and the reader
+     is counting columns to find out what Admin can do.
+
+     So the matrix is never rendered. A bounded list picks a role; the page
+     shows capabilities against THAT ONE, which is `n` rows and not `n × 6`.
+
+     ── COMPARISON IS THE HARD PART, AND A DELTA IS THE ANSWER ──
+     Losing the grid loses side-by-side, which was the one thing it was good
+     at. Rendering the DIFFERENCE gets it back and survives the growth that
+     killed the grid: Admin differs from Super Admin in four capabilities, and
+     that sentence is exactly as readable at four of two hundred. The eight
+     that match collapse to one line, because "these are the same" is a fact
+     that needs stating once rather than eight times.
+
+     ── THE OTHER READING ──
+     A role answers "what can Admin do". Nobody asks only that. The other
+     question is "who can delete synced records", which the matrix answered by
+     making you find a row and read across six columns. Searching a capability
+     flips the page to answer it directly — same data, second reading, no
+     second page.
+
+     ── AND IT WRITES NOW ──
+     This shipped as a reference and said so twice, because the matrix it
+     replaced had seventy-two cells a client admin could click and get nothing
+     from. That was honest about a table that could not be edited; it was never
+     an argument that roles should not be editable, and they are.
+
+     A capability is set on its own row, from the page of the role it belongs
+     to — which is the reason the one-role-at-a-time shape came first. The
+     compared column stays a label: two editable columns on one row is a
+     surface where it is not obvious which role you just changed.
+
+     `lock` is the exception and is the reason the state exists. It marks the
+     capabilities that could not be granted BACK from inside the product if
+     every admin gave them up, so those rows carry the padlock rather than the
+     control — a switch there would be a door that locks behind you.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  const roleIx = (name) => {
+    for (let i = 0; i < ROLES.length; i++) if (ROLES[i][0] === name) return i;
+    return -1;
+  };
+  /* ROLES is authored in descending power and the list keeps that order, so
+     where a role sits is information before you have read a word of it. */
+  const roleOf = (st) => (roleIx(st.role) > -1 ? st.role : ROLES[0][0]);
+  const vsOf = (st) => (roleIx(st.vs) > -1 && st.vs !== roleOf(st) ? st.vs : '');
+
+  /* Every capability, flattened with its group, so a diff can walk one list
+     instead of a nest. */
+  const CAP_FLAT = CAPS.reduce((a, [group, caps]) =>
+    a.concat(caps.map(([cap, states]) => ({ g: group, cap: cap, s: states }))), []);
+
+  /* Who holds this role, anywhere. Read off the grants, so it cannot disagree
+     with People — and it is the number that turns a reference into something
+     you can act on. */
+  const holdersOf = (name) => PEOPLE.filter((p) => p.grants.some((g) => g.r === name));
+
+  const capLabel = (state) => {
+    const [cls, label] = CAP_STATE[state];
+    return `<span class="set2-rl-s ${cls}">${state === 'lock' ? I.lock : ''}${esc(label)}</span>`;
+  };
+
+  /* ── THE MATRIX IS EDITABLE NOW, AND THE LOCK IS NOT ──
+     This module shipped as a reference and said so twice: every cell a static
+     `td`, a note under it explaining that nothing could be changed. That was
+     honest about what it did and it is what changes here — a capability is set
+     from the role's own page, on the row that names it.
+
+     `lock` stays fixed, and that is the whole reason it exists. It marks the
+     two capabilities that could not be granted BACK from inside the product if
+     every admin gave them up, so a control offering to remove them would be
+     offering a door that locks behind you. Those rows say Always and carry the
+     padlock instead of the switch.
+
+     Three states, so a segmented control rather than a menu: they are all
+     visible, the current one is marked, and changing it is one press instead
+     of open-read-choose. */
+  const CAP_EDIT = [['full', 'Full'], ['view', 'View'], ['none', 'None']];
+
+  function capControl(c, i) {
+    const state = c.s[i];
+    if (state === 'lock') {
+      return `<span class="set2-rl-s is-ok" title="Cannot be given away">${I.lock}Always</span>`;
+    }
     return `
-      <section class="set2-sec" id="st-scopes">
-        ${/* "Create client" had no handler. A control that does nothing is
-              worse than none: it teaches that buttons here are not to be
-              trusted. It returns with the flow that makes it real. */ ''}
-        <div class="set2-sec-h"><h2 class="set2-sec-t">Scopes</h2></div>
-        <div class="set2-pick">
-          <div class="set2-pick-bd" style="max-height:24rem" role="tree" aria-label="Hierarchy">${rows.join('')}</div>
-          <div class="set2-pick-ft"><span><b class="set2-num">${LEAF_TOTAL}</b> addressable units across six levels</span></div>
+      <span class="seg set2-rl-seg" role="group" aria-label="${esc(c.cap)}">
+        ${CAP_EDIT.map(([v, n]) => `
+          <button class="seg-btn${state === v ? ' active' : ''}" type="button"
+                  data-cap="${esc(c.g)}|${esc(c.cap)}|${i}|${v}"
+                  aria-pressed="${state === v}">${n}</button>`).join('')}
+      </span>`;
+  }
+
+  M.roles = function (st) {
+    const f = readF(st);
+    const q = (f.cap || '').trim();
+    const name = roleOf(st);
+    const i = roleIx(name);
+    const vs = vsOf(st);
+
+    return `
+      <section class="set2-sec is-headless" id="st-roles">
+        <div class="set2-rl">
+          ${roleNav(name, st, f)}
+          ${q ? capSearch(q) : roleDoc(name, i, vs, st)}
         </div>
       </section>`;
   };
+
+  function roleNav(name, st, f) {
+    return `
+      <aside class="set2-rl-nav" aria-label="Roles">
+        <div class="set2-rl-hd">
+          ${/* Searching here does not narrow the ROLES — six of them never
+                needed a filter. It asks the other question, and the right
+                column answers it instead of the role. The placeholder says so,
+                because a search box that changes what the page is about
+                without warning is a trap. */ ''}
+          <input class="set2-fld set2-rl-q" type="search" placeholder="Search capabilities…"
+                 value="${esc(f.cap || '')}" data-f-q data-f-key="cap"
+                 aria-label="Search capabilities">
+        </div>
+        <div class="set2-rl-bd">
+          ${ROLES.map((r) => {
+            const on = r[0] === name && !(f.cap || '').trim();
+            const held = holdersOf(r[0]).length;
+            return `
+              <button class="set2-rl-r${on ? ' is-on' : ''}" type="button"
+                      data-role-go="${esc(r[0])}" aria-current="${on ? 'true' : 'false'}">
+                <span class="set2-rl-n">${esc(r[0])}</span>
+                <span class="set2-rl-held${held ? '' : ' is-zero'}">${
+                  held ? held : 'none'}</span>
+              </button>`;
+          }).join('')}
+        </div>
+        ${/* The column of numbers needs a name or it is six figures against
+              six words. "Held by" went with the line in the detail; this says
+              what they COUNT, which is what the reader is asking. */ ''}
+        <div class="set2-rl-ft">People holding each role.</div>
+      </aside>`;
+  }
+
+  function roleDoc(name, i, vs, st) {
+    const j = vs ? roleIx(vs) : -1;
+    const rows = vs
+      ? CAP_FLAT.filter((c) => c.s[i] !== c.s[j])
+      : CAP_FLAT;
+    const same = vs ? CAP_FLAT.length - rows.length : 0;
+    /* Across BOTH columns being drawn, not just the primary one. Comparing
+       Admin against Super Admin puts three `Always` cells on screen and Admin
+       owns none of them — counting only the primary role left the word
+       unexplained in the exact case that raises the question. */
+    const locks = rows.filter((c) => c.s[i] === 'lock' || (j > -1 && c.s[j] === 'lock')).length;
+
+    return `
+      <div class="set2-rl-doc">
+        <h2 class="set2-rl-t">${esc(name)}</h2>
+        <p class="set2-rl-d">${esc(ROLES[i][1])}</p>
+
+        <div class="set2-rl-bar">
+          <span class="set2-rl-bar-l">${vs
+            ? `Differs in <b>${rows.length}</b> of ${CAP_FLAT.length}`
+            : `All <b>${CAP_FLAT.length}</b> capabilities`}</span>
+          <span class="set2-rl-cmp">
+            <span class="set2-rl-cmp-k">Compare with</span>
+            ${vsSelect(name, vs)}
+          </span>
+        </div>
+
+        ${vs ? `<div class="set2-rl-heads">
+          <span class="set2-rl-h1">${esc(name)}</span>
+          <span class="set2-rl-h2">${esc(vs)}</span>
+        </div>` : ''}
+
+        ${rows.length ? capGroups(rows, i, j) : `
+          <div class="set2-empty"><b>Identical</b>${esc(name)} and ${esc(vs)} can do exactly
+            the same things. One of them is redundant, or the difference is somewhere
+            this table does not model.</div>`}
+
+        ${vs && same ? `
+          <div class="set2-rl-same">
+            <span>${same} identical capabilit${same === 1 ? 'y' : 'ies'} collapsed</span>
+            <button class="set2-lnk" type="button" data-role-vs="">Show all ${CAP_FLAT.length}</button>
+          </div>` : ''}
+
+        ${locks ? `<div class="set2-note" style="margin-top:1rem">${I.lock} <b>Always</b> is not a
+          stronger <b>Full</b>. It marks a capability that cannot be given away: if every admin
+          surrendered it, nothing inside the product could grant it back.</div>` : ''}
+      </div>`;
+  }
+
+  /* Grouped, and the group heading only appears when the group has survived
+     the diff — a heading over nothing tells the reader a group differs when
+     it does not. */
+  function capGroups(rows, i, j) {
+    const out = [];
+    CAPS.forEach(([group]) => {
+      const mine = rows.filter((c) => c.g === group);
+      if (!mine.length) return;
+      out.push(`
+        <div class="set2-rl-g">
+          <div class="set2-rl-gt">${esc(group)}</div>
+          ${/* The role you are ON is the one you can change. The compared
+                column stays a label: two editable columns on one row is a
+                surface where it is not obvious which role you just altered,
+                and comparison is a thing you READ. */ ''}
+          ${mine.map((c) => `
+            <div class="set2-rl-cap">
+              <span class="set2-rl-cn">${esc(c.cap)}</span>
+              ${capControl(c, i)}
+              ${j > -1 ? capLabel(c.s[j]) : ''}
+            </div>`).join('')}
+        </div>`);
+    });
+    return out.join('');
+  }
+
+  /* The same `.v2-dropdown` the People filters use. It was the last native
+     `<select>` on the surface, and it was styled by the rules that went with
+     them — so converting it is what stops it rendering as a raw browser
+     control on a page where nothing else does. */
+  function vsSelect(name, vs) {
+    const opts = ROLES.map((r) => r[0]).filter((n) => n !== name);
+    return `
+      <div class="v2-dropdown set2-dd set2-fsel" data-vsdd>
+        <button class="v2-dropdown-btn${vs ? ' active-filter' : ''}" type="button"
+                aria-haspopup="listbox" aria-expanded="false"
+                aria-label="Compare with another role">
+          <span class="dd-label-text">${esc(vs || 'Nothing')}</span>
+          <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+        </button>
+        <div class="v2-dropdown-panel" role="listbox">
+          <div class="v2-dropdown-option${vs ? '' : ' selected'}" role="option"
+               aria-selected="${!vs}" data-value="">Nothing</div>
+          ${opts.map((n) => `<div class="v2-dropdown-option${n === vs ? ' selected' : ''}"
+            role="option" aria-selected="${n === vs}" data-value="${esc(n)}">${esc(n)}</div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  /* ── The other reading ──
+     A capability across every role. This is the question the matrix made you
+     read sideways for, and it is one row per hit rather than a grid. */
+  function capSearch(q) {
+    const k = q.toLowerCase();
+    const hits = CAP_FLAT.filter((c) => (c.cap + ' ' + c.g).toLowerCase().indexOf(k) >= 0);
+    return `
+      <div class="set2-rl-doc">
+        <h2 class="set2-rl-t">${hits.length} capabilit${hits.length === 1 ? 'y' : 'ies'}</h2>
+        <p class="set2-rl-d">Matching <b>${esc(q)}</b>, across all ${ROLES.length} roles.</p>
+        ${hits.length ? hits.map((c) => `
+          <div class="set2-rl-g">
+            <div class="set2-rl-gt">${esc(c.g)}</div>
+            <div class="set2-rl-cap is-wide">
+              <span class="set2-rl-cn">${esc(c.cap)}</span>
+            </div>
+            <div class="set2-rl-across">
+              ${ROLES.map((r, n) => `
+                <button class="set2-rl-x" type="button" data-role-go="${esc(r[0])}">
+                  <span class="set2-rl-xn">${esc(r[0])}</span>
+                  ${capLabel(c.s[n])}
+                </button>`).join('')}
+            </div>
+          </div>`).join('')
+          : `<div class="set2-empty"><b>No capability matches</b>Nothing in the three groups
+              answers to <b>${esc(q)}</b>.
+              <button class="btn btn-ghost btn-sm" type="button" data-f-clear>Clear search</button></div>`}
+      </div>`;
+  }
+
+  /* ══ SCOPES ═════════════════════════════════════════════════════════════
+     A MAP, BECAUSE THE TENANCY IS NOT THE SAME SHAPE TWICE.
+
+     This replaces an indented tree. A tree renders every branch as the same
+     shape at the same width, and the tenancy is nothing like that: CXS runs
+     all six levels, Upland stops at Product on most of what it owns, MedFar is
+     a client with nothing under it at all — the state the picker most often
+     gets wrong and the state most real clients are in. Indentation flattens
+     that unevenness away. A map is made of it.
+
+     And this tree is not a page. It is the spine: grants resolve through it,
+     skills target it, connections hang off its products. It showed names and
+     one total. Selecting a node now says what depends on it, all of it read
+     back out of `PEOPLE.grants`, `SEL` and `CONNECTIONS` — the map is the
+     first surface that asks those three the same question.
+
+     ── IT NEVER DRAWS EVERYTHING ──
+     The rule the other three modules were rebuilt under applies hardest here,
+     because a canvas fails at scale more expensively than a list does. Ten
+     clients and thirty products would be a wall of boxes.
+
+       DEPTH   stops at Product. Team and User roll up into a count on the
+               node above them, and open per branch when asked.
+       BREADTH `SIB_CAP` siblings, then "+n more" — Upland owns fourteen
+               products in the console and drawing them is a column of
+               fourteen boxes nobody reads.
+
+     That is also the answer to the six-columns-of-boxes problem: drawn to full
+     depth this is a tree lying on its side, which is worse than the tree it
+     replaced. Four levels wide, the rest in the inspector.
+
+     ── READ-ONLY, STILL ──
+     Nothing here edits the hierarchy. Expanding, searching and selecting are
+     the whole of it. "Create client" is not back: it left because it had no
+     handler, and a canvas does not make that less true.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  /* Geometry. In px at the drawn scale; the layer is transformed as a whole to
+     fit, so these are never recomputed for zoom. */
+  const SC = { w: 148, h: 30, gapX: 46, gapY: 12, padX: 20, padY: 20 };
+  const SC_STEP_X = SC.w + SC.gapX;
+  const SC_STEP_Y = SC.h + SC.gapY;
+  const SIB_CAP = 6;
+  /* Which branches are open past the depth cap, and which have had their
+     siblings revealed. Gestures mid-read, not places — restoring them on a
+     fresh load would restore an intention the reader no longer has, the same
+     reasoning that keeps the People selection out of the URL. */
+  const SC_OPEN = new Set();
+  const SC_MORE = new Set();
+  let SC_FIT = true;
+
+  const DEPTHS = ['Client', 'Business Unit', 'Product', 'Team', 'User'];
+  /* Product is the default floor: it is the deepest level anything else in the
+     product addresses — connections hang off it, and it is where a client
+     stops caring about our org chart and starts caring about their own. */
+  const depthOf = (st) => {
+    const want = readF(st).depth;
+    const i = DEPTHS.indexOf(want);
+    return i > -1 ? i + 1 : 3;
+  };
+
+  /* Search REVEALS. A hit and every ancestor of it are drawn at full strength
+     and opened whatever the depth cap says; everything else stays on the
+     canvas, dimmed. Filtering to the matches would remove the containment that
+     is the only reason a match means anything — "Tier 1" alone tells you
+     nothing about whose Tier 1 it is. */
+  function scKeep(q) {
+    if (!q) return null;
+    const keep = new Set();
+    (function walk(n, path) {
+      const here = path.concat([n.id]);
+      if (n.name.toLowerCase().indexOf(q) > -1) here.forEach((id) => keep.add(id));
+      (n.kids || []).forEach((k) => walk(k, here));
+    })(TREE[0], []);
+    return keep;
+  }
+
+  /* One pass: decide what is drawn, then place it. Children are laid out
+     first and the parent centres on them, so an edge never crosses a node it
+     is not connected to. */
+  function scLayout(st) {
+    const q = (readF(st).sq || '').trim().toLowerCase();
+    const keep = scKeep(q);
+    const maxD = depthOf(st);
+    const nodes = [], edges = [];
+    let slot = 0, maxX = 0;
+
+    function place(n, depth) {
+      const dim = !!keep && !keep.has(n.id);
+      const kids = n.kids || [];
+      /* Open when the depth allows it, when the reader asked, or when a match
+         is hiding underneath — a search that leaves its own hit collapsed has
+         not revealed anything. */
+      const wants = depth < maxD || SC_OPEN.has(n.id)
+                 || (keep && kids.some(function deep(k) {
+                      return keep.has(k.id) || (k.kids || []).some(deep); }));
+      let shown = wants ? kids : [];
+      let hidden = 0;
+      if (shown.length > SIB_CAP && !SC_MORE.has(n.id)) {
+        hidden = shown.length - SIB_CAP;
+        shown = shown.slice(0, SIB_CAP);
+      }
+
+      const kidYs = shown.map((k) => place(k, depth + 1));
+      const y = kidYs.length
+        ? (kidYs[0] + kidYs[kidYs.length - 1]) / 2
+        : (slot++) * SC_STEP_Y;
+      const x = SC.padX + depth * SC_STEP_X;
+      if (x + SC.w > maxX) maxX = x + SC.w;
+
+      nodes.push({ n: n, x: x, y: y, depth: depth, dim: dim,
+                   rolled: !wants && kids.length ? leavesOf(n).length : 0,
+                   open: wants && kids.length > 0, hidden: hidden });
+      shown.forEach((k, i) => edges.push({ x1: x + SC.w, y1: y, y2: kidYs[i],
+                                           x2: x + SC_STEP_X }));
+      if (hidden) {
+        const my = (slot++) * SC_STEP_Y;
+        nodes.push({ more: n.id, x: x + SC_STEP_X, y: my, depth: depth + 1,
+                     hidden: hidden, dim: dim });
+        edges.push({ x1: x + SC.w, y1: y, y2: my, x2: x + SC_STEP_X });
+      }
+      return y;
+    }
+    place(TREE[0], 0);
+    return { nodes: nodes, edges: edges,
+             w: maxX + SC.padX, h: slot * SC_STEP_Y + SC.padY * 2 - SC.gapY };
+  }
+
+  /* What a node is worth, all of it derived. Nothing here is a new field. */
+  function scFacts(n) {
+    const leaves = leavesOf(n);
+    const ids = {};
+    leaves.forEach((l) => { ids[l.id] = 1; });
+    const people = reachAt(n, PEOPLE);
+    /* ── SKILLS LAND ON AGENTS, NOT ON TENANCY ──
+       This asked whether a skill's targets included any leaf under the node,
+       which worked while a skill named tenancy. It names AGENTS now, and the
+       only place agents appear in this tree is AiMY's own pinned branch — so
+       the count is honest where it means something and zero everywhere else,
+       rather than a number derived from a relationship that no longer holds. */
+    const agentIds = leaves.filter((l) => l.type === 'Agent').map((l) => l.id);
+    const skills = agentIds.length
+      ? SKILLS.filter((s) => (s.agents || []).some((a) => agentIds.indexOf(a) > -1))
+      : [];
+    const prods = [];
+    (function walk(x) { if (x.type === 'Product') prods.push(x.name);
+      (x.kids || []).forEach(walk); })(n);
+    const conns = prods.reduce((a, p) => a.concat(connsOf(p)), []);
+    return { leaves: leaves.length, people: people, skills: skills, conns: conns };
+  }
+
+  M.hierarchy = function (st) {
+    const f = readF(st);
+    const q = (f.sq || '').trim();
+    const map = scLayout(st);
+    const here = nodeById(st.node || ROOT_ID);
+
+    return `
+      <section class="set2-sec is-headless" id="st-scopes">
+        <div class="set2-sc-bar">
+          <input class="set2-fld set2-sc-q" type="search" placeholder="Search the tenancy…"
+                 value="${esc(q)}" data-f-q data-f-key="sq" aria-label="Search the tenancy">
+          <span class="set2-sc-bar-end">
+            ${filterSel(st, 'depth', 'To Product', DEPTHS)}
+            <button class="btn btn-ghost btn-sm" type="button" data-sc-fit
+                    aria-pressed="${SC_FIT}">${SC_FIT ? 'Actual size' : 'Fit'}</button>
+          </span>
+        </div>
+
+        <div class="set2-sc">
+          <div class="set2-sc-canvas${SC_FIT ? ' is-fit' : ''}" data-sc-canvas
+               style="--sc-w:${map.w};--sc-h:${map.h}">
+            <div class="set2-sc-box"><div class="set2-sc-layer">
+              <svg class="set2-sc-wires" viewBox="0 0 ${map.w} ${map.h}" aria-hidden="true">
+                ${map.edges.map((e) => {
+                  const mx = e.x1 + SC.gapX / 2;
+                  return `<path d="M${e.x1} ${e.y1 + SC.h / 2} H${mx} V${e.y2 + SC.h / 2} H${e.x2}"
+                            fill="none" stroke="currentColor" stroke-width="1.25"/>`;
+                }).join('')}
+              </svg>
+              ${map.nodes.map((o) => scNode(o, here)).join('')}
+            </div></div>
+          </div>
+          ${scInspector(here, st)}
+        </div>
+      </section>`;
+  };
+
+  function scNode(o, here) {
+    const pos = `left:${o.x}px;top:${o.y}px;width:${SC.w}px;height:${SC.h}px`;
+    if (o.more) {
+      return `
+        <button class="set2-sc-n is-more" type="button" style="${pos}"
+                data-sc-more="${esc(o.more)}">+${o.hidden} more</button>`;
+    }
+    const n = o.n;
+    const kids = (n.kids || []).length;
+    /* Dashed means the tenancy STOPS here — not that it is collapsed. A client
+       with no products and a product with no teams are the same fact about the
+       world, and the one thing this map is for is making it visible. */
+    const aimy = n.type === 'Ours' || n.type === 'Agent';
+    /* Dashed says "the tenancy stops here", which is a fact about a client
+       with no products. An agent has nothing under it by construction and
+       always will, so drawing it as an unfinished branch would report a
+       problem that does not exist. */
+    const empty = !kids && !aimy;
+    return `
+      <div class="set2-sc-w" style="${pos}">
+        <button class="set2-sc-n${here.id === n.id ? ' is-on' : ''}${empty ? ' is-empty' : ''}${
+          aimy ? ' is-aimy' : ''}${o.dim ? ' is-dim' : ''}"
+                type="button" data-sc-node="${esc(n.id)}"
+                aria-current="${here.id === n.id ? 'true' : 'false'}"
+                aria-label="${esc(n.name)}, ${esc(n.type)}${
+                  empty ? ', nothing under it' : ''}">
+          <span class="set2-sc-nn">${esc(n.name)}</span>
+        </button>
+        ${o.rolled ? `
+          <button class="set2-sc-roll" type="button" data-sc-exp="${esc(n.id)}"
+                  aria-label="Open ${esc(n.name)}">${o.rolled}${I.caret}</button>` : ''}
+        ${o.open && o.depth >= 3 ? `
+          <button class="set2-sc-roll is-open" type="button" data-sc-exp="${esc(n.id)}"
+                  aria-label="Close ${esc(n.name)}">${I.caret}</button>` : ''}
+      </div>`;
+  }
+
+  /* ── The inspector ──
+     What this node IS, and what depends on it. It does NOT list people: that
+     is People's page and it answers the question properly, split by whether a
+     grant is revocable here. A count and a way in is the honest amount for a
+     map to carry — see the boundary note over there. */
+  function scInspector(n, st) {
+    const fx = scFacts(n);
+    const path = pathTo(n.id);
+    const kids = (n.kids || []).length;
+    const reach = fx.people.here.length + fx.people.up.length;
+
+    return `
+      <aside class="set2-sc-insp" aria-label="About ${esc(n.name)}">
+        <p class="set2-sc-path">${path.slice(0, -1).map((a) =>
+          `<button class="set2-sc-crumb" type="button" data-sc-node="${esc(a.id)}">${esc(a.name)}</button>`)
+          .join('<span class="set2-scope-s">&rsaquo;</span>')}</p>
+        <h2 class="set2-sc-t">${esc(n.name)}</h2>
+        <p class="set2-sc-type">${esc(n.type)}</p>
+
+        ${kids
+          ? `<p class="set2-sc-sub">${kids} direct${
+              fx.leaves !== kids ? ` · <b class="set2-num">${fx.leaves}</b> addressable below` : ''}</p>`
+          : `<p class="set2-sc-sub is-empty">Nothing under it yet.</p>`}
+
+        <div class="set2-sc-facts">
+          <button class="set2-sc-fact" type="button" data-sc-people="${esc(n.id)}">
+            <span class="set2-sc-fn">People who reach it</span>
+            <span class="set2-sc-fv set2-num">${reach}</span>
+            ${I.chev}
+          </button>
+          <button class="set2-sc-fact" type="button" data-sc-skills="${esc(n.id)}">
+            <span class="set2-sc-fn">Skills that land here</span>
+            <span class="set2-sc-fv set2-num${fx.skills.length ? '' : ' is-zero'}">${fx.skills.length}</span>
+            ${I.chev}
+          </button>
+          <div class="set2-sc-fact is-flat">
+            <span class="set2-sc-fn">Connections</span>
+            <span class="set2-sc-fv set2-num${fx.conns.length ? '' : ' is-zero'}">${fx.conns.length}</span>
+          </div>
+        </div>
+
+        ${fx.people.up.length ? `
+          <div class="set2-sc-inh">
+            <div class="set2-sc-ih">Inherited from above</div>
+            ${fx.people.up.slice(0, 4).map((x) => `
+              <div class="set2-sc-ir">
+                <span class="set2-sc-in">${esc(x.p.name)}</span>
+                <span class="set2-sp-note">${esc(x.gs[0].g.r)} on ${esc(x.gs[0].at.name)}</span>
+              </div>`).join('')}
+            ${fx.people.up.length > 4
+              ? `<div class="set2-sp-note">and ${fx.people.up.length - 4} more</div>` : ''}
+          </div>` : ''}
+
+        <p class="set2-sc-ft"><b class="set2-num">${LEAF_TOTAL}</b> addressable units across six
+          levels. Nothing on this canvas edits the hierarchy.</p>
+      </aside>`;
+  }
 
   M.plan = () => `
     <section class="set2-sec">
@@ -1779,6 +3177,43 @@
              ${bad ? pill('is-err', bad + ' not connected') : pill('is-ok', 'Connected')}`
           : pill('is-mute', 'No products connected')}
       </div>`;
+  }
+
+  /* ── THE BAR HAS TO MOVE ──
+     A run is Running for 1400ms and then it is not. A bar that renders once
+     and sits still for that whole window is a picture of progress, so this
+     advances it — from the clock in slot 6, which the live run already
+     records, against the same 1400ms the completion timer uses.
+
+     It touches TWO NODES per run rather than calling `render()`: a full repaint
+     forty times a second would rebuild the page under whatever the reader is
+     doing, and this is the one thing on the surface that changes without
+     anybody asking it to. It stops on its own when nothing is running, so
+     there is no timer left behind on a page with no live sync. */
+  /* Slower than the 1400ms it was. That number was chosen to get a prototype
+     out of the way; a progress bar that fills in under a second and a half
+     cannot be READ, and this one exists to be looked at. */
+  const RUN_MS = 4000;
+  let TICK = 0;
+  function tickRuns() {
+    if (TICK) return;
+    TICK = setInterval(() => {
+      let live = 0;
+      CONNECTIONS.forEach((c) => c.runs.forEach((r, i) => {
+        if (r[2] !== 'run' || !r[6]) return;
+        live++;
+        const at = Math.min(1, (Date.now() - r[6]) / RUN_MS);
+        r[7] = Math.round((r[4] || 0) * at);
+        const box = $(`[data-prog="${c.id}|${i}"]`);
+        if (!box) return;
+        const fill = $('.set2-prog-fill', box);
+        if (fill) fill.style.width = Math.round(at * 100) + '%';
+        box.setAttribute('aria-valuenow', String(r[7]));
+        const n = box.parentNode && $('[data-prog-n]', box.parentNode);
+        if (n) n.textContent = r[7].toLocaleString();
+      }));
+      if (!live) { clearInterval(TICK); TICK = 0; }
+    }, 60);
   }
 
   /* ── Config ── Dynamic Context Fields, and how far back to read ── */
@@ -2244,6 +3679,7 @@
       <input class="set2-pop-f" type="search" placeholder="Search ${esc(c.crm)} fields\u2026"
              data-pop-f autocomplete="off" aria-label="Search fields">
       <div class="set2-pop-bd" data-pop-list>${rows('')}</div>`);
+    if (!p) return;
     const f = $('[data-pop-f]', p); if (f) f.focus();
     p.addEventListener('input', (e) => {
       $('[data-pop-list]', p).innerHTML = rows(e.target.value.toLowerCase().trim());
@@ -2357,13 +3793,16 @@
     mapping:    (st) => secMapping(crmOf(st), st),
     window:     (st) => secWindow(st),
     retention:  (st) => secRetention(st),
-    criteria:   (st) => secCriteria(primaryOf(st), st),
+    /* The CHOSEN connector, not the product's first. Trigger sync scopes to
+       one connector now, so the section has to be handed the one its header
+       names. */
+    criteria:   (st) => secCriteria(crmOf(st), st),
     runs:       (st) => secRuns(st),
     enrichment: (st) => secEnrichment(st),
     apis:       (st) => M.apis(st),
     people:     (st) => secPeople(st),
-    roles:      () => M.roles(),
-    scopes:     () => M.hierarchy()
+    roles:      (st) => M.roles(st),
+    scopes:     (st) => M.hierarchy(st)
   };
 
   /* ── ONE SECTION, ONE TITLE ──
@@ -2421,14 +3860,29 @@
   function secCriteria(c, st) {
     const prod = prodOf(st);
     const list = connsOf(prod);
-    const n = list.reduce((a, x) => a + matchCount(x), 0);
-    const tot = list.reduce((a, x) => a + x.records, 0);
     const r = c.range || ['', ''];
     return `
       <section class="set2-sec" id="st-records">
+        ${/* ── A PICKER, NOT A LABEL ──
+              It read "Zendesk · runs on all 2 connectors", and that is what the
+              button did: one press, one row per connector, two syncs from one
+              decision. But a sync IS per connector — each has its own criteria,
+              its own window and its own credentials, and one can fail while the
+              other succeeds.
+
+              So the section scopes to a connector the way Dynamic fields does,
+              with the same control, and Run sync starts exactly the one named
+              here. Sync history below stays UNSCOPED: what you want after a run
+              is every run, which is why that table carries a CRM chip on every
+              row. */ ''}
         <div class="set2-sec-h"><h2 class="set2-sec-t">Trigger sync</h2>
-          <span class="set2-sec-end set2-from">${esc(c.crm)}${list.length > 1
-            ? ' \u00b7 runs on all ' + list.length + ' connectors' : ''}</span></div>
+          <span class="set2-sec-end">
+            ${list.length > 1 ? `
+              <button class="set2-crm-pick" type="button" data-crm-pick aria-haspopup="menu"
+                      aria-label="Choose which connector to sync">
+                <b>${esc(c.crm)}</b>${I.down}
+              </button>` : `<span class="set2-from">${esc(c.crm)}</span>`}
+          </span></div>
         <div class="set2-sub">Define the criteria a manual run reads with, then start it.</div>
 
         <div class="set2-card">
@@ -2486,9 +3940,17 @@
           </div>
         </div>
 
+        ${/* ── NO MATCH COUNT OVER THE BUTTONS ──
+              It read "5,057 records match right now, of 17,050" — a figure
+              recomputed on every keystroke in the criteria above it, sitting
+              at the size of a headline over the two buttons that are the
+              actual decision. Nobody presses Run sync BECAUSE the number is
+              5,057; they press it because they set the criteria and want it
+              run, and the run reports what it read when it is done.
+
+              What is left is the row of actions, which is what the block was
+              always for. */ ''}
         <div class="set2-blast">
-          <span class="set2-blast-n set2-num">${n.toLocaleString()}</span>
-          <span class="set2-blast-l">record${n === 1 ? '' : 's'} match right now, of ${tot.toLocaleString()}</span>
           <span class="set2-blast-end">
             <button class="btn btn-ghost btn-sm" type="button" data-test>Test sync</button>
             <button class="btn btn-brand btn-sm" type="button" data-run>Run sync</button>
@@ -2547,7 +4009,13 @@
                       press about it, is one click away in a panel with room
                       for the whole sentence. */ ''}
               </span>
-              <span class="set2-run-n set2-num">${r[4] ? r[4].toLocaleString() : ''}</span>
+              ${/* EMPTY while running. The column is headed Records and means
+                    what the run WROTE, which is not knowable until it stops —
+                    a number here mid-run is a figure that will be wrong a
+                    second later and never says so. The count that is moving
+                    belongs to the bar, and lives beside it. */ ''}
+              <span class="set2-run-n set2-num">${
+                r[2] === 'run' ? '' : (r[4] ? r[4].toLocaleString() : '')}</span>
               <span class="set2-run-st">
                 ${pill(state, r[3])}
                 ${/* Not "Retry". That button was a no-op, and on two of the
@@ -2561,6 +4029,20 @@
                              aria-haspopup="dialog"
                              aria-label="Why the run from ${esc(r[0])} failed">Why it failed</button>` : ''}
               </span>
+              ${/* Spans the row rather than sitting in the status cell: the
+                    thing in progress is the RUN, not its outcome, and a bar
+                    the width of a pill cannot show a proportion. */ ''}
+              ${r[2] === 'run' ? `
+                <span class="set2-prog-row">
+                  <span class="set2-prog" data-prog="${esc(c.id)}|${c.runs.indexOf(r)}"
+                        role="progressbar" aria-label="Records read"
+                        aria-valuemin="0" aria-valuemax="${r[4] || 0}" aria-valuenow="${r[7] || 0}">
+                    <span class="set2-prog-fill" style="width:${
+                      r[4] ? Math.min(100, Math.round(((r[7] || 0) / r[4]) * 100)) : 0}%"></span>
+                  </span>
+                  <span class="set2-prog-c set2-num"><b data-prog-n>${
+                    (r[7] || 0).toLocaleString()}</b> / ${(r[4] || 0).toLocaleString()}</span>
+                </span>` : ''}
             </div>`;
           }).join('')}
         </div>` : `<div class="set2-empty"><b>No runs yet</b>The first sync will appear here with what it matched.</div>`}
@@ -2763,7 +4245,10 @@
     return `
       <section class="set2-sec" id="st-webhooks">
         <div class="set2-sec-h"><h2 class="set2-sec-t">Webhook settings</h2>
-          ${one ? `<span class="set2-sec-end">${pill(e0.last[1], e0.last[2])}</span>` : ''}</div>
+          ${/* A single connector has no group header, so its test sits beside
+                the pill that is already up here for the same reason. */ ''}
+          ${one ? `<span class="set2-sec-end">${pill(e0.last[1], e0.last[2])}${
+            whTestBtn(list[0])}</span>` : ''}</div>
         <div class="set2-sub">Configure endpoints to activate the knowledge enrichment workflow for ${one ? 'this data source' : 'each data source'}.</div>
         <div class="set2-info" role="note">
           <span class="set2-info-i" aria-hidden="true">${I.info}</span>
@@ -2772,6 +4257,27 @@
         ${list.map((c, i) => whGroup(c, i, !one)).join('')}
       </section>`;
   };
+
+  /* ── TESTING AN ENDPOINT ──
+     The page could say an endpoint was down and offer nothing to do about it
+     but retype the token. A test is the one thing you want after editing a URL
+     or rotating a secret, and it is the only way a never-called endpoint ever
+     stops saying "Never called".
+
+     It reports what is actually true rather than flattering the button: an
+     endpoint whose last call was a 401 fails the test the same way, because
+     pressing Test does not fix a revoked token. Anything else succeeds and
+     stamps a fresh time, which is what turns `ks-zendesk` from never-called
+     into a live endpoint. */
+  const WH_TESTING = new Set();
+
+  function whTestBtn(c) {
+    const busy = WH_TESTING.has(c.id);
+    return `<button class="btn btn-ghost btn-sm set2-wh-test" type="button"
+              data-wh-test="${esc(c.id)}"${busy ? ' disabled' : ''}
+              aria-label="Test the ${esc(c.crm)} connection">${
+              busy ? 'Testing…' : 'Test connection'}</button>`;
+  }
 
   function whGroup(c, i, named) {
     const e = ENDPOINTS[c.id];
@@ -2784,7 +4290,8 @@
     const bad = e.last[1] === 'is-err' ? ' is-err' : e.last[1] === 'is-warn' ? ' is-warn' : '';
     return `
       <div class="set2-wh-grp${bad}" id="st-api-${esc(c.id)}">
-        ${named ? `<div class="set2-wh-hd"><h3 class="set2-wh-t">${esc(c.crm)}</h3>${pill(e.last[1], e.last[2])}</div>` : ''}
+        ${named ? `<div class="set2-wh-hd"><h3 class="set2-wh-t">${esc(c.crm)}</h3>${
+          pill(e.last[1], e.last[2])}${whTestBtn(c)}</div>` : ''}
         <div class="set2-wh">
           <div class="set2-wh-row">
             <label class="set2-wh-l" for="apUrl${i}">Webhook URL</label>
@@ -2857,11 +4364,12 @@
 
   function toMarkdown(s) {
     return '---\n'
-      + 'name: ' + s.id + '\n'
+      + 'name: ' + (s.slug || s.id) + '\n'
       + 'description: ' + s.desc + '\n'
       + 'trigger: ' + TRIGGER_FILE[s.trigger] + '\n'
       + 'sources: [' + s.sources.join(', ') + ']\n'
-      + 'targets: [' + Array.from(SEL[s.id]).join(', ') + ']\n'
+      + 'agents: [' + (s.agents || []).join(', ') + ']\n'
+      + 'products: [' + (s.products || []).join(', ') + ']\n'
       + '---\n\n'
       + '# ' + s.name + '\n\n'
       + s.body + '\n';
@@ -2903,10 +4411,17 @@
     let title = meta.name;
     if (h1) { title = h1[1].trim(); body = body.slice(h1[0].length); }
 
+    /* `name:` is the SLUG -- the address an agent asks for, and the field two
+       skills may collide on when their owners differ. It was returned as `id`,
+       which conflated the address with the record's own key; and `targets` was
+       still being returned long after reach became agents and products, so an
+       uploaded file's reach went into a field nothing reads and both lists
+       arrived empty. */
     return {
-      id: meta.name, name: title, desc: meta.description,
+      slug: meta.name, name: title, desc: meta.description,
       trigger: TRIGGER[trig] ? trig : 'auto',
-      sources: list(meta.sources), targets: list(meta.targets),
+      sources: list(meta.sources),
+      agents: list(meta.agents), products: list(meta.products),
       body: body.trim()
     };
   }
@@ -2914,16 +4429,23 @@
   /* Accepting an uploaded skill is the same act as creating one, so it lands
      in the same place with the same defaults rather than in a parallel list. */
   function acceptSkill(parsed) {
-    const dup = skillById(parsed.id);
-    if (dup) throw new Error('A skill named `' + parsed.id + '` already exists. Rename it, or edit that one.');
+    /* An upload lands among YOUR skills, so it may only collide with your
+       skills. Colliding with the organisation's is not an error -- it is the
+       override, and the file arrives marked Overridden with the Precedence tab
+       explaining why, which is more use than a refusal. */
+    const dup = SKILLS.filter((x) => x.own === 'you' && nameKey(x) === parsed.slug.toLowerCase())[0];
+    if (dup) throw new Error('You already have a skill addressed `' + parsed.slug + '`. Rename it, or edit that one.');
     const s = {
-      id: parsed.id, name: parsed.name, from: 'Yours', trigger: parsed.trigger, on: true,
+      /* The address may repeat across owners; the record's key may not. */
+      id: uniqueId(parsed.slug), slug: parsed.slug, name: parsed.name,
+      own: 'you', trigger: parsed.trigger, on: true,
       desc: parsed.desc, by: USER.name, when: 'just now', v: 1,
-      sources: parsed.sources, targets: parsed.targets, body: parsed.body,
-      lock: null, chain: [{}, {}, {}, {}, {}, { on: USER.name, val: parsed.desc, by: 'You', when: 'just now' }]
+      sources: parsed.sources, body: parsed.body,
+      /* A file naming neither arrives reaching nothing and says so in the
+         list, which beats inventing a default agent for it. */
+      agents: parsed.agents || [], products: parsed.products || []
     };
     SKILLS.push(s);
-    SEL[s.id] = new Set(s.targets);
     return s;
   }
 
@@ -2993,14 +4515,20 @@
   /* What opened the panel, so Escape can put focus back on it. */
   let POP_OPENER = null;
 
-  function popover(anchor, html) {
-    closePop();
-    POP_OPENER = anchor;
-    const p = document.createElement('div');
-    p.className = 'set2-pop';
-    p.id = 'setPop';
-    p.innerHTML = html;
-    document.body.appendChild(p);
+  /* ── A CHAINED POPOVER MUST NOT ANCHOR INTO THE ONE IT REPLACES ──
+     `closePop()` runs first. So when `anchor` is a button INSIDE the panel
+     being torn down — the kebab's "Grant a role", which opens the role picker
+     — it is already detached by the time it is measured. `getBoundingClientRect`
+     on a detached node is all zeros, both clamps below resolve to 8, and the
+     panel lands in the top-left corner of the WINDOW with the row it belongs
+     to five hundred pixels away. It is not a positioning bug, it is a
+     lifetime one.
+
+     A chain anchors to whatever opened the chain. */
+  /* Split out of `popover` so the same maths runs on open AND on every scroll
+     that follows — two copies would drift the moment either was tuned. */
+  let POP_TRACK = null;
+  function placePop(p, anchor) {
     const r = anchor.getBoundingClientRect();
     const w = p.offsetWidth, h = p.offsetHeight;
     /* `documentElement.clientWidth/Height` is the layout viewport and is what
@@ -3017,7 +4545,57 @@
     let top = r.bottom + 6;
     if (top + h > vh - 8 && r.top - h - 6 >= 8) top = r.top - h - 6;
     p.style.top = Math.max(8, Math.min(top, vh - h - 8)) + 'px';
-    p.style.left = Math.max(8, Math.min(r.left, vw - w - 8)) + 'px';
+    /* ── RIGHT-ALIGN RATHER THAN SLIDE ──
+       Left-aligned to the anchor and clamped, a menu opened from a control near
+       the right edge slid left until it fit — ending up under the middle of the
+       row with nothing connecting it to the button that opened it. A kebab at
+       the end of a row gets a panel whose RIGHT edge meets its own, which is
+       what makes it read as belonging to that button. The clamps stay as the
+       last resort for a panel wider than the space either way. */
+    const left = (r.left + w > vw - 8) ? r.right - w : r.left;
+    p.style.left = Math.max(8, Math.min(left, vw - w - 8)) + 'px';
+  }
+
+  function popover(anchor, html, cls) {
+    const old = document.getElementById('setPop');
+    if (old && old.contains(anchor)) anchor = POP_OPENER || anchor;
+    /* Placing against a node that is no longer in the document puts the panel
+       in the corner, silently. Better to not open than to open somewhere that
+       points at nothing — every caller reaches here through a control that is
+       on screen, so this only fires when a repaint has moved it. */
+    if (!anchor || !anchor.isConnected) { closePop(); return null; }
+    closePop();
+    POP_OPENER = anchor;
+    const p = document.createElement('div');
+    p.className = 'set2-pop' + (cls ? ' ' + cls : '');
+    p.id = 'setPop';
+    p.innerHTML = html;
+    document.body.appendChild(p);
+    placePop(p, anchor);
+
+    /* ── IT STAYS ON THE ROW ──
+       `position: fixed` places the panel against the VIEWPORT, so scrolling
+       moved the row and left the menu behind — after half a screen it was
+       sitting over somebody else's row, still listing the first person's
+       roles. It is re-placed on every scroll and resize instead, and it
+       listens in the CAPTURE phase because the page scrolls in an inner
+       container rather than on the window.
+
+       When the row it belongs to leaves the viewport the panel closes: there
+       is nothing left to be attached to, and a menu pinned to the top edge
+       pointing at something off-screen is worse than one that got out of the
+       way. */
+    POP_TRACK = () => {
+      const a = POP_OPENER;
+      if (!a || !a.isConnected) { closePop(); return; }
+      const b = a.getBoundingClientRect();
+      const vh = document.documentElement.clientHeight || 0;
+      if (b.bottom < 0 || b.top > vh) { closePop(); return; }
+      placePop(p, a);
+    };
+    window.addEventListener('scroll', POP_TRACK, true);
+    window.addEventListener('resize', POP_TRACK);
+
     const f = p.querySelector('input');
     if (f) f.focus();
     return p;
@@ -3025,6 +4603,13 @@
   function closePop() {
     const p = document.getElementById('setPop');
     if (p) p.remove();
+    /* Both listeners go with the panel. A tracker left running against a
+       removed node is a scroll handler firing on every frame for nothing. */
+    if (POP_TRACK) {
+      window.removeEventListener('scroll', POP_TRACK, true);
+      window.removeEventListener('resize', POP_TRACK);
+      POP_TRACK = null;
+    }
     POP_OPENER = null;
   }
 
@@ -3038,6 +4623,7 @@
       <div class="set2-pop-bd">
         ${keys.map((k) => `<button class="set2-pop-i" type="button" data-ck="${esc(k)}"><span>${esc(k)}</span></button>`).join('')}
       </div>`);
+    if (!p) return;
     p.addEventListener('click', (e) => {
       const k = e.target.closest('[data-ck]');
       if (k) {
@@ -3072,6 +4658,7 @@
     host.innerHTML = MODAL === 'new' ? newSkillModal()
                    : MODAL === 'upload' ? uploadModal()
                    : MODAL.kind === 'preview' ? previewModal(MODAL.c)
+                   : MODAL.kind === 'adduser' ? addUserModal()
                    : MODAL.kind === 'rmpeople' ? removePeopleModal(MODAL)
                    : MODAL.kind === 'rotate' ? rotateModal(MODAL)
                    : deleteModal(MODAL);
@@ -3158,64 +4745,87 @@
      `bad` is set only when a commit is ATTEMPTED on something that is not an
      address. Flagging the draft as wrong while it is still being typed marks
      every address wrong for its first eight characters. */
-  const NEWU = { mails: [], draft: '', bad: false };
   const MAIL_RE = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/;
 
-  function inviteBar() {
-    const n = NEWU.mails.length;
-    const draft = NEWU.draft.trim();
-    const draftOk = MAIL_RE.test(draft);
-    const total = n + (draftOk ? 1 : 0);
+  /* ══ ADDING SOMEBODY ════════════════════════════════════════════════════
+     THREE FIELDS, IN A SHEET.
+
+     This replaces a tag field that took email addresses and nothing else. It
+     was the better shape for what it did — paste twelve addresses, press once
+     — but what it did was not enough: an invitation carries a NAME and a JOB
+     TITLE as well, and the bar had nowhere to put either.
+
+     What it did instead was guess. `nameFromMail` split the local part on
+     dots and title-cased it, so `a.mahfouz@` became "A Mahfouz" and every
+     record landed with the literal title "From your directory". A directory
+     whose names are inferred from email addresses is one where somebody has
+     to correct every row later, and the title was not a guess at all — it was
+     a placeholder printed as a fact.
+
+     So: a button and a sheet. Three fields, all required, because a record
+     missing any of them is the record the bar was already producing.
+
+     WHAT IS LOST, AND WHY THAT IS ACCEPTABLE: the paste-a-list flow. Twelve
+     people is now twelve passes. That is a real cost and it buys a directory
+     that does not need correcting afterwards — and bulk import belongs with
+     the CSV flow it needs, not bolted onto a field that cannot ask for a
+     title. */
+  const ADDU = { name: '', mail: '', title: '', bad: null };
+
+  function addUserModal() {
+    const bad = ADDU.bad || {};
+    /* ── THE HELP IS ON THE LABEL, NOT UNDER THE FIELD ──
+       Three sentences printed under three fields is a sheet that reads as
+       four times longer than the decision in it, and every one of them is
+       something you need once — the first time — and never again.
+
+       The ERROR still prints. It is not help, it is the reason the sheet did
+       not close, and putting that behind a hover would mean pressing the
+       button and watching nothing happen. */
+    const fld = (id, key, label, ph, hint) => `
+      <div class="set2-field">
+        <span class="set2-lbl-row">
+          <label class="set2-lbl" for="${id}">${esc(label)}</label>
+          <span class="set2-tip-wrap">
+            <button class="set2-tip-b" type="button" aria-describedby="${id}Tip"
+                    aria-label="About ${esc(label.toLowerCase())}">${I.info}</button>
+            <span class="set2-tip" role="tooltip" id="${id}Tip">${esc(hint)}</span>
+          </span>
+        </span>
+        <input class="set2-fld${bad[key] ? ' is-bad' : ''}" id="${id}" autocomplete="off"
+               value="${esc(ADDU[key])}" placeholder="${esc(ph)}"${
+          key === 'mail' ? ' type="text" inputmode="email" spellcheck="false" autocapitalize="off"' : ''}>
+        ${bad[key] ? `<div class="set2-hint is-err">${esc(bad[key])}</div>` : ''}
+      </div>`;
     return `
-      <div class="set2-invite" data-invite>
-        <div class="set2-tags set2-invite-f${NEWU.bad ? ' is-bad' : ''}">
-          ${NEWU.mails.map((m, i) => `
-            <span class="set2-chip is-scope">${esc(m)}
-              <button class="set2-chip-x" type="button" data-au-rm="${i}"
-                      aria-label="Remove ${esc(m)}">${I.x}</button>
-            </span>`).join('')}
-          ${/* `type="text"`, not `email`: an email input refuses
-                `setSelectionRange`, which is how the caret is put back after
-                the bar repaints. `inputmode` still brings up the @ keyboard. */ ''}
-          <input class="set2-tags-i" type="text" inputmode="email" data-au-mail
-                 value="${esc(NEWU.draft)}" autocomplete="off" spellcheck="false" autocapitalize="off"
-                 aria-label="Email addresses to invite"
-                 placeholder="${n ? 'and another\u2026' : 'Type email addresses to invite \u2014 Enter adds another'}">
+      <div class="set2-scrim" data-scrim>
+        <div class="set2-modal" role="dialog" aria-modal="true" aria-labelledby="auT">
+          <div class="set2-modal-hd">
+            <h2 class="set2-modal-t" id="auT">Add a user</h2>
+            <button class="set2-modal-x" type="button" data-close aria-label="Close">${I.x}</button>
+          </div>
+          <div class="set2-modal-bd">
+            ${fld('auName', 'name', 'Full name', 'Karim Fouad',
+                  'As it should appear to everyone else in the workspace.')}
+            ${fld('auMail', 'mail', 'Work email', 'karim.fouad@flairstech.com',
+                  'Where the invitation goes.')}
+            ${fld('auTitle', 'title', 'Job title', 'QA Manager',
+                  'Shown beside their name. It does not grant anything.')}
+          </div>
+          <div class="set2-modal-ft">
+            ${/* Said plainly, here, rather than discovered afterwards on a row
+                  that reaches nothing. Access is a separate decision and this
+                  sheet does not pretend to make it. */ ''}
+            <span class="set2-hint">They arrive with no access. Grant a role once they are in.</span>
+            <span class="set2-modal-end">
+              <button class="btn btn-ghost btn-sm" type="button" data-close>Cancel</button>
+              <button class="btn btn-brand btn-sm" type="button" data-au-add>Send invitation</button>
+            </span>
+          </div>
         </div>
-        <button class="btn btn-brand btn-sm set2-invite-go" type="button" data-au-go${total ? '' : ' disabled'}>
-          Send invite${total > 1 ? 's' : ''}</button>
-        ${NEWU.bad
-          ? `<div class="set2-hint set2-invite-h"><b class="is-err">${esc(draft)}</b> is not an email address.</div>` : ''}
       </div>`;
   }
 
-  /* The bar repaints itself in place. A full render on every chip would
-     rebuild the page under the field being typed into and take the caret with
-     it. */
-  function repaintInvite() {
-    const el = $('[data-invite]');
-    if (!el) return;
-    el.outerHTML = inviteBar();
-    const f = $('[data-au-mail]');
-    if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
-  }
-
-  /* One address in, whichever key put it there. */
-  function commitMail() {
-    const t = NEWU.draft.trim();
-    if (!t) return false;
-    if (!MAIL_RE.test(t)) { NEWU.bad = true; repaintInvite(); return false; }
-    if (NEWU.mails.indexOf(t) < 0) NEWU.mails.push(t);
-    NEWU.draft = ''; NEWU.bad = false;
-    repaintInvite();
-    return true;
-  }
-
-  /* Until the directory answers, the name is the address made readable —
-     `karim.fouad@upland.com` reads as Karim Fouad. It is a placeholder and the
-     card says so with "Invite pending". */
-  const nameFromMail = (mail) => mail.split('@')[0].split(/[._-]+/).filter(Boolean)
-    .map((w) => w[0].toUpperCase() + w.slice(1)).join(' ') || mail;
 
   function removePeopleModal(m) {
     const withGrants = m.people.filter((p) => p.grants.length);
@@ -3459,7 +5069,6 @@
      so it is exported and the console's palette reads it. */
   /* ═══ RENDER ═══ */
   const RAW = new Set();
-  const FILTER = {};
 
   /* ══ THE RAIL SECTION ══════════════════════════════════════════════════
      This replaces "Sources & data" in the briefing rail. Same shape — a
@@ -3483,7 +5092,7 @@
     let n;
     switch (id) {
       case 'skills':
-        n = SKILLS.filter((x) => standing(x, 'eff')[0] !== 'is-ok').length;
+        n = SKILLS.filter((x) => standing2(x)[0] !== 'is-ok').length;
         return n ? [n + ' not applying', 'warn'] : [SKILLS.length + ' applying', 'ok'];
       case 'agents':
         n = AGENTS.filter((a) => !a.on).length;
@@ -3578,6 +5187,7 @@
   function quickFix(m, f) {
     return `<button class="rail-fix" type="button"
         data-fix-m="${esc(m.id)}" data-fix-sec="${esc(f.sec)}"
+        ${f.node ? `data-fix-node="${esc(f.node)}"` : ''}
         ${f.find ? `data-fix-find="${esc(f.find)}"` : ''}>
         ${AIMY}<span class="rail-fix-l">${esc(f.label)}</span>
         <svg class="rail-fix-go" viewBox="0 0 12 12" fill="none" stroke="currentColor"
@@ -3694,8 +5304,15 @@
   /* Only where a module has no section head to carry it. Everywhere else the
      count belongs beside the section it counts. */
   const TALLY = {
-    skills: () => {
-      const off = SKILLS.filter((x) => standing(x, 'eff')[0] !== 'is-ok').length;
+    /* Nothing when a skill is open. The tally counts the LIST — how many exist
+       and how many are idle — and on a skill's own page the reader is not
+       looking at the list: the header beside it already says whether THIS one
+       applies, in a pill, about the thing they opened. Two counts about
+       different subjects on one line is the header answering a question nobody
+       asked louder than the one they did. */
+    skills: (st) => {
+      if (st.skill && skillById(st.skill)) return '';
+      const off = SKILLS.filter((x) => standing2(x)[0] !== 'is-ok').length;
       return `<span class="set2-num"><b>${SKILLS.length}</b> configured</span>`
            + (off ? `<span class="set2-num is-warn"><b>${off}</b> not applying</span>` : '');
     }
@@ -3720,14 +5337,31 @@
     return `
       <h1 class="set2-title">${esc(pg ? pg.name : m.name)}</h1>
       <div class="set2-bar">
-        ${scoped ? prodScope(st) : `
-        <div class="set2-scope">
-          <span class="set2-scope-i">Org <b>FlairsTech</b></span><span class="set2-scope-s">&rsaquo;</span>
-          <span class="set2-scope-i">Client <b>CXS</b></span>
-        </div>`}
+        ${scopeSlot(st, m, pg)}
         <div class="set2-bar-end set2-tally">${
-          !st.skill && TALLY[m.id] ? TALLY[m.id](st) : ''}</div>
+          TALLY[m.id] ? TALLY[m.id](st) : ''}</div>
       </div>`;
+  }
+
+  /* ── ONE SCOPE SLOT, AND THE PAGE OWNS IT ──
+     The bar under the title printed `Org FlairsTech › Client CXS` on every
+     module that was not a connection, and both halves were literals. On People
+     that meant the header said CXS while the page stood on Upland, which is
+     the one thing a scope line exists not to do — a breadcrumb that cannot be
+     wrong is decoration, and one that can be and is, is worse than absent.
+
+     So the slot works the way Connections always used it: the page that HAS a
+     scope renders it here, with the picker in it, and there is exactly one
+     scope control on screen. People had built a second bar of its own
+     underneath this one, which is how a surface ends up with two answers to
+     "where am I" sitting 40px apart.
+
+     A page with no scope says the one true thing left — which organisation
+     you are in — and nothing more. */
+  function scopeSlot(st, m, pg) {
+    if (m.scope === 'prod') return prodScope(st);
+    if (pg && pg.id === 'people') return peopleScope(st);
+    return `<div class="set2-scope"><span class="set2-scope-i">Org <b>FlairsTech</b></span></div>`;
   }
 
   /* ── The module column, as a string ──
@@ -3774,7 +5408,12 @@
      A fix carries `sec` (which page) and `find` (which row on it). Arriving
      scrolls to that row and marks it, so the click lands you ON the thing
      rather than at the top of a page that contains it somewhere. */
-  const fixTo = (label, sec, find) => ({ label: label, sec: sec, find: find || null });
+  /* `node` because People is scoped now: the groups a fix aims at — nobody
+     with access, invites nobody accepted — exist at the ROOT and nowhere else.
+     A fix that changed the page but left you standing on InterFAX Support
+     would scroll to a row that is not on screen. */
+  const fixTo = (label, sec, find, node) =>
+    ({ label: label, sec: sec, find: find || null, node: node || null });
 
   const SUBPAGES = {
     /* Three pages, grouped the way the questions group: what the fields MEAN,
@@ -3863,10 +5502,10 @@
           var none = PEOPLE.filter(function (p) { return !p.grants.length; }).length;
           if (none) return { note: none + ' with no access', s: 'warn',
             fix: fixTo('Give ' + none + ' person' + (none === 1 ? '' : 's') + ' a role',
-                       'people', '.set2-person.is-none') };
+                       'people', '.set2-sp-row.is-none', ROOT_ID) };
           if (pend) return { note: pend + ' pending', s: 'warn',
             fix: fixTo('Resend ' + pend + ' invite' + (pend === 1 ? '' : 's'),
-                       'people', '.set2-person.is-warn') };
+                       'people', '.set2-sp-row.is-warn', ROOT_ID) };
           return { note: PEOPLE.length + ' people', s: 'ok' };
         } },
       { id: 'roles', name: 'Roles', secs: ['roles'],
@@ -3920,8 +5559,16 @@
        was: the 180px + 32px the spine occupied was dead gutter before it
        existed and is dead gutter again, so no measure inside the column moves
        and the left edge is still at 512 on every page. */
+    /* ── THE SKILL DETAIL STOPPED BEING A PAGE ──
+       This used to suppress the module header whenever a skill was open,
+       because the detail was a whole page that brought its own title and a
+       back link. It is a COLUMN now, sitting beside the library it was chosen
+       from, so there is nothing to go back to and nothing to stack: the page
+       is Skills either way, and the tally over it counts the same five skills
+       whether one of them is open or not. Suppressing the header now would
+       leave the page unnamed the moment you pressed a row. */
     return `<div class="set2-col${m.wide ? ' is-wide' : ''}">`
-      + (st.skill ? '' : head(st))
+      + head(st)
       + inner + `</div>`;
   }
 
@@ -4064,26 +5711,12 @@
     });
   }
 
-  function repaintPicker(sid, focusId) {
-    const p = $(`[data-pick="${sid}"]`);
-    if (!p) return;
-    const s = skillById(sid);
-    p.outerHTML = picker(s, FILTER[sid]);
-    const np = $(`[data-pick="${sid}"]`);
-    const rows = $$('[data-node]', np);
-    if (!rows.length) return;
-    const want = focusId ? rows.filter((r) => r.dataset.node === focusId)[0] : null;
-    (want || rows[0]).setAttribute('tabindex', '0');
-    if (want) want.focus();
-  }
+  /* `repaintPicker` and `toggleNode` stood here. Both served the tree
+     targeting picker: one rebuilt it in place, the other flipped a node and
+     every leaf under it. Nothing renders that picker any more, and
+     `repaintPicker` called `picker()` — which is gone — so it was a function
+     that could only ever throw. */
 
-  function toggleNode(id, sel) {
-    const node = findNode(id);
-    if (!node) return;
-    const lv = leavesOf(node);
-    const all = lv.every((l) => sel.has(l.id));
-    lv.forEach((l) => { if (all) sel.delete(l.id); else sel.add(l.id); });
-  }
 
   /* ═══ WIRING ═══ */
   document.addEventListener('click', (e) => {
@@ -4097,7 +5730,8 @@
     if (fixBtn) {
       PENDING_FIX = fixBtn.getAttribute('data-fix-find') || null;
       patch({ m: fixBtn.getAttribute('data-fix-m'),
-              sec: fixBtn.getAttribute('data-fix-sec'), skill: '' });
+              sec: fixBtn.getAttribute('data-fix-sec'), skill: '',
+              node: fixBtn.getAttribute('data-fix-node') || '' });
       return;
     }
 
@@ -4125,13 +5759,155 @@
        two disagreed about `sec`: this one set it, that one cleared it, and the
        page rows did nothing at all. One router. */
 
-    const lens = e.target.closest('[data-lens]');
-    if (lens) { patch({ lens: lens.dataset.lens }); return; }
+    /* No `[data-lens]` branch. The Effective / Organization / Yours control it
+       served went with the ladder — precedence has two parties now, and a
+       three-way filter over two of them is a control with a redundant third
+       position. */
+
+    /* ── Editing the file ── */
+    const edO = e.target.closest('[data-ed-open]');
+    if (edO) { openEdit(edO.getAttribute('data-ed-open')); return; }
+    const edC = e.target.closest('[data-ed-cancel]');
+    if (edC) { closeEdit(edC.getAttribute('data-ed-cancel')); return; }
+    const edS = e.target.closest('[data-ed-save]');
+    if (edS) { saveEdit(edS.getAttribute('data-ed-save')); return; }
+
+    /* ── Renaming, which is how an override is ended ──
+       One name, one editor. This opens the title at the top of the page and
+       puts the cursor in it; the address follows the title, so ending the
+       collision and renaming the skill are the same act rather than two
+       fields that have to be kept in step. */
+    const slO = e.target.closest('[data-slug-open]');
+    if (slO) {
+      EDIT.add('title:' + slO.getAttribute('data-slug-open'));
+      render();
+      const f = $('[data-title-ed]');
+      if (f) { f.scrollIntoView({ block: 'center' }); f.focus(); f.select(); }
+      return;
+    }
 
     const go = e.target.closest('[data-go]');
-    if (go && go.dataset.go.indexOf('skill:') === 0) { patch({ skill: go.dataset.go.slice(6) }); return; }
+    /* Opening a skill lands on Instructions, always. You pressed the skill,
+       not the part you were last reading of a different one — carrying
+       `precedence` across would answer a question nobody asked twice. */
+    if (go && go.dataset.go.indexOf('skill:') === 0) {
+      patch({ skill: go.dataset.go.slice(6), part: '' }); return;
+    }
 
-    if (e.target.closest('[data-back]')) { patch({ skill: '' }); return; }
+    /* ── Which half of the list you are looking at ──
+       In `f` with the other filters rather than in a key of its own, so it
+       survives opening a skill and coming back, and clears with them when the
+       module changes. `withF` toggles a key off when it is set to what it
+       already holds, which is right for a filter and wrong for a tab — a tab
+       has no off. So this writes the blob directly. */
+    const ownT = e.target.closest('[data-own]');
+    if (ownT) {
+      const v = ownT.getAttribute('data-own');
+      if (v === ownOf(st)) return;
+      const f = readF(st);
+      f.own = v;
+      patch({ f: Object.keys(f).map((k) => k + ':' + f[k]).join(',') });
+      return;
+    }
+
+    /* Back to the list. The detail is a page now, not a column beside one, so
+       there is somewhere to go back TO — and it goes back to the HALF the
+       skill lives in. Following "Open theirs" from your own overridden skill
+       crosses from one tab to the other, and returning to the tab you happened
+       to leave from would put you on a list the skill you just read is not in. */
+    if (e.target.closest('[data-back]')) {
+      const cur = skillById(st.skill);
+      const f = readF(st);
+      if (cur) f.own = cur.own;
+      patch({ skill: '', part: '',
+              f: Object.keys(f).map((k) => k + ':' + f[k]).join(',') });
+      return;
+    }
+
+    /* ── EDITING WHAT A SKILL REACHES ──
+       Two lists, two menus, same control: tick to add, tick again to remove,
+       and the panel stays open because choosing three agents is one decision.
+       Every tick commits, so the card behind updates as you go. */
+    const pAg = e.target.closest('[data-pick-ag]');
+    if (pAg) {
+      const s0 = skillById(pAg.getAttribute('data-pick-ag'));
+      if (s0) paintReachPick(pAg, s0, 'agents');
+      return;
+    }
+    const pPr = e.target.closest('[data-pick-pr]');
+    if (pPr) {
+      const s0 = skillById(pPr.getAttribute('data-pick-pr'));
+      if (s0) paintReachPick(pPr, s0, 'products');
+      return;
+    }
+    /* ── The title, edited in place ──
+       Reached from the overflow menu and from the precedence insight. Read the
+       id BEFORE anything re-renders: this fires on a button that lives inside
+       the popover, and `render()` destroys it. */
+    const tO = e.target.closest('[data-title-open]');
+    if (tO) {
+      const tid = tO.getAttribute('data-title-open');
+      closePop();
+      EDIT.add('title:' + tid);
+      render();
+      const f = $('[data-title-ed]');
+      if (f) { f.scrollIntoView({ block: 'center' }); f.focus(); f.select(); }
+      return;
+    }
+
+    const pTr = e.target.closest('[data-pick-tr]');
+    if (pTr) {
+      const s0 = skillById(pTr.getAttribute('data-pick-tr'));
+      if (s0) paintTriggerPick(pTr, s0);
+      return;
+    }
+    const tv = e.target.closest('[data-trig-val]');
+    if (tv) {
+      const [sid, val] = tv.getAttribute('data-trig-val').split('|');
+      const s0 = skillById(sid);
+      if (!s0) return;
+      s0.trigger = val;
+      DIRTY.add('trigger:' + sid);
+      closePop();
+      render();
+      return;
+    }
+
+    const rv2 = e.target.closest('[data-reach-val]');
+    if (rv2) {
+      const [sid, kind, val] = rv2.getAttribute('data-reach-val').split('|');
+      const s0 = skillById(sid);
+      if (!s0) return;
+      const list = s0[kind] || (s0[kind] = []);
+      const at = list.indexOf(val);
+      if (at > -1) list.splice(at, 1); else list.push(val);
+      DIRTY.add('reach:' + sid);
+      render();
+      const anchor = $('[data-pick-' + (kind === 'agents' ? 'ag' : 'pr') + '="' + sid + '"]');
+      if (anchor) paintReachPick(anchor, s0, kind); else closePop();
+      return;
+    }
+
+    /* The skill's own overflow. `Open the file` was the first item and pointed
+       at the Contents tab — which is two inches above it, always visible, and
+       already named. A menu item whose whole effect is to press a control the
+       reader can see is a longer way to do the same click. */
+    const sMenu = e.target.closest('[data-skill-menu]');
+    if (sMenu) {
+      const s0 = skillById(sMenu.getAttribute('data-skill-menu'));
+      if (!s0) return;
+      popover(sMenu, `
+        <button class="set2-pop-i" type="button" data-title-open="${esc(s0.id)}"><span class="set2-pop-n">Rename</span></button>
+        <button class="set2-pop-i" type="button" data-example><span class="set2-pop-n">Download as SKILL.md</span></button>`);
+      return;
+    }
+
+    /* A part names its own skill so the URL is explicit afterwards. Without
+       it, pressing a part of the default-selected skill would write `part`
+       against no `skill`, and the next filter change would move the document
+       out from under the part you had chosen. */
+    const prt = e.target.closest('[data-part]');
+    if (prt) { patch({ part: prt.dataset.part, skill: prt.dataset.sid || st.skill }); return; }
 
     /* ── One search, not a walk ── */
     const pth = e.target.closest('[data-path]');
@@ -4284,77 +6060,156 @@
       const r = RETENTION.filter((x) => x.id === retGo.dataset.retGo)[0];
       confirmDelete(r); return;
     }
-    /* ── Team & access ── */
-    const grT = e.target.closest('[data-gr]');
-    if (grT) { const k = grT.getAttribute('data-gr');
-      GOPEN.has(k) ? GOPEN.delete(k) : GOPEN.add(k); render(); return; }
+    /* ── Scopes ── */
+    /* Selecting a node is a PLACE, so it writes `node` — the same key People
+       stands on. That is deliberate and it is the payoff for the two modules
+       sharing a tree: pick InterFAX Support on the map, press through to the
+       people who reach it, and you are still on InterFAX Support. */
+    const scN = e.target.closest('[data-sc-node]');
+    if (scN) { patch({ node: scN.getAttribute('data-sc-node') }); return; }
 
-    const grD = e.target.closest('[data-gr-del]');
-    if (grD) { const [pid, gi] = grD.getAttribute('data-gr-del').split(':');
-      const p = personById(pid); if (p) { p.grants.splice(+gi, 1); DIRTY.add('grant:' + pid); render(); }
-      return; }
+    /* Opening a branch past the depth cap, and revealing capped siblings.
+       Neither is a place — they are gestures mid-read — so neither touches the
+       URL, and both repaint rather than navigate. */
+    const scE = e.target.closest('[data-sc-exp]');
+    if (scE) { const k = scE.getAttribute('data-sc-exp');
+      SC_OPEN.has(k) ? SC_OPEN.delete(k) : SC_OPEN.add(k); render(); return; }
+    const scM = e.target.closest('[data-sc-more]');
+    if (scM) { SC_MORE.add(scM.getAttribute('data-sc-more')); render(); return; }
+    if (e.target.closest('[data-sc-fit]')) { SC_FIT = !SC_FIT; render(); return; }
 
-    /* Revoking the last scope of a group removes the group: a role granted on
-       nothing reaches nothing, and leaving the empty shell behind would show
-       access that does not exist. */
-    const grV = e.target.closest('[data-gr-v]');
-    if (grV) { const [pid, gi, vi] = grV.getAttribute('data-gr-v').split(':');
-      const p = personById(pid);
-      if (p && p.grants[+gi]) {
-        p.grants[+gi].v.splice(+vi, 1);
-        if (!p.grants[+gi].v.length) p.grants.splice(+gi, 1);
-        DIRTY.add('grant:' + pid); render();
-      }
-      return; }
+    /* The two ways out of the inspector. It carries counts and nothing more,
+       because each of these is a question another page already answers
+       properly — and answering it twice, differently, is how two surfaces
+       start disagreeing about who can reach what. */
+    const scP = e.target.closest('[data-sc-people]');
+    if (scP) { patch({ sec: 'people', node: scP.getAttribute('data-sc-people'),
+                       f: withF(st, 'q', null) }); return; }
+    const scS = e.target.closest('[data-sc-skills]');
+    if (scS) { patch({ m: 'skills', sec: '', skill: '', part: '' }); return; }
 
-    /* Revoking a selection. Addresses are resolved to objects BEFORE anything
-       is spliced — indices shift as you delete, and deleting by index in a
-       loop removes the wrong grants after the first one. */
-    if (e.target.closest('[data-bulk-revoke]')) {
-      const doomed = [];
-      [...PICKED].forEach((k) => {
-        const [pid, gi, vi] = k.split(':');
-        const p = personById(pid);
-        if (p && p.grants[+gi]) doomed.push({ p: p, g: p.grants[+gi], v: p.grants[+gi].v[+vi] });
+    /* ── Roles ── */
+    /* Picking a role clears the capability search: the search is the OTHER
+       question, and pressing a role name is somebody going back to the first
+       one. Leaving the query up would answer neither. */
+    const rlGo = e.target.closest('[data-role-go]');
+    if (rlGo) { patch({ role: rlGo.getAttribute('data-role-go'),
+                        f: withF(st, 'cap', null) }); return; }
+
+    /* "Show all" is the comparison being switched off, not a separate view. */
+    const rlVs = e.target.closest('[data-role-vs]');
+    if (rlVs) { patch({ vs: rlVs.getAttribute('data-role-vs') || '' }); return; }
+
+    /* Who holds it is a question about PEOPLE, so it is answered there —
+       filtered to the role, and at the root, because the holders of a role are
+       spread across every scope and the directory is the only place that shows
+       all of them at once. */
+    /* No `[data-role-holders]`. "Held by Alex Smith" came off the detail — the
+       nav beside it already carries a count against every role, which answers
+       the same question for all six at once instead of for the open one. */
+
+    /* ── People ── */
+    /* The collapsible grant group, its delete, its per-chip revoke and the
+       "+ Add scope" that skipped to step three all addressed the person CARD,
+       which is gone. A grant is revoked where it applies now — `data-revoke`
+       below — and there is nothing left for these to address. */
+
+    /* Moving the page's scope. Search is cleared on the way, because every
+       route into this — a crumb, a scope chip, the tree — is somebody saying
+       "take me there", and landing there with a query still filtering the view
+       would answer a question they had already stopped asking. */
+    const sGo = e.target.closest('[data-scope-go]');
+    if (sGo) { closePop(); patch({ node: sGo.getAttribute('data-scope-go'), f: withF(st, 'q', null) }); return; }
+
+    const sPick = e.target.closest('[data-scope-pick]');
+    if (sPick) { SCOPE_Q = '';
+      paintScopePick(sPick, sPick.getAttribute('data-scope-pick'), ''); return; }
+
+    /* Revoking AT a node: strip this node's name out of every grant of theirs
+       that names it, and drop any grant left reaching nothing. Grants written
+       on an ancestor are untouched — those are not this page's to remove, and
+       the row that carries them says so instead of offering a button. */
+    const rv = e.target.closest('[data-revoke]');
+    if (rv) {
+      const [pid, nid] = rv.getAttribute('data-revoke').split(':');
+      const p = personById(pid), n = nodeById(nid);
+      if (!p || !n) return;
+      p.grants = p.grants.filter((g) => {
+        if (!covers(g, n)) return true;
+        g.v.splice(g.v.indexOf(n.name), 1);
+        return g.v.length > 0;
       });
-      doomed.forEach(({ p, g, v }) => {
-        const at = g.v.indexOf(v);
-        if (at > -1) g.v.splice(at, 1);
-        if (!g.v.length) { const gat = p.grants.indexOf(g); if (gat > -1) p.grants.splice(gat, 1); }
-        DIRTY.add('grant:' + p.id);
-      });
-      PICKED.clear(); render(); return;
+      DIRTY.add('grant:' + p.id); render(); return;
     }
-
-    /* Adding a value to a group that already has a role and a type skips
-       straight to step three — the two questions it would ask are answered. */
-    const grA = e.target.closest('[data-gr-add]');
-    if (grA) { const [pid, gi] = grA.getAttribute('data-gr-add').split(':');
-      const p = personById(pid);
-      if (!p || !p.grants[+gi]) return;
-      RPICK = { pid: pid, gi: +gi, step: 'val', role: p.grants[+gi].r, type: p.grants[+gi].t };
-      paintRPick(grA); return; }
 
     const rNew = e.target.closest('[data-role-new]');
     if (rNew) { RPICK = { pid: rNew.getAttribute('data-role-new'), gi: null, step: 'role', q: '', v: [] };
       paintRPick(rNew); return; }
 
-    /* The anchor: a card's own button, or the bulk bar. */
-    const rpAnchor = () => (RPICK && RPICK.bulk)
-      ? $('[data-bulk-grant]') : $('[data-role-new="' + (RPICK ? RPICK.pid : '') + '"]');
+    /* ── THE ANCHOR HAS TO OUTLIVE WHAT OPENED IT ──
+       This looked up `[data-role-new]`, which lives INSIDE the kebab popover.
+       Chaining from the kebab into the role picker destroys that button, so
+       from the second step on the lookup returned null and the panel closed
+       itself — which made the client list single-select by accident: pick one
+       and the whole thing vanished before you could pick a second.
 
+       `POP_OPENER` is the element the chain is anchored to and is still in the
+       row, so it is the fallback. */
+    /* ── THE ANCHOR HAS TO BE RE-FOUND, NOT REMEMBERED ──
+       Every tick in the client list calls `render()`, which rebuilds the rows
+       — so the kebab this panel was opened from is a DETACHED node by the time
+       the panel is re-placed against it. A detached element measures as zeros
+       and both clamps resolve to 8, which is the panel jumping to the top-left
+       corner of the window after you choose a client.
+
+       So the anchor is looked up fresh from the live DOM each time, keyed on
+       the person rather than on the element: `[data-person-menu]` is on the
+       row and survives the repaint, while `[data-role-new]` lives INSIDE the
+       menu and does not. `POP_OPENER` stays as a last resort and is only
+       trusted while it is still in the document. */
+    const rpAnchor = () => {
+      if (RPICK && RPICK.bulk) return $('[data-bulk-grant]') || null;
+      const pid = RPICK ? RPICK.pid : '';
+      return $('[data-person-menu="' + pid + '"]')
+          || $('[data-role-new="' + pid + '"]')
+          || (POP_OPENER && POP_OPENER.isConnected ? POP_OPENER : null);
+    };
+
+    /* ── BACK GOES WHERE YOU CAME FROM ──
+       Two steps, so from the clients you go back to the roles — but WHICH
+       roles depends on how you got here. Granting came through the chooser of
+       all six; editing came through the list of the ones this person holds.
+       Sending an edit back to the chooser offered to extend a different grant
+       than the one being edited, from a panel that still said "back". */
     const rpBack = e.target.closest('[data-rp-back]');
     if (rpBack && RPICK) {
-      RPICK.step = RPICK.step === 'val' ? 'type' : 'role';
-      paintRPick(rpAnchor() || rpBack); return; }
+      const anchor = rpAnchor() || rpBack;
+      if (RPICK.from === 'edit') {
+        const p = personById(RPICK.pid);
+        RPICK = null;
+        if (p) roleListPop(anchor, p, 'data-edit-role-go'); else closePop();
+        return;
+      }
+      RPICK.step = 'role';
+      paintRPick(anchor); return; }
 
     const rpRole = e.target.closest('[data-rp-role]');
-    if (rpRole && RPICK) { RPICK.role = rpRole.getAttribute('data-rp-role'); RPICK.step = 'type';
+    if (rpRole && RPICK) {
+      RPICK.role = rpRole.getAttribute('data-rp-role');
+      /* ── ONE QUESTION, NOT THREE ──
+         The picker asks role, then scope TYPE, then which scopes. Opened from
+         a page that is already standing on a scope, two of those are answered
+         before it opens — so it asks the one that is not, and commits. The
+         three-step walk survives for the paths where the scope genuinely is
+         the question: the kebab's "Grant a role", and anyone holding nothing. */
+      if (RPICK.at) { grantAt(RPICK); closePop(); RPICK = null; render(); return; }
+      RPICK.type = 'Client';
+      RPICK.step = 'val';
       paintRPick(rpAnchor() || rpRole); return; }
 
-    const rpType = e.target.closest('[data-rp-type]');
-    if (rpType && RPICK) { RPICK.type = rpType.getAttribute('data-rp-type'); RPICK.step = 'val';
-      paintRPick(rpAnchor() || rpType); return; }
+    /* No `[data-rp-type]` branch. The step it served is gone, and a handler
+       waiting on a control nothing renders is the kind of thing that survives
+       three rewrites looking load-bearing. */
 
     /* The grant is created the moment the FIRST value is chosen, not when the
        panel closes. A role with no scope reaches nothing, so there is no state
@@ -4380,14 +6235,25 @@
     if (rpVal && RPICK) {
       const p = personById(RPICK.pid); if (!p) return;
       const v = rpVal.getAttribute('data-rp-val');
+      /* ── ONE GRANT PER ROLE, NOT ONE PER VISIT ──
+         This only ever reused a grant when `gi` was already set, so coming in
+         fresh from "Grant a role" it pushed a NEW one — and granting Manager
+         twice left two "Manager" rows against the same person that nothing
+         could tell apart. The bulk path has always deduped on the role; the
+         single path now does the same, which is the only thing that makes
+         multi-select add clients to a grant rather than grants to a person. */
       let g = RPICK.gi != null ? p.grants[RPICK.gi] : null;
+      if (!g) {
+        g = p.grants.filter((y) => y.r === RPICK.role && y.t === RPICK.type)[0];
+        if (g) RPICK.gi = p.grants.indexOf(g);
+      }
       if (!g) { g = { r: RPICK.role, t: RPICK.type, v: [] };
                 p.grants.push(g); RPICK.gi = p.grants.length - 1;
-                GOPEN.add(RPICK.pid + ':' + RPICK.gi); }
+                }
       const at = g.v.indexOf(v);
       if (at > -1) g.v.splice(at, 1); else g.v.push(v);
       /* A group emptied of every value is a grant that reaches nothing. */
-      if (!g.v.length) { p.grants.splice(RPICK.gi, 1); RPICK.gi = null; RPICK.step = 'type'; }
+      if (!g.v.length) { p.grants.splice(RPICK.gi, 1); RPICK.gi = null; }
       DIRTY.add('grant:' + p.id);
       render();
       const anchor = rpAnchor();
@@ -4399,12 +6265,101 @@
     if (pMenu) {
       const p = personById(pMenu.getAttribute('data-person-menu'));
       if (!p) return;
+      /* ── FIVE ITEMS, TWO IDEAS ──
+         Three ways to change what somebody can reach, then two that are not
+         about access at all. Labelled and ruled, the reader sorts them before
+         reading any of them; flat, they were five equal sentences with the
+         irreversible one sitting a row under Copy email. */
       popover(pMenu, `
+        <div class="set2-pop-t">Access</div>
         <button class="set2-pop-i" type="button" data-role-new="${esc(p.id)}"><span class="set2-pop-n">Grant a role</span></button>
+        ${/* Per ROLE, which is the unit somebody actually holds: a person has
+              several roles and each one spans several clients, so "Employee,
+              everywhere" is one decision and revoking it three times at three
+              clients is the same decision typed three times. Per-scope revoke
+              stays where it belongs — on the row, at the scope you are
+              standing on. */ ''}
+        ${/* Edit changes WHICH CLIENTS a role reaches; revoke takes the role
+              away entirely. Two different acts on the same object, so they are
+              two items rather than one that means both depending on what you
+              do inside it. */ ''}
+        ${p.grants.length ? `<button class="set2-pop-i" type="button" data-edit-role="${esc(p.id)}">
+          <span class="set2-pop-n">Edit a role</span>
+          <span class="set2-pop-s">add or remove clients</span></button>` : ''}
+        ${p.grants.length ? `<button class="set2-pop-i" type="button" data-rm-role="${esc(p.id)}">
+          <span class="set2-pop-n">Revoke a role</span>
+          <span class="set2-pop-s">${p.grants.length} held</span></button>` : ''}
         ${p.s[0] === 'is-warn' ? '<button class="set2-pop-i" type="button"><span class="set2-pop-n">Resend invite</span></button>' : ''}
-        <button class="set2-pop-i" type="button" data-copy="${esc(p.mail)}"><span class="set2-pop-n">Copy email</span></button>
+        ${/* Space, not a rule. The heading above already says where the first
+              group ends; a line here would be a second mark for one fact, and
+              the only rule this panel keeps is the one under its title. */ ''}
+        <button class="set2-pop-i is-gap" type="button" data-copy="${esc(p.mail)}"><span class="set2-pop-n">Copy email</span></button>
         <button class="set2-pop-i is-err" type="button" data-rm-one="${esc(p.id)}"><span class="set2-pop-n">Remove from workspace</span></button>`);
       return;
+    }
+
+    /* Setting a capability for the open role. `CAPS` is the model both the
+       detail and the diff read, so one write updates the row, the "differs in
+       N of 12" count and the compared column together. */
+    const capB = e.target.closest('[data-cap]');
+    if (capB) {
+      const [group, cap, ix, val] = capB.getAttribute('data-cap').split('|');
+      const grp = CAPS.filter((x) => x[0] === group)[0];
+      const row = grp && grp[1].filter((x) => x[0] === cap)[0];
+      if (!row || row[1][+ix] === 'lock') return;
+      row[1][+ix] = val;
+      DIRTY.add('roles'); render(); return;
+    }
+
+    /* One person's roles, open or shut. */
+    const rTog = e.target.closest('[data-roles]');
+    if (rTog) { const k = rTog.getAttribute('data-roles');
+      ROPEN.has(k) ? ROPEN.delete(k) : ROPEN.add(k); render(); return; }
+
+    const rmR = e.target.closest('[data-rm-role]');
+    if (rmR) {
+      const p = personById(rmR.getAttribute('data-rm-role'));
+      if (p) roleListPop(rmR, p, 'data-rm-role-go');
+      return;
+    }
+
+    /* ── EDITING WHICH CLIENTS A ROLE REACHES ──
+       Straight to step two with the grant already chosen, so the panel opens
+       on the client list with this role's clients ticked. Ticking adds and
+       unticking removes, against the grant itself — which is why it reuses the
+       picker rather than reimplementing a second multi-select that would drift
+       from it. Emptying the last client removes the grant, because a role
+       reaching nothing is not a role somebody holds. */
+    const edR = e.target.closest('[data-edit-role]');
+    if (edR) {
+      const p = personById(edR.getAttribute('data-edit-role'));
+      if (p) roleListPop(edR, p, 'data-edit-role-go');
+      return;
+    }
+
+    const edGo = e.target.closest('[data-edit-role-go]');
+    if (edGo) {
+      const [pid, gi] = edGo.getAttribute('data-edit-role-go').split(':');
+      const p = personById(pid);
+      const g = p && p.grants[+gi];
+      if (!g) return;
+      RPICK = { pid: pid, gi: +gi, step: 'val', role: g.r, type: g.t, from: 'edit' };
+      paintRPick(edGo);
+      return;
+    }
+
+    /* Resolved to the OBJECT before splicing. Indices shift as you delete, and
+       this file has already been caught removing the wrong grant that way. */
+    const rmRGo = e.target.closest('[data-rm-role-go]');
+    if (rmRGo) {
+      const [pid, gi] = rmRGo.getAttribute('data-rm-role-go').split(':');
+      const p = personById(pid);
+      const g = p && p.grants[+gi];
+      if (!g) return;
+      const at = p.grants.indexOf(g);
+      if (at > -1) p.grants.splice(at, 1);
+      DIRTY.add('grant:' + p.id);
+      closePop(); render(); return;
     }
 
     /* ── Selection ── */
@@ -4423,10 +6378,18 @@
     }
     if (e.target.closest('[data-pick-none]')) { PICKED.clear(); render(); return; }
 
-    /* One role, granted to everyone ticked. Same three-step picker a single
-       card uses — the operation is identical, only the target is plural. */
+    /* One role, granted to everyone ticked. Same picker a single person uses —
+       the operation is identical, only the target is plural.
+
+       Standing ON a client pre-answers the second step, so the panel asks the
+       role and commits. At the root it does not: "every client" is not a thing
+       you should be able to grant by pressing one button that does not say so,
+       and the client multi-select is where that decision belongs. */
     const bg = e.target.closest('[data-bulk-grant]');
-    if (bg) { RPICK = { pid: null, bulk: true, gi: null, step: 'role', q: '', v: [] };
+    if (bg) {
+      const c = clientOfSt(st);
+      RPICK = { pid: null, bulk: true, gi: null, step: 'role', q: '', v: [],
+                at: c ? { t: 'Client', v: c.name } : null };
       paintRPick(bg); return; }
 
     const brs = e.target.closest('[data-bulk-resend]');
@@ -4443,57 +6406,71 @@
       return;
     }
 
-    /* ── Inviting somebody ── */
-    const auRm = e.target.closest('[data-au-rm]');
-    if (auRm) { NEWU.mails.splice(+auRm.getAttribute('data-au-rm'), 1); repaintInvite(); return; }
+    /* ── Adding somebody ── */
+    if (e.target.closest('[data-add-user]')) {
+      ADDU.name = ''; ADDU.mail = ''; ADDU.title = ''; ADDU.bad = null;
+      MODAL = { kind: 'adduser' }; paintModal(); return;
+    }
 
-    if (e.target.closest('[data-au-go]')) {
-      /* Whatever is still in the box counts — nobody should lose the address
-         they just typed because they pressed the button instead of Enter. And
-         a draft that is NOT an address stops the send rather than being
-         dropped on the floor: silently inviting two of three is the kind of
-         partial success nobody notices until the third person asks. */
-      if (NEWU.draft.trim() && !commitMail()) return;
-      const all = NEWU.mails.slice();
-      if (!all.length) return;
-      all.forEach((mail, i) => {
-        PEOPLE.push({
-          id: 'p' + (Date.now() % 100000) + i,
-          name: nameFromMail(mail), mail: mail,
-          title: 'From your directory',
-          s: ['is-warn', 'Invite pending'],
-          grants: []
-        });
+    if (e.target.closest('[data-au-add]')) {
+      const val = (id) => { const el = $('#' + id); return el ? el.value.trim() : ''; };
+      ADDU.name = val('auName'); ADDU.mail = val('auMail'); ADDU.title = val('auTitle');
+
+      /* Every field that is wrong says so, in one pass. Validating to the
+         first failure makes somebody fix three things in three rounds. */
+      const bad = {};
+      if (!ADDU.name) bad.name = 'A name is required.';
+      if (!ADDU.mail) bad.mail = 'An email address is required.';
+      else if (!MAIL_RE.test(ADDU.mail)) bad.mail = '“' + ADDU.mail + '” is not an email address.';
+      else if (PEOPLE.some((x) => x.mail.toLowerCase() === ADDU.mail.toLowerCase()))
+        bad.mail = 'Somebody in this workspace already has that address.';
+      if (!ADDU.title) bad.title = 'A job title is required.';
+
+      if (Object.keys(bad).length) { ADDU.bad = bad; paintModal(); return; }
+
+      PEOPLE.push({
+        id: 'p' + Date.now().toString(36),
+        name: ADDU.name, mail: ADDU.mail, title: ADDU.title,
+        s: ['is-warn', 'Invite pending'],
+        grants: []
       });
-      NEWU.mails = []; NEWU.draft = ''; NEWU.bad = false;
-      DIRTY.add('people'); render();
-      /* The card arriving with its Pending pill is the real confirmation; the
-         button says so too, under the cursor, and the field is ready for the
-         next batch. */
-      const go = $('[data-au-go]');
-      if (go) {
-        go.textContent = all.length > 1 ? 'Sent ' + all.length + ' invites' : 'Invite sent';
-        setTimeout(() => { const b = $('[data-au-go]');
-                           if (b && b.disabled) b.textContent = 'Send invite'; }, 1800);
-      }
-      const f = $('[data-au-mail]'); if (f) f.focus();
+      ADDU.name = ''; ADDU.mail = ''; ADDU.title = ''; ADDU.bad = null;
+      closeModal();
+      /* They land at the root under No access, with a Pending pill. That row
+         arriving IS the confirmation — a toast saying the same thing over the
+         top of it would be the product telling you what you can already see. */
+      DIRTY.add('people');
+      patch({ node: '', f: withF(readURL(), 'q', null) });
       return;
     }
 
     /* ── Filters ── */
-    if (e.target.closest('[data-f-clear]')) { patch({ f: '' }); return; }
-
-    /* Three states, not two: ascending, descending, and the order the fixture
-       is in — which is the authored order and is worth being able to get back
-       to without reloading. */
-    const th = e.target.closest('[data-sort]');
-    if (th) {
-      const k = th.getAttribute('data-sort');
-      const cur = readF(st).sort || '';
-      const next = cur === k ? k + '!' : cur === k + '!' ? '' : k;
-      patch({ f: withF(st, 'sort', next || null) });
+    /* Clearing filters keeps `own`. It is stored with them because it lives in
+       the same blob, but it is a PLACE you are, not a narrowing you applied —
+       emptying the whole blob would answer "clear these filters" by moving you
+       to the other half of the list. */
+    /* The x inside the field clears the QUERY only. `Clear filters` in the
+       empty state clears the dropdowns too, which is a different act — and the
+       one that arrives when a search has already emptied the list. */
+    const fqx = e.target.closest('[data-fq-clear]');
+    if (fqx) {
+      const key = fqx.getAttribute('data-fq-key') || 'q';
+      patch({ f: withF(st, key, null) });
+      const back = $('[data-f-q]');
+      if (back) back.focus();
       return;
     }
+
+    if (e.target.closest('[data-f-clear]')) {
+      const cur = readF(st).own;
+      patch({ f: cur ? 'own:' + cur : '' });
+      return;
+    }
+
+    /* The three-state column sort went with the skills table. It was the only
+       thing writing `f=sort:…`, and nothing left on this surface is ordered by
+       a header — so the handler goes rather than sitting here waiting for a
+       control that no longer renders. */
 
     /* ── The date range for one run ── */
     if (e.target.closest('[data-range-clear]') || e.target.closest('[data-scal-clear]')) {
@@ -4674,44 +6651,46 @@
        instantaneous and a history that only ever shows finished runs cannot
        show you one in flight. */
     if (e.target.closest('[data-run]')) {
-      const conns = connsOf(prodOf(st));
-      if (!conns.length) return;
-      const p = primaryOf(st);
-      const r = (p && p.range) || ['', ''];
+      /* ── ONE PRESS, ONE CONNECTOR, ONE ROW ──
+         This ran every connector under the product and wrote a row for each,
+         which meant one press produced two syncs. The justification was that
+         the button sat under a combined match count, so a single row would
+         have recorded a third of what the count promised.
+
+         Both halves of that are gone. The count was removed, and Trigger sync
+         now names a connector in its header rather than announcing that it
+         reaches all of them — so the run is exactly the one you chose, with
+         its own criteria and its own window. Syncing the other is choosing it
+         and pressing again, which is also the only way to sync one and not the
+         other. */
+      const c = crmOf(st);
+      if (!c) return;
+      const r = c.range || ['', ''];
 
       /* ── A RANGE HAS TO RUN FORWARDS, AND NOW ALWAYS DOES ──
          There was a check here refusing a pair that ended before it started —
          necessary while both ends were free-text date inputs that knew nothing
          about each other. The range picker sorts the two days it is given, so
          the state is unreachable and the guard went with it. */
+      const crit = c.criteria.map((k) => k.slice());
+      if (r[0] || r[1]) crit.push(['Range', rangeLabel(r)]);
+      /* Slot 6 is the sortable clock. Slot 0 stays the human string the column
+         prints -- one is for the reader, the other for the sort, and deriving
+         either from the other would mean parsing a display format. */
+      const row = [stampNow(), crit, 'run', 'Running', matchCount(c), null, Date.now(), 0];
+      c.runs.unshift(row);
 
-      /* ── ONE ROW PER CONNECTOR ──
-         The header says the run goes to all of them and the count above the
-         button is their total, so a single row against the primary would
-         record a third of what the button just promised: the form said 5,057
-         and the history said 3,289. Each connector runs with its own criteria
-         and reports its own number, and the rows add up to the figure you
-         pressed. */
-      const when = stampNow();
-      const started = conns.map((c) => {
-        const crit = c.criteria.map((k) => k.slice());
-        if (r[0] || r[1]) crit.push(['Range', rangeLabel(r)]);
-        /* Slot 6 is the sortable clock. Slot 0 stays the human string the
-           column prints -- one is for the reader, the other for the sort, and
-           deriving either from the other would mean parsing a display format. */
-        const row = [when, crit, 'run', 'Running', matchCount(c), null, Date.now()];
-        c.runs.unshift(row);
-        return { c: c, row: row };
-      });
       DIRTY.add('runs'); markDirtyStage('history');
       render();
+      tickRuns();
       setTimeout(() => {
-        started.forEach(({ c, row }) => {
-          if (c.runs.indexOf(row) < 0) return;
-          row[2] = 'ok'; row[3] = 'Succeeded';
-        });
+        if (c.runs.indexOf(row) < 0) return;
+        /* A run that finished wrote everything it was for, so done catches up
+           with the total rather than being left wherever the last tick
+           happened to land. */
+        row[2] = 'ok'; row[3] = 'Succeeded'; row[7] = row[4];
         render();
-      }, 1400);
+      }, RUN_MS);
       return;
     }
 
@@ -4728,11 +6707,30 @@
       render(); return;
     }
 
-    const ladT = e.target.closest('[data-lad-t]');
-    if (ladT) {
-      const box = ladT.closest('[data-lad]');
-      const open = box.classList.toggle('is-open');
-      ladT.setAttribute('aria-expanded', String(open));
+    /* The result lands on the model the pill and the "Last call" line already
+       read, so one write updates the header, the note and the rail's health
+       note together — rather than three places each told separately. */
+    const wht = e.target.closest('[data-wh-test]');
+    if (wht) {
+      const cid = wht.getAttribute('data-wh-test');
+      const ep = ENDPOINTS[cid];
+      if (!ep || WH_TESTING.has(cid)) return;
+      WH_TESTING.add(cid);
+      render();
+      setTimeout(() => {
+        WH_TESTING.delete(cid);
+        const d = new Date();
+        const stamp = d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() + ', '
+          + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        const ms = (120 + Math.floor(Math.random() * 180)) + 'ms';
+        /* A failing endpoint fails again. Pressing Test does not rotate a
+           revoked token, and a green result here would be the page telling you
+           the thing it is about to keep failing at is fine. */
+        ep.last = ep.last[1] === 'is-err'
+          ? [stamp, 'is-err', ep.last[2], ms]
+          : [stamp, 'is-ok', 'Succeeded', ms];
+        render();
+      }, 900);
       return;
     }
 
@@ -4746,22 +6744,11 @@
     }
     if (e.target.closest('[data-rotate-go]')) { closeModal(); return; }
 
-    const node = e.target.closest('[data-node]');
-    if (node) {
-      const pick = node.closest('[data-pick]');
-      const id = node.dataset.node;
-      if (e.target.closest('.set2-exp')) {
-        if (OPEN.has(id)) OPEN.delete(id); else OPEN.add(id);
-      } else if (pick) {
-        toggleNode(id, SEL[pick.dataset.pick]);
-        DIRTY.add('targets:' + pick.dataset.pick);
-      } else { return; }
-      /* Repaint the picker in place and nothing else. It used to also update
-         the unsaved bar, which no longer exists -- settings apply as they are
-         made, so there is no count to keep. */
-      if (pick) repaintPicker(pick.dataset.pick, id);
-      else render();
-    }
+    /* The `[data-node]` click and keyboard handlers stood here — expand,
+       collapse, toggle a target, arrow between rows. They drove the tree
+       targeting picker, which no longer renders: nothing on this surface
+       carries `data-node` or `data-pick`, and every branch of them called
+       `picker()`, `repaintPicker()` or `SEL`, all three now gone. */
   });
 
   document.addEventListener('input', (e) => {
@@ -4770,70 +6757,33 @@
        chosen. Everything else just stores. */
     /* A comma commits, the same as Enter — people paste comma-separated lists
        out of a spreadsheet and expect that to work. */
-    const auM = e.target.closest('[data-au-mail]');
-    if (auM) {
-      if (auM.value.indexOf(',') > -1) {
-        /* A pasted list: every valid address becomes a chip, and whatever did
-           not parse stays in the box to be looked at rather than vanishing. */
-        const rest = [];
-        auM.value.split(',').forEach((part) => {
-          const t = part.trim();
-          if (!t) return;
-          if (MAIL_RE.test(t)) { if (NEWU.mails.indexOf(t) < 0) NEWU.mails.push(t); }
-          else rest.push(t);
-        });
-        NEWU.draft = rest.join(', ');
-        NEWU.bad = false;
-        repaintInvite();
-        return;
-      }
-      NEWU.draft = auM.value;
-      /* Typing retracts the complaint: it was about the previous attempt. */
-      if (NEWU.bad) { NEWU.bad = false; repaintInvite(); return; }
-      const go = $('[data-au-go]');
-      if (go) { go.disabled = !(NEWU.mails.length || MAIL_RE.test(NEWU.draft.trim()));
-                go.textContent = 'Send invite' + (NEWU.mails.length + (MAIL_RE.test(NEWU.draft.trim()) ? 1 : 0) > 1 ? 's' : ''); }
-      return;
-    }
-
-    /* The role picker's own search filters in place rather than re-rendering
-       the popover, so the caret never jumps. */
-    if (e.target.closest('[data-rp-q]') && RPICK) {
-      RPICK.q = e.target.value;
-      const q = RPICK.q.toLowerCase();
-      $$('.set2-pop-i', $('#setPop')).forEach((b) => {
-        b.style.display = b.textContent.toLowerCase().indexOf(q) < 0 ? 'none' : '';
-      });
-      return;
-    }
     /* The team search is URL state like every other filter, but it is written
        on a debounce: a `patch` per keystroke would push a history entry per
-       letter and make the back button unusable. */
+       letter and make the back button unusable.
+
+       The KEY is named by the field, because two pages search different
+       things: People looks up a person and Roles looks up a capability. They
+       shared `q` for one build and the query survived the move between them,
+       so Roles answered "no capability called Karim Fouad" to somebody who had
+       never asked it anything. */
     const fq = e.target.closest('[data-f-q]');
     if (fq) {
       const v = e.target.value;
+      const key = fq.getAttribute('data-f-key') || 'q';
       clearTimeout(FQ_T);
       FQ_T = setTimeout(() => {
         const st = readURL();
         const el = $('[data-f-q]');
         const at = el ? el.selectionStart : null;
-        patch({ f: withF(st, 'q', v) });
+        patch({ f: withF(st, key, v) });
         const back = $('[data-f-q]');
         if (back) { back.focus(); if (at != null) back.setSelectionRange(at, at); }
       }, 260);
       return;
     }
 
-    const f = e.target.closest('[data-pfilter]');
-    if (f) {
-      const pick = f.closest('[data-pick]');
-      FILTER[pick.dataset.pick] = f.value.toLowerCase().trim();
-      const sel = f.selectionStart;
-      repaintPicker(pick.dataset.pick);
-      const nf = $(`[data-pick="${pick.dataset.pick}"] [data-pfilter]`);
-      if (nf) { nf.focus(); nf.setSelectionRange(sel, sel); }
-      return;
-    }
+    /* No `[data-pfilter]` branch: it filtered the tree picker's search, and
+       the picker is gone. */
     /* Type-to-confirm. The button stays dead until the name matches, so the
        gate is the typing rather than the clicking. */
     /* The confirmed removal. Bound before the generic confirm handler so the
@@ -5021,6 +6971,23 @@
   document.addEventListener('dd:change', (e) => {
     const dd = e.target.closest && e.target.closest('.set2-dd');
     if (!dd) return;
+
+    /* A filter dropdown writes to the `f` blob the old `<select>` wrote to, so
+       the chips, the Clear button and the URL are unchanged by the swap. It is
+       read before the day pickers because its value is a STRING — parsing it as
+       an integer below would turn "QA Manager" into NaN and drop it. */
+    if (dd.hasAttribute('data-vsdd')) {
+      patch({ vs: (e.detail && e.detail.value) || '' });
+      return;
+    }
+
+    const fkey = dd.getAttribute('data-fdd');
+    if (fkey) {
+      const st0 = readURL();
+      patch({ f: withF(st0, fkey, (e.detail && e.detail.value) || null) });
+      return;
+    }
+
     const v = parseInt(e.detail && e.detail.value, 10);
     if (!(v > 0)) return;
 
@@ -5049,6 +7016,16 @@
      empty one is dropped. Deferred a tick so a click on another control lands
      first and is not swallowed by the re-render this causes. */
   document.addEventListener('focusout', (e) => {
+    const ti = e.target.closest && e.target.closest('[data-title-ed]');
+    if (ti) {
+      const id = ti.getAttribute('data-title-ed'), v = ti.value;
+      /* Same guard the draft field needed: right after a blur the input is
+         still in the DOM, so the check is "is there still a title being
+         edited", not "is this element still focused". Enter and Escape
+         re-render first, so by this tick there is nothing left to settle. */
+      setTimeout(() => { if ($('[data-title-ed]')) settleTitle(id, true, v); }, 0);
+      return;
+    }
     const f = e.target.closest && e.target.closest('[data-newname]');
     if (!f) return;
     const v = f.value;
@@ -5075,6 +7052,9 @@
     const fs = e.target.closest('[data-f]');
     if (fs) { const st = readURL();
       patch({ f: withF(st, fs.getAttribute('data-f'), fs.value) }); return; }
+
+    /* No `[data-role-vs-sel]`. That control is a `.v2-dropdown` now, and a
+       listbox reports through `dd:change` rather than firing `change`. */
 
     /* No `[data-range]` branch. Both ends were `<input type="date">` and
        reported through `change`; they are buttons opening our own calendar
@@ -5112,29 +7092,44 @@
      is ours -- the spec defines `mixed` and says nothing about parent-to-child
      propagation -- and it is the same cascade the mouse gets, because two
      selection models on one widget is how a picker disagrees with itself. */
+  /* ── Settling an inline title ──
+     Enter and blur keep it, Escape drops it. An empty name is a drop, not an
+     error: there is nothing to tell the reader that they do not already know
+     from looking at the box they just emptied. */
+  function settleTitle(id, keep, value) {
+    const s = skillById(id);
+    EDIT.delete('title:' + id);
+    if (s && keep) {
+      const v = String(value == null ? '' : value).trim();
+      if (v && v !== s.name) {
+        s.name = v;
+        s.slug = freeSlug(slugify(v), s);
+        s.when = 'just now'; s.v = (s.v || 0) + 1;
+        if (!isOrg(s)) s.by = USER.name;
+        DIRTY.add('file:' + id);
+      }
+    }
+    render();
+  }
+
   document.addEventListener('keydown', (e) => {
+    const ti = e.target.closest && e.target.closest('[data-title-ed]');
+    if (ti) {
+      if (e.key === 'Enter')  { e.preventDefault(); settleTitle(ti.getAttribute('data-title-ed'), true, ti.value); return; }
+      if (e.key === 'Escape') { e.preventDefault(); settleTitle(ti.getAttribute('data-title-ed'), false); return; }
+    }
     /* The draft field name. Enter keeps it, Escape drops it — the two answers
        to "what is this called", and nothing else needs a key. */
     if (e.target.closest && e.target.closest('[data-newname]')) {
       if (e.key === 'Enter')  { e.preventDefault(); settleDraft(true);  return; }
       if (e.key === 'Escape') { e.preventDefault(); settleDraft(false); return; }
     }
-    /* Enter inside the address box commits a chip rather than submitting the
-       form — the common case is a second address, not the end of the task. */
-    if (e.key === 'Enter' && e.target.closest && e.target.closest('[data-au-mail]')) {
-      e.preventDefault();
-      NEWU.draft = e.target.value || '';
-      /* Enter on an empty box with chips waiting is the end of the list, so
-         it sends — the same Enter that added them finishes the job. */
-      if (!NEWU.draft.trim() && NEWU.mails.length) { const go = $('[data-au-go]'); if (go) go.click(); return; }
-      commitMail();
-      return;
-    }
-    /* Backspace on an empty box takes the last chip back. */
-    if (e.key === 'Backspace' && e.target.closest && e.target.closest('[data-au-mail]')
-        && !e.target.value && NEWU.mails.length) {
-      NEWU.mails.pop(); repaintInvite();
-      return;
+    /* Enter anywhere in the Add-user sheet submits it. Three short fields and
+       a primary action is exactly the form where reaching for the mouse to
+       finish is the wrong ending. */
+    if (e.key === 'Enter' && e.target.closest && e.target.closest('.set2-modal')
+        && $('[data-au-add]')) {
+      e.preventDefault(); $('[data-au-add]').click(); return;
     }
     /* A credential field commits on Enter and reverts on Escape, so the
        common case never has to leave the keyboard for the Save beside it. */
@@ -5178,46 +7173,10 @@
     }
     const node = e.target.closest && e.target.closest('[data-node]');
     if (!node) return;
-    const tree = node.closest('[role="tree"]');
-    const pick = node.closest('[data-pick]');
-    const rows = $$('[data-node]', tree);
-    const i = rows.indexOf(node);
-    const id = node.dataset.node;
-    const open = node.getAttribute('aria-expanded');
-    const move = (j) => {
-      const t = rows[Math.max(0, Math.min(rows.length - 1, j))];
-      if (!t) return;
-      rows.forEach((r) => r.setAttribute('tabindex', '-1'));
-      t.setAttribute('tabindex', '0'); t.focus();
-    };
-    switch (e.key) {
-      case ' ': case 'Enter':
-        e.preventDefault();
-        if (!pick) return;
-        toggleNode(id, SEL[pick.dataset.pick]);
-        DIRTY.add('targets:' + pick.dataset.pick);
-        repaintPicker(pick.dataset.pick, id);
-        break;
-      case 'ArrowDown': e.preventDefault(); move(i + 1); break;
-      case 'ArrowUp':   e.preventDefault(); move(i - 1); break;
-      case 'Home':      e.preventDefault(); move(0); break;
-      case 'End':       e.preventDefault(); move(rows.length - 1); break;
-      case 'ArrowRight':
-        e.preventDefault();
-        if (open === 'false') { OPEN.add(id); pick ? repaintPicker(pick.dataset.pick, id) : render(); }
-        else if (open === 'true') move(i + 1);
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        if (open === 'true') { OPEN.delete(id); pick ? repaintPicker(pick.dataset.pick, id) : render(); }
-        else {
-          const lvl = +node.getAttribute('aria-level');
-          for (let j = i - 1; j >= 0; j--)
-            if (+rows[j].getAttribute('aria-level') < lvl) { move(j); break; }
-        }
-        break;
-      default: return;
-    }
+    /* The tree keyboard model stood here — space to toggle, arrows to move,
+       left and right to collapse and expand. It belonged to the targeting
+       picker and every branch of it called something that no longer exists. */
+    return;
   });
 
   /* ═══════════════════════════════════════════════════════════════════════
