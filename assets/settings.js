@@ -3194,19 +3194,30 @@
      Picked once and carried. It reads as a sentence about where you are, with
      exactly one thing in it you can change — which is the shape the design
      uses and the reason nothing below it has to ask again. */
-  /* `hideConns` — Dynamic fields only. The connector COUNT and the connection
-     HEALTH belong to a page about connections; on the mapping page there is a
-     connector picker ten pixels below saying which one you are reading, and its
-     own counts beside it. "2 connectors · 1 not connected" there answers a
-     question about a different screen, and the red pill in the chrome reads as
-     a warning about the fields you are looking at when nothing is wrong with
-     them. Sync and Data relevance keep it: on those, whether a connector is
-     connected is the subject. */
-  function prodScope(st, hideConns) {
+  /* ── THE CONNECTOR COUNT AND THE HEALTH PILL ARE GONE FROM THE CHROME ──
+     "2 connectors · 1 not connected" rode the scope bar on all four pages that
+     use it. Removed from Dynamic fields first, then from the rest, on the same
+     test applied page by page.
+
+     It could not name the connector. That is the whole case against it: a red
+     pill saying one of two is down, on a page whose own connector picker lists
+     BOTH BY NAME WITH THEIR HEALTH AS THE CAPTION (see `data-crm-pick`), warns
+     you about something the page states better two inches away — and states it
+     in the one place you cannot act on it.
+
+     Page by page: on Dynamic fields it sat over a table of fields that were all
+     fine and read as a warning about them. On Sync every run in the history is
+     tagged with its connector and its outcome, and `Test sync` is right there.
+     On Data relevance the rows ARE the connectors, each named, and a retention
+     threshold does not care whether a token is live. On Enablement the rail
+     already says "1 endpoint down" with a Reconnect beside it, which is the
+     same fact carrying the action this pill never had.
+
+     The `No products connected` case stays. That one is not a count, it is the
+     reason the page below is empty. */
+  function prodScope(st) {
     const client = clientOf(st);
     const prod = prodOf(st);
-    const list = prod ? connsOf(prod) : [];
-    const bad = list.filter((c) => c.health[0] === 'is-err').length;
     return `
       <div class="set2-scope">
         <button class="set2-scope-pick" type="button" data-client-pick aria-haspopup="menu"
@@ -3218,11 +3229,7 @@
           ? `<button class="set2-scope-pick" type="button" data-prod-pick aria-haspopup="menu"
                      aria-label="Choose a product">
                <span class="set2-scope-k">Product</span><b>${esc(prod)}</b>${I.down}
-             </button>
-             ${hideConns ? '' : `
-             <span class="set2-scope-s">&rsaquo;</span>
-             <span class="set2-scope-i">${list.length} connector${list.length === 1 ? '' : 's'}</span>
-             ${bad ? pill('is-err', bad + ' not connected') : pill('is-ok', 'Connected')}`}`
+             </button>`
           : pill('is-mute', 'No products connected')}
       </div>`;
   }
@@ -5465,7 +5472,7 @@
      A page with no scope says the one true thing left — which organisation
      you are in — and nothing more. */
   function scopeSlot(st, m, pg) {
-    if (m.scope === 'prod') return prodScope(st, !!(pg && pg.id === 'fields'));
+    if (m.scope === 'prod') return prodScope(st);
     if (pg && pg.id === 'people') return peopleScope(st);
     return `<div class="set2-scope"><span class="set2-scope-i">Org <b>FlairsTech</b></span></div>`;
   }
