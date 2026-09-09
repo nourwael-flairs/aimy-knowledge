@@ -42,6 +42,25 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+  /* ══ A TAG IS A NAME, SO IT IS CAPITALISED LIKE ONE ═══════════════════
+     Sentence case is right for anything with a verb doing work — a button,
+     a filter, a line of prose. A tag is none of those. "Voice Operations"
+     is the NAME of a service; "voice operations" is a thing a team does.
+     Both words take the capital, the way a proper noun does.
+
+     Past two words it has stopped being a name and become a phrase, and
+     title-casing a phrase turns it into a headline — so those are left
+     alone. The same string can be a tag here and a filter label two
+     screens away; this runs where the pill is drawn, never on the table
+     it came from. */
+  const tagCase = (v) => {
+    const t = String(v == null ? '' : v);
+    const w = t.split(' ');
+    return w.length === 2
+      ? w.map((x) => x.replace(/^./, (c) => c.toUpperCase())).join(' ')
+      : t;
+  };
+
   /* Icons ALWAYS carry width/height. An <svg> with a viewBox and no dimensions
      is a replaced element with no intrinsic size — inside any container that
      does not size it in CSS it expands to fill. */
@@ -3516,7 +3535,7 @@
   const axisTags = (o, lead) => '<div class="tc-tags">' + (lead || '') +
     `<span class="tag tag-neutral">${esc(REGIONS[o.region] || o.region)}</span>` +
     o.services.slice(0, 2).map((s) =>
-      `<span class="tag tag-neutral">${esc(SERVICES[s] || s)}</span>`).join('') +
+      `<span class="tag tag-neutral">${esc(tagCase(SERVICES[s] || s))}</span>`).join('') +
     '</div>';
 
   const TYPE_BODY = {
@@ -3534,7 +3553,7 @@
     ticket:   (o) => (o.x.status === 'Resolved'
         ? '<div class="tc-tags"><span class="tag tag-ok">'
         : '<div class="tc-tags"><span class="tag tag-warn">') +
-      esc(o.x.status) + '</span></div>' +
+      esc(tagCase(o.x.status)) + '</span></div>' +
       (o.x.resolution && o.x.resolution !== '—' ? tcSum(o.x.resolution) : ''),
 
     /* Fit, then the two axes an ICP is filed on, as the tags the profile is
