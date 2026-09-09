@@ -2644,7 +2644,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
   width: 17rem;
 }
 .set2-cal .cal-day { font-size: var(--ty-micro); }
-.set2-cal .cal-dow { font-size: 0.875rem; }
+.set2-cal .cal-dow { font-size: var(--ty-meta); }
 .set2-cal .cal-hint b { color: var(--ink-quiet); font-weight: var(--fw-semibold); }
 /* `.set2-range-a` — the arrow between the two date boxes — went with the
    second box. One field needs nothing pointing at anything. */
@@ -2825,7 +2825,7 @@ body.is-settings .set2-pop {
    controls on the surface were the smallest text on it. */
 body.is-settings .set2-col .btn-sm,
 body.is-settings .set2-scrim .btn-sm,
-body.is-settings .set2-pop .btn-sm { font-size: 0.875rem; }
+body.is-settings .set2-pop .btn-sm { font-size: var(--ty-meta); }
 
 /* This compensated for mono running visually small. Nothing here uses mono, so
    it went with it — everything sits on the one scale now. */
@@ -3239,7 +3239,7 @@ input.set2-fld[type="password"] {
   display: inline-flex; align-items: center; gap: 0.125rem;
   min-width: 1.25rem; height: 1.25rem; padding: 0 0.25rem;
   appearance: none; cursor: pointer; font: inherit;
-  font-size: 0.875rem; font-variant-numeric: tabular-nums;
+  font-size: var(--ty-meta); font-variant-numeric: tabular-nums;
   border: 0.0625rem solid var(--card-border); border-radius: var(--r-pill);
   background: var(--card-bg); color: var(--ink-quiet);
 }
@@ -3341,7 +3341,7 @@ input.set2-fld[type="password"] {
   display: inline-flex; align-items: center; flex-shrink: 0;
   height: 1.125rem; padding: 0 0.375rem;
   border-radius: var(--r-xs);
-  font-size: 0.875rem; font-weight: var(--fw-semibold);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold);
   letter-spacing: var(--ls-wide); text-transform: uppercase;
   white-space: nowrap;
 }
@@ -3360,7 +3360,7 @@ input.set2-fld[type="password"] {
 /* The address, wherever it is printed. Mono because it is a token you type,
    not a phrase you read — the same reason the frontmatter is mono. */
 .set2-slug {
-  font-family: var(--font-mono); font-size: 0.875rem;
+  font-family: var(--font-mono); font-size: var(--ty-meta);
   color: var(--ink-quiet); word-break: break-all;
 }
 
@@ -3384,7 +3384,7 @@ input.set2-fld[type="password"] {
   min-width: 1.125rem; height: 1.125rem; padding: 0 0.3125rem;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: var(--r-pill); background: var(--card-bg-raised);
-  font-size: 0.875rem; font-weight: var(--fw-semibold); color: var(--ink-quiet);
+  font-size: var(--ty-meta); font-weight: var(--fw-semibold); color: var(--ink-quiet);
 }
 .set2-tab.is-on .set2-tab-n { background: var(--brand-dim); color: var(--ink-primary); }
 

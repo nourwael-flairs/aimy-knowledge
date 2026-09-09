@@ -66,69 +66,69 @@
      does not size it in CSS it expands to fill. */
   const svg = (d, w, size) =>
     `<svg viewBox="0 0 24 24" width="${size || 14}" height="${size || 14}" ` +
-    `fill="none" stroke="currentColor" stroke-width="${w || 2.2}" ` +
+    `fill="none" stroke="currentColor" stroke-width="${w || 2}" ` +
     `stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 
   const ICO = {
-    shield:   svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>', 2.4),
-    clock:    svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', 2.4),
-    slash:    svg('<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>', 2.4),
-    question: svg('<circle cx="12" cy="12" r="9"/><path d="M9.2 9.3a3 3 0 015.7 1.2c0 2-3 3-3 3"/><path d="M12 17.5h.01"/>', 2.4),
-    arrow:    svg('<path d="M4 12h13"/><path d="M13 6l6 6-6 6"/>', 2.4),
-    eye:      svg('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>'),
-    search:   svg('<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>'),
-    folder:   svg('<path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>'),
-    grid:     svg('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'),
-    scales:   svg('<path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-2 6h4z"/><path d="M19 7l-2 6h4z"/>'),
-    refresh:  svg('<path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/>'),
-    check:    svg('<path d="M20 6L9 17l-5-5"/>'),
-    x:        svg('<path d="M18 6L6 18M6 6l12 12"/>'),
-    warn:     svg('<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/>', 2.4),
-    doc:      svg('<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/>', 2),
-    ticket:   svg('<path d="M3 9V7a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a2 2 0 000-4z"/><path d="M13 5v14"/>', 2),
-    target:   svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>', 2),
-    megaphone:svg('<path d="M3 11v2a1 1 0 001 1h2l4 4V6L6 10H4a1 1 0 00-1 1z"/><path d="M16 8.5a4 4 0 010 7"/><path d="M19 6a8 8 0 010 12"/>', 2),
-    image:    svg('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>', 2),
-    trophy:   svg('<path d="M8 21h8"/><path d="M12 17v4"/><path d="M17 4h3v3a5 5 0 01-5 5H9a5 5 0 01-5-5V4h3"/><path d="M7 4h10v4a5 5 0 01-10 0z"/>', 2),
-    book:     svg('<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>', 2),
-    globe:    svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 010 18a15 15 0 010-18z"/>', 2),
+    shield:   svg('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>'),
+    clock:    svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
+    slash:    svg('<circle cx="12" cy="12" r="10"/><path d="M4.929 4.929 19.07 19.071"/>'),
+    question: svg('<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>'),
+    arrow:    svg('<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>'),
+    eye:      svg('<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>'),
+    search:   svg('<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>'),
+    folder:   svg('<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>'),
+    grid:     svg('<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>'),
+    scales:   svg('<path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/>'),
+    refresh:  svg('<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>'),
+    check:    svg('<path d="M20 6 9 17l-5-5"/>'),
+    x:        svg('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'),
+    warn:     svg('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>'),
+    doc:      svg('<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>'),
+    ticket:   svg('<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/>'),
+    target:   svg('<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'),
+    megaphone:svg('<path d="M11 6a13 13 0 0 0 8.4-2.8A1 1 0 0 1 21 4v12a1 1 0 0 1-1.6.8A13 13 0 0 0 11 14H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"/><path d="M6 14a12 12 0 0 0 2.4 7.2 2 2 0 0 0 3.2-2.4A8 8 0 0 1 10 14"/><path d="M8 6v8"/>'),
+    image:    svg('<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>'),
+    trophy:   svg('<path d="M10 14.66V17a1 1 0 0 1-1 1 2 2 0 0 0-2 2v2"/><path d="M14 14.66V17a1 1 0 0 0 1 1 2 2 0 0 1 2 2v2"/><path d="M17.916 10H19.5A2.5 2.5 0 0 0 22 7.5V5a1 1 0 0 0-1-1h-3"/><path d="M4 22h16"/><path d="M6 9a6 6 0 0 0 12 0V3a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1z"/><path d="M6.084 10H4.5A2.5 2.5 0 0 1 2 7.5V5a1 1 0 0 1 1-1h3"/>'),
+    book:     svg('<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>'),
+    globe:    svg('<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>'),
     /* A screen on a stand. Distinct from `image` at 11px, which is the size the
        card's meta line draws a type glyph at — a deck and a marketing asset are
        neighbours in the taxonomy and must not be neighbours in silhouette. */
-    deck:     svg('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4"/><path d="M8.5 20h7"/>', 2),
-    flag:     svg('<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>'),
-    quote:    svg('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>'),
-    left:     svg('<path d="M15 18l-6-6 6-6"/>'),
-    pen:      svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>'),
-    plus:     svg('<path d="M12 5v14M5 12h14"/>', 2.4),
-    tag:      svg('<path d="M20.6 13.4L12 22l-9-9V3h10l7.6 7.6a2 2 0 010 2.8z"/><path d="M7.5 7.5h.01"/>'),
-    plug:     svg('<path d="M9 2v6M15 2v6"/><path d="M6 8h12v3a6 6 0 01-12 0z"/><path d="M12 17v5"/>'),
+    deck:     svg('<path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/>'),
+    flag:     svg('<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/>'),
+    quote:    svg('<path d="M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/><path d="M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"/>'),
+    left:     svg('<path d="m15 18-6-6 6-6"/>'),
+    pen:      svg('<path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>'),
+    plus:     svg('<path d="M5 12h14"/><path d="M12 5v14"/>'),
+    tag:      svg('<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>'),
+    plug:     svg('<path d="M12 22v-5"/><path d="M15 8V2"/><path d="M17 8a1 1 0 0 1 1 1v4a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z"/><path d="M9 8V2"/>'),
     /* The arrow leaves the box. Every other glyph here draws something that
        happens on this page; this one has to say "and then you are somewhere
        else", which is the only reason a link out needs a picture at all. */
-    external: svg('<path d="M15 3h6v6"/><path d="M21 3l-9 9"/><path d="M19 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"/>'),
-    box:      svg('<path d="M21 8v13H3V8"/><rect x="1" y="3" width="22" height="5" rx="1"/><path d="M10 12h4"/>'),
-    send:     svg('<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>'),
+    external: svg('<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'),
+    box:      svg('<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>'),
+    send:     svg('<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>'),
     /* The same picture the drop layer draws, so choosing a file and dropping
        one read as the same capability rather than two. */
-    upload:   svg('<path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>'),
+    upload:   svg('<path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'),
 
     /* ── Added for the conversation features ──
        Same factory, same stroke weights. `more` is three dots rather than a
        chevron because it opens a menu of unlike things; a chevron promises a
        list of one kind. */
-    copy:     svg('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>', 2),
-    pin:      svg('<path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/>', 2),
-    trash:    svg('<path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>', 2),
-    more:     svg('<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>', 2),
-    chevron:  svg('<polyline points="6 9 12 15 18 9"/>', 2.2),
-    thumbUp:  svg('<path d="M7 22V11l5-9a2.5 2.5 0 012.4 3.2L13 10h5.6a2 2 0 011.9 2.6l-2 7A2 2 0 0116.6 22z"/>', 2),
-    thumbDown:svg('<path d="M17 2v11l-5 9a2.5 2.5 0 01-2.4-3.2L11 14H5.4a2 2 0 01-1.9-2.6l2-7A2 2 0 017.4 2z"/>', 2),
-    share:    svg('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>', 2),
-    clip:     svg('<path d="M21.4 11.05L12.25 20.2a5 5 0 01-7.07-7.07l9.19-9.19a3.33 3.33 0 014.71 4.71l-9.2 9.19a1.67 1.67 0 01-2.35-2.36l8.49-8.48"/>', 2),
-    skill:    svg('<path d="M12 2l2.4 5.5L20 9l-4.2 4 1 5.9L12 16l-4.8 2.9 1-5.9L4 9l5.6-1.5z"/>', 2),
-    person:   svg('<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>', 2),
-    folder2:  svg('<path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M3 12h18"/>', 2)
+    copy:     svg('<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>'),
+    pin:      svg('<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>'),
+    trash:    svg('<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'),
+    more:     svg('<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>'),
+    chevron:  svg('<path d="m6 9 6 6 6-6"/>'),
+    thumbUp:  svg('<path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/><path d="M7 10v12"/>'),
+    thumbDown:svg('<path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/><path d="M17 14V2"/>'),
+    share:    svg('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/>'),
+    clip:     svg('<path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/>'),
+    skill:    svg('<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>'),
+    person:   svg('<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+    folder2:  svg('<path d="M20 5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2.5a1.5 1.5 0 0 1 1.2.6l.6.8a1.5 1.5 0 0 0 1.2.6z"/><path d="M3 8.268a2 2 0 0 0-1 1.738V19a2 2 0 0 0 2 2h11a2 2 0 0 0 1.732-1"/>')
   };
 
   const AIMY_MARK = (w, h) =>
@@ -2585,10 +2585,10 @@
     return `<div class="cal">
       <div class="cal-head">
         <button class="cal-nav" type="button" data-cal-nav="-1" aria-label="Previous month">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
         <div class="cal-title">${esc(MONTHS[mo])} ${y}</div>
         <button class="cal-nav" type="button" data-cal-nav="1" aria-label="Next month">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
       </div>
       <div class="cal-grid">
         ${DOW.map((d) => `<div class="cal-dow">${d}</div>`).join('')}
@@ -2638,8 +2638,7 @@
               aria-haspopup="dialog" aria-expanded="${open}" aria-label="${esc(c.label)}">
         ${ICO.clock.replace('<svg', '<svg class="k-date-ico" width="12" height="12"')}
         <span class="dd-label-text">${esc(label)}</span>
-        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+        ${ICO.chevron}
       </button>
       ${open ? `<div class="k-date-panel" role="dialog" aria-label="Date range">
         <div class="k-date-field">
@@ -2724,8 +2723,7 @@
       <button class="k-facet-btn${sel.length ? ' active-filter' : ''}" type="button"
               aria-haspopup="listbox" aria-expanded="${open}" aria-label="${esc(c.label)}">
         <span class="dd-label-text">${esc(label)}</span>
-        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+        ${ICO.chevron}
       </button>
       ${open ? `<div class="k-facet-panel" role="listbox" aria-multiselectable="true"
                      aria-label="${esc(c.label)}">
@@ -4135,7 +4133,7 @@
         return `<details class="ws-tree-col"${top.length <= 2 ? ' open' : ''}>
           <summary>
             <svg class="tree-chev" width="12" height="12" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             ${ICO.folder ? ICO.folder.replace('<svg', '<svg width="13" height="13"') : ''}
             ${id && AXES[g].kind
               ? `<button class="ws-tree-name is-ent" data-peek="${AXES[g].kind}:${esc(id)}"
@@ -4150,7 +4148,7 @@
             ${bucket(docs, sub).map(([sid, sdocs]) => `<details class="ws-tree-type" open>
               <summary>
                 <svg class="tree-chev" width="11" height="11" viewBox="0 0 24 24" fill="none"
-                     stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                 ${sub === 't' && TYPES[sid] ? TYPES[sid].ico.replace('<svg', '<svg width="12" height="12"') : ''}
                 <span class="ws-tree-name${sid ? '' : ' is-none'}">${esc(groupName(sub, sid))}</span>
                 <span class="ws-tree-n">${sdocs.length}</span>
@@ -4180,8 +4178,7 @@
       <button class="v2-dropdown-btn" type="button" aria-haspopup="listbox" aria-expanded="false"
               aria-label="Group the tree by">
         <span class="dd-label-text">Grouped by ${esc(AXES[cur].label.toLowerCase())}</span>
-        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+        ${ICO.chevron}
       </button>
       <div class="v2-dropdown-panel" role="listbox">
         ${Object.keys(AXES).map((k) => `<div class="v2-dropdown-option${k === cur ? ' selected' : ''}"
@@ -5083,8 +5080,7 @@
               aria-label="${esc(f.label)}">
         ${row && (f.lead || f.label) ? `<span class="prop-lead">${esc(f.lead || f.label)}</span>` : ''}
         <span class="dd-label-text">${esc(label)}</span>
-        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+        ${ICO.chevron}
       </button>
       <div class="v2-dropdown-panel" role="listbox">
         ${rows.map(([v, value, text]) => `<div class="v2-dropdown-option${v === cur ? ' selected' : ''}"
@@ -5395,8 +5391,7 @@
               aria-label="${esc(label)}">
         <span class="prop-lead">${esc(label)}</span>
         <span class="dd-label-text">${esc(text)}</span>
-        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+        ${ICO.chevron}
       </button>
       ${open ? `<div class="k-multi-panel" role="group" aria-label="${esc(label)}">
         ${keys.map((k) => `<label class="ds-choice k-multi-opt">
@@ -5712,7 +5707,7 @@
     <details class="rail-block" data-rail-block="${key}"${railShut[key] ? '' : ' open'}>
       <summary>
         <svg class="tree-chev" width="11" height="11" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
         <span class="rail-block-title">${esc(title)}</span>
         ${n ? `<span class="rail-block-n">${n}</span>` : ''}
       </summary>
@@ -9447,8 +9442,7 @@
       <button class="v2-dropdown-btn" type="button" aria-haspopup="listbox" aria-expanded="false"
               aria-label="${esc(label)}">
         <span class="dd-label-text">${esc(rows.reduce((a, r) => (String(r[0]) === String(cur) ? r[1] : a), '—'))}</span>
-        <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round"><polyline points="1 1 5 5 9 1"/></svg>
+        ${ICO.chevron}
       </button>
       <div class="v2-dropdown-panel" role="listbox">
         ${rows.map(([v, l]) => `<div class="v2-dropdown-option${String(v) === String(cur) ? ' selected' : ''}"
