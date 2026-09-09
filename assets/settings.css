@@ -2273,7 +2273,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 
    `.set2-map-row` had no `display` at all — it was a block, so its three cells
    stacked. The column head above it went on declaring `9rem 1fr auto`, which
-   meant ZENDESK KEY was a heading over empty space and every key sat under its
+   meant TEAMSUPPORT KEY was a heading over empty space and every key sat under its
    own field name instead of beside it. The actions cell, being a full-width
    block with `justify-content: flex-end`, became a line of its own with
    `Advanced` marooned at the right margin — which is why it read as a separate
@@ -2292,7 +2292,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 }
 /* ── THE INDENT MOVED INTO THE NAME CELL ──
    It was on the row, so a subfield pushed its KEY right as well as its name.
-   Reading down the Zendesk column — which is the column you scan when you are
+   Reading down the TeamSupport column — which is the column you scan when you are
    checking a mapping — every nested key started at a different x, and the
    deeper the field the further it drifted from the one above it. The tree is a
    fact about the NAME; the key column stays a column. */
@@ -2421,7 +2421,7 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
    THE CRM DROPDOWN
 
    It was a 150x24 run of text at the right edge of the section head, reading
-   "Fields from Zendesk" and sitting between the heading and a count — a
+   "Fields from TeamSupport" and sitting between the heading and a count — a
    control dressed as a caption, which is why it could not be found. The design
    has it as a select: bordered, its own height, unmistakably something you
    press. It scopes this section only, which the column head beneath it already

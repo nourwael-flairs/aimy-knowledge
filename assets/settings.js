@@ -324,7 +324,7 @@
      something other than its label. Modelled here as keys, which is the only
      reading where the control and its heading agree. */
   const SCHEMA = {
-    zendesk: {
+    teamsupport: {
       assignee:  { o: { name: 's', email: 's', id: 'id', phone: 's' } },
       requester: { o: { name: 's', email: 's',
                         organization: { o: { name: 's', domain: 's' } } } },
@@ -335,6 +335,26 @@
       agent:    { o: { name: 's', email: 's', id: 'id' } },
       contact:  { o: { name: 's', email: 's', company: { o: { name: 's', domain: 's' } } } },
       ticket:   { o: { id: 'id', subject: 's', status: 'e', priority: 'e' } }
+    },
+    /* The three that are not helpdesks. A data source does not have to be a
+       ticketing system to have a shape, and the mapping page is the same page
+       for all five — which is the point of naming the axis Data Source rather
+       than CRM. Each is shallower than a helpdesk because each genuinely is:
+       a page has an author and a space, and that is most of what it has. */
+    confluence: {
+      page:   { o: { id: 'id', title: 's', updated: 'd',
+                     space: { o: { key: 's', name: 's' } } } },
+      author: { o: { name: 's', email: 's' } },
+      label:  { o: { name: 's' } }
+    },
+    web: {
+      page: { o: { url: 's', title: 's', crawled: 'd', status: 'e' } },
+      meta: { o: { description: 's', canonical: 's' } }
+    },
+    upload: {
+      file:     { o: { name: 's', kind: 'e', size: 's' } },
+      uploader: { o: { name: 's', email: 's' } },
+      uploaded: 'd'
     }
   };
 
@@ -349,7 +369,7 @@
      `SELECT KEY` -- those names under the picker are the VALUES coming back,
      not the keys going in. */
   const SAMPLES = {
-    zendesk: {
+    teamsupport: {
       'assignee.name': ['Mohamed Ramy', 'Mostafa Adel', 'Mosaab Hany'],
       'assignee.email': ['m.ramy@cxs.com', 'm.adel@cxs.com', 'm.hany@cxs.com'],
       'assignee.id': ['4471', '4472', '4488'],
@@ -377,6 +397,35 @@
       'ticket.subject': ['Licence renewal', 'Batch stuck', 'Export failing'],
       'ticket.status': ['open', 'open', 'pending'],
       'ticket.priority': ['1', '3', '2']
+    },
+    confluence: {
+      'page.id': ['118034', '118211', '119002'],
+      'page.title': ['Refund policy', 'Data residency', 'SSO rollout runbook'],
+      'page.updated': ['2026-08-02', '2026-07-28', '2026-08-11'],
+      'page.space.key': ['SUP', 'LEG', 'SUP'],
+      'page.space.name': ['Support', 'Legal', 'Support'],
+      'author.name': ['Amira Mahfouz', 'Nour Wael', 'Omar Said'],
+      'author.email': ['a.mahfouz@upland.com', 'n.wael@upland.com', 'o.said@upland.com'],
+      'label.name': ['policy', 'gdpr', 'runbook']
+    },
+    web: {
+      'page.url': ['aimy.app/security', 'aimy.app/pricing', 'aimy.app/blog/residency'],
+      'page.title': ['Security', 'Pricing', 'Where your data lives'],
+      'page.crawled': ['2026-07-11', '2026-07-11', '2026-07-11'],
+      /* The crawl has been blocked since 11 Jul, so what it last returned is
+         two thirds 403. A preview that showed three clean 200s would hide the
+         connector's actual state on the one screen built to reveal it. */
+      'page.status': ['200', '403', '403'],
+      'meta.description': ['How AiMY stores and segregates customer data', 'Plans and limits', 'null'],
+      'meta.canonical': ['aimy.app/security', 'aimy.app/pricing', 'null']
+    },
+    upload: {
+      'file.name': ['Q3-QBR-Nordwind.pptx', 'DPA-2026-signed.pdf', 'refund-matrix.xlsx'],
+      'file.kind': ['pptx', 'pdf', 'xlsx'],
+      'file.size': ['4.2 MB', '318 KB', '96 KB'],
+      'uploader.name': ['Nour Wael', 'Legal', 'Amira Mahfouz'],
+      'uploader.email': ['n.wael@upland.com', 'legal@upland.com', 'a.mahfouz@upland.com'],
+      'uploaded': ['2026-09-08', '2026-08-19', '2026-08-04']
     }
   };
   const samplesFor = (crmId, path) => (SAMPLES[crmId] || {})[path.join('.')] || null;
@@ -554,9 +603,9 @@
   }
 
   const CONNECTIONS = [
-    { id: 'fb-zendesk', product: 'FileBound Support', crm: 'Zendesk', crmId: 'zendesk',
+    { id: 'fb-teamsupport', product: 'FileBound Support', crm: 'TeamSupport', crmId: 'teamsupport',
       health: ['is-ok', 'Healthy'], last: '14 minutes ago', every: 'Every 15 minutes',
-      window: 30, records: 12840,
+      window: 30, records: 22836,
       /* A mapping is a TREE. `kids` are fields whose value comes from inside
          their parent's: the domain lives in the email, so it is a child of the
          email rather than a second path that happens to look related. */
@@ -591,16 +640,16 @@
            the same trap the `SRC` fixture fell into. */
         ['31 Oct, 13:58', [['Status', 'Open'], ['Form', 'Billing']], 'err', 'Failed', 0,
           { code: 'MAP_422_PATH_GONE', fix: 'mapping', affected: 0, runs: 1,
-            why: 'Priority level maps to ticket.priority, which Zendesk returned as null on every record in the window. Nothing was written.' }],
+            why: 'Priority level maps to ticket.priority, which TeamSupport returned as null on every record in the window. Nothing was written.' }],
         ['30 Oct, 22:10', [['Status', 'Solved']], 'err', 'Failed', 806,
           { code: 'RATE_429_THROTTLED', fix: 'retry', affected: 806, runs: 2,
-            why: 'Zendesk throttled the pull at 806 of 2,090 records. The run stopped where it was; the rest were never read.' }]
+            why: 'TeamSupport throttled the pull at 806 of 2,090 records. The run stopped where it was; the rest were never read.' }]
       ] },
 
-    { id: 'fb-freshdesk', product: 'FileBound Support', crm: 'FreshDesk', crmId: 'freshdesk',
+    { id: 'fb-freshdesk', product: 'FileBound Support', crm: 'Freshdesk', crmId: 'freshdesk',
       health: ['is-err', 'Token rejected'], last: '26 Jul', every: 'Every hour',
-      window: 90, records: 4210,
-      /* Deliberately broken: `contact.organization` does not exist in FreshDesk,
+      window: 90, records: 510,
+      /* Deliberately broken: `contact.organization` does not exist in Freshdesk,
          whose equivalent is `contact.company`. This is what a renamed field on
          the connector's side looks like from in here. */
       maps: [
@@ -609,15 +658,75 @@
         { ctx: 'Email address', path: ['contact', 'email'] },
         /* Deliberately broken and left at the TOP level, so the broken-path
            case is still on screen: `contact.organization` does not exist in
-           FreshDesk, whose equivalent is `contact.company`. */
+           Freshdesk, whose equivalent is `contact.company`. */
         { ctx: 'Email domain',  path: ['contact', 'organization', 'domain'] }
       ],
       criteria: [['Status', 'Open']],
       runs: [['26 Jul, 09:02', [['Status', 'Open']], 'err', 'Failed', 0,
         { code: 'AUTH_401_TOKEN_EXPIRED', fix: 'reconnect', affected: 0, runs: 14,
-          why: 'The token FreshDesk issued on 4 Mar was revoked. Every run since has failed the same way and nothing has been read.' }]] },
+          why: 'The token Freshdesk issued on 4 Mar was revoked. Every run since has failed the same way and nothing has been read.' }]] },
 
-    { id: 'ks-zendesk', product: 'Knowledge Search', crm: 'Zendesk', crmId: 'zendesk',
+    /* ── THE OTHER THREE DATA SOURCES ──
+       FileBound Support has read from five things all along — the console's
+       source breakdown counts all five — and this fixture held two, because it
+       was written when the axis was called CRM and a CRM is what it could
+       imagine. A scope level that offers five values and can only answer for
+       two is worse than the two-value picker it replaced.
+
+       They are not helpdesks and are not modelled as though they were: a crawl
+       has no criteria a person composes, and a folder somebody drops files into
+       has neither criteria nor a schedule. Both say so rather than rendering an
+       empty ticket form. */
+    { id: 'fb-confluence', product: 'FileBound Support', crm: 'Confluence', crmId: 'confluence',
+      health: ['is-ok', 'Healthy'], last: '14 minutes ago', every: 'Every 15 minutes',
+      window: 30, records: 1814,
+      maps: [
+        { ctx: 'Article title', path: ['page', 'title'] },
+        { ctx: 'Author name',   path: ['author', 'name'], kids: [
+          { ctx: 'Author surname', derive: 'last' } ] },
+        { ctx: 'Collection',    path: ['page', 'space', 'name'] },
+        { ctx: 'Last updated',  path: ['page', 'updated'] }
+      ],
+      criteria: [['Space', 'Support']],
+      range: ['2026-08-01', '2026-08-31'],
+      runs: [
+        ['31 Oct, 15:38', [['Space', 'Support']], 'ok', 'Succeeded', 1814],
+        ['31 Oct, 15:23', [['Space', 'Support']], 'ok', 'Succeeded', 1812],
+        ['31 Oct, 15:08', [['Space', 'Legal']], 'ok', 'Succeeded', 96]
+      ] },
+
+    { id: 'fb-web', product: 'FileBound Support', crm: 'Website crawl', crmId: 'web',
+      health: ['is-err', 'Blocked by robots.txt'], last: '11 Jul', every: 'Weekly',
+      window: 90, records: 2215,
+      maps: [
+        { ctx: 'Article title', path: ['page', 'title'] },
+        { ctx: 'Page address',  path: ['page', 'url'] },
+        { ctx: 'Summary',       path: ['meta', 'description'] }
+      ],
+      criteria: [],
+      runs: [
+        ['18 Jul, 03:00', [], 'err', 'Failed', 0,
+          { code: 'CRAWL_403_ROBOTS', fix: 'reconnect', affected: 0, runs: 11,
+            why: 'aimy.app/robots.txt started disallowing our crawler on 11 Jul. Every weekly run since has fetched nothing, and the 2,215 pages we hold are the copy from before that date.' }],
+        ['11 Jul, 03:00', [], 'ok', 'Succeeded', 2215]
+      ] },
+
+    { id: 'fb-upload', product: 'FileBound Support', crm: 'Manual upload', crmId: 'upload',
+      health: ['is-ok', 'No schedule'], last: '1 day ago', every: 'On demand',
+      window: 180, records: 1617,
+      maps: [
+        { ctx: 'Article title', path: ['file', 'name'] },
+        { ctx: 'Owner name',    path: ['uploader', 'name'] },
+        { ctx: 'Owner email',   path: ['uploader', 'email'], kids: [
+          { ctx: 'Email domain', derive: 'domain' } ] }
+      ],
+      criteria: [],
+      runs: [
+        ['8 Sep, 11:20', [], 'ok', 'Succeeded', 1],
+        ['4 Sep, 16:47', [], 'ok', 'Succeeded', 3]
+      ] },
+
+    { id: 'ks-teamsupport', product: 'Knowledge Search', crm: 'TeamSupport', crmId: 'teamsupport',
       health: ['is-warn', '3 records skipped'], last: '2 hours ago', every: 'Every 6 hours',
       window: 30, records: 340,
       maps: [{ ctx: 'Ticket subject', path: ['ticket', 'subject'] }],
@@ -737,13 +846,22 @@
      unchanged, and carries three states on purpose: succeeded, failed, and
      never called — a brand new endpoint is not a healthy one. */
   const ENDPOINTS = {
-    'fb-zendesk': { url: 'https://api.aimy.ai/v1/knowledge/filebound-zendesk',
+    'fb-teamsupport': { url: 'https://api.aimy.ai/v1/knowledge/filebound-teamsupport',
       token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6', rotated: ['4 Mar 2026', 'A. Mahfouz'],
       last: ['6 Jun 2026, 14:02', 'is-ok', 'Succeeded', '212ms'], calls: 4180 },
     'fb-freshdesk': { url: 'https://api.aimy.ai/v1/knowledge/filebound-freshdesk',
       token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6', rotated: ['4 Mar 2026', 'A. Mahfouz'],
       last: ['26 Jul 2026, 09:02', 'is-err', '401 Unauthorised', '88ms'], calls: 0 },
-    'ks-zendesk': { url: 'https://api.aimy.ai/v1/knowledge/knowledge-search',
+    'fb-confluence': { url: 'https://api.aimy.ai/v1/knowledge/filebound-confluence',
+      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6', rotated: ['4 Mar 2026', 'A. Mahfouz'],
+      last: ['9 Sep 2026, 09:41', 'is-ok', 'Succeeded', '164ms'], calls: 1814 },
+    'fb-web': { url: 'https://api.aimy.ai/v1/knowledge/filebound-web',
+      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6', rotated: ['4 Mar 2026', 'A. Mahfouz'],
+      last: ['18 Jul 2026, 03:00', 'is-err', '403 Forbidden', '41ms'], calls: 2215 },
+    'fb-upload': { url: 'https://api.aimy.ai/v1/knowledge/filebound-upload',
+      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6', rotated: ['12 May 2026', 'N. Wael'],
+      last: ['8 Sep 2026, 11:20', 'is-ok', 'Succeeded', '96ms'], calls: 1617 },
+    'ks-teamsupport': { url: 'https://api.aimy.ai/v1/knowledge/knowledge-search',
       token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6', rotated: ['12 May 2026', 'N. Wael'],
       last: [null, 'is-mute', 'Never called', ''], calls: 0 }
   };
@@ -3215,9 +3333,28 @@
 
      The `No products connected` case stays. That one is not a count, it is the
      reason the page below is empty. */
+  /* ── AND THE THIRD LEVEL, WHICH WAS ALREADY THE SCOPE ──
+     `?crm=` has been module-wide state since Config and Sync merged: it picks
+     which connector's fields the mapping table shows, which connector's
+     criteria the trigger form edits, and which one Run sync starts. It was
+     spelled out twice in two section headers and nowhere in the chrome, so the
+     page had two pickers for one fact and no line saying where you were
+     standing — the exact defect the client and product pair was fixed for.
+
+     It is called DATA SOURCE rather than CRM because two of the five are not
+     CRMs and never were: a website crawl and a folder of uploaded files answer
+     for this product too. The console names the same axis the same way, and an
+     axis with two names is two axes to everybody except the person who built
+     it.
+
+     The bar reads whose it is, what it answers for, and where that came from —
+     Client › Product › Data Source — narrowing left to right, which is the
+     order the console's filter row puts the same three in. */
   function prodScope(st) {
     const client = clientOf(st);
     const prod = prodOf(st);
+    const src = prod ? crmOf(st) : null;
+    const many = prod ? connsOf(prod).length > 1 : false;
     return `
       <div class="set2-scope">
         <button class="set2-scope-pick" type="button" data-client-pick aria-haspopup="menu"
@@ -3231,6 +3368,17 @@
                <span class="set2-scope-k">Product</span><b>${esc(prod)}</b>${I.down}
              </button>`
           : pill('is-mute', 'No products connected')}
+        ${/* One data source is stated, not offered. A picker with a single
+              option is a control that cannot be used, and the level still has
+              to READ — dropping it entirely would make the bar's shape depend
+              on how many connectors a product happens to have. */ ''}
+        ${src ? `<span class="set2-scope-s">&rsaquo;</span>
+          ${many
+            ? `<button class="set2-scope-pick" type="button" data-crm-pick aria-haspopup="menu"
+                       aria-label="Choose a data source">
+                 <span class="set2-scope-k">Data Source</span><b>${esc(src.crm)}</b>${I.down}
+               </button>`
+            : `<span class="set2-scope-i">Data Source <b>${esc(src.crm)}</b></span>`}` : ''}
       </div>`;
   }
 
@@ -3274,7 +3422,6 @@
   /* ── Config ── Dynamic Context Fields, and how far back to read ── */
   function secMapping(c, st) {
     const k = mapCounts(c);
-    const list = connsOf(prodOf(st));
     return `
       <section class="set2-sec" id="st-fields">
         ${/* ── THE COUNTS SIT AT THE LEFT EDGE, THE ACTION AT THE RIGHT ──
@@ -3286,21 +3433,11 @@
               what it DOES goes right. */ ''}
         <div class="set2-sec-h is-bare"><h2 class="set2-sec-t">Fields</h2>
           <span class="set2-sec-lead set2-tally">
-            ${/* The CRM picker belongs HERE and nowhere else. A product's
-                  connectors differ in exactly one way — what their fields are
-                  called — so this is the only section on any of these pages
-                  whose content changes when you switch connector. */ ''}
-            ${/* Labelled, because it is the only picker on the page that does
-                  NOT change the page. Two connectors under one product name
-                  their fields differently and agree about everything else, so
-                  this scopes one section and the scope bar above scopes the
-                  rest. Unlabelled, the two read as rival answers to the same
-                  question. */ ''}
-            ${list.length > 1 ? `
-              <button class="set2-crm-pick" type="button" data-crm-pick aria-haspopup="menu"
-                      aria-label="Show fields for a different connector">
-                <b>${esc(c.crm)}</b>${I.down}
-              </button>` : `<span class="set2-from">${esc(c.crm)}</span>`}
+            ${/* The connector picker that used to sit here is the scope bar's
+                  third level now. It was never scoping only this section —
+                  `?crm=` is the same state the trigger form and Run sync read —
+                  and a second control for module-wide state, in a section
+                  header, taught that switching it changed one table. */ ''}
             <span class="set2-num"><b>${k.confirmed}</b> confirmed</span>
 
             ${k.unmapped ? `<span class="set2-num is-mute"><b>${k.unmapped}</b> not mapped</span>` : ''}
@@ -3427,7 +3564,7 @@
     return `
       <section class="set2-sec" id="st-window">
         <div class="set2-sec-h"><h2 class="set2-sec-t">Data relevance range</h2></div>
-        <div class="set2-sub">How far back AiMY reads when it answers from ${esc(prodOf(st))}, per CRM.</div>
+        <div class="set2-sub">How far back AiMY reads when it answers from ${esc(prodOf(st))}, per data source.</div>
 
         <div class="set2-ret-card">
           ${list.map((c) => `
@@ -3477,13 +3614,22 @@
   }
 
   const RETENTION = [
-    { id: 'freshdesk', name: 'FreshDesk', days: 90, matched: 4210,
+    { id: 'freshdesk', name: 'Freshdesk', days: 90, matched: 4210,
       affects: [['Support', 'loses grounding for tickets before the threshold'],
                 ['Triage an inbound ticket', 'answers from a shorter history'],
                 ['FileBound Support', 'next sync re-reads only what remains']] },
-    { id: 'zendesk', name: 'ZenDesk', days: 90, matched: 1180,
+    { id: 'teamsupport', name: 'TeamSupport', days: 90, matched: 1180,
       affects: [['Support', 'loses grounding for tickets before the threshold'],
-                ['Draft a refund response', 'loses the older refund precedents it cites']] }
+                ['Draft a refund response', 'loses the older refund precedents it cites']] },
+    { id: 'confluence', name: 'Confluence', days: 180, matched: 1814,
+      affects: [['Policies', 'loses superseded revisions of the pages it grounds on'],
+                ['Answer a policy question', 'can no longer show what a rule used to say']] },
+    { id: 'web', name: 'Website crawl', days: 180, matched: 2215,
+      affects: [['Marketing', 'loses crawled pages that have since changed'],
+                ['FileBound Support', 'the crawl is blocked, so nothing replaces what goes']] },
+    { id: 'upload', name: 'Manual upload', days: 180, matched: 1617,
+      affects: [['Marketing', 'loses collateral nobody re-uploads'],
+                ['Manual upload', 'has no schedule, so a deleted file does not come back']] }
   ];
   /* Fewer days selects MORE records for deletion. Getting this backwards is
      how a retention control becomes an incident. */
@@ -3925,31 +4071,24 @@
 
   function secCriteria(c, st) {
     const prod = prodOf(st);
-    const list = connsOf(prod);
     const r = c.range || ['', ''];
     return `
       <section class="set2-sec" id="st-records">
-        ${/* ── A PICKER, NOT A LABEL ──
-              It read "Zendesk · runs on all 2 connectors", and that is what the
-              button did: one press, one row per connector, two syncs from one
-              decision. But a sync IS per connector — each has its own criteria,
-              its own window and its own credentials, and one can fail while the
-              other succeeds.
+        ${/* ── ONE DATA SOURCE, AND THE BAR NAMES IT ──
+              This section once read "TeamSupport · runs on all 2 connectors",
+              and that is what the button did: one press, two syncs from one
+              decision. But a sync IS per data source — each has its own
+              criteria, its own window and its own credentials, and one can fail
+              while the other succeeds.
 
-              So the section scopes to a connector the way Dynamic fields does,
-              with the same control, and Run sync starts exactly the one named
-              here. Sync history below stays UNSCOPED: what you want after a run
-              is every run, which is why that table carries a CRM chip on every
+              So it runs exactly the source the scope bar names, and the picker
+              that used to sit in this header is that bar's third level. Sync
+              history below stays UNSCOPED: what you want after a run is every
+              run, which is why that table carries a source chip on every
               row. */ ''}
-        <div class="set2-sec-h"><h2 class="set2-sec-t">Trigger sync</h2>
-          <span class="set2-sec-end">
-            ${list.length > 1 ? `
-              <button class="set2-crm-pick" type="button" data-crm-pick aria-haspopup="menu"
-                      aria-label="Choose which connector to sync">
-                <b>${esc(c.crm)}</b>${I.down}
-              </button>` : `<span class="set2-from">${esc(c.crm)}</span>`}
-          </span></div>
-        <div class="set2-sub">Define the criteria a manual run reads with, then start it.</div>
+        <div class="set2-sec-h"><h2 class="set2-sec-t">Trigger sync</h2></div>
+        <div class="set2-sub">Define the criteria a manual run reads with, then start it.
+          Scoped to <b>${esc(c.crm)}</b>, the data source named in the bar above.</div>
 
         <div class="set2-card">
           <div class="set2-card-t">Sync criteria</div>
@@ -4027,14 +4166,14 @@
 
   /* The history is the PRODUCT's, because the run is. Every row names the
      connector it hit — two CRMs' runs in one undifferentiated list would make
-     a FreshDesk failure look like a FileBound-wide outage. */
+     a Freshdesk failure look like a FileBound-wide outage. */
   function secRuns(st) {
     const list = connsOf(prodOf(st));
     const rows = [];
     list.forEach((c) => c.runs.forEach((r) => rows.push({ c: c, r: r })));
     /* ── NEWEST FIRST, ACROSS CONNECTORS ──
-       It flattened connector by connector, so every Zendesk run sat above
-       every FreshDesk one whatever their times were -- and a run started just
+       It flattened connector by connector, so every TeamSupport run sat above
+       every Freshdesk one whatever their times were -- and a run started just
        now on the second connector appeared below fixture rows from October.
        A history that is not in time order is not a history.
 
@@ -4120,7 +4259,7 @@
      read as one decision when they are on one page. */
   /* ── Retention ──
      Per CRM, and EVERY CRM this product syncs — not just the one currently
-     scoped. FileBound Support reads from both Zendesk and FreshDesk, and a
+     scoped. FileBound Support reads from both TeamSupport and Freshdesk, and a
      threshold page that showed you one of them would let you set 90 days on
      the connector you happened to be looking at while the other silently kept
      everything. The design lists both for exactly that reason. */
@@ -4148,7 +4287,7 @@
               reads as unfinished; the sentence under it says the same thing
               in words and the rows say it in numbers. */ ''}
         <div class="set2-sec-h"><h2 class="set2-sec-t">Trigger delete</h2></div>
-        <div class="set2-sub">Remove synced data older than a set threshold, per CRM.</div>
+        <div class="set2-sub">Remove synced data older than a set threshold, per data source.</div>
         <div class="set2-danger" role="note">
           <span class="set2-danger-i" aria-hidden="true">${I.warn}</span>
           <span>This action is irreversible. Deleted records cannot be recovered.</span>
@@ -4291,7 +4430,7 @@
      This rendered a full section per connector -- heading, the same sentence,
      the same blue note, then the two rows -- so a product with two connectors
      read the identical paragraph twice, 300px apart, with only the word
-     "Zendesk" or "FreshDesk" changed. The frame has ONE heading over this,
+     "TeamSupport" or "Freshdesk" changed. The frame has ONE heading over this,
      and the frame is right: what differs between two connectors is two URLs
      and two tokens, and that is all that should repeat. The connector name
      becomes a sub-head over its own pair of rows; the spine still lands on
@@ -4333,7 +4472,7 @@
      It reports what is actually true rather than flattering the button: an
      endpoint whose last call was a 401 fails the test the same way, because
      pressing Test does not fix a revoked token. Anything else succeeds and
-     stamps a fresh time, which is what turns `ks-zendesk` from never-called
+     stamps a fresh time, which is what turns `ks-teamsupport` from never-called
      into a live endpoint. */
   const WH_TESTING = new Set();
 
@@ -5118,7 +5257,7 @@
      SEARCH
 
      Indexes LEAF SETTINGS, not modules. Typing "retention" should find the
-     FreshDesk threshold itself, not the page it sits on -- Devin's palette
+     Freshdesk threshold itself, not the page it sits on -- Devin's palette
      returns "Settings > Review > Per-PR spend limit" and that specificity is
      the whole value. Module-level search would have been a nicer-looking
      version of the profile-pill deep links this replaced.
@@ -6932,7 +7071,7 @@
        either, and the assignment threw — AFTER `r.days = v` had already
        changed the model.
 
-       So lowering FreshDesk from 90 days to 10 left the row saying "2,105
+       So lowering Freshdesk from 90 days to 10 left the row saying "2,105
        records would go" while the confirmation it feeds said 3,976. The error
        was silent, and it was DIRECTIONAL: it always understated the damage as
        you made the threshold more destructive. On the one control here that

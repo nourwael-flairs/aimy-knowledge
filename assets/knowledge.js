@@ -132,11 +132,11 @@
 
   /* ── Who answers for a document ──
 
-     A ticket's `owner` is its ingestion marker — *Ingested · Zendesk* — not a
+     A ticket's `owner` is its ingestion marker — *Ingested · Freshdesk* — not a
      person, so the accountable party is the assignee. Everything that asks
      "who answers for this" goes through here rather than reading `o.owner`,
      which is what let the same screen disagree with itself: the byline read
-     "No owner — it arrived from Zendesk" while the rail's Owner row two inches
+     "No owner — it arrived from Freshdesk" while the rail's Owner row two inches
      below read "Owned by —", because one printed the field and the other
      looked it up in OWNERS and found nothing.
 
@@ -295,10 +295,10 @@
     confluence: { label: 'Confluence',    health: 'ok',     note: 'Synced 14 minutes ago',
                   last: 0, cadence: 'Every 15 minutes',
                   history: [[0, 'ok', '14 objects checked, 2 updated'], [1, 'ok', '14 objects checked, none changed'], [2, 'ok', '13 objects checked, 1 added']] },
-    zendesk:    { label: 'Zendesk',       health: 'failed', note: 'OAuth token rejected since 26 Jul',
+    freshdesk:  { label: 'Freshdesk',     health: 'failed', note: 'OAuth token rejected since 26 Jul',
                   last: 4, cadence: 'Every hour', code: 'AUTH_401_TOKEN_EXPIRED',
                   history: [[0, 'failed', 'OAuth token rejected'], [2, 'failed', 'OAuth token rejected'], [4, 'ok', '9 objects checked, 3 updated']] },
-    hubspot:    { label: 'HubSpot',       health: 'warn',   note: '3 records skipped — missing owner',
+    teamsupport:{ label: 'TeamSupport',   health: 'warn',   note: '3 records skipped — missing owner',
                   last: 0, cadence: 'Every 6 hours',
                   history: [[0, 'warn', '12 checked, 3 skipped — no owner'], [1, 'warn', '12 checked, 3 skipped — no owner'], [3, 'ok', '11 checked, 1 added']] },
     web:        { label: 'Website crawl', health: 'failed', note: 'Crawler blocked by robots.txt since 11 Jul',
@@ -351,9 +351,9 @@
       + String(o.col).toUpperCase() + '/pages/' + extRef(o),
     /* A ticket already wears its number in its id — #48120 — so this one is
        not invented at all. */
-    zendesk: (o) => 'https://aimy.zendesk.com/agent/tickets/'
+    freshdesk: (o) => 'https://aimy.freshdesk.com/a/tickets/'
       + ((String(o.id).match(/\d+/) || [extRef(o)])[0]),
-    hubspot: (o) => 'https://app.hubspot.com/contacts/aimy/record/2-0/' + extRef(o),
+    teamsupport: (o) => 'https://aimy.teamsupport.com/a/contacts/' + extRef(o),
     web: (o) => {
       const u = (o.x || {}).url || (o.x || {}).canonical;
       return u && u !== '—' ? httpsify(u) : '';
@@ -561,7 +561,7 @@
       x:{ applies:'EU storefront · all plans' } },
 
     { id:'article-returns-faq', t:'article', work:'detected', owner:'A. Mahfouz',
-      title:'Returns FAQ — activated items', col:'support', src:'zendesk', prod:'kapost', client:'upland',
+      title:'Returns FAQ — activated items', col:'support', src:'freshdesk', prod:'kapost', client:'upland',
       tags:['refunds','warranty','policy'], upd:26, ing:300, xc:480, xu:26,
       sum:'Activation ends refund eligibility. Faults are handled under warranty instead.',
       x:{ applies:'All storefronts — unscoped' } },
@@ -624,38 +624,38 @@
       sum:'When a voice call escalates to a human, and what context is carried across.',
       x:{ applies:'Voice deployments' } },
 
-    { id:'ticket-48120', t:'ticket', work:'detected', owner:'Ingested · Zendesk',
-      title:'#48120 — Refund declined after activation', col:'support', src:'zendesk', prod:'copilot', client:'nordwind',
+    { id:'ticket-48120', t:'ticket', work:'detected', owner:'Ingested · Freshdesk',
+      title:'#48120 — Refund declined after activation', col:'support', src:'freshdesk', prod:'copilot', client:'nordwind',
       tags:['refunds','eu'], upd:150, ing:150, xc:158, xu:150,
       sum:'Customer activated before requesting a refund; policy exception granted on goodwill.',
       x:{ requester:'Nordwind GmbH', assignee:'A. Mahfouz', status:'Resolved', resolution:'Goodwill credit issued; policy exception logged.' } },
 
-    { id:'ticket-51004', t:'ticket', work:'completed', owner:'Ingested · Zendesk',
-      title:'#51004 — SCIM group mapping fails silently', col:'support', src:'zendesk', prod:'copilot', client:'meridian',
+    { id:'ticket-51004', t:'ticket', work:'completed', owner:'Ingested · Freshdesk',
+      title:'#51004 — SCIM group mapping fails silently', col:'support', src:'freshdesk', prod:'copilot', client:'meridian',
       tags:['sso','enterprise','provisioning'], upd:34, ing:34, xc:38, xu:34,
       sum:'Groups synced but roles did not apply. Root cause was a stale mapping cache.',
       x:{ requester:'Meridian Health', assignee:'N. Wael', status:'Resolved', resolution:'Cache invalidated on mapping change; fix shipped 24 Jun.' } },
 
-    { id:'ticket-51877', t:'ticket', work:'completed', owner:'Ingested · Zendesk',
-      title:'#51877 — Data residency question, APAC contract', col:'support', src:'zendesk', prod:'copilot', client:'tavola',
+    { id:'ticket-51877', t:'ticket', work:'completed', owner:'Ingested · Freshdesk',
+      title:'#51877 — Data residency question, APAC contract', col:'support', src:'freshdesk', prod:'copilot', client:'tavola',
       tags:['gdpr','apac','security'], upd:9, ing:9, xc:11, xu:9,
       sum:'Asked where APAC data is stored under an enterprise contract. Answer could not be grounded.',
       x:{ requester:'Tavola Retail', assignee:'O. Said', status:'Awaiting legal', resolution:'Open — routed to the policy owner.' } },
 
-    { id:'ticket-52310', t:'ticket', work:'completed', owner:'Ingested · Zendesk',
-      title:'#52310 — Proration disputed on mid-cycle upgrade', col:'support', src:'zendesk', prod:'sales', client:'orbit',
+    { id:'ticket-52310', t:'ticket', work:'completed', owner:'Ingested · Freshdesk',
+      title:'#52310 — Proration disputed on mid-cycle upgrade', col:'support', src:'freshdesk', prod:'sales', client:'orbit',
       tags:['billing'], upd:4, ing:4, xc:5, xu:4,
       sum:'Customer expected a credit rather than a prorated charge.',
       x:{ requester:'Orbit BPO', assignee:'N. Wael', status:'Resolved', resolution:'Credit applied; billing article flagged as unclear.' } },
 
-    { id:'ticket-52488', t:'ticket', work:'failed', owner:'Ingested · Zendesk',
-      title:'#52488 — Voice call dropped at handoff', col:'support', src:'zendesk', prod:'voice', client:'orbit',
+    { id:'ticket-52488', t:'ticket', work:'failed', owner:'Ingested · Freshdesk',
+      title:'#52488 — Voice call dropped at handoff', col:'support', src:'freshdesk', prod:'voice', client:'orbit',
       tags:['voice','sla'], upd:2, ing:2, xc:2, xu:2,
       sum:'Ingestion incomplete — the transcript attachment could not be fetched.',
-      x:{ requester:'Orbit BPO', assignee:'Unassigned', status:'Open', resolution:'Blocked — Zendesk credentials expired mid-sync.' } },
+      x:{ requester:'Orbit BPO', assignee:'Unassigned', status:'Open', resolution:'Blocked — Freshdesk credentials expired mid-sync.' } },
 
     { id:'icp-bpo', t:'icp', work:'recommended', owner:'Sales Ops',
-      title:'Mid-market BPO — EMEA', col:'sales', src:'hubspot', prod:'sales', client:'',
+      title:'Mid-market BPO — EMEA', col:'sales', src:'teamsupport', prod:'sales', client:'',
       tags:['emea','sales','qa'], upd:171, ing:400, xc:430, xu:171,
       sum:'Outsourced contact-centre operators between 200 and 2,000 seats across EMEA.',
       x:{ segment:'200–2,000 seats · outsourced support', score:92,
@@ -663,7 +663,7 @@
           dis:['Single-client captive centres','Under 200 seats — no QA budget'] } },
 
     { id:'icp-bpo-apac', t:'icp', work:'detected', owner:'Sales Ops',
-      title:'Mid-market BPO — APAC', col:'sales', src:'hubspot', prod:'sales', client:'',
+      title:'Mid-market BPO — APAC', col:'sales', src:'teamsupport', prod:'sales', client:'',
       tags:['apac','sales','qa'], upd:290, ing:420, xc:450, xu:290,
       sum:'The APAC cut of the BPO segment. Nothing has cited it since February.',
       x:{ segment:'150–1,500 seats · outsourced support', score:61,
@@ -671,7 +671,7 @@
           dis:['Domestic-only operators','No data residency requirement'] } },
 
     { id:'icp-healthcare', t:'icp', work:'completed', owner:'Sales Ops',
-      title:'Regulated healthcare support — EU', col:'sales', src:'hubspot', prod:'sales', client:'',
+      title:'Regulated healthcare support — EU', col:'sales', src:'teamsupport', prod:'sales', client:'',
       tags:['eu','security','sales'], upd:23, ing:200, xc:230, xu:23,
       sum:'In-house support teams inside regulated healthcare providers.',
       x:{ segment:'Regulated providers · in-house support', score:84,
@@ -687,19 +687,19 @@
           dis:['Flat annual volume','No voice channel'] } },
 
     { id:'campaign-q3', t:'campaign', work:'completed', owner:'Marketing',
-      title:'Q3 — Quality at scale', col:'marketing', src:'hubspot', prod:'asterisImaging', client:'asteris',
+      title:'Q3 — Quality at scale', col:'marketing', src:'teamsupport', prod:'asterisImaging', client:'asteris',
       tags:['emea','qa','campaign'], upd:32, ing:120, xc:140, xu:32,
       sum:'Pipeline generation against the mid-market BPO segment.',
       x:{ objective:'Pipeline from mid-market BPO', window:'1 Jul – 30 Sep · active', assets:'6 assets · 3 landing pages' } },
 
     { id:'campaign-q4-voice', t:'campaign', work:'recommended', owner:'Marketing',
-      title:'Q4 — Voice that does not drop', col:'marketing', src:'hubspot', prod:'voice', client:'',
+      title:'Q4 — Voice that does not drop', col:'marketing', src:'teamsupport', prod:'voice', client:'',
       tags:['voice','campaign'], upd:61, ing:100, xc:110, xu:61,
       sum:'Launch campaign for the voice handoff work. Window opens before the next review date.',
       x:{ objective:'Awareness for voice handoff', window:'1 Oct – 31 Dec · not started', assets:'2 assets · 1 landing page' } },
 
     { id:'campaign-residency', t:'campaign', work:'detected', owner:'Marketing',
-      title:'EU residency — compliance push', col:'marketing', src:'hubspot', prod:'copilot', client:'',
+      title:'EU residency — compliance push', col:'marketing', src:'teamsupport', prod:'copilot', client:'',
       tags:['gdpr','eu','campaign'], upd:210, ing:300, xc:320, xu:210,
       sum:'Ran in Q1 and never closed out.',
       x:{ objective:'Inbound from compliance buyers', window:'1 Jan – 31 Mar · ended', assets:'4 assets' } },
@@ -735,21 +735,21 @@
       x:{ format:'PDF · A4 · 1pp', usage:'External — customer-facing', approval:'approved' } },
 
     { id:'story-nordwind', t:'story', work:'completed', owner:'Marketing',
-      title:'Nordwind — 31% faster resolution', col:'marketing', src:'hubspot', prod:'sales', client:'nordwind',
+      title:'Nordwind — 31% faster resolution', col:'marketing', src:'teamsupport', prod:'sales', client:'nordwind',
       tags:['qa','emea','proof'], upd:39, ing:120, xc:130, xu:39,
       sum:'Eight hundred seats, three months, measured against their own baseline.',
       x:{ size:'800 seats', outcome:'31% faster first resolution',
           quote:'We stopped guessing which conversations to review.', approval:'pending' } },
 
     { id:'story-meridian', t:'story', work:'completed', owner:'Marketing',
-      title:'Meridian Health — audit-ready in six weeks', col:'marketing', src:'hubspot', prod:'copilot', client:'meridian',
+      title:'Meridian Health — audit-ready in six weeks', col:'marketing', src:'teamsupport', prod:'copilot', client:'meridian',
       tags:['security','eu','proof'], upd:54, ing:140, xc:150, xu:54,
       sum:'A regulated provider reaching audit readiness without adding headcount.',
       x:{ size:'240 seats', outcome:'Audit readiness in 6 weeks',
           quote:'The evidence was already there. We just could not find it.', approval:'approved' } },
 
     { id:'story-tavola', t:'story', work:'recommended', owner:'Marketing',
-      title:'Tavola Retail — peak season without extra headcount', col:'marketing', src:'hubspot', prod:'voice', client:'tavola',
+      title:'Tavola Retail — peak season without extra headcount', col:'marketing', src:'teamsupport', prod:'voice', client:'tavola',
       tags:['voice','proof'], upd:104, ing:180, xc:190, xu:104,
       sum:'Seasonal volume absorbed by voice deflection rather than temporary staff.',
       x:{ size:'410 seats', outcome:'Peak absorbed with 0 temporary hires',
@@ -816,8 +816,8 @@
       tags:['gdpr','policy'], upd:110, ing:350, xc:410, xu:110,
       sum:'How long each class of record is kept, and what triggers deletion.',
       x:{ applies:'All regions' } },
-    { id:'ticket-49002', t:'ticket', work:'completed', owner:'Ingested · Zendesk',
-      title:'#49002 — Legal hold on an account under dispute', col:'legal', src:'zendesk', prod:'copilot', client:'orbit',
+    { id:'ticket-49002', t:'ticket', work:'completed', owner:'Ingested · Freshdesk',
+      title:'#49002 — Legal hold on an account under dispute', col:'legal', src:'freshdesk', prod:'copilot', client:'orbit',
       tags:['security'], upd:70, ing:70, xc:72, xu:70,
       sum:'Account data preserved pending resolution.',
       x:{ requester:'Orbit BPO', assignee:'Legal', status:'On hold', resolution:'Open — legal hold in force.' } }
@@ -1084,7 +1084,7 @@
       sum:'The 14-day window that preceded the current 30-day policy.',
       x:{ applies:'EU storefront · superseded 12 Mar 2025' } },
     { id:'campaign-q1-launch', t:'campaign', work:'completed', owner:'Marketing', arch:true,
-      title:'Q1 — Launch week', col:'marketing', src:'hubspot', prod:'sales', client:'',
+      title:'Q1 — Launch week', col:'marketing', src:'teamsupport', prod:'sales', client:'',
       tags:['campaign'], upd:290, ing:320, xc:330, xu:290,
       sum:'Closed out and archived. Kept for the asset list and the outcome numbers.',
       x:{ objective:'Launch awareness', window:'6 Jan – 20 Jan · ended', assets:'9 assets' } }
@@ -1944,9 +1944,9 @@
     [/\bblogs?(?: posts?)?\b/i,           { type: 'blog' }],
     [/\bweb ?pages?\b|\bpages?\b/i,       { type: 'webpage' }],
     // sources
-    [/\bzendesk\b/i,                      { source: 'zendesk' }],
+    [/\bteam ?support\b/i,                { source: 'teamsupport' }],
     [/\bconfluence\b/i,                   { source: 'confluence' }],
-    [/\bhubspot\b/i,                      { source: 'hubspot' }],
+    [/\bfresh ?desk\b/i,                  { source: 'freshdesk' }],
     [/\bcrawl(?:ed|er)?\b|\bwebsite\b/i,  { source: 'web' }],
     [/\buploaded?\b|\bmanual\b/i,         { source: 'upload' }],
     // products
@@ -2272,14 +2272,30 @@
      already speaks all of it. Checked against LEX before removing anything:
      status all seven, type all nine, source all five, client all four, product
      all three, region, service and audience complete, the date windows, `mine`
-     and `archived`. Every key removed is typeable today. The only gap was
-     `collection` — policies, support and marketing are in the lexicon and sales
-     and legal are not — and collection stayed, so nothing lost reach.
+     and `archived`. Every key removed is typeable today.
+
+     COLLECTION has now left too, and it is the one removal that costs reach:
+     `collection` is the single axis the lexicon does not cover — policies,
+     support and marketing are in it, sales and legal are not. It goes anyway,
+     because it was answering a question this row is no longer the place for.
+     Where a document is FILED is a fact about our shelving; who it is about,
+     what it answers for and where it came from are facts about the document.
+     The first is still on every card, still a chip, still an addressable
+     entity with a settings page behind it — and now, with no control of its
+     own, `?collection=` draws a chip rather than hiding behind a dropdown,
+     which is the rule that has always governed a filter without a control.
 
      What stays is what you narrow by before you know what you are looking for:
      where it lives, what it is, what it is ABOUT, and when it moved. Everything
      else is a question about the set, and a question belongs in the thing that
      answers questions.
+
+     DATA SOURCE takes the seat Collection left, and it is the axis the
+     removal argued for: five connectors, each with its own health, cadence and
+     failure — the corpus's most operational fact and the first cut somebody
+     makes when a sync has gone wrong. "What did TeamSupport give us" is not a
+     question about our filing, it is a question about the material, and until
+     now the only way to ask it was to type the connector's name.
 
      Product and Client are that third clause, and they came back for it. They
      are not questions about the set — they are the ground a reader is already
@@ -2290,12 +2306,16 @@
      be spoken by someone who already knew the words — which is the test the
      removal was supposed to apply and, for these two, got wrong.
 
-     They cost far less room than the disclosure they replaced. Settled with
-     Urbanist at 1536: the five controls measure 433.55px of the 1160px row
-     while empty, and 641.65px carrying the longest value on every axis — one
-     line either way, 461px still clear before *Clear*. The row wraps rather
-     than overflows below that, reaching three lines on a 390px phone, where
-     the tray and the input are the way in anyway.
+     They cost far less room than the disclosure they replaced, and swapping
+     Collection for Data Source did not change that arithmetic: the widest
+     value on the new axis is *Website crawl*, and the widest on the old one
+     was *Marketing*. Measured with Urbanist at 1536, the five controls take
+     450.14px of the 1160px row while empty, and 725.92px carrying the longest
+     value on every axis — Meridian Health, PowerSteering Service & Support,
+     Website crawl, Marketing Asset and a named date range. One line either
+     way, with the search field still beside them. The row wraps rather than
+     overflows below that, reaching three lines on a 390px phone, where the
+     tray and the input are the way in anyway.
 
      `work` is not migrated because it never worked: the key is absent from
      LIST_KEYS, so serialize never wrote it and parseParams never read it, and
@@ -2347,21 +2367,22 @@
     return [{ label: '', items: opts(CLIENTS) }];
   }
 
-  /* Collection and Type have nothing to group BY — no owner, no hierarchy — so
+  /* Data Source and Type have nothing to group BY — no owner, no hierarchy — so
      they are one untitled list each, which is what `is-untitled` renders
      without a heading and without a divider when it stands alone. */
 
-  /* Entitled collections only. `ENTITLED` filters the corpus by
-     `USER.collections`, which does not include Legal, so a Legal row here is a
-     filter that can only ever return nothing — the same defect the client and
-     product pair was just taught not to construct, arrived at from the other
-     direction. It offered one before this control was rebuilt; it does not now.
+  /* Sources that ENTITLED actually holds. The same rule the collection filter
+     was built on and the reason it could be dropped without taking anything
+     with it: a row for a source whose every document sits in a collection this
+     reader cannot open is a filter that can only ever return nothing.
 
-     Only the FILTER is narrowed. `opts(COLLECTIONS)` still holds all five for
-     the editor's own Collection field, because filing a document somewhere is
-     a different question from being able to read what is already there. */
-  function collectionGroups() {
-    return [{ label: '', items: opts(COLLECTIONS).filter(([slug]) => USER.collections.indexOf(slug) > -1) }];
+     Read off the corpus rather than off `SRC`, so a connector added to the
+     fixture with nothing ingested yet does not put an empty row on the panel.
+     `SRC`'s own key order decides the order on screen — the connectors are
+     listed there in the order the product presents them everywhere else. */
+  function sourceGroups() {
+    const live = Object.keys(SRC).filter((k) => ENTITLED.some((o) => o.src === k));
+    return [{ label: '', items: opts(SRC, live) }];
   }
 
   function typeGroups() {
@@ -2395,11 +2416,16 @@
     return groups;
   }
 
+  /* The order is the order a reader arrives in: whose it is, what it answers
+     for, where it came from, what it is — then when it moved, which the date
+     control adds on the end. Client and Product lead because they are the
+     ground somebody is already standing on; Data Source and Type are questions
+     about the material itself and only get asked once the account is chosen. */
   const FACET_FILTERS = [
-    { key: 'collection', label: 'Collection', groups: collectionGroups },
-    { key: 'type',       label: 'Type',       groups: typeGroups },
-    { key: 'client',     label: 'Client',     groups: clientGroups },
-    { key: 'product',    label: 'Product',    groups: productGroups }
+    { key: 'client',  label: 'Client',      groups: clientGroups },
+    { key: 'product', label: 'Product',     groups: productGroups },
+    { key: 'source',  label: 'Data Source', groups: sourceGroups },
+    { key: 'type',    label: 'Type',        groups: typeGroups }
   ];
 
   /* ── Keeping the pair answerable ──
@@ -2709,8 +2735,8 @@
         ${/* ── SEARCH IS NOT A FACET ──
               It sits in `.filter-row-end`, which already carries `margin-left:
               auto`, so it holds the right edge while the facets stay grouped
-              at the left. That separation is the point: Collection, Type,
-              Client and Product each narrow to a value someone picked from a
+              at the left. That separation is the point: Client, Product,
+              Data Source and Type each narrow to a value someone picked from a
               list the corpus supplied, and search narrows to whatever you
               typed. Sitting it fifth in that row would have made it look like
               a fifth facet with a very long menu.
@@ -3452,8 +3478,8 @@
      TYPE_FACTS was written under, applied where it actually holds.
 
      Two rules this table is written to, both checkable against the corpus:
-       · A fact earns space only if it VARIES within its type. `src` is zendesk
-         for six tickets out of six and hubspot for three ICPs out of four —
+       · A fact earns space only if it VARIES within its type. `src` is freshdesk
+         for six tickets out of six and teamsupport for three ICPs out of four —
          zero information there, real information on an article or a blog.
        · Never restate the meta line. Status, owner, edited and used are tier
          three. Repeating one here is the five-row card coming back.
@@ -3674,7 +3700,7 @@
     const meta = [
       statusInk(o),
       /* Some documents carry an ingestion marker in the owner field rather than
-         a person — "Ingested · Zendesk" — which on a middot-separated line reads
+         a person — "Ingested · Freshdesk" — which on a middot-separated line reads
          as two more items and pointed the peek at an owner that does not exist.
          Same test the document's byline uses. */
       hasOwner(o)
@@ -5403,7 +5429,7 @@
     /* The PHRASE, not the name. "Owned by Unassigned" is not a sentence
        anybody wrote — ownerPhrase already knows that an unassigned document
        reads "Nobody owns it" and an ingestion marker reads "No owner — it
-       arrived from Zendesk", and the note has no business inventing a second
+       arrived from Freshdesk", and the note has no business inventing a second
        way to say either. Captured before the swap, because after it the
        function would describe the state it is trying to contrast with. */
     const ownedWas = ownerPhrase(o);
@@ -5595,7 +5621,7 @@
 
   /* Some documents carry an ingestion marker in the owner field rather than a
      person. As a label over a value that read as odd data; as a sentence,
-     "Owned by Ingested · Zendesk" reads as nonsense. The phrase treatment makes
+     "Owned by Ingested · Freshdesk" reads as nonsense. The phrase treatment makes
      the defect visible, which is the argument for the phrase treatment. */
   const hasOwner = (o) => OWNERS.indexOf(responsible(o)) > -1 && responsible(o) !== 'Unassigned';
   const ownerPhrase = (o) => hasOwner(o) ? 'Owned by ' + esc(responsible(o))
@@ -6349,7 +6375,7 @@
        is the SOURCE's word — "Awaiting legal" says something none of our seven
        statuses can — and is not o.status, which is ours and on the byline.
 
-       The narrative from Zendesk is evidence under the record, not the point
+       The narrative from Freshdesk is evidence under the record, not the point
        of the page. And "Where it came from" opens, because a ticket's identity
        IS its source record and that is the second question after the fix. */
     ticket: {
@@ -8883,7 +8909,7 @@
       /* "Who owns this" means "who do I ask", which is why this goes through
          `responsible` and not the raw field: some documents carry an ingestion
          marker there rather than a person, and answering with
-         "Ingested · Zendesk" names something you cannot send a message to.
+         "Ingested · Freshdesk" names something you cannot send a message to.
          An ingested document with an assignee now has somebody to ask, and
          `hasOwner` is the same test every other surface applies. */
       const by = {};
@@ -9002,8 +9028,8 @@
          this read it as two: a warned source is running and dropping rows,
          which is a different thing from one that has stopped. Counting it as
          stopped made the headline contradict the note printed directly under
-         it — "3 of 4 sources are not syncing", above "HubSpot — 3 records
-         skipped", which only happens if HubSpot ran. */
+         it — "3 of 4 sources are not syncing", above "TeamSupport — 3 records
+         skipped", which only happens if TeamSupport ran. */
       const stopped = keys.filter((k) => SRC[k].health === 'failed');
       const degraded = keys.filter((k) => SRC[k].health === 'warn');
       const list = named.length ? named : stopped.concat(degraded);
@@ -9108,7 +9134,7 @@
        DOWN AND DEGRADED ARE DIFFERENT NEWS. A failed source is not syncing at
        all, so everything from it is a copy of an unknown age. A warned one is
        syncing and skipping rows. Reporting them in one sentence said the
-       stronger thing about both, which overstated HubSpot and buried Zendesk
+       stronger thing about both, which overstated TeamSupport and buried Freshdesk
        in a list. */
     const feeds = (k) => ENTITLED.some((o) => o.src === k);
     const down = Object.keys(SRC).filter((k) => SRC[k].health === 'failed' && feeds(k)).map((k) => SRC[k]);
@@ -9970,12 +9996,12 @@
      If a fixture changes underneath one, it stops being offered rather than
      becoming a demo of the empty state — there is already one of those. */
   const FILTER_DEMOS = [
-    'unowned documents from zendesk',
+    'unowned documents from freshdesk',
     'quality assurance in emea',
     'stakeholder success stories in apac',
     'blogs updated last month',
     'client-facing articles for nordwind',
-    'conflicting tickets from zendesk',
+    'conflicting tickets from freshdesk',
     'copilot presentations',
     'archived'
   ];
@@ -10021,7 +10047,7 @@
     return [
       ['type', 'url:?type=icp'],
       ['tags', someTag ? 'url:?tag=' + encodeURIComponent(someTag) : ''],
-      ['source', 'url:?source=zendesk'],
+      ['source', 'url:?source=freshdesk'],
       ['client', aStory ? 'url:?client=' + aStory.client : ''],
       ['product', 'url:?product=copilot'],
       ['region', anIcp ? 'url:?region=' + anIcp.region : ''],
