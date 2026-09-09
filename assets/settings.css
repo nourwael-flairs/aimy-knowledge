@@ -1744,7 +1744,10 @@ kbd {
 .set2-th:focus-visible { outline: 0.125rem solid var(--brand); outline-offset: 0.125rem; }
 /* The arrow is always drawn, so pressing a header is never a guess about
    whether it does anything. It lights only for the column doing the work. */
-.set2-th-a { color: var(--ink-rule); font-size: var(--ty-micro); }
+.set2-th-a { color: var(--ink-rule); display: inline-flex; align-items: center; }
+/* An <svg> with a viewBox and no size fills its container, so the sort mark
+   carries its own box rather than inheriting a font size it no longer uses. */
+.set2-th-a svg { width: 0.75rem; height: 0.75rem; display: block; }
 .set2-th-a.is-on { color: var(--ink-action); }
 
 @media (max-width: 52rem) {
