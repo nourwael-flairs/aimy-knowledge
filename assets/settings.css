@@ -2817,8 +2817,16 @@ body.is-settings .set2-col { padding-bottom: 5rem; }
 body.is-settings .set2-col,
 body.is-settings .set2-scrim,
 body.is-settings .set2-pop {
+  /* 15 stood here, and it was the last odd step in the product: one pixel off
+     the floor above it and one pixel off the body below it, which is the exact
+     thing the console's scale comment calls a level a reader cannot see. Three
+     steps inside two pixels is not a hierarchy, it is a blur.
+
+     A 14 floor on an even scale leaves 14 · 16 · 20, so the row name joins the
+     body step and separates from prose the way the rail already does — weight
+     and ink, not size. Nothing moves DOWN: the floor is still 14. */
   --ty-micro:   0.875rem;   /* 14 - FLOOR: counts, captions, help */
-  --ty-meta:    0.9375rem;  /* 15 - label, row name               */
+  --ty-meta:    1rem;       /* 16 - label, row name               */
   --ty-body:    1rem;       /* 16 - prose, a value you read for    */
   --ty-title:   1.25rem;    /* 20 - section head                   */
 }
