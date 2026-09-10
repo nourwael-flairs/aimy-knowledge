@@ -3712,8 +3712,11 @@
      full-width button — two rules and a banner where one row does the job. */
   function typeCard(o, compact) {
     const t = TYPES[o.t];
-    const act = cardAction(o);
     const ins = compact ? null : cardInsight(o);
+    /* The finding decides whether there is an action at all, so it is asked
+       first and `cardAction` is not asked at all on a card with nothing wrong —
+       which is most of a screenful. */
+    const act = ins ? cardAction(o) : null;
     const meta = [
       statusInk(o),
       /* Some documents carry an ingestion marker in the owner field rather than
@@ -3754,6 +3757,61 @@
          there, and the type is stated exactly once in both modes. */
       compact ? `<span class="tc-kind" title="${esc(t.label)}">${t.ico}<span class="k-sr">${esc(t.label)}</span></span>` : ''
     ].filter(Boolean);
+    /* ── The finding and the way out of it are one object ──
+
+       They were two. AiMY's sentence sat in a marked panel and the button that
+       answers it sat outside and under it, on the card's own ground, in the
+       card's own footer chrome — so the exchange was split across two
+       containers and the remedy read as the card's, not as AiMY's. On the one
+       card that shows it plainest: `Confluence changed it 157 days after our
+       copy` in the panel, `Re-sync` below it, and nothing but proximity saying
+       the second is the answer to the first.
+
+       Inside the panel they are one piece of speech: what I found, then what I
+       would do. Every other surface that carries a finding already works this
+       way — the band over the grid keeps its verbs in its own wash
+       (`.ins-acts`), the document rail keeps its verb on the row that states
+       the finding (`.ins-row-act`), and the name-collision note in settings
+       keeps its verb inside the same wash this panel uses (`.set2-ins-a`,
+       lifted from these values on purpose). The card was the one surface of the
+       four that stated a finding and then handed its action to somebody else.
+
+       AND THERE IS NO ACTION WITHOUT A FINDING. An action is the step AFTER
+       AiMY detects something; a document with nothing wrong with it has no
+       next step, and offering one anyway was the card inventing work. It is
+       what the seven quiet cards actually said: `Open campaign`, `Open asset`,
+       `Open deck`, `Open post` — the card's own click target, restated as a
+       verb in the bottom-right corner. A button that does what clicking
+       anywhere already does is not an action, it is a label for the cursor.
+
+       So the footer renders only when there is something to report, and the
+       quiet card now ends where its facts end.
+
+       NOTHING IS STRANDED BY IT, and the three exits worth more than an open
+       were each checked against the corpus rather than assumed:
+
+         Restore, on the two archived documents. `dv-notice` renders `Restore
+         it →` on the page and the cite bar carries Restore beside it. The
+         archived case is really the rule stated twice — findings are computed
+         over LIVE, so an archived document can never carry one, and an archived
+         document is not something AiMY detected. It is something a person put
+         away.
+
+         Go to the successor, on `article-churn-signals` — the ONE document in
+         all 37 that loses an action here, because `needsYou` has no superseded
+         bucket. The page opens on `Replaced. A newer document replaced it` and
+         `Go to the current one →`, and the rail names the successor again under
+         What it connects to.
+
+         Check the source, on a blocked one. There is no footless card in the
+         corpus with `work: failed` — the only one, `page-status`, is also
+         conflicting, so it keeps its finding and its footer.
+
+       Every other footless card is `status: current`, which is the whole point:
+       nothing is wrong with it, so there is no next step to offer. And the card
+       itself is still the way in — `data-card-open` is on the whole thing. */
+    const actEl = !ins ? '' : `<span class="tc-foot-act">${entryAction(act[0], act[1],
+      `data-card-act="${o.id}"`, AI_EXIT[act[2]] ? AIMY_MARK(12, 14) : null)}</span>`;
     /* The whole card opens the document. The title stays a real button so the
        keyboard has one focusable target that announces which document it is —
        wrapping the card itself in a button would swallow the action inside it,
@@ -3764,10 +3822,11 @@
       <button class="tc-title-btn" data-open-doc="${o.id}"><span class="tc-title">${esc(o.title)}</span></button>
       ${compact ? '' : typeBody(o)}
       <p class="tc-meta">${meta.join('<i class="tc-sep">·</i>')}</p>
-      ${compact ? '' : `<div class="tc-foot">
-        ${ins ? `<p class="tc-ins">${AIMY_MARK(13, 15)}<span class="tc-ins-t">${esc(ins.long)}</span></p>` : ''}
-        <span class="tc-foot-act">${entryAction(act[0], act[1], `data-card-act="${o.id}"`,
-          AI_EXIT[act[2]] ? AIMY_MARK(12, 14) : null)}</span>
+      ${compact || !ins ? '' : `<div class="tc-foot">
+        <div class="tc-ins">
+          <p class="tc-ins-say">${AIMY_MARK(13, 15)}<span class="tc-ins-t">${esc(ins.long)}</span></p>
+          ${actEl}
+        </div>
       </div>`}
     </div>`;
   }

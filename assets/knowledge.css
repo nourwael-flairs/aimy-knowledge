@@ -5303,17 +5303,39 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
 /* margin-top:auto pins the footer to the bottom of a stretched card, so a row
    of cards ends on one line whatever each of them had to say. */
 .tc-foot {
-  display: flex; align-items: center; gap: 0.5rem;
-  margin-top: auto; padding: 0.75rem 1rem 0.75rem;
+  display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem;
+  margin-top: auto; padding: 0.75rem 1rem;
   font-size: var(--ty-micro); color: var(--ink-faint);
-  /* Two rows now, and the order matters: the finding, then the way out of it.
-     The action is the LAST child either way, so it stays pinned to the bottom
-     of a stretched card and a row of actions still lands on one line — which is
-     the contract, and it is about where the card ends, not where the footer
-     starts. */
-  flex-direction: column; align-items: stretch; gap: 0.5rem;
 }
-.tc-foot-act { margin-left: auto; flex-shrink: 0; }
+/* ── The footer's LAST BOX ends 12px above the card, and that is the rule ──
+
+   The contract is that a row of cards ends together. It used to be stated of
+   the action, because the action was the last thing in the footer and it sat on
+   the card's own ground: a bare control, so its own bottom edge WAS the
+   footer's. That stopped being true the moment the action moved inside a
+   bordered panel, and following the old wording cost the card its gutter — the
+   footer gave back 11 of its 12px so the button inside the panel could reach
+   the old line, and the panel then ended 3px from a card edge whose sides it
+   clears by 16. A pixel-aligned button in a box that looks like it fell out of
+   the card.
+
+   So the rule is stated of the box, not of what is in it: whatever the footer
+   ends on — a panel on the cards with a finding, a bare action on the seven
+   without — ends 12px above the card. Both cases get it from one declaration,
+   which is why there is no `:has()` override here any more. A row of cards
+   still ends together; the actions inside the panels simply sit a panel's
+   padding higher, which is what being inside something means. */
+/* A flex container, not a block holding an inline button — a block would give
+   the button a line box, and the leading under it is dead height inside the
+   panel. The line-height is stated rather than inherited for the same kind of
+   reason: `.entry-action` declares none, so its height is whatever leading the
+   container hands it — the panel's snug 13px prose in one case, the footer's
+   11px chrome in the other — and the same control would render 2.3px taller
+   depending on which box it was in. */
+.tc-foot-act {
+  display: flex; justify-content: flex-end; margin-left: auto; flex-shrink: 0;
+  line-height: var(--lh-snug);
+}
 /* ── What AiMY noticed about THIS one ──
 
    It was a run of footer chrome: the same 12px, the same --ink-faint, the same
@@ -5334,16 +5356,27 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
    Full width and two lines. At 115px, which is what the footer's left half
    comes to on a 322px card once the action has taken its share, every one of
    the nine findings ellipsised, and a truncated insight costs a line to deliver
-   half a fact. */
+   half a fact.
+
+   AND ITS ACTION, INSIDE IT. The panel said what was wrong and the button that
+   answers it stood outside on the card's ground — one exchange in two boxes,
+   with only proximity claiming the second was the reply to the first. The band
+   over the grid keeps its verbs inside its own wash and the rail keeps them on
+   the row that states the finding; the card was the odd one out. So: the
+   sentence, then the verb, in the panel that is speaking. */
 .tc-foot .tc-ins {
-  display: flex; align-items: flex-start; gap: 0.5rem; margin: 0 0 0.25rem; min-width: 0;
+  display: flex; flex-direction: column; gap: 0.5rem; margin: 0; min-width: 0;
   padding: 0.5rem 0.75rem; border-radius: var(--r-md);
   background: linear-gradient(120deg, rgba(var(--accent-rgb), 0.10), rgba(0, 102, 255, 0.04));
   border: 0.0625rem solid rgba(var(--accent-rgb), 0.18);
   font-size: var(--ty-meta); font-weight: var(--fw-regular); line-height: var(--lh-snug);
   color: var(--ink-secondary);
 }
-.tc-foot .tc-ins svg { flex-shrink: 0; margin-top: 0.125rem; }
+/* The mark and the sentence. Scoped to the sentence's own row and to a DIRECT
+   child, because the action below it now brings an svg of its own into the
+   panel and a 2px nudge meant for the mark would land on the button's glyph. */
+.tc-ins-say { display: flex; align-items: flex-start; gap: 0.5rem; min-width: 0; margin: 0; }
+.tc-ins-say > svg { flex-shrink: 0; margin-top: 0.125rem; }
 .tc-ins-t {
   min-width: 0;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
@@ -5365,6 +5398,24 @@ body.is-doc .page-inner { max-width: var(--measure-doc-page); margin-inline: aut
   font-size: var(--ty-meta); color: var(--ink-action);
 }
 .tc-foot-act .entry-action:hover { background: none; opacity: 0.75; }
+/* ── One height per row ──
+
+   `stretch` rather than the design system's `start`, which this is the only
+   place to override. A row of cards is scanned across, and cards that end on
+   six different lines make the reader's eye do the work of a grid.
+
+   The trailing space on a card with less to say is not a cost of that override
+   and never was. Content length varies — a two-line title against a one-line
+   title, a body of forty words against twelve — so the tallest card in a row
+   has always set the height and the shorter ones have always had slack. Before
+   the footer became conditional the slack sat BETWEEN the meta line and the
+   action, because `margin-top: auto` parked the action at the bottom of it; a
+   quiet card now carries the same slack after the meta line instead, with
+   nothing standing at the end of it. Same space, one fewer button in it.
+
+   Which is also why `margin-top: auto` stays on `.tc-foot`: a card with a
+   finding still puts its panel on the row's bottom line, where a reader
+   scanning for what AiMY said finds all of them together. */
 .ws-grid {
   grid-template-columns: repeat(auto-fill, minmax(18.75rem, 1fr));
   gap: 0.75rem;
