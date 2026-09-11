@@ -32,7 +32,7 @@
     ═══════════════════════════════════════════════ */
     :root {
       /* ── AI Brand Gradient ── */
-      --ai: linear-gradient(104deg, #0066ff 0%, #61adf1 47%, #6fdfe2 100%);
+      --ai: linear-gradient(104deg, #0066ff 0%, #61adf1 47%, #45d3e6 100%);
 
       /* ── Dark Scale (navy-tinted) ── */
       --d950: #080b10;
@@ -41,72 +41,74 @@
       --d800: #1c2630;
       --d750: #233040;
       --d700: #2e3d50;
-      --d600: #4a5b6e;
-      --d500: #637280;
-      --d400: #8b9aaa;
-      --d300: #b0bcca;
-      --d200: #c8d2dc;
-      --d100: #d8e0e8;
-      --d50:  #eef2f6;
+      --d600: #8091a5;
+      --d500: #8394a8;
+      --d400: #93a2b4;
+      --d300: #a8b5c5;
+      --d200: #c3ceda;
+      --d100: #dee5ed;
+      --d50:  #f5f7fb;
 
       /* ── Brand / Primary ── */
       --brand:        #3369ff;
+      --brand-rgb:    51,105,255;
+      --brand-hover:  #4a7bff;   /* dark lifts on hover. Upstream shipped var(--brand-hover), a cycle -> invalid */
       --brand-dim:    rgba(51,105,255,0.15);
       --brand-glow:   rgba(51,105,255,0.25);
 
-      /* ── Product Accent (secondary — each Aimy product may re-theme this) ── */
-      --accent:     #8b4ff4;
-      --accent-rgb: 139,79,244;
-      --accent-dim: rgba(139,79,244,0.15);
-      --accent-glow:rgba(139,79,244,0.25);
+      /* ── QA Product Accent (placeholder, replace with Figma magenta) ── */
+      --qa-accent:     #8b4ff4;
+      --qa-accent-rgb: 139,79,244;
+      --qa-accent-dim: rgba(139,79,244,0.15);
+      --qa-accent-glow:rgba(139,79,244,0.25);
 
       /* ── Secondary Accents ── */
-      --teal:   #6fdfe2;
-      --teal-dim: rgba(111,223,226,0.12);
-      --purple: #8b4ff4;
+      --cyan:        #45d3e6;
+      --cyan-rgb:    69,211,230;
+      --cyan-bg:     rgba(69,211,230,0.12);
+      --cyan-border: rgba(69,211,230,0.30);
+      --teal:        var(--cyan);      /* compatibility alias */
+      --teal-dim:    var(--cyan-bg);   /* compatibility alias */
+      --purple:      #8b4ff4;
 
       /* ── Semantic Status ── */
-      --ok:      #7fae94;
-      --ok-bg:   color-mix(in srgb, var(--ok) 12%, transparent);
-      --ok-glow: color-mix(in srgb, var(--ok) 20%, transparent);
-      --warn:    #c0a47c;
-      --warn-bg: color-mix(in srgb, var(--warn) 12%, transparent);
-      --err:     #d2827b;
-      --err-strong: #f04438;   /* NOT in the family — a control that stops something in flight */
-      --err-bg:  color-mix(in srgb, var(--err) 12%, transparent);
-      /* The border that goes with that fill. It was written only as a
-         fallback inside settings.css, so a failure card kept one hard-coded
-         alpha in both themes while its background switched around it. */
-      --err-line: color-mix(in srgb, var(--err) 28%, transparent);
-      --err-glow:color-mix(in srgb, var(--err) 20%, transparent);
-      --info:    #8aa6bd;
-      --accent-label: #a892bf;
-      --teal-label:   #84b3b0;
-      --info-bg: color-mix(in srgb, var(--info) 12%, transparent);
+      --ok:          #4ed6a1;
+      --ok-rgb:      78,214,161;
+      --ok-bg:       rgba(78,214,161,0.12);
+      --ok-border:   rgba(78,214,161,0.30);
+      --ok-glow:     rgba(78,214,161,0.20);
+      --warn:        #f7c95c;
+      --warn-rgb:    247,201,92;
+      --warn-bg:     rgba(247,201,92,0.13);
+      --warn-border: rgba(247,201,92,0.32);
+      --err:         #ff7282;
+      --err-rgb:     255,114,130;
+      --err-bg:      rgba(255,114,130,0.12);
+      --err-border:  rgba(255,114,130,0.30);
+      --err-glow:    rgba(255,114,130,0.20);
+      --info:        #7ea7ff;
+      --info-rgb:    126,167,255;
+      --info-bg:     rgba(126,167,255,0.12);
+      --info-border: rgba(126,167,255,0.28);
+      --text-on-status: #0d1117;
 
       /* ── Surface Tokens ── */
       --body-bg:          #0f1215;
       --card-bg:          #141b24;
       --card-bg-raised:   #1c2630;
-      --card-border:      rgba(255,255,255,0.07);
-      --card-border-hover:rgba(255,255,255,0.14);
+      --card-border:      var(--w07);
+      --card-border-hover:var(--w14);
       --card-border-focus:rgba(51,105,255,0.4);
       --panel-bg:         rgba(13,17,22,0.95);
 
       /* ── Overlay / Glass ── */
       --glass-bg:     rgba(20,27,36,0.85);
-      --glass-border: rgba(255,255,255,0.08);
-
-      /* ── Theme-aware helpers (overridden in light) ── */
-      --ai-text: #61adf1;                  /* AI-blue text — darkened in light */
-      --text-strong: #ffffff;              /* strongest text / gradient text stop */
-      --hairline:    rgba(255,255,255,0.07);/* subtle dividers on raised surfaces */
-      --code-bg:     #0b0f14;              /* code block bg — stays dark in both themes */
+      --glass-border: var(--w08);
 
       /* ── Gradients ── */
       --grad-avatar: linear-gradient(135deg,#7c3aed,#3369ff);
       --grad-ellipse-1: radial-gradient(ellipse at 30% 50%, rgba(0,102,255,0.18) 0%, rgba(97,173,241,0.1) 28%, transparent 60%);
-      --grad-ellipse-2: radial-gradient(ellipse at 75% 70%, rgba(111,223,226,0.1) 0%, rgba(139,79,244,0.07) 38%, transparent 60%);
+      --grad-ellipse-2: radial-gradient(ellipse at 75% 70%, rgba(69,211,230,0.1) 0%, rgba(139,79,244,0.07) 38%, transparent 60%);
 
       /* ── Layout ── */
       --topbar-height: 60px;
@@ -134,81 +136,9 @@
       --sp-15: 60px;
 
       /* ── Typography ── */
-      /* Pairing: Urbanist (primary — UI & body) + Poppins (display — headings) */
       --font-sans:    "Urbanist", system-ui, sans-serif;  /* primary / body */
       --font-display: "Poppins", system-ui, sans-serif;   /* pairing / headings */
-      --font-mono:    "JetBrains Mono", monospace;
-
-      /* Font style */
-      --fst-normal: normal;
-      --fst-italic: italic;
-
-      /* Font sizes — 12-step scale */
-      /* ══ EVERY SIZE IS EVEN, AND THE SMALLEST IS 12 ══════════════════
-         A scale that steps 12 · 14 · 16 · 18 has a decision in it. One that
-         also holds 13, 15 and 17 has none — nothing distinguishes the odd
-         values from the even ones except which file they were typed in, and
-         a 12 next to a 15 is two components that were never compared.
-
-         12 — MINIMAL COMPONENTS. Tags, status labels, work states, and the
-              metadata beside something else: a timestamp, a count, a unit,
-              an attribution. Things you recognise rather than read.
-         14 — THE SMALLEST SENTENCE. A supporting line, help text, a dense
-              cell. Anything with a verb in it starts here.
-         16 — THE WORKING MINIMUM. Body, row text, card text, anything
-              primary. Most of the product lives here.
-
-         Nothing is smaller than 12, and 12 is never a paragraph. */
-      --fs-2xs:  12px;   /* minimal components — a mark, not a sentence */
-      --fs-xs:   14px;   /* the smallest sentence */
-      --fs-sm:   16px;
-      --fs-base: 16px;   /* body */
-      --fs-md:   16px;
-      --fs-lg:   18px;
-      --fs-xl:   20px;
-      --fs-2xl:  24px;
-      --fs-3xl:  30px;
-      --fs-4xl:  38px;
-      --fs-5xl:  46px;
-
-      /* ══ THE INK BAND — THREE VALUES, AND THEY ARE CLOSE TOGETHER ══════
-         Muted text tested badly: readers skipped it, which means the ramp
-         was not creating hierarchy, it was creating text nobody read. So
-         the band that may carry type is narrow and every value in it is
-         legible on its own.
-
-         Only these carry type. --d300 and below are for rules, dots,
-         dividers and disabled states — they are NON-TEXT, and the one
-         exception is a placeholder, which has to read as an absence. */
-      --ink-primary:     var(--d50);    /* anything you read */
-      --ink-secondary:   var(--d100);   /* the supporting line under it */
-      --ink-muted:       var(--d200);   /* the floor for type. Slightly quiet, still read */
-      --ink-placeholder: var(--d400);   /* the ONE exception — must not read as a value */
-      --ink-rule:        var(--d600);   /* NON-TEXT. Hairlines and dots. Never type. */
-
-      /* Font weights */
-      --fw-light:     300;
-      --fw-regular:   400;
-      --fw-medium:    500;
-      --fw-semibold:  600;
-      --fw-bold:      700;
-      --fw-extrabold: 800;
-
-      /* Line heights */
-      --lh-none:    1;
-      --lh-tight:   1.2;
-      --lh-snug:    1.4;
-      --lh-base:    1.55;
-      --lh-relaxed: 1.75;
-
-      /* Letter spacing */
-      --ls-tighter: -0.03em;
-      --ls-tight:   -0.02em;
-      --ls-normal:  0;
-      /* Capitals need five to twelve per cent; four is uppercase with the
-         correction left out. */
-      --ls-wide:    0.06em;
-      --ls-wider:   0.08em;
+      --font-mono: "JetBrains Mono", monospace;
 
       /* ── Motion ── */
       --t-fast: 150ms;
@@ -222,6 +152,183 @@
       --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
       --shadow-lg: 0 8px 32px rgba(0,0,0,0.4);
       --shadow-xl: 0 16px 48px rgba(0,0,0,0.5);
+
+      --err-strong: #ff5268;
+
+      /* Typography colors use named roles instead of ad-hoc ramp choices. */
+      --text-strong:      #f5f7fb;
+      --text-primary:     #dee5ed;
+      --text-secondary:   #c3ceda;
+      --text-subtext:     #a8b5c5;
+      --text-muted:       #93a2b4;
+      --text-caption:     #8394a8;
+      --text-placeholder: #8091a5;
+      --text-link:        #7ea7ff;
+      --ink-primary:      var(--text-strong);
+      --ink-secondary:    var(--text-primary);
+      --ink-muted:        var(--text-subtext);
+      --ink-placeholder:  var(--text-placeholder);
+      --ink-rule:         var(--text-caption);
+
+
+      /* ══ TYPE SCALE — three sizes, and each one names what it is for ══
+      12 marks (a tag, a count, a timestamp) · 14 is the smallest
+      sentence · 16 is the working minimum and where most of the product
+      lives. Nothing is smaller than 12, and 12 is never a paragraph.
+      The upper steps moved up with the base to keep the +2 interval. */
+      --fs-2xs:  12px;   /* minimal components — a mark, not a sentence */
+      --fs-xs:   14px;   /* the smallest sentence */
+      --fs-sm:   16px;
+      --fs-base: 16px;   /* body */
+      --fs-md:   16px;
+      --fs-lg:   18px;
+      --fs-xl:   20px;
+      --fs-2xl:  24px;
+      --fs-3xl:  30px;
+      --fs-4xl:  38px;
+      --fs-5xl:  46px;
+
+      /* Font weights */
+      --fw-light:     300;
+      --fw-regular:   400;
+      --fw-medium:    500;
+      --fw-semibold:  600;
+      --fw-bold:      700;
+      --fw-extrabold: 800;
+
+      /* Line height */
+      --lh-none:    1;
+      --lh-tight:   1.2;
+      --lh-snug:    1.4;
+      --lh-base:    1.55;
+      --lh-relaxed: 1.75;
+
+      /* Tracking. --ls-wide is the tracking for CAPITALS, which need 5-12%. */
+      --ls-tighter: -0.03em;
+      --ls-tight:   -0.02em;
+      --ls-normal:  0;
+      --ls-wide:    0.06em;
+      --ls-wider:   0.08em;
+
+      /* Font style */
+      --fst-normal: normal;
+      --fst-italic: italic;
+
+      /* ══ Motion ══ */
+      --t-press: 90ms;
+
+      /* Four tokens the library referenced but nothing ever defined, so the
+      transitions and hover lifts reading them silently did nothing.
+      Defined here as the aliases they were plainly meant to be. */
+      --transition-fast: var(--t-fast);
+      --transition-base: var(--t-base);
+      --motion-hover-lift-sm: translateY(-1px);
+      --motion-hover-lift-md: translateY(-2px);
+
+      /* Muted label variants of the two accents — a label beside a value,
+      never the value itself. */
+      --qa-accent-label: #a892bf;
+      --cyan-label:      #84b3b0;
+
+      /* -- Surface Wash Ramp --------------------------------
+      Every subtle fill, hairline and hover in the system
+      resolves through this ramp. Dark mode washes light
+      ONTO a dark ground; light mode washes a navy-tinted
+      dark ONTO a light ground. One ramp, two directions. */
+      --w015: rgba(255,255,255,0.015);
+      --w02:  rgba(255,255,255,0.02);
+      --w025: rgba(255,255,255,0.025);
+      --w03:  rgba(255,255,255,0.03);
+      --w04:  rgba(255,255,255,0.04);
+      --w05:  rgba(255,255,255,0.05);
+      --w055: rgba(255,255,255,0.055);
+      --w06:  rgba(255,255,255,0.06);
+      --w07:  rgba(255,255,255,0.07);
+      --w08:  rgba(255,255,255,0.08);
+      --w09:  rgba(255,255,255,0.09);
+      --w10:  rgba(255,255,255,0.10);
+      --w11:  rgba(255,255,255,0.11);
+      --w12:  rgba(255,255,255,0.12);
+      --w13:  rgba(255,255,255,0.13);
+      --w14:  rgba(255,255,255,0.14);
+      --w15:  rgba(255,255,255,0.15);
+      --w16:  rgba(255,255,255,0.16);
+      --w18:  rgba(255,255,255,0.18);
+      --w20:  rgba(255,255,255,0.20);
+      --w22:  rgba(255,255,255,0.22);
+      --w25:  rgba(255,255,255,0.25);
+      --w40:  rgba(255,255,255,0.40);
+      --w50:  rgba(255,255,255,0.50);
+
+      /* -- Recessed wells (full-bleed data strips) -- */
+      --well:        rgba(0,0,0,0.12);
+      --well-strong: rgba(0,0,0,0.25);
+
+      /* -- Shadow ink, by weight. Geometry stays per-component,
+      only the ink is themed. -- */
+      --shc-1: rgba(0,0,0,0.20);
+      --shc-2: rgba(0,0,0,0.35);
+      --shc-3: rgba(0,0,0,0.55);
+      --shc-4: rgba(0,0,0,0.65);
+
+      /* -- AI ink + tint. --ai-ink is the readable member of the
+      brand gradient; the gradient itself is decoration. -- */
+      --ai-rgb:       0,102,255;
+      --ai-ink:       #61adf1;
+      --ai-ink-rgb:   97,173,241;
+      --ai-ink-soft:  #a8ccff;
+
+      /* -- Named product surfaces that sit off the d-ramp -- */
+      --surface-deep:   #151d28;
+      --surface-float:  #1e2428;
+      --surface-sunken: #1a2330;
+      --topbar-bg:      rgba(15,18,21,0.88);
+      --panel-veil:     rgba(10,13,17,0.72);
+      --glass-strong:   rgba(20,27,36,0.90);
+      --glass-soft:     rgba(20,27,36,0.65);
+
+      /* -- Integration brand inks -- */
+      --ic-zendesk-ink:   #5ac8f5;
+      --ic-freshdesk-ink: #4dc98a;
+
+      /* -- Code syntax palette -- */
+      --syn-base:    #a8b5c5;
+      --syn-comment: #8091a5;
+      --syn-keyword: #a8ccff;
+      --syn-value:   #45d3e6;
+      --syn-string:  #4ed6a1;
+      --syn-type:    #f1a1c8;
+      --syn-name:    #f7c95c;
+      --code-bg:     #0d1117;
+      --code-border: rgba(255,255,255,0.07);
+
+      /* -- Display heading sheen. Runs bright -> dim in dark,
+      and must run dark -> mid in light or the text
+      disappears into the page. -- */
+      --grad-display: linear-gradient(135deg, #ffffff 30%, var(--d300) 100%);
+
+      /* -- Scrim behind modals -- */
+      /* -- Ink for heat-scale fills (saturated tint in both themes) -- */
+      --heat-ink: #0d1117;
+
+      --scrim: rgba(6,9,13,0.66);
+
+      color-scheme: dark;
+
+      /* ══ COMPATIBILITY ALIASES ═══════════════════════════════════════
+      Names this product still calls by their old spelling. They are
+      var() indirections, so they resolve LAZILY against whichever
+      theme is active -- defining them once here covers light too. */
+      --accent:       var(--qa-accent);
+      --accent-rgb:   var(--qa-accent-rgb);
+      --accent-dim:   var(--qa-accent-dim);
+      --accent-glow:  var(--qa-accent-glow);
+      --accent-label: var(--qa-accent-label);
+      --teal-label:   var(--cyan-label);
+      --ai-text:      var(--ai-ink);
+      --hairline:     var(--w07);
+      --err-line:     var(--err-border);
+
     }
 
     /* ═══════════════════════════════════════════════
@@ -230,70 +337,197 @@
        surfaces/shadows re-tuned for a light background.
     ═══════════════════════════════════════════════ */
     :root[data-theme="light"] {
-      /* Neutral ramp inverted: --d50 = strongest text, --d950 = lightest surface */
-      --d950: #f7fafc;
-      --d900: #eef2f6;
-      --d850: #e4eaf0;
-      --d800: #d8e0e8;
-      --d750: #c8d2dc;
-      --d700: #b0bcca;
-      --d600: #6e7d8d;  /* muted labels/separators — #8b9aaa fails 3:1 on white */
-      --d500: #637280;
-      --d400: #566472;
-      --d300: #3a4653;
-      --d200: #2a3540;
-      --d100: #1c2630;
-      --d50:  #10151b;
+      color-scheme: light;
 
-      /* Brand tint slightly denser for contrast on white */
-      --brand-dim:  rgba(51,105,255,0.12);
-      --brand-glow: rgba(51,105,255,0.20);
-      --accent-dim: rgba(139,79,244,0.12);
-      --accent-glow:rgba(139,79,244,0.20);
-      /* --teal is very light (cyan) — darken it for legible text on white.
-         Tints (--teal-dim) and the AI gradient use their own values, so this only affects teal text. */
-      --teal:       #0d8f95;
-      --teal-dim:   rgba(111,223,226,0.20);
+      /* -- Brand gradient, darkened so it survives background-clip:text -- */
+      --ai: linear-gradient(104deg, #0047c7 0%, #1f6fc4 47%, #0a7a8c 100%);
 
-      /* Semantic hues darkened one step — the dark-mode mid-tones fail
-         contrast when used as text/icons on white. Tint backgrounds stay pale. */
-      --ok:   #3f6b52;
-      --warn: #7a613c;
-      --err:  #8a473f;
-      --err-strong: #d92d20;
-      --info: #4d6b85;
-      --accent-label: #5f5079;
-      --teal-label:   #3f6b68;
-      --ok-bg:   color-mix(in srgb, var(--ok) 14%, transparent);
-      --warn-bg: color-mix(in srgb, var(--warn) 14%, transparent);
-      --err-bg:  color-mix(in srgb, var(--err) 14%, transparent);
-      --err-line: color-mix(in srgb, var(--err) 32%, transparent);
-      --info-bg: color-mix(in srgb, var(--info) 14%, transparent);
+      /* -- Ramp re-pointed. d950..d750 are surfaces (ground -> panel),
+      d700 is dividers + decorative glyphs, d600..d50 is the ink
+      ramp, spaced for dark-on-light where weight reads heavier. -- */
+      --d950: #e4e9f0;
+      --d900: #edf1f6;
+      --d850: #ffffff;
+      --d800: #f2f5fa;
+      --d750: #e6ebf3;
+      --d700: #cfd8e3;
+      --d600: #5f6b7d;
+      --d500: #515e72;
+      --d400: #45505f;
+      --d300: #3a4352;
+      --d200: #2e3747;
+      --d100: #1e293b;
+      --d50:  #0f172a;
 
-      /* Surfaces */
-      --body-bg:          #f4f6f9;
-      --card-bg:          #ffffff;
-      --card-bg-raised:   #f7f9fc;
-      --card-border:      rgba(16,24,40,0.10);
-      --card-border-hover:rgba(16,24,40,0.18);
-      --card-border-focus:rgba(51,105,255,0.4);
-      --panel-bg:         rgba(255,255,255,0.96);
+      /* -- Brand -- */
+      --brand:      #1d4ed8;
+      --brand-rgb:  29,78,216;
+      --brand-hover: #1a44bd;   /* light deepens on hover: a lighter blue would
+      drop the white label to 3.6:1 */
+      --brand-dim:  rgba(29,78,216,0.10);
+      --brand-glow: rgba(29,78,216,0.18);
 
-      /* Glass */
-      --glass-bg:     rgba(255,255,255,0.85);
-      --glass-border: rgba(16,24,40,0.10);
+      /* -- QA accent -- */
+      --qa-accent:     #6725cc;
+      --qa-accent-rgb: 103,37,204;
+      --qa-accent-dim: rgba(103,37,204,0.10);
+      --qa-accent-glow:rgba(103,37,204,0.18);
 
-      /* Theme-aware helpers */
-      --ai-text: #1f5fd0;
-      --text-strong: #10151b;
-      --hairline:    rgba(16,24,40,0.09);
-      /* --code-bg stays dark — code blocks keep their dark syntax theme */
+      /* -- Secondary accents -- */
+      --cyan:        #096673;
+      --cyan-rgb:    9,102,115;
+      --cyan-bg:     rgba(9,102,115,0.10);
+      --cyan-border: rgba(9,102,115,0.28);
+      --purple:      #6725cc;
 
-      /* Softer, cooler shadows for light UI */
-      --shadow-sm: 0 1px 3px rgba(16,24,40,0.08);
-      --shadow-md: 0 4px 16px rgba(16,24,40,0.10);
-      --shadow-lg: 0 8px 32px rgba(16,24,40,0.12);
-      --shadow-xl: 0 16px 48px rgba(16,24,40,0.16);
+      /* -- Semantic status. Solid chips now carry WHITE ink,
+      so --text-on-status flips with them. -- */
+      --ok:          #066640;
+      --ok-rgb:      6,102,64;
+      --ok-bg:       rgba(6,102,64,0.10);
+      --ok-border:   rgba(6,102,64,0.26);
+      --ok-glow:     rgba(6,102,64,0.16);
+      --warn:        #6b4500;
+      --warn-rgb:    107,69,0;
+      --warn-bg:     rgba(107,69,0,0.10);
+      --warn-border: rgba(107,69,0,0.26);
+      --err:         #a81029;
+      --err-rgb:     168,16,41;
+      --err-bg:      rgba(168,16,41,0.09);
+      --err-border:  rgba(168,16,41,0.26);
+      --err-glow:    rgba(168,16,41,0.16);
+      --err-strong:  #8a0b20;
+      --info:        #1a54bd;
+      --info-rgb:    26,84,189;
+      --info-bg:     rgba(26,84,189,0.09);
+      --info-border: rgba(26,84,189,0.26);
+      --text-on-status: #ffffff;
+
+      /* -- Surfaces. Cards are white on a tinted ground; the
+      "raised" step stays white and earns its lift from
+      shadow rather than from lightness. -- */
+      --body-bg:           #eef1f6;
+      --card-bg:           #ffffff;
+      --card-bg-raised:    #ffffff;
+      --card-border:       rgba(15,23,42,0.10);
+      --card-border-hover: rgba(15,23,42,0.18);
+      --card-border-focus: rgba(29,78,216,0.45);
+      --panel-bg:          rgba(255,255,255,0.96);
+
+      /* -- Glass -- */
+      --glass-bg:     rgba(255,255,255,0.80);
+      --glass-border: rgba(15,23,42,0.10);
+
+      /* -- Gradients. The ambient ellipses drop to about a third
+      of their alpha; at dark-mode strength they read as
+      smudges on a light ground. -- */
+      --grad-avatar: linear-gradient(135deg,#6d28d9,#1d4ed8);
+      --grad-ellipse-1: radial-gradient(ellipse at 30% 50%, rgba(0,82,212,0.07) 0%, rgba(97,173,241,0.05) 28%, transparent 60%);
+      --grad-ellipse-2: radial-gradient(ellipse at 75% 70%, rgba(10,115,130,0.05) 0%, rgba(115,49,224,0.04) 38%, transparent 60%);
+
+      /* -- Wash ramp, reversed. Navy-tinted rather than pure
+      black: neutral black washes read grey and dirty.
+      Hairlines hold their alpha (0.07+) because dark-on-
+      light needs the presence; broad fills drop about 25%
+      because dark-on-light reads heavier. -- */
+      --w015: rgba(15,23,42,0.012);
+      --w02:  rgba(15,23,42,0.016);
+      --w025: rgba(15,23,42,0.020);
+      --w03:  rgba(15,23,42,0.024);
+      --w04:  rgba(15,23,42,0.030);
+      --w05:  rgba(15,23,42,0.038);
+      --w055: rgba(15,23,42,0.042);
+      --w06:  rgba(15,23,42,0.045);
+      --w07:  rgba(15,23,42,0.075);
+      --w08:  rgba(15,23,42,0.085);
+      --w09:  rgba(15,23,42,0.070);
+      --w10:  rgba(15,23,42,0.100);
+      --w11:  rgba(15,23,42,0.105);
+      --w12:  rgba(15,23,42,0.110);
+      --w13:  rgba(15,23,42,0.120);
+      --w14:  rgba(15,23,42,0.140);
+      --w15:  rgba(15,23,42,0.145);
+      --w16:  rgba(15,23,42,0.155);
+      --w18:  rgba(15,23,42,0.170);
+      --w20:  rgba(15,23,42,0.185);
+      --w22:  rgba(15,23,42,0.200);
+      --w25:  rgba(15,23,42,0.220);
+      --w40:  rgba(15,23,42,0.340);
+      --w50:  rgba(15,23,42,0.420);
+
+      /* -- Wells become light grey recesses, never black scrims -- */
+      --well:        rgba(15,23,42,0.045);
+      --well-strong: rgba(15,23,42,0.075);
+
+      /* -- Shadow ink: soft, cool and low-alpha. This is what
+      carries elevation now, so it does more work than in
+      dark mode while staying far more transparent. -- */
+      --shc-1: rgba(15,23,42,0.05);
+      --shc-2: rgba(15,23,42,0.09);
+      --shc-3: rgba(15,23,42,0.14);
+      --shc-4: rgba(15,23,42,0.18);
+
+      --shadow-sm: 0 1px 2px rgba(15,23,42,0.05), 0 1px 3px rgba(15,23,42,0.07);
+      --shadow-md: 0 2px 4px -2px rgba(15,23,42,0.06), 0 4px 10px -2px rgba(15,23,42,0.09);
+      --shadow-lg: 0 4px 8px -4px rgba(15,23,42,0.05), 0 12px 24px -6px rgba(15,23,42,0.11);
+      --shadow-xl: 0 8px 12px -6px rgba(15,23,42,0.05), 0 24px 48px -12px rgba(15,23,42,0.15);
+
+      --heat-ink: #0f172a;
+
+      --scrim: rgba(15,23,42,0.40);
+
+      /* -- AI ink re-derived: the gradient's mid blue is 2.4:1 on
+      white and cannot carry text. The gradient stays for
+      decoration; the ink darkens. -- */
+      --ai-rgb:       0,82,212;
+      --ai-ink:       #0a57ac;
+      --ai-ink-rgb:   10,87,172;
+      --ai-ink-soft:  #37618f;
+
+      /* -- Product surfaces: the deep panels become white and take
+      their separation from border + shadow instead. -- */
+      --surface-deep:   #ffffff;
+      --surface-float:  #ffffff;
+      --surface-sunken: #f2f5fa;
+      --topbar-bg:      rgba(255,255,255,0.85);
+      --panel-veil:     rgba(255,255,255,0.92);
+      --glass-strong:   rgba(255,255,255,0.94);
+      --glass-soft:     rgba(255,255,255,0.72);
+
+      /* -- Integration brand inks, darkened for a white ground -- */
+      --ic-zendesk-ink:   #0a6f9e;
+      --ic-freshdesk-ink: #0d7a4e;
+
+      --grad-display: linear-gradient(135deg, #0b1220 25%, #4a5a73 100%);
+
+      /* -- Code blocks stay dark in both themes, so the syntax
+      palette is pinned rather than re-derived. Its colours
+      are read against the dark panel, not the light page. -- */
+
+      /* Muted accent labels, re-derived for a white ground */
+      --qa-accent-label: #5f5079;
+      --cyan-label:      #3f6b68;
+
+      /* -- Code blocks deliberately do NOT flip. --code-bg and the
+      --syn-* palette are inherited from :root, so a snippet
+      reads identically in both themes. Only the panel's outer
+      edge changes, because it now sits on a light page. -- */
+      --code-border: rgba(15,23,42,0.16);
+
+      /* -- Ink roles -- */
+      --text-strong:      #0f172a;
+      --text-primary:     #1e293b;
+      --text-secondary:   #2e3747;
+      --text-subtext:     #3a4352;
+      --text-muted:       #45505f;
+      --text-caption:     #515e72;
+      --text-placeholder: #5f6b7d;
+      --text-link:        #1d4ed8;
+      --ink-primary:      var(--text-strong);
+      --ink-secondary:    var(--text-primary);
+      --ink-muted:        var(--text-subtext);
+      --ink-placeholder:  var(--text-placeholder);
+      --ink-rule:         var(--text-caption);
     }
 
     :root[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(16,24,40,0.18); }
@@ -311,8 +545,10 @@
     :root[data-theme="light"] .btn-ghost:hover,
     :root[data-theme="light"] .btn-ghost.is-hover { background: rgba(16,24,40,0.09); border-color: rgba(16,24,40,0.18); }
     /* Tags */
-    :root[data-theme="light"] .tag-neutral { background: rgba(16,24,40,0.05); border-color: rgba(16,24,40,0.12); color: var(--d200); }
-    :root[data-theme="light"] .tag-ai { color: #1f5fd0; border-color: rgba(0,102,255,0.30); }
+    /* .tag-neutral and .tag-ai lost their light overrides. Both hardcoded a
+       fill, an ink and a BORDER-COLOR onto a border declared transparent,
+       so light mode was the one theme where a label grew an edge. The base
+       rules now resolve through --w07 and --cyan, which invert on their own. */
     /* Chips & filters */
     :root[data-theme="light"] .chip.default { background: rgba(16,24,40,0.04); border-color: rgba(16,24,40,0.12); color: var(--ink-muted); }
     :root[data-theme="light"] .chip.default:hover { background: rgba(16,24,40,0.07); color: var(--d100); }
@@ -328,17 +564,12 @@
     /* Callouts — pale text → darker semantic hue */
     /* Semantic text on pale tints — mid-tone hues fail contrast on white,
        so tags / badges / chips use the darker shade of each hue in light mode. */
-    :root[data-theme="light"] .tag-ok,
-    :root[data-theme="light"] .signal-badge.ok,
-    :root[data-theme="light"] .chip.ok   { color: var(--ok); }
-    :root[data-theme="light"] .tag-warn,
-    :root[data-theme="light"] .chip.warn  { color: var(--warn); }
-    :root[data-theme="light"] .tag-err,
-    :root[data-theme="light"] .signal-badge.err,
-    :root[data-theme="light"] .chip.err   { color: var(--err); }
-    :root[data-theme="light"] .tag-info   { color: var(--info); }
-    :root[data-theme="light"] .tag-teal   { color: #0a6d73; }
-    :root[data-theme="light"] .tag-accent,
+    /* The per-hue light restatements were removed: each said
+       `color: var(--ok)` where the base rule already said exactly that, and
+       the semantic tokens now carry their own light values (--ok #066640,
+       --err #a81029, --cyan #096673 ...), so the hue darkens for a white
+       ground without a single override. .tag-teal had pinned #0a6d73 by
+       hand, which is the one that would have drifted. */
     :root[data-theme="light"] .chip.active { color: var(--accent-label); }
     /* Faint labels & stat deltas */
     :root[data-theme="light"] .ds-nav-label { color: var(--ink-muted); }
@@ -442,18 +673,47 @@
       line-height: 16px;
       vertical-align: middle; white-space: nowrap;
     }
+    /* ── The tints come from the semantic -bg tokens now, not from an ad-hoc
+       colour-mix, so a tag and a callout carrying the same state are the same
+       fill. Geometry is unchanged: a label has a fill, a control has an edge,
+       so these stay borderless and sentence-case.
+
+       AI split away from INFO here. They were one colour because "AiMY said
+       this" and "here is something you should know" both read as blue; the
+       new palette gives provenance its own hue (cyan), which leaves --info
+       free to mean only informational. A tag that says the model produced
+       something no longer looks like a tag that says the disk is filling. */
     .tag-ok, .tag-warn, .tag-err, .tag-ai, .tag-accent,
-    .tag-neutral, .tag-info, .tag-teal {
-      background: rgba(255,255,255,0.07); color: var(--ink-muted);
+    .tag-neutral, .tag-info, .tag-teal, .tag-qa {
+      background: var(--w07); color: var(--ink-muted);
       border: 1px solid transparent;
     }
-    .tag-ok     { color: var(--ok);     background: color-mix(in srgb, var(--ok) 15%, transparent); }
-    .tag-err    { color: var(--err);    background: color-mix(in srgb, var(--err) 15%, transparent); }
-    .tag-warn   { color: var(--warn);   background: color-mix(in srgb, var(--warn) 15%, transparent); }
-    .tag-accent { color: var(--accent-label); background: color-mix(in srgb, var(--accent-label) 15%, transparent); }
-    .tag-teal   { color: var(--teal-label);   background: color-mix(in srgb, var(--teal-label) 15%, transparent); }
+    .tag-ok     { color: var(--ok);     background: var(--ok-bg); }
+    .tag-err    { color: var(--err);    background: var(--err-bg); }
+    .tag-warn   { color: var(--warn);   background: var(--warn-bg); }
+    .tag-info   { color: var(--info);   background: var(--info-bg); }
+    .tag-neutral{ background: var(--w05); }
     /* Provenance: this came from AiMY. */
-    .tag-ai, .tag-info { color: var(--info); background: color-mix(in srgb, var(--info) 15%, transparent); }
+    .tag-ai, .tag-teal { color: var(--cyan); background: var(--cyan-bg); }
+    /* The two accents keep their MUTED label variants: a label beside a
+       value, never the value itself. --tag-qa is the full-strength one. */
+    .tag-accent { color: var(--accent-label); background: color-mix(in srgb, var(--accent-label) 15%, transparent); }
+    .tag-qa     { color: var(--qa-accent);    background: var(--qa-accent-dim); }
+
+    /* ── Solid tags ────────────────────────────────────────────────
+       A tinted tag is the default and carries every state worth naming.
+       The solid one is louder on purpose and is for SHORT, high-priority
+       states only — Failed, At risk — where the tag is the thing you are
+       meant to find on the row. Its ink is --text-on-status, which flips
+       (near-black on dark, white on light) so the fill stays readable in
+       both themes rather than being pinned to one. */
+    .tag-solid            { color: var(--text-on-status); border-color: transparent; }
+    .tag-solid.tag-ok     { background: var(--ok); }
+    .tag-solid.tag-warn   { background: var(--warn); }
+    .tag-solid.tag-err    { background: var(--err); }
+    .tag-solid.tag-teal,
+    .tag-solid.tag-ai     { background: var(--cyan); }
+    .tag-solid.tag-info   { background: var(--info); }
 
     /* ── Signal / Live Badge ── */
     .signal-badge {
@@ -835,7 +1095,7 @@
     .progress-bar-fill.err  { background: var(--err); }
     .progress-bar-fill.brand{ background: var(--brand); }
     .progress-bar-fill.ai   {
-      background: linear-gradient(90deg, #0066ff, #6fdfe2);
+      background: linear-gradient(90deg, #0066ff, var(--cyan));
     }
 
     /* thick variant for KPI category breakdown */
